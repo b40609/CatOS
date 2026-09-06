@@ -8,9 +8,9 @@
 
 **Blocked by:** 06: 實質槓桿硬上限風控引擎, 07: 策略插件介面、熱加載沙盒與出廠雙試紙
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作 `BotState` 列舉與 `BotStateMachine` 類別，限制合法狀態跳轉路徑
-- [ ] 實作交易對排他鎖（Contract Exclusivity Lock），杜絕多機器人重複下單同一合約
-- [ ] 實作持倉對帳與 OKX App 手動平倉自動同步轉移至 `停機 · App 已平倉`，並鎖死開倉
-- [ ] 撰寫單元測試 `tests/test_state_machine.py`：驗證標準狀態轉換、排他性衝突報錯、OKX App 平倉同步防二次開倉
+- [x] 實作 `BotState` 列舉與 `BotStateMachine` 類別，限制合法狀態跳轉路徑
+- [x] 實作交易對排他鎖（Contract Exclusivity Lock），杜絕多機器人重複下單同一合約
+- [x] 實作持倉對帳與 OKX App 手動平倉自動同步轉移至 `停機 · App 已平倉`，並鎖死開倉
+- [x] 撰寫單元測試 `tests/test_state_machine.py`：驗證標準狀態轉換、排他性衝突報錯、OKX App 平倉同步防二次開倉
