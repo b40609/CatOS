@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 from datetime import datetime, timezone
+from decimal import Decimal
 import hashlib
 import hmac
 import json
@@ -19,6 +20,7 @@ import random
 from typing import Any
 
 import httpx
+from pydantic import BaseModel, Field
 
 from src.core.security import OKXCredentials
 
@@ -43,6 +45,23 @@ class OKXRateLimitError(OKXAPIError):
 
 class OKXNetworkError(OKXError):
     """OKX 網路連線異常。"""
+
+
+class OKXOrderSizeError(OKXError):
+    """下單張數換算異常（低於最小下單張數或計算非法）。"""
+
+
+class InstrumentSpec(BaseModel):
+    """OKX 合約產品規格模型。"""
+
+    inst_id: str = Field(..., description="合約代碼 (例如 BTC-USDT-SWAP)")
+    ct_val: float = Field(..., description="合約面值")
+    ct_val_ccy: str = Field(..., description="合約面值計價單位")
+    ct_type: str = Field(..., description="合約類型 (linear / inverse)")
+    min_sz: float = Field(..., description="最小下單張數")
+    lot_sz: float = Field(..., description="下單張數步進單位")
+    tick_sz: float = Field(..., description="價格最小跳動單位")
+    settle_ccy: str = Field(..., description="結算資產單位")
 
 
 def generate_okx_signature(
@@ -107,6 +126,7 @@ class OKXDemoClient:
         self._base_url = base_url.rstrip("/")
         self._max_retries = max_retries
         self._initial_retry_delay = initial_retry_delay
+        self._instruments_cache: dict[str, InstrumentSpec] = {}
 
         # 配置內部非同步客戶端
         self._client = httpx.AsyncClient(
@@ -246,3 +266,120 @@ class OKXDemoClient:
                 raise OKXNetworkError(
                     f"OKX 網路連線異常，重試 {self._max_retries} 次後失敗: {e}"
                 ) from e
+
+    async def get_instrument_spec(self, inst_id: str) -> InstrumentSpec:
+        """獲取合約產品規格（支援記憶體快取）。
+
+        :param inst_id: 合約代碼 (例如 BTC-USDT-SWAP)
+        :return: InstrumentSpec 實例
+        """
+        if inst_id in self._instruments_cache:
+            return self._instruments_cache[inst_id]
+
+        response = await self.request(
+            method="GET",
+            path="/api/v5/public/instruments",
+            is_auth=False,
+            params={"instType": "SWAP", "instId": inst_id},
+        )
+        data = response.get("data", [])
+        if not data:
+            raise OKXAPIError(code="404", msg=f"未找到該合約規格: {inst_id}")
+
+        row = data[0]
+        spec = InstrumentSpec(
+            inst_id=row["instId"],
+            ct_val=float(row["ctVal"]),
+            ct_val_ccy=row.get("ctValCcy", ""),
+            ct_type=row.get("ctType", "linear"),
+            min_sz=float(row.get("minSz", "1")),
+            lot_sz=float(row.get("lotSz", "1")),
+            tick_sz=float(row.get("tickSz", "0.1")),
+            settle_ccy=row.get("settleCcy", "USDT"),
+        )
+        self._instruments_cache[inst_id] = spec
+        return spec
+
+    async def get_mark_price(self, inst_id: str) -> float:
+        """查詢永續合約最新標記價。
+
+        :param inst_id: 合約代碼 (例如 BTC-USDT-SWAP)
+        :return: 當前標記價 (浮點數)
+        """
+        response = await self.request(
+            method="GET",
+            path="/api/v5/market/mark-price",
+            is_auth=False,
+            params={"instType": "SWAP", "instId": inst_id},
+        )
+        data = response.get("data", [])
+        if not data or "markPx" not in data[0]:
+            raise OKXAPIError(code="404", msg=f"無法獲取標記價: {inst_id}")
+        return float(data[0]["markPx"])
+
+    async def notional_to_contracts(
+        self,
+        inst_id: str,
+        notional_usdt: float,
+        mark_price: float | None = None,
+    ) -> float:
+        """依據【倉位名義價值 (Notional Value in USDT)】計算下單合約張數 (cont)。
+
+        【交易核心原則】：
+        交易者輸入金額一律為「倉位名義價值」，絕非保證金！
+        計算公式：下單張數 = 倉位名義價值 / (當前標記價 * 合約面值)
+        向下取整至合約步進單位 (lotSz)。若未達最小下單張數 (minSz)，強制拒單。
+
+        :param inst_id: 合約代碼
+        :param notional_usdt: 倉位名義價值（USDT）
+        :param mark_price: 標記價（若為 None 則自動非同步查詢）
+        :return: 合法之合約張數
+        """
+        if notional_usdt <= 0:
+            raise ValueError("倉位名義價值必須大於 0。")
+
+        if mark_price is None:
+            mark_price = await self.get_mark_price(inst_id)
+        if mark_price <= 0:
+            raise ValueError("標記價必須大於 0。")
+
+        spec = await self.get_instrument_spec(inst_id)
+        one_contract_notional = Decimal(str(mark_price)) * Decimal(str(spec.ct_val))
+        raw_sz = Decimal(str(notional_usdt)) / one_contract_notional
+
+        # 向下取整至 lot_sz 步進
+        lot_step = Decimal(str(spec.lot_sz))
+        stepped_sz = (raw_sz // lot_step) * lot_step
+        final_contracts = float(stepped_sz)
+
+        if final_contracts < spec.min_sz:
+            raise OKXOrderSizeError(
+                f"倉位名義價值 {notional_usdt} USDT 換算之合約張數 {final_contracts} "
+                f"未達最小下單張數 {spec.min_sz} 張 ({inst_id})。"
+            )
+
+        return final_contracts
+
+    async def contracts_to_notional(
+        self,
+        inst_id: str,
+        sz: float,
+        mark_price: float | None = None,
+    ) -> float:
+        """將合約張數反向換算為倉位名義價值 (Notional Value in USDT)。
+
+        :param inst_id: 合約代碼
+        :param sz: 合約張數
+        :param mark_price: 標記價（若為 None 則自動非同步查詢）
+        :return: 倉位名義價值（USDT）
+        """
+        if sz <= 0:
+            return 0.0
+
+        if mark_price is None:
+            mark_price = await self.get_mark_price(inst_id)
+
+        spec = await self.get_instrument_spec(inst_id)
+        notional = Decimal(str(sz)) * Decimal(str(spec.ct_val)) * Decimal(str(mark_price))
+        return float(round(notional, 4))
+

@@ -13,10 +13,10 @@
 
 **Blocked by:** 03: OKX 模擬盤非同步連線與 V5 簽名核心
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作合約產品規格查詢與本地快取（取得 `ctVal`, `minSz`, `lotSz`, `ctValCcy`）
-- [ ] 實作標記價即時查詢方法 `get_mark_price(inst_id)`
-- [ ] 實作名義價值轉合約張數算法 `notional_to_contracts(inst_id, notional_usdt, mark_price)`，嚴格以「倉位名義價值」換算，包含小於最小張數之拒單防呆
-- [ ] 實作合約張數轉名義價值算法 `contracts_to_notional(inst_id, sz, mark_price)`
-- [ ] 撰寫測試 `tests/test_okx_sizer.py`：測試 BTC-USDT-SWAP 等多幣種在各種價格與金額下的換算精度、邊界值防呆與取整邏輯（以倉位名義價值為基準）
+- [x] 實作合約產品規格查詢與本地快取（取得 `ctVal`, `minSz`, `lotSz`, `ctValCcy`）
+- [x] 實作標記價即時查詢方法 `get_mark_price(inst_id)`
+- [x] 實作名義價值轉合約張數算法 `notional_to_contracts(inst_id, notional_usdt, mark_price)`，嚴格以「倉位名義價值」換算，包含小於最小張數之拒單防呆
+- [x] 實作合約張數轉名義價值算法 `contracts_to_notional(inst_id, sz, mark_price)`
+- [x] 撰寫測試 `tests/test_okx_sizer.py`：測試 BTC-USDT-SWAP 等多幣種在各種價格與金額下的換算精度、邊界值防呆與取整邏輯（以倉位名義價值為基準）
