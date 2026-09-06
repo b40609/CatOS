@@ -10,10 +10,10 @@
 
 **Blocked by:** 06: 實質槓桿硬上限風控引擎
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作 `src/plugins/base.py`，定義 `StrategyBase`、`ParameterSchema` 與信號/委託介面
-- [ ] 實作 `src/plugins/loader.py`，支援動態掃描、熱加載與錯誤隔離沙盒
-- [ ] 實作試紙一：`SignalTestStrategy` (通道驗證試紙)
-- [ ] 實作試紙二：`SMACrossStrategy` (SMA 5/20 雙均線試紙)
-- [ ] 撰寫單元測試 `tests/test_plugins.py`：驗證插件熱加載、參數 Schema 結構、雙試紙信號運算與例外隔離
+- [x] 實作 `src/plugins/base.py`，定義 `StrategyBase`、`ParameterSchema` 與信號/委託介面
+- [x] 實作 `src/plugins/loader.py`，支援動態掃描、熱加載與錯誤隔離沙盒
+- [x] 實作試紙一：`SignalTestStrategy` (通道驗證試紙)
+- [x] 實作試紙二：`SMACrossStrategy` (SMA 5/20 雙均線試紙)
+- [x] 撰寫單元測試 `tests/test_plugins.py`：驗證插件熱加載、參數 Schema 結構、雙試紙信號運算與例外隔離
