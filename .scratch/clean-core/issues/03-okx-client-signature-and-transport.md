@@ -9,10 +9,10 @@
 
 **Blocked by:** 01: 環境與核心依賴配置, 02: 本地 AES-256-GCM 金鑰安全模組
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作 `OKXDemoClient`，封裝非同步 `httpx.AsyncClient` 與連線生命週期
-- [ ] 實作請求攔截器強制注入 `x-simulated-trading: 1` 標頭
-- [ ] 實作 OKX V5 簽名計算器（`timestamp + method + path + body` 之 HMAC-SHA256 Base64 編碼）
-- [ ] 實作指數退避重試機制（處理 429 與暫態連線錯誤）
-- [ ] 撰寫測試 `tests/test_okx_client_auth.py`，驗證官方簽名向量數據契約、標頭強制注入防呆與重試行為
+- [x] 實作 `OKXDemoClient`，封裝非同步 `httpx.AsyncClient` 與連線生命週期
+- [x] 實作請求攔截器強制注入 `x-simulated-trading: 1` 標頭
+- [x] 實作 OKX V5 簽名計算器（`timestamp + method + path + body` 之 HMAC-SHA256 Base64 編碼）
+- [x] 實作指數退避重試機制（處理 429 與暫態連線錯誤）
+- [x] 撰寫測試 `tests/test_okx_client_auth.py`，驗證官方簽名向量數據契約、標頭強制注入防呆與重試行為
