@@ -15,10 +15,10 @@
 
 **Blocked by:** 04: 合約規格查詢與張數雙向精確換算
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作永續合約市價委託下單方法 `place_market_order`
-- [ ] 實作交易所標記價條件停損單方法 `place_mark_stop_loss`，並支援停損參數留白不掛單防呆
-- [ ] 實作持倉查詢方法 `get_positions` 與標記價對齊
-- [ ] 實作交易對撤銷所有條件單與市價全平方法 `close_position_market`
-- [ ] 撰寫測試 `tests/test_okx_orders.py`：使用 Mock HTTP Transport 驗證完整開倉 ➔ 掛標記價停損 ➔ 查持倉 ➔ 市價全平之 Payload 結構與呼叫順序
+- [x] 實作永續合約市價委託下單方法 `place_market_order`
+- [x] 實作交易所標記價條件停損單方法 `place_mark_stop_loss`，並支援停損參數留白不掛單防呆
+- [x] 實作持倉查詢方法 `get_positions` 與標記價對齊
+- [x] 實作交易對撤銷所有條件單與市價全平方法 `close_position_market`
+- [x] 撰寫測試 `tests/test_okx_orders.py`：使用 Mock HTTP Transport 驗證完整開倉 ➔ 掛標記價停損 ➔ 查持倉 ➔ 市價全平之 Payload 結構與呼叫順序

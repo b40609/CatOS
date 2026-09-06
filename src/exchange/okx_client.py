@@ -64,6 +64,20 @@ class InstrumentSpec(BaseModel):
     settle_ccy: str = Field(..., description="結算資產單位")
 
 
+class Position(BaseModel):
+    """OKX 永續合約持倉部位模型。"""
+
+    inst_id: str = Field(..., description="合約代碼 (例如 BTC-USDT-SWAP)")
+    pos_side: str = Field(..., description="持倉方向 (net / long / short)")
+    pos: float = Field(..., description="持倉張數")
+    avg_px: float = Field(..., description="開倉均價")
+    mark_px: float = Field(..., description="當前標記價")
+    upl: float = Field(..., description="未實現盈虧 (USDT)")
+    upl_ratio: float = Field(..., description="未實現盈虧率")
+    lever: float = Field(..., description="逐倉槓桿倍數")
+    mgn_ratio: float = Field(..., description="保證金率")
+
+
 def generate_okx_signature(
     timestamp: str,
     method: str,
@@ -382,4 +396,185 @@ class OKXDemoClient:
         spec = await self.get_instrument_spec(inst_id)
         notional = Decimal(str(sz)) * Decimal(str(spec.ct_val)) * Decimal(str(mark_price))
         return float(round(notional, 4))
+
+    async def place_market_order(
+        self,
+        inst_id: str,
+        side: str,
+        sz: float,
+        td_mode: str = "isolated",
+        pos_side: str = "net",
+        client_order_id: str | None = None,
+    ) -> dict[str, Any]:
+        """送出永續合約市價委託單（開多、開空、平多、平空）。
+
+        :param inst_id: 合約代碼 (例如 BTC-USDT-SWAP)
+        :param side: 委託方向 ("buy" 或 "sell")
+        :param sz: 合約張數 (cont)
+        :param td_mode: 保證金模式，預設 "isolated"（逐倉）
+        :param pos_side: 持倉方向，預設 "net"（單向持倉）
+        :param client_order_id: 客戶端自訂訂單 ID
+        :return: OKX 回傳之訂單資料字典 (含 ordId, sCode 等)
+        """
+        sz_str = str(int(sz)) if sz == int(sz) else str(sz)
+        payload: dict[str, Any] = {
+            "instId": inst_id,
+            "tdMode": td_mode,
+            "side": side.lower(),
+            "posSide": pos_side.lower(),
+            "ordType": "market",
+            "sz": sz_str,
+        }
+        if client_order_id:
+            payload["clOrdId"] = client_order_id
+
+        res = await self.request(
+            method="POST",
+            path="/api/v5/trade/order",
+            is_auth=True,
+            json_data=payload,
+        )
+        return res.get("data", [{}])[0]
+
+    async def place_mark_stop_loss(
+        self,
+        inst_id: str,
+        side: str,
+        sz: float,
+        trigger_price: float | None,
+        td_mode: str = "isolated",
+        pos_side: str = "net",
+    ) -> dict[str, Any] | None:
+        """原子化掛出 OKX 交易所端標記價條件停損單 (Mark Price Stop Loss)。
+
+        【產品核心紅線】：
+        1. 停損單必須掛在交易所端（OKX 標記價觸發市價平倉，slTriggerPxType: "mark"）。
+        2. 停損參數留白（None 或 <= 0）代表交易者不設停損，明確略過不掛單。
+
+        :param inst_id: 合約代碼
+        :param side: 平倉方向（多頭部位停損為 "sell"，空頭部位停損為 "buy"）
+        :param sz: 停損平倉張數 (cont)
+        :param trigger_price: 標記價停損觸發價（若為 None 則不掛單）
+        :param td_mode: 保證金模式，預設 "isolated"
+        :param pos_side: 持倉方向，預設 "net"
+        :return: 條件單資料字典 (含 algoId)，留白時回傳 None
+        """
+        if trigger_price is None or trigger_price <= 0:
+            return None
+
+        sz_str = str(int(sz)) if sz == int(sz) else str(sz)
+        payload: dict[str, Any] = {
+            "instId": inst_id,
+            "tdMode": td_mode,
+            "side": side.lower(),
+            "posSide": pos_side.lower(),
+            "ordType": "conditional",
+            "sz": sz_str,
+            "slTriggerPx": str(trigger_price),
+            "slTriggerPxType": "mark",
+            "slOrdPx": "-1",  # 市價委託平倉
+        }
+
+        res = await self.request(
+            method="POST",
+            path="/api/v5/trade/order-algo",
+            is_auth=True,
+            json_data=payload,
+        )
+        return res.get("data", [{}])[0]
+
+    async def get_positions(self, inst_id: str | None = None) -> list[Position]:
+        """查詢逐倉持倉部位。
+
+        :param inst_id: 合約代碼（可選，若未指定則查詢全帳戶 SWAP 持倉）
+        :return: Position 部位物件清單
+        """
+        params = {"instType": "SWAP"}
+        if inst_id:
+            params["instId"] = inst_id
+
+        res = await self.request(
+            method="GET",
+            path="/api/v5/account/positions",
+            is_auth=True,
+            params=params,
+        )
+
+        positions: list[Position] = []
+        for row in res.get("data", []):
+            positions.append(
+                Position(
+                    inst_id=row["instId"],
+                    pos_side=row.get("posSide", "net"),
+                    pos=float(row.get("pos", "0")),
+                    avg_px=float(row.get("avgPx", "0")),
+                    mark_px=float(row.get("markPx", "0")),
+                    upl=float(row.get("upl", "0")),
+                    upl_ratio=float(row.get("uplRatio", "0")),
+                    lever=float(row.get("lever", "1")),
+                    mgn_ratio=float(row.get("mgnRatio", "0")),
+                )
+            )
+        return positions
+
+    async def cancel_algo_orders(
+        self,
+        inst_id: str,
+        algo_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """撤銷指定交易對的條件委託單。
+
+        :param inst_id: 合約代碼
+        :param algo_ids: 指定撤銷的 algoId 清單；若為 None 則自動查詢並撤銷所有未完成條件單
+        :return: 撤單回應清單
+        """
+        if algo_ids is None:
+            pending_res = await self.request(
+                method="GET",
+                path="/api/v5/trade/orders-algo-pending",
+                is_auth=True,
+                params={"instType": "SWAP", "instId": inst_id},
+            )
+            algo_ids = [
+                row["algoId"]
+                for row in pending_res.get("data", [])
+                if "algoId" in row
+            ]
+
+        if not algo_ids:
+            return []
+
+        payload = [{"algoId": aid, "instId": inst_id} for aid in algo_ids]
+        res = await self.request(
+            method="POST",
+            path="/api/v5/trade/cancel-algos",
+            is_auth=True,
+            json_data=payload,
+        )
+        return res.get("data", [])
+
+    async def close_position_market(
+        self,
+        inst_id: str,
+        mgn_mode: str = "isolated",
+    ) -> dict[str, Any]:
+        """市價全平特定交易對之所有持倉，並自動撤銷所有殘留條件單。
+
+        :param inst_id: 合約代碼
+        :param mgn_mode: 保證金模式，預設 "isolated"
+        :return: OKX 全平回應資料字典
+        """
+        # 第一步：撤銷所有未觸發條件單，避免殘留掛單在平倉後被意外觸發
+        await self.cancel_algo_orders(inst_id)
+
+        # 第二步：原子化送出 OKX 市價全平部位請求
+        payload = {"instId": inst_id, "mgnMode": mgn_mode}
+        res = await self.request(
+            method="POST",
+            path="/api/v5/trade/close-position",
+            is_auth=True,
+            json_data=payload,
+        )
+        return res.get("data", [{}])[0]
+
 
