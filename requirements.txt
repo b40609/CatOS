@@ -1,0 +1,17 @@
+# catOS V1 後端核心依賴 (Python 3.12)
+# 嚴禁引入任何 Node.js 依賴或外部未授權套件
+
+# Web 服務與非同步框架
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+
+# 資料驗證與配置
+pydantic>=2.8.0
+
+# 安全加密 (AES-256-GCM / PBKDF2)
+cryptography>=43.0.0
+
+# 測試框架與非同步測試
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
