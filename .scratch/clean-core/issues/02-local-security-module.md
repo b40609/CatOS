@@ -5,10 +5,10 @@
 
 **Blocked by:** 01: 環境與核心依賴配置
 
-**Status:** ready-for-agent
+**Status:** completed
 
-- [ ] 實作 `SecurityManager` 類別，支援 AES-256-GCM 加解密與 PBKDF2 密鑰衍生
-- [ ] 實作憑證模型 `OKXCredentials`，具備敏感欄位遮罩（repr 脫敏）
-- [ ] 實作本機加密憑證持久化（以安全 JSON 格式或 SQLite 儲存密文）
-- [ ] 撰寫單元測試 `tests/test_security.py`：驗證加解密往返一致性、防竄改拋錯、空密碼與格式異常保護
-- [ ] 測試通過且無任何敏感資訊洩漏至日誌
+- [x] 實作 `SecurityManager` 類別，支援 AES-256-GCM 加解密與 PBKDF2 密鑰衍生
+- [x] 實作憑證模型 `OKXCredentials`，具備敏感欄位遮罩（repr 脫敏）
+- [x] 實作本機加密憑證持久化（以安全 JSON 格式或 SQLite 儲存密文）
+- [x] 撰寫單元測試 `tests/test_security.py`：驗證加解密往返一致性、防竄改拋錯、空密碼與格式異常保護
+- [x] 測試通過且無任何敏感資訊洩漏至日誌
