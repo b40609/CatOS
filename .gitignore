@@ -1,0 +1,48 @@
+# Python caches, virtual environments, and build outputs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local secrets and credentials (never commit real values)
+.env
+.env.*
+!.env.example
+credentials/
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local market data, databases (including WAL/SHM), logs
+/data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+/logs/
+
+# Generated reports; retain the existing visual verification script
+/reports/*
+!/reports/visual-qa/
+/reports/visual-qa/*
+!/reports/visual-qa/check.cjs
+
+# Local editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

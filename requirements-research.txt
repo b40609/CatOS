@@ -1,0 +1,2 @@
+# Optional optimization dependency; core backtest remains standard-library only.
+optuna==4.9.0
