@@ -108,6 +108,8 @@ py -3 -B -m unittest discover -s tests -p test_optimization.py -v
 
 研究版驗收後，新增獨立的 [D：Worker／JSON IPC](docs/worker.md) 切片，提供受信 SMA 策略的普通子程序執行、有界通訊與明確 JSON 狀態還原；既有研究入口與交易邏輯維持原樣。預設 D 模式是純記憶體的程序故障隔離，沒有交易或 OS 安全沙箱保證。後續順序見[本機模擬規劃](docs/local-simulation-plan.md)。
 
-[E：本機 Supervisor／SQLite](docs/supervisor.md) 另提供單一 Windows 模擬帳戶的路徑綁定與帳戶鎖、合約所有權、原子 journal、重播去重，以及 COMMIT 後才 ACK 的 Worker 模式。預設拒絕交易意圖；明示 fixture 的 outbox 也固定不可派送。F／G 的完整風控與交易所恢復流程仍未接入。
+[E：本機 Supervisor／SQLite](docs/supervisor.md) 另提供單一 Windows 模擬帳戶的路徑綁定與帳戶鎖、合約所有權、原子 journal、重播去重，以及 COMMIT 後才 ACK 的 Worker 模式。保留的 E fixture 介面預設拒絕交易意圖，outbox 固定不可派送。
+
+[F：合成帳戶風控](docs/risk.md) 已接入 Decimal 曝險、含在途／UNKNOWN 的數量保留、固定日初權益的台北日損、Soft／Hard／Kill 鎖存與合法 reduceOnly 減倉裁決。以 `risk_limits` 明示啟用，獨立合成快照不等待 Worker。G 的假交易所、派送與恢復閉環尚未實作；真實估值、保證金及待決金融政策不在本片驗證範圍。
 
 專屬測試採合成資料驗證預熱、可見時間、tick／lot 與合約單位、雙向淨倉、費用／資金費、帳務守恆、期末狀態及 Decimal context 隔離。沒有執行全市場歷史回測或存取真實憑證。

@@ -1,17 +1,17 @@
 """Single-thread SQLite journal for local simulation; no order dispatcher."""
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, localcontext
 import hashlib
 import json
 from pathlib import Path
 import sqlite3
 
-from catos import ipc, research
+from catos import ipc, research, risk
 from catos.account_lock import ENVIRONMENT
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 HALT_REASONS = frozenset(("manual_kill", "soft_loss", "hard_loss"))
 
 
@@ -120,11 +120,21 @@ _SCHEMA = (
        state TEXT NOT NULL CHECK(state='HELD_SIMULATION'), epoch INTEGER NOT NULL)""",
 )
 
+_RISK_SCHEMA = (
+    "CREATE TABLE risk_control (id INTEGER PRIMARY KEY CHECK(id=1), limits_json TEXT NOT NULL, state_json TEXT NOT NULL)",
+    """CREATE TABLE risk_orders (intent_key TEXT PRIMARY KEY REFERENCES intents(intent_key),
+       quantity TEXT NOT NULL CHECK(typeof(quantity)='text'), reduce_only INTEGER NOT NULL,
+       eligible INTEGER NOT NULL CHECK(eligible IN (0,1)))""",
+)
+
 
 class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
-    def __init__(self, path, account_id, fixture_budget):
+    def __init__(self, path, account_id, fixture_budget, risk_limits=None):
         self.account_id = ipc.token(account_id, "account_id")
+        if risk_limits is not None and not isinstance(risk_limits, risk.Limits):
+            raise ipc.ProtocolError("risk_limits must be Supervisor Limits")
+        self.risk_limits = risk_limits
         self.budget = money(fixture_budget, "fixture budget", derived=False)
         if self.budget <= 0:
             raise ipc.ProtocolError("fixture budget must be positive")
@@ -137,7 +147,7 @@ class Journal:
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version != SCHEMA_VERSION:
+            elif version not in (1, SCHEMA_VERSION):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -156,7 +166,24 @@ class Journal:
                     self.connection.execute("INSERT INTO metadata VALUES (?,?,?)",
                                             (account_id, ENVIRONMENT, str(self.budget)))
                     self.connection.execute("INSERT INTO control VALUES (1,0,'[]','RECONCILING')")
+                if version < 2:
+                    for statement in _RISK_SCHEMA:
+                        self.connection.execute(statement)
                     self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                saved_risk = self.connection.execute("SELECT * FROM risk_control WHERE id=1").fetchone()
+                if saved_risk is not None:
+                    if risk_limits is None or saved_risk["limits_json"] != canonical(risk_limits.to_wire()):
+                        raise JournalError("risk mode/limits cannot be replaced in place")
+                    restored = risk.State.from_wire(ipc.decode_payload(saved_risk["state_json"].encode()))
+                    self._write_risk(replace(restored, health="RECONCILING", snapshot=None,
+                                                 epoch=restored.epoch + 1))
+                elif risk_limits is not None:
+                    if self.connection.execute("SELECT 1 FROM reservations UNION ALL SELECT 1 FROM outbox LIMIT 1").fetchone():
+                        raise JournalError("fixture obligations must be resolved before enabling risk")
+                    reasons = json.loads(self.connection.execute("SELECT halt_reasons FROM control").fetchone()[0])
+                    state = risk.halt(risk.State(), reasons)
+                    self.connection.execute("INSERT INTO risk_control VALUES (1,?,?)",
+                                            (canonical(risk_limits.to_wire()), canonical(state.to_wire())))
                 # A new process cannot reuse a previous process's reconciliation gate.
                 self.connection.execute("UPDATE control SET health='RECONCILING' WHERE id=1")
                 self.connection.execute("UPDATE ownership SET reconciled_revision=NULL")
@@ -226,6 +253,67 @@ class Journal:
             return sum((ipc.decimal_text(row[0], "reservation", derived=True)
                         for row in self.connection.execute("SELECT amount FROM reservations")), Decimal("0"))
 
+    def risk_state(self):
+        row = self.connection.execute("SELECT state_json FROM risk_control WHERE id=1").fetchone()
+        return None if row is None else risk.State.from_wire(ipc.decode_payload(row[0].encode()))
+
+    def _write_risk(self, state):
+        self.connection.execute("UPDATE risk_control SET state_json=? WHERE id=1", (canonical(state.to_wire()),))
+        self.connection.execute("UPDATE control SET epoch=?,halt_reasons=? WHERE id=1",
+                                (state.epoch, json.dumps(sorted(state.reasons))))
+        if state.mode != "RUN" or state.health != "HEALTHY":
+            # HELD_SIMULATION has never been sent. Keep its reservation until G
+            # supplies a terminal lifecycle; it cannot become eligible again.
+            self.connection.execute("UPDATE risk_orders SET eligible=0 WHERE reduce_only=0")
+
+    def save_risk(self, state):
+        if self.risk_limits is None:
+            raise JournalError("risk mode is not enabled")
+        with self._transaction():
+            previous = self.risk_state()
+            if state.seq < previous.seq or state.epoch < previous.epoch or not previous.reasons <= state.reasons:
+                raise JournalError("risk state cannot move backwards")
+            self._write_risk(state)
+
+    def flatten_progress(self, bot_id, phase, now_ms):
+        if self.risk_limits is None:
+            raise JournalError("risk mode is not enabled")
+        ipc.integer(now_ms, "flatten time")
+        with self._transaction():
+            state = self.risk_state()
+            complete = False
+            if phase == "DONE":
+                bot, owner = self._require_owner(bot_id)
+                s = state.snapshot
+                complete = (s is not None and state.time_ms <= now_ms < s.valid_until_ms
+                            and s.position_verified and s.position == 0 and s.other_notional == 0
+                            and s.pending_buy == 0 and s.pending_sell == 0 and not s.reduction_conflict
+                            and owner["position"] is not None and Decimal(owner["position"]) == 0
+                            and owner["ordinary_open"] == 0 and owner["conditional_open"] == 0
+                            and owner["unknown_count"] == 0 and owner["fills_reconciled"]
+                            and owner["reconciled_revision"] == bot["revision"]
+                            and not self.connection.execute("SELECT 1 FROM reservations UNION ALL SELECT 1 FROM outbox LIMIT 1").fetchone()
+                            and not self.connection.execute("SELECT 1 FROM inputs WHERE state='PENDING'").fetchone())
+            updated = risk.progress(state, phase, complete=bool(complete))
+            self._write_risk(updated)
+        return updated
+
+    def _risk_verdict(self, bot, owner, result, account, now_ms):
+        state = self.risk_state()
+        buys, sells, reducing = Decimal("0"), Decimal("0"), False
+        with localcontext(research._CONTEXT):
+            for row in self.connection.execute("SELECT quantity,reduce_only FROM risk_orders"):
+                qty = ipc.decimal_text(row["quantity"], "held quantity", derived=True)
+                buys += max(qty, Decimal("0"))
+                sells += max(-qty, Decimal("0"))
+                reducing |= bool(row["reduce_only"])
+        known = (owner["position"] is not None and owner["reconciled_revision"] is not None
+                 and owner["fills_reconciled"] and owner["unknown_count"] == 0
+                 and Decimal(owner["position"]) == account.position)
+        return risk.evaluate(state, self.risk_limits, self._checkpoint(bot).config.contract,
+                             result.target_position, account.position, now_ms,
+                             held_buy=buys, held_sell=sells, held_reduction=reducing, reconciled=bool(known))
+
     def snapshot(self, bot_id):
         bot = self._bot(bot_id)
         control = self.connection.execute("SELECT * FROM control WHERE id=1").fetchone()
@@ -233,12 +321,17 @@ class Journal:
         return dict(checkpoint=self._checkpoint(bot), revision=bot["revision"], isolated=bool(bot["isolated"]),
                     health=control["health"], epoch=control["epoch"], halt_reasons=tuple(json.loads(control["halt_reasons"])),
                     owner=None if owner is None else dict(owner), total_reserved=self.total_reserved(),
-                    pending=self.connection.execute("SELECT seq FROM inputs WHERE bot_id=? AND state='PENDING'", (bot_id,)).fetchone() is not None)
+                    pending=self.connection.execute("SELECT seq FROM inputs WHERE bot_id=? AND state='PENDING'", (bot_id,)).fetchone() is not None,
+                    risk_state=self.risk_state())
 
     def record_halts(self, reasons):
         if not set(reasons) <= HALT_REASONS:
             raise JournalError("unknown halt reason")
         with self._transaction():
+            if self.risk_limits is not None:
+                state = risk.halt(self.risk_state(), reasons)
+                self._write_risk(state)
+                return state.epoch
             row = self.connection.execute("SELECT epoch,halt_reasons FROM control WHERE id=1").fetchone()
             previous = set(json.loads(row["halt_reasons"]))
             merged = previous | set(reasons)
@@ -316,6 +409,8 @@ class Journal:
 
     def commit_result(self, bot_id, result, fixture, now_ms):
         fixture.validate()
+        if self.risk_limits is not None and fixture != FixtureDecision():
+            raise JournalError("fixture verdict cannot bypass installed risk engine")
         ipc.integer(result.event_seq, "result sequence", 1)
         ipc.integer(now_ms, "simulation now_ms")
         bot, owner = self._require_owner(bot_id)
@@ -344,11 +439,16 @@ class Journal:
             amount = Decimal("0")
             key = None
             status, reason = "NO_INTENT", "no_target"
+            verdict = None
             if result.target_position is not None:
                 key = json.dumps([ENVIRONMENT, self.account_id, bot_id, ipc.STRATEGY_ID,
                                   ipc.STRATEGY_VERSION, result.event_seq, 0], separators=(",", ":"))
                 if now_ms >= stored["expires_at_ms"]:
                     status, reason = "EXPIRED", "deadline_elapsed"
+                elif self.risk_limits is not None:
+                    verdict = self._risk_verdict(bot, owner, result, account, now_ms)
+                    status = "RESERVED_SIMULATION" if verdict.accepted else "NO_CHANGE" if verdict.reason == "target_equals_position" else "REJECTED"
+                    reason, amount = verdict.reason, verdict.reservation
                 elif json.loads(control["halt_reasons"]) or control["health"] != "LOCAL_READY":
                     status, reason = "REJECTED", "control_gate_closed"
                 elif result.target_position == account.position:
@@ -366,6 +466,9 @@ class Journal:
                 if status == "RESERVED_SIMULATION":
                     self.connection.execute("INSERT INTO reservations VALUES (?,?)", (key, str(amount)))
                     self.connection.execute("INSERT INTO outbox VALUES (?,'HELD_SIMULATION',?)", (key, control["epoch"]))
+                    if verdict is not None:
+                        self.connection.execute("INSERT INTO risk_orders VALUES (?,?,?,1)",
+                                                (key, str(verdict.quantity), int(verdict.reduce_only)))
             receipt_json = canonical(dict(checkpoint=result.checkpoint.to_wire(), target=result_payload["target"],
                 disposition=status, reason=reason, reservation=str(amount), intent_key=key, epoch=control["epoch"]))
             self.connection.execute("UPDATE bots SET checkpoint_json=?,consumed_seq=?,revision=revision+1 WHERE bot_id=?",

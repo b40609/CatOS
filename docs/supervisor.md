@@ -54,7 +54,7 @@ async def main():
 asyncio.run(main())
 ```
 
-新帳戶預期為 `NO_INTENT`、`NO_INTENT`、`REJECTED`。F 尚未接入，預設以 `risk_engine_not_installed` 拒絕有交易差額的目標。`CommitReceipt` 只表示資料已提交，不是交易所 ACK 或成交證明。重跑相同事件可回傳既有紀錄，`replayed=True`。
+以上 E 相容介面的新帳戶預期為 `NO_INTENT`、`NO_INTENT`、`REJECTED`；未傳入 `risk_limits` 時，以 `risk_engine_not_installed` 拒絕有交易差額的目標。[F 風控](risk.md) 已另提供明示啟用的合成風控介面。`CommitReceipt` 只表示資料已提交，不是交易所 ACK 或成交證明。重跑相同事件可回傳既有紀錄，`replayed=True`。
 
 `account_id` 是明示且穩定的本機假帳戶識別；目前只接受 `environment="local-sim"`，拒絕 Demo／Live。再次啟動須使用同一帳戶、DB、Bot 設定與 fixture budget，並先提供合成對帳證據。沒有憑證讀取器、連網 client、背景服務或交易出口。
 
@@ -134,4 +134,4 @@ py -3 -B -m unittest discover -s tests -p test_worker.py -v
 
 合成場景包含 WAL／FULL／TEXT、重播去重與異內容隔離、原子額度、預熱／拒絕／過期、所有權釋放條件、錯 DB 與缺檔拒絕、雙程序競爭、程序死亡解鎖、COMMIT 前後 `os._exit`、COMMIT 錯誤、ACK 遺失、取消／關閉等待及 Kill 不被舊提交解除。故障子程序僅存在於 `tests/fixtures/journal_process.py`。
 
-這些是程序中斷及受控 I/O 故障驗證，不代表真實斷電、硬體 fsync 耐久性、遠端 exactly-once、完整帳戶風控或 OKX 對帳已驗證。F／G、UI、Demo／Live 與真實憑證均未接入。
+這些是程序中斷及受控 I/O 故障驗證，不代表真實斷電、硬體 fsync 耐久性、遠端 exactly-once、完整帳戶風控或 OKX 對帳已驗證。F 已接入合成風控與 schema 2，介面與升級限制見 [F 文件](risk.md)；G、UI、Demo／Live 與真實憑證均未接入。

@@ -1,21 +1,25 @@
 # catOS 階段與分工規劃
 
-## 目前階段：E 已交付，下一片為 F
+## 目前階段：F 已交付，下一片為 G
 
 2026-09-11 使用者確認研究版驗收完成，隨後同意依規劃開始實作「本機模擬交易底座」；切片順序為 D：Worker／JSON 契約 → E：SQLite／單 Supervisor／所有權 → F：已確認風控 → G：假交易所／UNKNOWN／重啟對帳。
 
-詳見 [階段規劃](docs/local-simulation-plan.md)、[D 使用契約](docs/worker.md)與 [E 使用契約](docs/supervisor.md)。D／E 已完成，F／G 尚未實作，未接入 Demo／Live；下方研究版分工與配額數字保留為歷史紀錄。
+詳見 [階段規劃](docs/local-simulation-plan.md)、[D 使用契約](docs/worker.md)、[E 使用契約](docs/supervisor.md)與 [F 風控契約](docs/risk.md)。D／E／F 已完成，G 尚未實作，未接入 Demo／Live；下方研究版分工與配額數字保留為歷史紀錄。
 
 | 工作 | 狀態／出口 |
 |---|---|
 | D：獨立 Worker／JSON IPC | 已完成；IPC 11 個、Worker 13 個專屬測試通過。包含真實子程序故障、非同步控制、假憑證不繼承、SMA 狀態還原與父程序不載入策略 |
 | E：SQLite／單 Supervisor／所有權 | 已完成；Journal 14、Supervisor 14、受影響 Worker 15，共 43 個模組測試通過；固定 Windows 單使用者 local-sim 範圍 |
-| F：已確認風控 | 排程下一片；未定案政策維持原狀 |
+| F：已確認風控 | 已完成；risk 14、risk journal 8、risk Supervisor 5，另跑受影響 Journal／Supervisor 28，共 55 個測試通過；未定案政策維持原狀 |
 | G：假交易所／UNKNOWN／對帳 | 待 F 驗收；只用本機假資料 |
 
-E 基線為使用者指定的 `3879c55`，已核對 HEAD 與乾淨工作目錄。使用者回報基線全域 93／93 測試通過，本輪未重跑全域套件。E 沒有修改研究核心、SMA 交易邏輯、既有 CLI／Optuna／下載工具，也未執行行情下載、Git 提交或推送。
+F 基線為使用者指定的 `c928195`，已核對 HEAD 與乾淨工作目錄；使用者回報基線測試全過。本輪只跑 F 及受影響模組，共 55 個測試通過，未重跑全域套件。完成 Decimal 最壞曝險、原子數量保留、固定日初分母、台北切日、獨立風險事件、鎖存／epoch、合法減倉與 schema 1→2 升級。未修改研究／Worker 策略邏輯、CLI／Optuna／下載工具，未執行行情下載或 Git 提交／推送。
 
-E 已驗證 COMMIT 前後程序中斷、ACK 遺失重播、取消／關閉仍等待 writer、在途 80／100 額度阻擋第二筆、Kill 持續鎖存、跨 DB 路徑鎖競爭及 Worker 死亡保留所有權。outbox 只有不可派送的 `HELD_SIMULATION`；fixture budget 不是帳戶實際風控，F／G 仍待交付。
+2026-09-11 F 交付查得：Codex 週配額剩餘 17%，5 小時配額剩餘 12%（帳戶共用快照）。相較 E 紀錄，週配額差額為 6 個百分點，不能歸為 F 的精確成本。本輪依使用者啟動 F 的授權完成並交付，不續開 G；後續分工依下方既有配額流程評估。
+
+E 基線為使用者指定的 `3879c55`，當時已核對 HEAD 與乾淨工作目錄。使用者回報基線全域 93／93 測試通過，E 未重跑全域套件。E 沒有修改研究核心、SMA 交易邏輯、既有 CLI／Optuna／下載工具，也未執行行情下載、Git 提交或推送。
+
+E 已驗證 COMMIT 前後程序中斷、ACK 遺失重播、取消／關閉仍等待 writer、在途 80／100 額度阻擋第二筆、Kill 持續鎖存、跨 DB 路徑鎖競爭及 Worker 死亡保留所有權。F 延續不可派送的 `HELD_SIMULATION`，另以合成風控取代明示啟用帳戶的 fixture 裁決；G 的委託終結與對帳閉環仍待交付。
 
 2026-09-11 E 交付查得：Codex 週配額剩餘 23%，5 小時配額剩餘 56%（帳戶共用快照）。與 D 紀錄相比週配額差額為 8 個百分點，不能歸為 E 的精確成本。依單片完成即交付原則，本輪不續開 F。
 
