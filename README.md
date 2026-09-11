@@ -6,6 +6,15 @@ CSV 格式見 [資料匯入](docs/data-io.md)，報告介面與視覺驗收見 [
 
 ## 執行
 
+命令列入口（固定 SMA 示範策略，詳見 [CLI 設定契約](docs/research-cli.md)）：
+
+```powershell
+py -3 -B -m examples.report_demo
+py -3 -B -m catos.research_cli --csv reports/visual-qa/synthetic.csv --config examples/research-config.json --strategy sma-trend --output reports/research.html
+```
+
+輸出已存在時拒絕覆蓋，請指定新路徑。範例 JSON 的空資金費陣列代表無資金費假設，與 `report_demo` 的非空資金費設定不同，兩份報告不可直接視為相同設定的績效。
+
 在專案根目錄執行合成資料示範：
 
 ```powershell

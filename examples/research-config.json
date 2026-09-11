@@ -1,0 +1,15 @@
+{
+  "contract": {
+    "inst_id": "SYNTHETIC-USDT-SWAP",
+    "base_per_contract": "0.01",
+    "tick_size": "0.01",
+    "lot_size": "1",
+    "min_size": "1"
+  },
+  "timeframe_ms": 900000,
+  "initial_balance": "1000",
+  "fee_rate": "0.0005",
+  "slippage_bps": "2",
+  "funding_events": [],
+  "warmup_bars": 2
+}
