@@ -24,7 +24,7 @@ def worker_environment():
 
 
 class WorkerHost:
-    def __init__(self, bot_id, config, *, checkpoint=None, timeout=5):
+    def __init__(self, bot_id, config, *, checkpoint=None, timeout=5, require_commit_ack=False):
         self.bot_id = ipc.token(bot_id, "bot_id")  # Bound to this pipe, never sent by the child.
         self.config = ipc.WorkerConfig.from_wire(config.to_wire())
         self.checkpoint = ipc.Checkpoint.from_wire(
@@ -32,6 +32,10 @@ class WorkerHost:
         if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("timeout must be in (0, 60] seconds")
         self.timeout = timeout  # Scheduling duration only; never a financial Float.
+        if type(require_commit_ack) is not bool:
+            raise ValueError("require_commit_ack must be bool")
+        self.require_commit_ack = require_commit_ack
+        self._unacknowledged = None
         self.generation = uuid.uuid4().hex
         self.process = None
         self.failure = None
@@ -113,9 +117,11 @@ class WorkerHost:
         try:
             self.process = await self._spawn()
             self._tasks = [asyncio.create_task(self._stdout()), asyncio.create_task(self._stderr())]
+            initial = dict(config=self.config.to_wire(), checkpoint=self.checkpoint.to_wire())
+            if self.require_commit_ack:
+                initial["commit_ack"] = True
             payload = await self._exchange(ipc.envelope("init", self.generation,
-                self.checkpoint.event_seq, dict(config=self.config.to_wire(),
-                checkpoint=self.checkpoint.to_wire())), "initialized")
+                self.checkpoint.event_seq, initial), "initialized")
             ipc.exact(payload, ("checkpoint",))
             if ipc.Checkpoint.from_wire(payload["checkpoint"], self.config) != self.checkpoint:
                 raise ipc.ProtocolError("worker restored a different checkpoint")
@@ -134,6 +140,8 @@ class WorkerHost:
             raise WorkerError(self.failure or "worker not running")
         if self._busy:
             raise WorkerError("one outstanding event per bot; concurrent request rejected")
+        if self._unacknowledged is not None:
+            raise WorkerError("previous event awaits durable commit acknowledgement")
         self._busy = True
         try:
             payload = dict(bar=ipc.bar_to_wire(bar), account=ipc.account_to_wire(account))
@@ -141,10 +149,35 @@ class WorkerHost:
             response = await self._exchange(ipc.envelope("bar", self.generation,
                 self.checkpoint.event_seq + 1, payload), "result")
             result = ipc.parse_result(response, self.checkpoint, bar, account, warmup)
-            self.checkpoint = result.checkpoint
+            if self.require_commit_ack:
+                self._unacknowledged = result
+            else:
+                self.checkpoint = result.checkpoint
             return result
         except BaseException as exc:
             self._fail(f"worker event failed: {type(exc).__name__}: {exc}")
+            await self.close()
+            if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
+                raise
+            raise WorkerError(self.failure) from exc
+        finally:
+            self._busy = False
+
+    async def acknowledge(self, event_seq):
+        """Called by the owner only after its durable COMMIT, never by strategy."""
+        if self._busy or self._closing or self.failure or self._unacknowledged is None:
+            raise WorkerError("no available event awaiting acknowledgement")
+        self._busy = True
+        try:
+            ipc.integer(event_seq, "ack event_seq", 1)
+            if event_seq != self._unacknowledged.event_seq:
+                raise ipc.ProtocolError("wrong acknowledgement sequence")
+            payload = await self._exchange(ipc.envelope("ack", self.generation, event_seq, {}), "acknowledged")
+            ipc.exact(payload, ())
+            self.checkpoint = self._unacknowledged.checkpoint
+            self._unacknowledged = None
+        except BaseException as exc:
+            self._fail(f"worker acknowledgement failed: {type(exc).__name__}: {exc}")
             await self.close()
             if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
                 raise

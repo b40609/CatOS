@@ -12,7 +12,10 @@ def run(reader, writer):
     generation = ipc.token(message["generation"], "generation")
     seq = ipc.integer(message["seq"], "seq")
     payload = ipc.check_envelope(message, "init", generation, seq)
-    ipc.exact(payload, ("config", "checkpoint"))
+    require_ack = payload.get("commit_ack", False)
+    if type(require_ack) is not bool:
+        raise ipc.ProtocolError("commit_ack must be bool")
+    ipc.exact(payload, ("config", "checkpoint", "commit_ack") if "commit_ack" in payload else ("config", "checkpoint"))
     config = ipc.WorkerConfig.from_wire(payload["config"])
     checkpoint = ipc.Checkpoint.from_wire(payload["checkpoint"], config)
     if seq != checkpoint.event_seq:
@@ -39,6 +42,12 @@ def run(reader, writer):
         ipc.parse_result(result, checkpoint, bar, account, warmup)
         ipc.write_frame_sync(writer, ipc.envelope("result", generation,
                                                  next_checkpoint.event_seq, result))
+        if require_ack:
+            acknowledgement = ipc.read_frame_sync(reader)
+            ipc.exact(ipc.check_envelope(acknowledgement, "ack", generation,
+                                        next_checkpoint.event_seq), ())
+            ipc.write_frame_sync(writer, ipc.envelope("acknowledged", generation,
+                                                     next_checkpoint.event_seq, {}))
         checkpoint = next_checkpoint
 
 

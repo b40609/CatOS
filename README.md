@@ -106,6 +106,8 @@ py -3 -B -m unittest discover -s tests -p test_optimization.py -v
 
 研究核心未包含限價／停利／停損撮合、保證金／強平模型、帳戶風控與額度保留、Guardian、UNKNOWN／對帳、完整 Supervisor、SQLite、UI 或 OKX 連線。核心可用來驗證策略與帳務算術，尚不能作為 Demo／Live 執行器或判定交易所是否會接受委託；也不宣稱已實現跨環境同一核心的完整產品。
 
-研究版驗收後，新增獨立的 [D：Worker／JSON IPC](docs/worker.md) 切片，提供受信 SMA 策略的普通子程序執行、有界通訊與明確 JSON 狀態還原；既有研究入口與交易邏輯維持原樣。這是程序故障隔離，尚無持久化 ACK、交易或 OS 安全沙箱保證。後續順序見[本機模擬規劃](docs/local-simulation-plan.md)。
+研究版驗收後，新增獨立的 [D：Worker／JSON IPC](docs/worker.md) 切片，提供受信 SMA 策略的普通子程序執行、有界通訊與明確 JSON 狀態還原；既有研究入口與交易邏輯維持原樣。預設 D 模式是純記憶體的程序故障隔離，沒有交易或 OS 安全沙箱保證。後續順序見[本機模擬規劃](docs/local-simulation-plan.md)。
+
+[E：本機 Supervisor／SQLite](docs/supervisor.md) 另提供單一 Windows 模擬帳戶的路徑綁定與帳戶鎖、合約所有權、原子 journal、重播去重，以及 COMMIT 後才 ACK 的 Worker 模式。預設拒絕交易意圖；明示 fixture 的 outbox 也固定不可派送。F／G 的完整風控與交易所恢復流程仍未接入。
 
 專屬測試採合成資料驗證預熱、可見時間、tick／lot 與合約單位、雙向淨倉、費用／資金費、帳務守恆、期末狀態及 Decimal context 隔離。沒有執行全市場歷史回測或存取真實憑證。

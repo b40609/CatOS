@@ -91,6 +91,27 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
         await host.process_bar(bar(1))
         self.assertIsNone((await host.process_bar(bar(2), account(2))).target_position)
 
+    async def test_commit_ack_holds_checkpoint_and_blocks_next_event(self):
+        host = await self.started(WorkerHost("sma-bot", config(), require_commit_ack=True))
+        result = await host.process_bar(bar(0))
+        self.assertEqual(result.event_seq, 1)
+        self.assertEqual(host.checkpoint.event_seq, 0)
+        with self.assertRaisesRegex(WorkerError, "awaits durable"):
+            await host.process_bar(bar(1))
+        await host.acknowledge(1)
+        self.assertEqual(host.checkpoint, result.checkpoint)
+        await host.process_bar(bar(1))
+        await host.acknowledge(2)
+        self.assertEqual(host.checkpoint.event_seq, 2)
+
+    async def test_wrong_commit_ack_stops_worker_without_promoting_checkpoint(self):
+        host = await self.started(WorkerHost("sma-bot", config(), require_commit_ack=True))
+        await host.process_bar(bar(0))
+        with self.assertRaisesRegex(WorkerError, "wrong acknowledgement"):
+            await host.acknowledge(2)
+        self.assertEqual(host.checkpoint.event_seq, 0)
+        await self.assert_stopped(host)
+
     async def test_faults_disable_worker_without_advancing_checkpoint(self):
         for mode in ("crash", "corrupt", "truncated", "wrong_generation", "wrong_seq",
                      "impersonate", "warmup_intent"):

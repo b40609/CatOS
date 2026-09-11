@@ -2,7 +2,7 @@
 
 本模組讓已檢查的 SMA 策略在普通獨立 Python 程序執行，透過有界 JSON 訊框回傳純資料目標。父程序不載入 SMA，不提供交易 client、憑證或 SQLite 介面。僅使用 Python 標準函式庫；研究核心與既有 SMA 交易邏輯未修改。
 
-這是本機模擬底座的 D 切片，尚非完整 Supervisor。沒有撮合、交易所連線、風控裁決、合約所有權、持久化 ACK、outbox 或自動故障續跑。普通子程序提供故障隔離，不能阻止惡意策略自行讀檔、連網或越權；只執行使用者選定並經檢查的策略及依賴。
+這是本機模擬底座的 D 切片，單獨使用時尚非完整 Supervisor。沒有撮合、交易所連線、風控裁決、合約所有權、outbox 或自動故障續跑。E 已新增由 [LocalSupervisor](supervisor.md) 管理的 SQLite／COMMIT ACK 模式；直接使用 D 的預設行為仍為純記憶體。普通子程序提供故障隔離，不能阻止惡意策略自行讀檔、連網或越權；只執行使用者選定並經檢查的策略及依賴。
 
 ## 使用方式
 
@@ -70,9 +70,11 @@ asyncio.run(main())
 
 `Checkpoint` 包含設定（含策略識別／版本）、最後事件序號、最後 K 線開盤時間、最多兩根 Decimal 收盤價。欄位明確，不序列化 `__dict__`；設定不符、窗口長度／價格錯誤或不可能的時間／序號均拒絕。父程序另比對回覆的窗口是否正是前窗口加當前收盤價。
 
-`result.checkpoint` 與 `host.checkpoint` 是通過驗證後的記憶體狀態。可由呼叫端明確傳入新的 `WorkerHost(..., checkpoint=saved)`，驗證相同輸入產生相同後續決策；本模組不自動保存、重啟或重送。這不是耐久 checkpoint，也沒有持久化 COMMIT／ACK。E 階段才建立輸入留存、消費位置、風控裁決與提交邊界。
+預設 D 模式的 `result.checkpoint` 與 `host.checkpoint` 是通過驗證後的記憶體狀態。可由呼叫端明確傳入新的 `WorkerHost(..., checkpoint=saved)`，驗證相同輸入產生相同後續決策；本模組不自動保存、重啟或重送。E 的 [LocalSupervisor](supervisor.md) 已另外建立輸入留存、消費位置、模擬裁決與 COMMIT／ACK 邊界；其 ACK 模式如下。
 
 ## 故障與資源上限
+
+E 新增可選 `WorkerHost(..., require_commit_ack=True)`。初始化帶 `commit_ack: true`，Worker 回覆 result 後只等 `ack`；父端須在 SQLite COMMIT 成功後呼叫 `await host.acknowledge(seq)`，並驗證 `acknowledged` 回覆。ACK 完成前 host checkpoint 不前進，下一根事件會被拒絕。錯 ACK、連線失敗或程序停止須由 Supervisor 從已持久化紀錄恢復；Worker 本身不驗證 DB，亦不持有 DB。省略此選項時維持 D 原行為。
 
 | 項目 | 上限／處置 |
 |---|---|
@@ -95,6 +97,8 @@ Worker 崩潰、EOF／截斷、stdout 污染、無回覆或協議違約會停用
 ## 驗收
 
 2026-09-11：IPC 11 個、Worker 13 個專屬測試全部通過；Worker 最後一輪包含控制端主動關閉與 Windows 隱藏子程序啟動設定。測試結束已檢查受測 Worker 終止與讀取 task 收尾。
+
+E 整合新增 COMMIT ACK 與錯序號 ACK 測試，本輪受影響 Worker 共 15 個測試通過；IPC 原始模組未修改，未重跑其測試。
 
 只執行本切片的專屬測試：
 

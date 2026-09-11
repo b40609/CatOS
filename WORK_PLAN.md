@@ -1,19 +1,23 @@
 # catOS 階段與分工規劃
 
-## 目前階段：D 已交付，下一片為 E
+## 目前階段：E 已交付，下一片為 F
 
 2026-09-11 使用者確認研究版驗收完成，隨後同意依規劃開始實作「本機模擬交易底座」；切片順序為 D：Worker／JSON 契約 → E：SQLite／單 Supervisor／所有權 → F：已確認風控 → G：假交易所／UNKNOWN／重啟對帳。
 
-詳見 [階段規劃](docs/local-simulation-plan.md)與 [D 使用契約](docs/worker.md)。D 已完成，E／F／G 尚未實作，未接入 Demo／Live；下方研究版分工與配額數字保留為歷史紀錄。
+詳見 [階段規劃](docs/local-simulation-plan.md)、[D 使用契約](docs/worker.md)與 [E 使用契約](docs/supervisor.md)。D／E 已完成，F／G 尚未實作，未接入 Demo／Live；下方研究版分工與配額數字保留為歷史紀錄。
 
 | 工作 | 狀態／出口 |
 |---|---|
 | D：獨立 Worker／JSON IPC | 已完成；IPC 11 個、Worker 13 個專屬測試通過。包含真實子程序故障、非同步控制、假憑證不繼承、SMA 狀態還原與父程序不載入策略 |
-| E：SQLite／單 Supervisor／所有權 | 排程下一片；尚未實作 |
-| F：已確認風控 | 待 E 介面驗收；未定案政策維持原狀 |
+| E：SQLite／單 Supervisor／所有權 | 已完成；Journal 14、Supervisor 14、受影響 Worker 15，共 43 個模組測試通過；固定 Windows 單使用者 local-sim 範圍 |
+| F：已確認風控 | 排程下一片；未定案政策維持原狀 |
 | G：假交易所／UNKNOWN／對帳 | 待 F 驗收；只用本機假資料 |
 
-本輪未修改既有研究核心或 SMA 交易邏輯，未重跑全域測試，未執行行情下載、Git 提交或推送。既存未追蹤的 `catos/cli.py`、`catos/optuna_study.py`、`tools/` 維持原樣。
+E 基線為使用者指定的 `3879c55`，已核對 HEAD 與乾淨工作目錄。使用者回報基線全域 93／93 測試通過，本輪未重跑全域套件。E 沒有修改研究核心、SMA 交易邏輯、既有 CLI／Optuna／下載工具，也未執行行情下載、Git 提交或推送。
+
+E 已驗證 COMMIT 前後程序中斷、ACK 遺失重播、取消／關閉仍等待 writer、在途 80／100 額度阻擋第二筆、Kill 持續鎖存、跨 DB 路徑鎖競爭及 Worker 死亡保留所有權。outbox 只有不可派送的 `HELD_SIMULATION`；fixture budget 不是帳戶實際風控，F／G 仍待交付。
+
+2026-09-11 E 交付查得：Codex 週配額剩餘 23%，5 小時配額剩餘 56%（帳戶共用快照）。與 D 紀錄相比週配額差額為 8 個百分點，不能歸為 E 的精確成本。依單片完成即交付原則，本輪不續開 F。
 
 2026-09-11 D 交付查得：Codex 週配額剩餘 31%，5 小時配額剩餘 12%（帳戶共用，為查詢當下快照）。與任務 C 記錄相比週配額差額為 6 個百分點，包含其他工作，不能當成本模組精確用量。依單片完成即交付原則，本輪不續開 E。
 
