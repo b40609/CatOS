@@ -11,7 +11,7 @@ import sqlite3
 from catos import ipc, research, risk
 from catos.account_lock import ENVIRONMENT
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 HALT_REASONS = frozenset(("manual_kill", "soft_loss", "hard_loss"))
 
 
@@ -130,7 +130,11 @@ _RISK_SCHEMA = (
 
 class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
-    def __init__(self, path, account_id, fixture_budget, risk_limits=None):
+    def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False):
+        from catos.execution import ExecutionJournal, SCHEMA as EXECUTION_SCHEMA
+        if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
+            raise JournalError("local execution requires installed risk")
+        self.execution = None
         self.account_id = ipc.token(account_id, "account_id")
         if risk_limits is not None and not isinstance(risk_limits, risk.Limits):
             raise ipc.ProtocolError("risk_limits must be Supervisor Limits")
@@ -147,7 +151,7 @@ class Journal:
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version not in (1, SCHEMA_VERSION):
+            elif version not in (1, 2, SCHEMA_VERSION):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -169,7 +173,17 @@ class Journal:
                 if version < 2:
                     for statement in _RISK_SCHEMA:
                         self.connection.execute(statement)
-                    self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                if version < 3:
+                    for statement in EXECUTION_SCHEMA:
+                        self.connection.execute(statement)
+                self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                installed = self.connection.execute("SELECT 1 FROM execution_mode").fetchone() is not None
+                if installed and not execution_enabled:
+                    raise JournalError("execution mode cannot be disabled in place")
+                if execution_enabled:
+                    self.connection.execute("INSERT OR IGNORE INTO execution_mode VALUES (1)")
+                    self.execution = ExecutionJournal(self)
+                    self.connection.execute("UPDATE execution_orders SET state='UNKNOWN' WHERE settled=0 AND (state='SUBMITTING' OR cancel_pending=1)")
                 saved_risk = self.connection.execute("SELECT * FROM risk_control WHERE id=1").fetchone()
                 if saved_risk is not None:
                     if risk_limits is None or saved_risk["limits_json"] != canonical(risk_limits.to_wire()):
@@ -294,11 +308,16 @@ class Journal:
                             and owner["reconciled_revision"] == bot["revision"]
                             and not self.connection.execute("SELECT 1 FROM reservations UNION ALL SELECT 1 FROM outbox LIMIT 1").fetchone()
                             and not self.connection.execute("SELECT 1 FROM inputs WHERE state='PENDING'").fetchone())
+                if self.execution is not None and self.execution.unresolved():
+                    complete = False
             updated = risk.progress(state, phase, complete=bool(complete))
             self._write_risk(updated)
         return updated
 
     def _risk_verdict(self, bot, owner, result, account, now_ms):
+        if self.execution is not None and (self.execution.unresolved()
+                or self.connection.execute("SELECT 1 FROM risk_orders").fetchone()):
+            return risk.Verdict(False, "order_pending")
         state = self.risk_state()
         buys, sells, reducing = Decimal("0"), Decimal("0"), False
         with localcontext(research._CONTEXT):
@@ -341,6 +360,17 @@ class Journal:
         return epoch
 
     def reconcile(self, bot_id, evidence):
+        if self.execution is not None:
+            try:
+                evidence.validate(bot_id)
+                bot, owner = self._require_owner(bot_id)
+                if evidence.revision != bot["revision"]:
+                    raise OwnershipError("stale reconciliation evidence")
+                self.execution.check_reconciliation(owner, evidence)
+            except OwnershipError:
+                with self._transaction():
+                    self.execution._dirty(bot_id)
+                raise
         evidence.validate(bot_id)
         with self._transaction():
             bot, owner = self._require_owner(bot_id)
@@ -351,6 +381,8 @@ class Journal:
                 (str(evidence.position), evidence.ordinary_open, evidence.conditional_open, evidence.unknown_count,
                  int(evidence.fills_reconciled), evidence.evidence_id, evidence.revision, bot_id))
             health = "LOCAL_READY" if evidence.unknown_count == 0 and evidence.fills_reconciled else "RECONCILING"
+            if self.execution is not None and evidence.conditional_open:
+                health = "RECONCILING"
             self.connection.execute("UPDATE control SET health=? WHERE id=1", (health,))
         return self.snapshot(bot_id)
 
@@ -367,6 +399,8 @@ class Journal:
                  OR EXISTS(SELECT 1 FROM outbox o WHERE o.intent_key=i.intent_key))""", (bot_id,)).fetchone()
             if pending or obligations:
                 raise OwnershipError("pending input, reservation or outbox still belongs to this bot")
+            if self.execution is not None and self.execution.unresolved():
+                raise OwnershipError("unresolved execution still belongs to this bot")
             self.connection.execute("DELETE FROM ownership WHERE bot_id=?", (bot_id,))
 
     def _conflict(self, bot_id):

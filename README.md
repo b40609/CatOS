@@ -110,6 +110,8 @@ py -3 -B -m unittest discover -s tests -p test_optimization.py -v
 
 [E：本機 Supervisor／SQLite](docs/supervisor.md) 另提供單一 Windows 模擬帳戶的路徑綁定與帳戶鎖、合約所有權、原子 journal、重播去重，以及 COMMIT 後才 ACK 的 Worker 模式。保留的 E fixture 介面預設拒絕交易意圖，outbox 固定不可派送。
 
-[F：合成帳戶風控](docs/risk.md) 已接入 Decimal 曝險、含在途／UNKNOWN 的數量保留、固定日初權益的台北日損、Soft／Hard／Kill 鎖存與合法 reduceOnly 減倉裁決。以 `risk_limits` 明示啟用，獨立合成快照不等待 Worker。G 的假交易所、派送與恢復閉環尚未實作；真實估值、保證金及待決金融政策不在本片驗證範圍。
+[F：合成帳戶風控](docs/risk.md) 已接入 Decimal 曝險、含在途／UNKNOWN 的數量保留、固定日初權益的台北日損、Soft／Hard／Kill 鎖存與合法 reduceOnly 減倉裁決。以 `risk_limits` 明示啟用，獨立合成快照不等待 Worker。
+
+[G：假交易所與恢復閉環](docs/execution.md) 已接入固定 tag 的唯一模擬建單、SUBMITTING／UNKNOWN、查單、撤單、成交去重、原操作 reduceOnly 清倉及重啟對帳。以 `FakeExchange` 明示啟用，只使用本機腳本回報；D–G 本機模擬底座已完成，真實估值、保證金與 Demo／Live 尚未接入，待決金融政策維持原狀。
 
 專屬測試採合成資料驗證預熱、可見時間、tick／lot 與合約單位、雙向淨倉、費用／資金費、帳務守恆、期末狀態及 Decimal context 隔離。沒有執行全市場歷史回測或存取真實憑證。

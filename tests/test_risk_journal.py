@@ -118,13 +118,16 @@ class RiskJournalTests(unittest.TestCase):
         journal.record_halts({"hard_loss"})
         journal.connection.execute("DROP TABLE risk_orders")
         journal.connection.execute("DROP TABLE risk_control")
+        journal.connection.execute("DROP TABLE execution_fills")
+        journal.connection.execute("DROP TABLE execution_orders")
+        journal.connection.execute("DROP TABLE execution_mode")
         journal.connection.execute("PRAGMA user_version=1")
         journal.close()
         journal = Journal(legacy, "legacy", D("100"), risk.Limits())
         self.addCleanup(journal.close)
         self.assertEqual(journal.snapshot("bot")["checkpoint"].event_seq, 1)
         self.assertEqual(journal.risk_state().mode, "FLAT")
-        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 3)
 
     def test_enabling_risk_refuses_existing_fixture_obligations(self):
         legacy = self.path.parent / "legacy.sqlite3"

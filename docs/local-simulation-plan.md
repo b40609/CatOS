@@ -1,6 +1,6 @@
 # 下一階段規劃：本機模擬交易底座
 
-日期：2026-09-11。使用者已確認研究版驗收完成，並依序啟動 D／E／F。本文件記錄實作順序與驗收契約；D／E／F 已完成。F 以 `c928195` 為基線，新增風控測試 27 個，另跑受影響 Journal／Supervisor 28 個，共 55 個通過。實際介面見 [Worker 文件](worker.md)、[Supervisor 文件](supervisor.md)與 [F 風控文件](risk.md)。G 尚未實作，待決金融政策未因此核准。
+更新日期：2026-09-12。使用者已依序啟動 D／E／F／G，本機模擬底座四片均已完成。G 以 `3e41c97` 為基線，專屬 27 個、受影響 E／F 模組 41 個，共 68 個測試通過。實際介面見 [Worker 文件](worker.md)、[Supervisor 文件](supervisor.md)、[F 風控文件](risk.md)及 [G 執行文件](execution.md)。這不是 Demo／Live 驗收，待決金融政策未因此核准。
 
 依據：[AGENTS.md](../AGENTS.md) 的 AUTONOMY、INVARIANTS、DESIGN BOUNDARY，以及[架構評估](../catOS-architecture-review.md)第 3、7–12、14–15 節。第 14 節的下一個里程碑為「v1 交易底座」，本次將它縮成可逐片驗收的離線版本。
 
@@ -94,4 +94,4 @@ P5 的暫不提供成功解除是交付範圍限制，並非核准「永不恢�
 
 本階段不納入 Web UI／FastAPI、公開行情下載、私有 WS／REST、Telegram、真實憑證、Demo／Live 請求、Optuna 續跑或多策略分帳。Demo 開工前再查核適用的 OKX 官方介面並處理相關政策；本次規劃未重新查核外部 API。
 
-D／E／F 已由 Codex 完成；後續若需 Antigravity 分工，再依已固定介面撰寫單一模組交接，不沿用已結案 A／B／C 指令、不讓兩個 IDE 同改同檔。本輪沒有派送任務、建立背景工作或執行 Git 提交／推送。
+D／E／F／G 已由 Codex 完成；後續若需 Antigravity 分工，再依已固定介面撰寫單一模組交接，不沿用已結案 A／B／C 指令、不讓兩個 IDE 同改同檔。本輪沒有派送任務、建立背景工作或執行 Git 提交／推送。

@@ -134,4 +134,4 @@ py -3 -B -m unittest discover -s tests -p test_worker.py -v
 
 合成場景包含 WAL／FULL／TEXT、重播去重與異內容隔離、原子額度、預熱／拒絕／過期、所有權釋放條件、錯 DB 與缺檔拒絕、雙程序競爭、程序死亡解鎖、COMMIT 前後 `os._exit`、COMMIT 錯誤、ACK 遺失、取消／關閉等待及 Kill 不被舊提交解除。故障子程序僅存在於 `tests/fixtures/journal_process.py`。
 
-這些是程序中斷及受控 I/O 故障驗證，不代表真實斷電、硬體 fsync 耐久性、遠端 exactly-once、完整帳戶風控或 OKX 對帳已驗證。F 已接入合成風控與 schema 2，介面與升級限制見 [F 文件](risk.md)；G、UI、Demo／Live 與真實憑證均未接入。
+這些是程序中斷及受控 I/O 故障驗證，不代表真實斷電、硬體 fsync 耐久性、遠端 exactly-once、完整帳戶風控或 OKX 對帳已驗證。F 已接入合成風控；G 已接入 schema 3 與本機假交易所，介面與升級限制見 [F 文件](risk.md)及 [G 文件](execution.md)。本文件的 E fixture 行為保留；UI、Demo／Live 與真實憑證均未接入。

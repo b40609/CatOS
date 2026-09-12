@@ -1,6 +1,7 @@
 """One local-simulation Supervisor, one SQLite writer, no network or dispatch."""
 
 import asyncio
+import json
 from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -9,8 +10,9 @@ from pathlib import Path
 
 from catos import ipc, research, risk
 from catos.account_lock import AccountLock, ENVIRONMENT
-from catos.journal import FixtureDecision, HALT_REASONS, Journal, OwnershipError, money
+from catos.journal import FixtureDecision, HALT_REASONS, Journal, JournalError, OwnershipError, money
 from catos.worker_host import WorkerHost
+from catos.fake_exchange import FakeExchange
 
 
 class SupervisorBusy(RuntimeError):
@@ -23,7 +25,7 @@ class SupervisorUnavailable(RuntimeError):
 
 class LocalSupervisor:
     def __init__(self, database, *, account_id, bot_id, config, fixture_budget,
-                 environment=ENVIRONMENT, risk_limits=None):
+                 environment=ENVIRONMENT, risk_limits=None, exchange=None):
         self._lock = AccountLock(account_id, environment)
         self.database = Path(database).resolve()
         self.account_id = account_id
@@ -32,6 +34,10 @@ class LocalSupervisor:
         if risk_limits is not None and not isinstance(risk_limits, risk.Limits):
             raise ipc.ProtocolError("risk_limits must be Supervisor Limits")
         self.risk_limits = risk_limits
+        if exchange is not None and (type(exchange) is not FakeExchange or exchange.account_id != account_id
+                                     or risk_limits is None):
+            raise SupervisorUnavailable("only a matching local FakeExchange with risk enabled is supported")
+        self._exchange = exchange
         self.risk_state = risk.State() if risk_limits is not None else None
         self._risk_loaded = False
         self._risk_persisted = None
@@ -187,7 +193,8 @@ class LocalSupervisor:
             self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="catos-sqlite")
 
             def open_journal():
-                self._journal = Journal(self.database, self.account_id, self.fixture_budget, self.risk_limits)
+                self._journal = Journal(self.database, self.account_id, self.fixture_budget, self.risk_limits,
+                                        self._exchange is not None)
                 return self._journal.register(self.bot_id, self.config)
 
             self._busy = True
@@ -208,7 +215,152 @@ class LocalSupervisor:
     async def reconcile(self, evidence):
         async with self._operation():
             await self._flush_halts()
-            self._load(await self._io(self._journal.reconcile, self.bot_id, evidence))
+            try:
+                self._load(await self._io(self._journal.reconcile, self.bot_id, evidence))
+            except OwnershipError:
+                self._load(await self._io(self._journal.snapshot, self.bot_id))
+                raise
+
+    def _execution(self):
+        if self._exchange is None or self._journal.execution is None:
+            raise SupervisorUnavailable("local execution is not enabled")
+        return self._journal.execution
+
+    async def _execution_sync(self):
+        stored = await self._io(self._journal.snapshot, self.bot_id)
+        self._load(stored)
+        if self.risk_state.mode == "FLAT":
+            phase = (stored["risk_state"].phase if stored["risk_state"].mode == "FLAT"
+                     and stored["risk_state"].seq == self.risk_state.seq else "WORKING")
+            self._accept_risk(replace(self.risk_state, phase=phase))
+        await self._flush_halts()
+
+    async def _exchange_result(self, key, operation, argument):
+        execution = self._execution()
+        try:
+            report = await asyncio.wait_for(getattr(self._exchange, operation)(argument), timeout=5)
+        except (TimeoutError, OSError):
+            await self._io(execution.uncertain, key)
+        except asyncio.CancelledError:
+            await self._io(execution.uncertain, key)
+            raise
+        else:
+            try:
+                await self._io(execution.apply, key, report)
+            except OwnershipError as exc:
+                raise JournalError("report ownership conflict requires recovery") from exc
+        await self._execution_sync()
+        return await self._io(execution.order, key)
+
+    async def _submit_prepared(self, request):
+        if request is None:
+            await self._execution_sync()
+            return None
+        execution = self._execution()
+        key = request["order_key"]
+        await self._flush_halts()
+        entered = False
+
+        async def handoff():
+            nonlocal entered
+            # No await between the last in-memory check and entering transport.
+            if (self._closing or self.risk_state.epoch != request["epoch"]
+                    or self.risk_state.seq != request["risk_seq"]
+                    or self.risk_state.time_ms != request["risk_time"]):
+                return None
+            entered = True
+            return await self._exchange.submit(request["payload"])
+
+        try:
+            report = await asyncio.wait_for(handoff(), timeout=5)
+        except (TimeoutError, OSError):
+            await self._io(execution.uncertain, key)
+        except asyncio.CancelledError:
+            await self._io(execution.uncertain if entered else execution.abort_unsent, key)
+            raise
+        else:
+            if not entered:
+                await self._io(execution.abort_unsent, key)
+            else:
+                try:
+                    await self._io(execution.apply, key, report)
+                except OwnershipError as exc:
+                    raise JournalError("report ownership conflict requires recovery") from exc
+        await self._execution_sync()
+        return await self._io(execution.order, key)
+
+    async def dispatch(self, intent_key, *, now_ms):
+        async with self._operation():
+            execution = self._execution()
+            await self._flush_halts()
+            request = await self._io(execution.prepare, self.bot_id, intent_key, now_ms)
+            return await self._submit_prepared(request)
+
+    async def query_order(self, order_key):
+        async with self._operation():
+            execution = self._execution()
+            await self._flush_halts()
+            row = await self._io(execution.order, order_key)
+            return await self._exchange_result(order_key, "query", row["cl_ord_id"])
+
+    async def cancel_order(self, order_key):
+        async with self._operation():
+            execution = self._execution()
+            await self._flush_halts()
+            cl_id = await self._io(execution.start_cancel, order_key)
+            if cl_id is None:
+                await self._execution_sync()
+                return await self._io(execution.order, order_key)
+            return await self._exchange_result(order_key, "cancel", cl_id)
+
+    async def flatten_step(self, *, now_ms, expires_at_ms):
+        """One bounded local step; caller supplies subsequent query/reconciliation evidence."""
+        async with self._operation():
+            execution = self._execution()
+            await self._flush_halts()
+            if self.risk_state.mode != "FLAT":
+                raise SupervisorUnavailable("FLAT is not latched")
+            orders = await self._io(execution.unresolved)
+            query_later = None
+            for row in orders:
+                # Uncertain outcomes are queried, never blindly resubmitted.
+                if row["state"] in ("UNKNOWN", "SUBMITTING") or row["cancel_pending"]:
+                    query_later = row
+                    continue
+                if not json.loads(row["payload_json"])["reduceOnly"]:
+                    cl_id = await self._io(execution.start_cancel, row["order_key"])
+                    if cl_id is not None:
+                        await self._exchange_result(row["order_key"], "cancel", cl_id)
+                        return None
+            request = await self._io(execution.flatten, self.bot_id, now_ms, expires_at_ms)
+            if request is None and query_later is not None:
+                await self._exchange_result(query_later["order_key"], "query", query_later["cl_ord_id"])
+                return None
+            return await self._submit_prepared(request)
+
+    async def control_step(self, *, now_ms, expires_at_ms):
+        """Explicit synthetic control tick; no autonomous/live service is started."""
+        if self.risk_state is not None and self.risk_state.mode == "FLAT":
+            return await self.flatten_step(now_ms=now_ms, expires_at_ms=expires_at_ms)
+        async with self._operation():
+            execution = self._execution()
+            await self._flush_halts()
+            if self.risk_state.mode == "RUN" and self.risk_state.health == "HEALTHY":
+                return None
+            held = await self._io(lambda: [row[0] for row in self._journal.connection.execute(
+                """SELECT r.intent_key FROM risk_orders r LEFT JOIN execution_orders e USING(intent_key)
+                   WHERE r.reduce_only=0 AND e.order_key IS NULL""")])
+            for key in held:
+                await self._io(execution.prepare, self.bot_id, key, now_ms)
+            orders = await self._io(execution.unresolved)
+            for row in orders:
+                if json.loads(row["payload_json"])["reduceOnly"]:
+                    continue
+                cl_id = await self._io(execution.start_cancel, row["order_key"])
+                return await self._exchange_result(row["order_key"], "cancel" if cl_id else "query",
+                                                   cl_id or row["cl_ord_id"])
+            await self._execution_sync()
+            return None
 
     async def persist_controls(self):
         async with self._operation():

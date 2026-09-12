@@ -2,6 +2,8 @@
 
 基線 `c928195`。F 實作已確認的曝險與日損規則，沿用 E 的單 Supervisor、單 SQLite writer、原子意圖提交及 COMMIT 後 ACK。只處理合成資料；沒有交易所連線或派送器。
 
+2026-09-12 補註：[G](execution.md) 已完成本機假交易所閉環。下文保留 F 單獨啟用的契約；傳入 `FakeExchange` 時，委託生命週期、保留釋放及 pending 去重以 G 契約為準，未連線至真實交易所。
+
 ## 啟用與資料來源
 
 建立 `LocalSupervisor` 時傳入 `risk_limits=risk.Limits()`，預設槓桿上限 `Decimal("3.0")`、單幣預算占比 `Decimal("0.50")`。參數只由 Supervisor 設定，不進入 Worker IPC。同一 DB 啟用後不得改回 fixture 模式或更換 limits；本片不提供在線風控設定變更。
