@@ -6,7 +6,7 @@
 
 ## 啟用與資料來源
 
-建立 `LocalSupervisor` 時傳入 `risk_limits=risk.Limits()`，預設槓桿上限 `Decimal("3.0")`、單幣預算占比 `Decimal("0.50")`。參數只由 Supervisor 設定，不進入 Worker IPC。同一 DB 啟用後不得改回 fixture 模式或更換 limits；本片不提供在線風控設定變更。
+建立 `LocalSupervisor` 時傳入 `risk_limits=risk.Limits()`，預設槓桿上限 `Decimal("3.0")`、單幣預算占比 `Decimal("0.50")`。參數只由 Supervisor 設定，不進入 Worker IPC。同一 DB 啟用後不得改回 fixture 模式；曝險 limits 仍固定。P5 新增 Soft／Hard 設定，預設 Decimal("0.10")／Decimal("0.20")，可透過下方 Supervisor 介面原子更新。
 
 未傳入 `risk_limits` 保留 E 的離線 fixture 測試介面，預設仍拒絕有差額的目標。啟用 F 後拒絕任何非預設 `FixtureDecision`，裁決不採用 `fixture_budget`；該欄位只保留舊 DB 身分相容性。
 
@@ -43,11 +43,11 @@ worst_q = max(abs(q - S), abs(q + B))
 日損率 = (當前權益 - 固定日初權益 - 外部淨流入) / 固定日初權益
 ```
 
-費用、資金費及損益已含在當前權益，不重複扣除。台北 UTC+08:00 午夜切日；快照跨午夜仍須重新確認當日基準。`<= -3%` 鎖存 soft，`<= -5%` 鎖存 hard；入金、反彈、跨日、重啟均不解除。
+費用、資金費及損益已含在當前權益，不重複扣除。台北 UTC+08:00 午夜切日；快照跨午夜仍須重新確認當日基準。最新 P5：Soft／Hard 可配置，v1 預設損失 10%／20%；入金、反彈、跨日、重啟均不自動解除。原原因消失且條件合格後可隨時人工 re-arm，修改門檻不直接解除 latch。P5 本機遷移已完成：可配置 10%／20%、原子保存門檻、合格人工 re-arm、schema 4 控制稽核；舊意圖不復活。實際帳戶資料與交易所適配仍未接入。
 
 | 狀態 | F 行為 |
 |---|---|
-| R：RUN／NO_INCREASE／FLAT | soft 至 NO_INCREASE，hard／manual Kill 至 FLAT；不提供成功 re-arm |
+| R：RUN／NO_INCREASE／FLAT | soft 至 NO_INCREASE，hard／manual Kill 至 FLAT；只有明示人工 re-arm 可降低嚴重度 |
 | H：RECONCILING／HEALTHY／DEGRADED | 啟動先對帳並要求新快照；不完整／逾時觀測與執行錯誤關閉增倉 |
 | P：IDLE／WORKING／VERIFY／WAIT／DONE | FLAT 建立唯一 `flatten_id`；反覆 Kill 沿用；F 的進度由合成呼叫驅動 |
 
@@ -61,4 +61,28 @@ schema 1 → 2 在交易內增加 `risk_control` 與依附原意圖的 `risk_ord
 
 專屬驗證：risk 14、risk journal 8、risk Supervisor 5；另跑受影響的原 Journal 14、Supervisor 14，共 55 個測試。包含真實 Worker、SQLite 提交回滾、Kill 在 COMMIT 中到達、等待 Worker 期間日損越線又反彈、重啟鎖存、舊 schema 升級、期限及 Decimal 邊界。未重跑全域套件或市場回測。
 
-權益／費用／滑價緩衝、帳單分類與停機跨日重建、人工恢復資格、被動超限自動減倉及交易所保護單仍待決。合成 `risk_equity` 與 `margin_ok` 不構成真實保證金模型或 Demo／Live 風控驗證。
+2026-09-12 已確認：E_risk = E_verified，不設 equity buffer；被動超限只禁增倉、合法減倉始終允許、不自動去槓桿；陌生部位／委託不接管、不處置；資金流白名單分類。P5 政策如上，具體帳單類別與缺失基準重建未自行定案；[P6 政策](disaster-stop-policy.md) 已確認，實際交易所適配未實作。合成 `risk_equity` 與 `margin_ok` 不構成真實保證金模型或 Demo／Live 風控驗證。
+
+## P5 人工設定與恢復介面（本機已實作）
+
+本輪驗證：P5 專屬 12、既有 F 27、受影響 G 28、共用 Journal／Supervisor 28，共 95 tests 通過。涵蓋重複 Kill 在恢復提交期间的否決、失敗回滾、舊版 DB 遷移及 G 舊意圖不復活；未執行全域測試或帳戶請求。
+
+具體失敗情境：設定變更誤清除 latch，或恢復與新 Kill 競爭，導致舊委託出站。最小做法沿用單 writer，新增控制稽核表，先 COMMIT 才在記憶體解除；不增加新交易出口或常駐服務。
+
+```python
+await supervisor.set_loss_limits(
+    soft_loss=Decimal("0.10"), hard_loss=Decimal("0.20"),
+    actor="operator", evidence_id="settings-review")
+await supervisor.rearm(
+    now_ms=now_ms, actor="operator", evidence_id="reconciliation-review")
+```
+
+門檻為正的損失比例，必須 `0 < soft_loss < hard_loss <= 1`，拒絕 float／非有限值。提高門檻保留 latch；降低門檻立即以現有可信快照評估並鎖存。人工恢復按目前已保存的門檻判定日損原因；設定變更本身不恢復，不改寫固定 E_0／C_t。
+
+re-arm 需要新鮮健康快照、當日有效 E_0、完整已歸因部位對帳、無未知單、普通／條件委託已終結、無本地 reservation／outbox／PENDING 輸入，以及原風險原因消失。Soft 可持有核實部位恢復；Hard／Kill 須完成既有清倉至 DONE 且帳戶空倉。manual Kill 另需 `manual_cause_cleared=True` 明示已排除手動停機原因，不能覆蓋有效日損／健康原因。RUN 仍受曝險與合法減倉裁決約束。
+
+2026-09-15 修補（待驗證）：上述恢復檢查明確納入 P6 active／pending／uncertain／triggered 責任，即使首次保護建立尚無 active ID 也不得略過。拒絕恢復時 latch、epoch 與成功稽核紀錄不變。已明確結束且只剩 failed 訊號時，仍按原條件判斷能否恢復；P6 自身禁增倉閘門保持關閉，恢復不等於允許增倉。
+
+恢復增加 epoch、重置清倉操作 ID／phase，不復活舊意圖、不釋放未終結責任。同日可恢復；反彈、入金、跨日或重啟不自動解除。恢復提交期間任何新風控輸入（含重複 Kill）均否決本地解除並重新保存最新鎖存；一般輸入仍須 persist_controls 才有耐久保證。
+
+schema 3 → 4 增加 `risk_actions`，保存動作、操作者、證據 ID、前後狀態／E_0、門檻及 epoch。設定、狀態與稽核同交易提交；失敗回滾，普通 save_risk 仍禁止清除原因。舊版只有曝險欄位的 limits JSON 補入 10%／20%，保留既有 latch／E_0／所有權／委託；啟動清除快照並先對帳。新版 DB 重啟須提供已保存的 limits，不可用建構子悄悄換設定。

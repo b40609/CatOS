@@ -76,10 +76,13 @@ class FakeExchange:
     def __init__(self, account_id):
         self.account_id = ipc.token(account_id, "fake account")
         self.calls = []
-        self._scripts = {name: deque() for name in ("submit", "query", "cancel")}
+        self._scripts = {name: deque() for name in ('submit', 'query', 'cancel',
+            'algo_create', 'algo_amend', 'algo_cancel', 'algo_query')}
 
     def enqueue(self, operation, outcome):
-        if operation not in self._scripts or not isinstance(outcome, (Report, Exception)):
+        from catos.protection import Report as ProtectionReport
+        expected = ProtectionReport if operation.startswith('algo_') else Report
+        if operation not in self._scripts or not isinstance(outcome, (expected, Exception)):
             raise ValueError("queue a synthetic Report or Exception")
         self._scripts[operation].append(outcome)
 
@@ -103,3 +106,12 @@ class FakeExchange:
 
     async def cancel(self, cl_ord_id):
         return self._reply("cancel", dict(clOrdId=cl_ord_id))
+
+    async def protection(self, operation, payload):
+        if operation not in ('algo_create', 'algo_amend', 'algo_cancel', 'algo_query'):
+            raise ipc.ProtocolError('unsupported protection operation')
+        if (payload.get('tag') != TAG or payload.get('tdMode') != 'cross'
+                or payload.get('posSide') != 'net' or payload.get('reduceOnly') is not True
+                or payload.get('closeFraction') != '1'):
+            raise ipc.ProtocolError('invalid Supervisor protection payload')
+        return self._reply(operation, payload)

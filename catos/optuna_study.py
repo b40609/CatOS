@@ -1,13 +1,14 @@
 """Optuna study script for optimizing moving average parameters on real market data.
 
 Usage:
-    py -3 -B -m catos.optuna_study --csv data/BTC-USDT-SWAP-1H.csv --trials 50
+    Explicit --symbol, --base-per-contract, --tick-size, --lot-size and
+    --min-size are required. --timeframe-ms defaults to 3600000 (1H).
+    Inputs are local research assumptions, not verified exchange metadata.
 """
 
 import argparse
 from collections import deque
 from decimal import Decimal, localcontext
-import math
 from pathlib import Path
 import sys
 
@@ -56,32 +57,36 @@ class DualSMAStrategy(Strategy):
             return Decimal("0")
 
 
-def compute_annualized_sharpe(equity_curve: tuple[AccountView, ...], hours_per_year: float = 8760.0) -> float:
-    """Calculate annualized Sharpe ratio from an hourly equity curve."""
-    if len(equity_curve) < 2:
-        return 0.0
+def compute_annualized_sharpe(
+    equity_curve: tuple[AccountView, ...], *, timeframe_ms: int = 3_600_000,
+) -> Decimal | None:
+    """Zero-risk-free-rate sample Sharpe; 365-day year, fixed bar intervals.
 
-    returns = []
-    for i in range(1, len(equity_curve)):
-        prev_eq = float(equity_curve[i - 1].equity)
-        curr_eq = float(equity_curve[i].equity)
-        if prev_eq > 0:
-            returns.append((curr_eq - prev_eq) / prev_eq)
-        else:
-            returns.append(0.0)
-
-    n = len(returns)
-    if n == 0:
-        return 0.0
-
-    mean_r = sum(returns) / n
-    variance = sum((r - mean_r) ** 2 for r in returns) / (n - 1 if n > 1 else 1)
-    std_r = math.sqrt(variance)
-
-    if std_r == 0:
-        return 0.0
-
-    return (mean_r / std_r) * math.sqrt(hours_per_year)
+    Keep equity differences and all derived arithmetic in Decimal. None means
+    fewer than two returns or zero variance, not a measured zero Sharpe.
+    """
+    if type(timeframe_ms) is not int or timeframe_ms <= 0:
+        raise ValueError("timeframe_ms must be a positive integer")
+    for point in equity_curve:
+        if (type(point.equity) is not Decimal or not point.equity.is_finite()
+                or point.equity <= 0):
+            raise ValueError("Sharpe requires finite positive Decimal equity")
+        if type(point.time_ms) is not int or point.time_ms < 0:
+            raise ValueError("invalid equity timestamp")
+    if any(b.time_ms - a.time_ms != timeframe_ms for a, b in zip(equity_curve, equity_curve[1:])):
+        raise ValueError("equity curve must have fixed timeframe intervals")
+    if len(equity_curve) < 3:
+        return None
+    with localcontext(_CONTEXT):
+        returns = [(b.equity - a.equity) / a.equity
+                   for a, b in zip(equity_curve, equity_curve[1:])]
+        n = Decimal(len(returns))
+        mean = sum(returns, Decimal(0)) / n
+        variance = sum(((r - mean) ** 2 for r in returns), Decimal(0)) / (n - 1)
+        if variance == 0:
+            return None
+        periods_per_year = Decimal(365 * 24 * 60 * 60 * 1000) / Decimal(timeframe_ms)
+        return mean / variance.sqrt() * periods_per_year.sqrt()
 
 
 def run_study(
@@ -90,26 +95,27 @@ def run_study(
     n_trials: int = 50,
     seed: int = 42,
     metric: str = "net_pnl",
+    *,
+    contract: ContractSpec | None = None,
+    timeframe_ms: int = 3_600_000,
 ) -> None:
     csv_p = Path(csv_path).resolve()
     if not csv_p.exists():
         raise FileNotFoundError(f"找不到 CSV 檔案: {csv_path}")
+
+    if not isinstance(contract, ContractSpec) or contract.inst_id != symbol:
+        raise ValueError("explicit ContractSpec matching symbol is required")
+    if metric not in ("net_pnl", "risk_adjusted"):
+        raise ValueError("unsupported study metric")
 
     # Maximum slow SMA to search is 80, so warmup_bars covers the maximum requirement
     max_slow = 80
     warmup_bars = max_slow
 
     with localcontext(_CONTEXT):
-        contract = ContractSpec(
-            inst_id=symbol,
-            base_per_contract=Decimal("0.01"),
-            tick_size=Decimal("0.1"),
-            lot_size=Decimal("1"),
-            min_size=Decimal("1"),
-        )
         config = BacktestConfig(
             contract=contract,
-            timeframe_ms=3600000,  # 1 hour
+            timeframe_ms=timeframe_ms,
             initial_balance=Decimal("10000"),
             fee_rate=Decimal("0.0005"),
             slippage_bps=Decimal("1"),
@@ -174,12 +180,18 @@ def run_study(
                 config=config,
                 warmup_bars=warmup_bars,
             )
-            sharpe = compute_annualized_sharpe(detailed_result.equity_curve)
+            try:
+                sharpe = compute_annualized_sharpe(detailed_result.equity_curve, timeframe_ms=timeframe_ms)
+                sharpe_text = "N/A (insufficient returns or zero variance)" if sharpe is None else f"{sharpe:.4f}"
+            except ValueError:
+                # A valid research PnL may include nonpositive equity; do not
+                # replace it with a fabricated zero-return Sharpe or hide PnL.
+                sharpe_text = "N/A (equity or sampling does not support Sharpe)"
 
             print(f"\n【第 {rank} 名】Trial #{trial.number}")
             print(f"  均線參數:   Fast SMA = {fast_val}, Slow SMA = {slow_val}")
             print(f"  淨損益:     {perf.net_pnl} USDT ({perf.return_pct}%)")
-            print(f"  夏普比率:   {sharpe:.4f} (年化 1H)")
+            print(f"  夏普比率:   {sharpe_text} (365 天年化，週期 {timeframe_ms} ms，無風險利率 0)")
             print(f"  最大回撤:   {perf.max_drawdown_pct}%")
             print(f"  期末權益:   {perf.final_equity} USDT")
             print(f"  模擬成交:   {perf.trade_count} 筆 (手續費: {perf.fees} USDT)")
@@ -191,7 +203,12 @@ def run_study(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="catOS Optuna Parameter Study")
     parser.add_argument("--csv", default="data/BTC-USDT-SWAP-1H.csv", help="K 線 CSV 檔案路徑")
-    parser.add_argument("--symbol", default="BTC-USDT-SWAP", help="交易合約代碼")
+    parser.add_argument("--symbol", required=True, help="明示交易合約代碼")
+    parser.add_argument("--base-per-contract", required=True, help="每張標的幣數")
+    parser.add_argument("--tick-size", required=True, help="價格 tick")
+    parser.add_argument("--lot-size", required=True, help="數量 step")
+    parser.add_argument("--min-size", required=True, help="最小張數")
+    parser.add_argument("--timeframe-ms", type=int, default=3_600_000, help="K 線週期毫秒；預設 1H")
     parser.add_argument("--trials", type=int, default=50, help="Trial 搜尋次數 (預設: 50)")
     parser.add_argument("--seed", type=int, default=42, help="隨機種子 (預設: 42)")
     parser.add_argument("--metric", choices=["net_pnl", "risk_adjusted"], default="net_pnl", help="優化目標指標")
@@ -205,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
             n_trials=args.trials,
             seed=args.seed,
             metric=args.metric,
+            contract=ContractSpec(args.symbol, Decimal(args.base_per_contract),
+                                  Decimal(args.tick_size), Decimal(args.lot_size), Decimal(args.min_size)),
+            timeframe_ms=args.timeframe_ms,
         )
         return 0
     except Exception as err:

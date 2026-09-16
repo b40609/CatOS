@@ -1,0 +1,79 @@
+catOS 离线定向回归验证记录
+日期：2026-09-15（UTC+08:00）
+
+后续补验更新（同日）
+已依用户新授权在托管隔离 venv 安装 optuna==4.9.0；依赖一致性检查通过。
+test_optuna_study 11 项、test_optimization 8 项全部通过；累计 16 模块 232 项通过。
+完整补验记录见 outputs/catos-research-tests-2026-09-15.txt。
+以下保留前轮执行时的历史状态，“缺依赖/待授权”已被本段更新取代；静态遗留与真实对账限制不变。
+
+结论
+已执行 14 个模块，共 213 项测试；213 通过，0 失败，0 错误，0 跳过。
+Optuna study 测试未执行：当前托管环境缺少 optuna，不能视作通过或 unittest skip。
+第二步验证尚未全部完成；不进入第三步真实 Demo 采集。
+
+环境
+解释器路径：C:\Users\user\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe
+实际版本输出：3.13.14 (main, Jun 11 2026, 04:04:46) [MSC v.1944 64 bit (AMD64)]
+路径目录名与实际补丁版本不同；本记录按实际 sys.version 报告。
+依赖文件：requirements-research.txt 指定 optuna==4.9.0。
+依赖探测结果：optuna=MISSING。
+未安装依赖、未改用系统 Python、未联网。
+
+执行方式
+工作目录为项目根目录。
+用上述解释器加 -B -u，按下列明确文件名调用 unittest.TestLoader().discover；不是全域 discover。
+两批独立进程运行，每批模块内部顺序执行。
+TextTestRunner verbosity=1、buffer=True；记录每模块 run/failures/errors/skipped 等计数。
+没有修改测试断言、替换缺失的 Optuna 模块或补写业务实现。
+测试仅使用合成输入、FakeExchange、临时文件与临时 SQLite；Supervisor 相关测试包含本机 Worker 子进程。
+Demo loader 测试用 mock 将路径替换为测试创建的合成临时文件，不读取真实凭证。
+
+模块结果（以下模块均为 0 failures / 0 errors / 0 skipped）
+测试文件                              数量    结果
+--------------------------------------------------
+tests/test_cli_output.py                13    OK
+tests/test_account_report.py            39    OK
+tests/test_demo_collection.py           12    OK
+tests/test_bounded_pagination.py         16    OK
+tests/test_okx_collection.py             13    OK
+第一批小计                              93
+
+tests/test_execution.py                 24    OK
+tests/test_execution_supervisor.py       9    OK
+tests/test_risk.py                      14    OK
+tests/test_risk_journal.py               8    OK
+tests/test_risk_supervisor.py            5    OK
+tests/test_p5.py                        13    OK
+tests/test_protection.py                19    OK
+tests/test_journal.py                   14    OK
+tests/test_supervisor.py                14    OK
+第二批小计                             120
+--------------------------------------------------
+总计                                   213    全部通过
+
+覆盖结论
+1. 当前已有的 CLI 输出保护回归通过；不代表此前静态发现的 stat/unlink 竞态已经修复。
+2. 同实体不同内容版本的来源隔离、A/B/A 来源归并、余额字段诊断及安全摘要相关测试通过。
+3. Demo 合成模式查询测试通过，不再因访问不存在的 WireRequest.method 崩溃。
+4. 当前合法减仓、UNKNOWN/冲突拒绝、执行恢复与风险门控测试通过。
+5. P5/P6 现有测试通过，包括首次保护创建超时阻止 re-arm，以及明确拒绝后恢复仍保持保护阻断状态。
+6. Journal/Supervisor 直接关联回归通过，包括本机进程及事务故障场景。
+
+未完成和不能外推的事项
+- tests/test_optuna_study.py 未运行；Decimal 夏普及其极端数值场景本轮未获动态验证。
+- 未运行完整测试套件、市场历史回测或真实 HTTP/TLS sender 验收；test_okx_http.py 不在本次执行范围。
+- 未补写、未执行独立于现有测试的新专项复现；P5/P6 恢复后所有增仓入口的端到端复现仍不能宣称完成。
+- 既有测试通过不消除静态残留：CLI 异常清理竞态、Optuna 默认 BTC CSV 与其他 symbol 混用、固定数量 2 与任意 lot/min 不兼容、全失败仍可能退出 0、文档阶段残留。
+- 减仓遇 epoch/seq 更新仍拒发需专项讨论；不能直接移除安全版本检查。
+- P6 TRIGGERED 完整结案属于文档已排除的未实现能力，本轮未补齐。
+- 真实余额解码与模式差异原因仍未知；reconciled=false、trade_authorized=false 保持不变。
+
+权限与改动
+未修改源码、测试或业务文档；未读取真实凭证，未调用 OKX，未操作真实账户或交易数据库。
+未运行 Git 命令、提交或推送；未执行 Demo/Live 下单、撤单、账户设置或真实采集。
+永久新增交付仅本验证记录，另追加项目工作日志；测试自身创建并清理合成临时资源。
+
+下一步
+先取得在托管隔离 venv 安装 optuna==4.9.0 及依赖的明确授权，再补跑 Optuna study 及直接关联测试。
+不把依赖安装授权视为源码修改、真实采集或交易授权。

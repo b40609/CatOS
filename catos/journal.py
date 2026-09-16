@@ -11,7 +11,7 @@ import sqlite3
 from catos import ipc, research, risk
 from catos.account_lock import ENVIRONMENT
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
 HALT_REASONS = frozenset(("manual_kill", "soft_loss", "hard_loss"))
 
 
@@ -132,9 +132,11 @@ class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
     def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False):
         from catos.execution import ExecutionJournal, SCHEMA as EXECUTION_SCHEMA
+        from catos.protection import ProtectionJournal
         if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
             raise JournalError("local execution requires installed risk")
         self.execution = None
+        self.protection = None
         self.account_id = ipc.token(account_id, "account_id")
         if risk_limits is not None and not isinstance(risk_limits, risk.Limits):
             raise ipc.ProtocolError("risk_limits must be Supervisor Limits")
@@ -151,7 +153,7 @@ class Journal:
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version not in (1, 2, SCHEMA_VERSION):
+            elif version not in (1, 2, 3, 4, SCHEMA_VERSION):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -176,6 +178,20 @@ class Journal:
                 if version < 3:
                     for statement in EXECUTION_SCHEMA:
                         self.connection.execute(statement)
+                if version < 4:
+                    self.connection.execute("""CREATE TABLE IF NOT EXISTS risk_actions (
+                        id INTEGER PRIMARY KEY, kind TEXT NOT NULL, actor TEXT NOT NULL,
+                        evidence_id TEXT NOT NULL, before_json TEXT NOT NULL,
+                        after_json TEXT NOT NULL, limits_json TEXT NOT NULL)""")
+                if version < 5:
+                    self.connection.execute("CREATE TABLE IF NOT EXISTS protection (bot_id TEXT PRIMARY KEY REFERENCES bots(bot_id), state_json TEXT NOT NULL)")
+                self.protection = ProtectionJournal(self)
+                for row in self.connection.execute('SELECT bot_id FROM protection'):
+                    state = self.protection.state(row[0])
+                    if state['active'] or state['pending']:
+                        state['uncertain'] = True
+                        state['alert'] = 'restart_protection_reconciliation'
+                        self.protection.save(row[0], state)
                 self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
                 installed = self.connection.execute("SELECT 1 FROM execution_mode").fetchone() is not None
                 if installed and not execution_enabled:
@@ -186,9 +202,17 @@ class Journal:
                     self.connection.execute("UPDATE execution_orders SET state='UNKNOWN' WHERE settled=0 AND (state='SUBMITTING' OR cancel_pending=1)")
                 saved_risk = self.connection.execute("SELECT * FROM risk_control WHERE id=1").fetchone()
                 if saved_risk is not None:
-                    if risk_limits is None or saved_risk["limits_json"] != canonical(risk_limits.to_wire()):
+                    saved_limits = json.loads(saved_risk["limits_json"])
+                    legacy = set(saved_limits) == {"leverage", "symbol_share"}
+                    if legacy:
+                        saved_limits.update(soft_loss="0.10", hard_loss="0.20")
+                    if risk_limits is None or saved_limits != risk_limits.to_wire():
                         raise JournalError("risk mode/limits cannot be replaced in place")
                     restored = risk.State.from_wire(ipc.decode_payload(saved_risk["state_json"].encode()))
+                    if legacy:
+                        self.connection.execute("UPDATE risk_control SET limits_json=? WHERE id=1",
+                                                (canonical(saved_limits),))
+                        self._audit_risk("migrate_p5", "migration", "schema-4", restored, restored, risk_limits)
                     self._write_risk(replace(restored, health="RECONCILING", snapshot=None,
                                                  epoch=restored.epoch + 1))
                 elif risk_limits is not None:
@@ -260,6 +284,7 @@ class Journal:
                 raise OwnershipError("bot artifact/config cannot be replaced in place")
             if owner is None:
                 self.connection.execute("INSERT INTO ownership (inst_id,bot_id) VALUES (?,?)", (config.contract.inst_id, bot_id))
+            self.protection.register(bot_id)
         return self.snapshot(bot_id)
 
     def total_reserved(self):
@@ -289,6 +314,58 @@ class Journal:
                 raise JournalError("risk state cannot move backwards")
             self._write_risk(state)
 
+    def _audit_risk(self, kind, actor, evidence_id, before, after, limits):
+        self.connection.execute("INSERT INTO risk_actions VALUES (NULL,?,?,?,?,?,?)",
+            (kind, actor, evidence_id, canonical(before.to_wire()), canonical(after.to_wire()),
+             canonical(limits.to_wire())))
+
+    def set_loss_limits(self, limits, expected, actor, evidence_id):
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "configuration evidence")
+        if not isinstance(limits, risk.Limits) or self.risk_limits is None:
+            raise JournalError("risk limits required")
+        if (limits.leverage, limits.symbol_share) != (self.risk_limits.leverage, self.risk_limits.symbol_share):
+            raise JournalError("only loss thresholds can change in place")
+        with self._transaction():
+            previous = self.risk_state()
+            if previous != expected:
+                raise JournalError("risk changed before configuration update")
+            updated = risk.halt(replace(previous, epoch=previous.epoch + 1), risk.loss_reasons(previous, limits))
+            self.connection.execute("UPDATE risk_control SET limits_json=? WHERE id=1", (canonical(limits.to_wire()),))
+            self._write_risk(updated)
+            self._audit_risk("loss_limits", actor, evidence_id, previous, updated, limits)
+        self.risk_limits = limits
+        return updated
+
+    def rearm(self, bot_id, expected, now_ms, actor, evidence_id, manual_cause_cleared):
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "re-arm evidence")
+        if type(manual_cause_cleared) is not bool:
+            raise ipc.ProtocolError("manual cause confirmation must be bool")
+        with self._transaction():
+            previous = self.risk_state()
+            if previous != expected:
+                raise JournalError("risk changed before re-arm")
+            bot, owner = self._require_owner(bot_id)
+            s = previous.snapshot
+            ready = (s is not None and owner["position"] is not None
+                     and Decimal(owner["position"]) == s.position
+                     and owner["ordinary_open"] == 0 and owner["conditional_open"] == 0
+                     and owner["unknown_count"] == 0 and owner["fills_reconciled"] == 1
+                     and owner["reconciled_revision"] == bot["revision"] and not bot["isolated"]
+                     and self.connection.execute("SELECT health FROM control WHERE id=1").fetchone()[0] == "LOCAL_READY"
+                     and not self.connection.execute("SELECT 1 FROM reservations UNION ALL SELECT 1 FROM outbox LIMIT 1").fetchone()
+                     and not self.connection.execute("SELECT 1 FROM inputs WHERE state='PENDING'").fetchone()
+                     and (self.execution is None or not self.execution.unresolved())
+                     and not self.protection.obligations(bot_id))
+            updated = risk.rearm(previous, self.risk_limits, now_ms, reconciled=bool(ready),
+                                 manual_cause_cleared=manual_cause_cleared)
+            self._write_risk(updated)
+            # Old work never becomes eligible again after recovery.
+            self.connection.execute("UPDATE risk_orders SET eligible=0 WHERE reduce_only=0")
+            self._audit_risk("rearm", actor, evidence_id, previous, updated, self.risk_limits)
+        return updated
+
     def flatten_progress(self, bot_id, phase, now_ms):
         if self.risk_limits is None:
             raise JournalError("risk mode is not enabled")
@@ -310,12 +387,19 @@ class Journal:
                             and not self.connection.execute("SELECT 1 FROM inputs WHERE state='PENDING'").fetchone())
                 if self.execution is not None and self.execution.unresolved():
                     complete = False
+                if self.protection.obligations(bot_id):
+                    complete = False
             updated = risk.progress(state, phase, complete=bool(complete))
             self._write_risk(updated)
         return updated
 
     def _risk_verdict(self, bot, owner, result, account, now_ms):
-        if self.execution is not None and (self.execution.unresolved()
+        position = account.position
+        target = result.target_position
+        reduction = position != 0 and (target == 0 or (target * position > 0 and abs(target) < abs(position)))
+        if not reduction and self.protection.blocked(bot['bot_id']):
+            return risk.Verdict(False, 'protection_gate_closed')
+        if not reduction and self.execution is not None and (self.execution.unresolved()
                 or self.connection.execute("SELECT 1 FROM risk_orders").fetchone()):
             return risk.Verdict(False, "order_pending")
         state = self.risk_state()
@@ -326,6 +410,8 @@ class Journal:
                 buys += max(qty, Decimal("0"))
                 sells += max(-qty, Decimal("0"))
                 reducing |= bool(row["reduce_only"])
+        if self.execution is not None:
+            reducing |= self.execution.reduction_conflict(position)
         known = (owner["position"] is not None and owner["reconciled_revision"] is not None
                  and owner["fills_reconciled"] and owner["unknown_count"] == 0
                  and Decimal(owner["position"]) == account.position)
@@ -381,12 +467,14 @@ class Journal:
                 (str(evidence.position), evidence.ordinary_open, evidence.conditional_open, evidence.unknown_count,
                  int(evidence.fills_reconciled), evidence.evidence_id, evidence.revision, bot_id))
             health = "LOCAL_READY" if evidence.unknown_count == 0 and evidence.fills_reconciled else "RECONCILING"
-            if self.execution is not None and evidence.conditional_open:
+            if self.execution is not None and evidence.conditional_open > int(self.protection.state(bot_id)['active'] is not None):
                 health = "RECONCILING"
             self.connection.execute("UPDATE control SET health=? WHERE id=1", (health,))
         return self.snapshot(bot_id)
 
     def release(self, bot_id):
+        if self.protection.obligations(bot_id):
+            raise OwnershipError('protection responsibility still belongs to bot')
         with self._transaction():
             bot, owner = self._require_owner(bot_id)
             if (owner["position"] is None or ipc.decimal_text(owner["position"], "position", derived=True) != 0

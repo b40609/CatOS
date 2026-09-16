@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -41,6 +42,8 @@ class LocalSupervisor:
         self.risk_state = risk.State() if risk_limits is not None else None
         self._risk_loaded = False
         self._risk_persisted = None
+        self._control_generation = 0
+        self._protection_alert = None
         self.fixture_budget = money(fixture_budget, "fixture budget", derived=False)
         if self.fixture_budget <= 0:
             raise ipc.ProtocolError("fixture budget must be positive")
@@ -73,6 +76,7 @@ class LocalSupervisor:
             raise ValueError("unsupported latch reason")
         if not self._started or self._closing:
             raise SupervisorUnavailable("Supervisor is not accepting control inputs")
+        self._control_generation += 1
         if reason not in self.halt_reasons:
             self.halt_reasons.add(reason)
             self.epoch += 1
@@ -101,13 +105,15 @@ class LocalSupervisor:
         immediately even if later snapshots arrive before the writer catches up.
         """
         self._require_risk()
-        self._accept_risk(risk.observe(self.risk_state, snapshot))
+        self._control_generation += 1
+        self._accept_risk(risk.observe(self.risk_state, snapshot, self.risk_limits))
         if self.failure:
             self._degrade_risk()
         return self.risk_state
 
     def risk_timer(self, now_ms):
         self._require_risk()
+        self._control_generation += 1
         self._accept_risk(risk.expire(self.risk_state, now_ms))
         return self.risk_state
 
@@ -202,6 +208,8 @@ class LocalSupervisor:
             self._load(await self._io(open_journal))
             self._lock.bind_database(self.database)
             await self._flush_halts()
+            if self._exchange is not None:
+                await self._log_protection_alert()
             return self
         except BaseException:
             self._busy = False
@@ -234,6 +242,13 @@ class LocalSupervisor:
                      and stored["risk_state"].seq == self.risk_state.seq else "WORKING")
             self._accept_risk(replace(self.risk_state, phase=phase))
         await self._flush_halts()
+        await self._log_protection_alert()
+
+    async def _log_protection_alert(self):
+        state = await self._io(self._journal.protection.state, self.bot_id)
+        if state['alert'] and state['alert'] != self._protection_alert:
+            logging.getLogger('catos.protection').warning('Bot %s: %s', self.bot_id, state['alert'])
+        self._protection_alert = state['alert']
 
     async def _exchange_result(self, key, operation, argument):
         execution = self._execution()
@@ -365,6 +380,96 @@ class LocalSupervisor:
     async def persist_controls(self):
         async with self._operation():
             await self._flush_halts()
+
+    async def configure_protection(self, config):
+        from catos.protection import Config
+        if not isinstance(config, Config):
+            raise ipc.ProtocolError('Supervisor protection config required')
+        async with self._operation():
+            self._execution()
+            try:
+                state = await self._io(self._journal.protection.configure, self.bot_id, config)
+                await self._log_protection_alert()
+                return state
+            except ipc.ProtocolError as exc:
+                raise SupervisorUnavailable(str(exc)) from exc
+
+    async def protection_state(self):
+        async with self._operation():
+            return await self._io(self._journal.protection.state, self.bot_id)
+
+    async def protection_step(self, *, now_ms):
+        """One explicit FakeExchange step; no autonomous service or live transport."""
+        async with self._operation():
+            self._execution()
+            p = self._journal.protection
+            try:
+                request = await self._io(p.prepare, self.bot_id, now_ms)
+            except ipc.ProtocolError as exc:
+                raise SupervisorUnavailable(str(exc)) from exc
+            if request is not None:
+                try:
+                    report = await asyncio.wait_for(self._exchange.protection(
+                        request['operation'], request['payload']), timeout=5)
+                except (TimeoutError, OSError):
+                    pass  # Durable pending/UNKNOWN already closes increases.
+                else:
+                    await self._io(p.apply, self.bot_id, report)
+            await self._execution_sync()
+            return await self._io(p.state, self.bot_id)
+
+    async def set_loss_limits(self, *, soft_loss, hard_loss, actor, evidence_id):
+        self._require_risk()
+        limits = replace(self.risk_limits, soft_loss=soft_loss, hard_loss=hard_loss)
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "configuration evidence")
+        async with self._operation():
+            await self._flush_halts()
+            before = self.risk_state
+            # New observations immediately use the new limits; tighter limits
+            # close the in-memory gate even while the sole writer is waiting.
+            self.risk_limits = limits
+            self._accept_risk(risk.halt(replace(before, epoch=before.epoch + 1),
+                                        risk.loss_reasons(before, limits)))
+            updated = await self._io(self._journal.set_loss_limits, limits, before, actor, evidence_id)
+            self._risk_persisted = updated
+            await self._flush_halts()
+            return self.risk_state
+
+    async def rearm(self, *, now_ms, actor, evidence_id, manual_cause_cleared=False):
+        self._require_risk()
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "re-arm evidence")
+        if type(manual_cause_cleared) is not bool:
+            raise ipc.ProtocolError("manual cause confirmation must be bool")
+        # Expected policy rejection is not a Supervisor fault.
+        try:
+            risk.rearm(self.risk_state, self.risk_limits, now_ms, reconciled=True,
+                       manual_cause_cleared=manual_cause_cleared)
+        except ipc.ProtocolError as exc:
+            raise SupervisorUnavailable(str(exc)) from exc
+        async with self._operation():
+            await self._flush_halts()
+            before, generation = self.risk_state, self._control_generation
+            try:
+                updated = await self._io(self._journal.rearm, self.bot_id, before, now_ms,
+                                         actor, evidence_id, manual_cause_cleared)
+            except ipc.ProtocolError as exc:
+                raise SupervisorUnavailable(str(exc)) from exc
+            if generation == self._control_generation:
+                self.risk_state = updated
+                self.halt_reasons = set(updated.reasons)
+                self._persisted_halts = set(updated.reasons)
+                self.epoch = max(self.epoch, updated.epoch)
+                self._risk_persisted = updated
+            else:
+                # Even a repeated Kill or crossing-then-bounce during COMMIT
+                # vetoes application of the recovery result to the local gate.
+                self._accept_risk(replace(self.risk_state, epoch=max(self.risk_state.epoch, updated.epoch) + 1))
+                self._risk_persisted = updated
+                await self._flush_halts()
+                raise SupervisorUnavailable("new control input superseded re-arm")
+            return self.risk_state
 
     async def flatten_progress(self, phase, *, now_ms):
         async with self._operation():

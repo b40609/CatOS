@@ -40,6 +40,11 @@ class ExecutionJournal:
     def unresolved(self):
         return [dict(row) for row in self.db.execute("SELECT * FROM execution_orders WHERE settled=0 ORDER BY rowid")]
 
+    def reduction_conflict(self, position):
+        with localcontext(research._CONTEXT):
+            return any(json.loads(row["payload_json"])["reduceOnly"] or D(row["quantity"]) * position < 0
+                       for row in self.unresolved())
+
     def _dirty(self, bot_id):
         self.db.execute("UPDATE bots SET revision=revision+1 WHERE bot_id=?", (bot_id,))
         self.db.execute("UPDATE ownership SET reconciled_revision=NULL,fills_reconciled=0 WHERE bot_id=?", (bot_id,))
@@ -67,9 +72,11 @@ class ExecutionJournal:
                     risk_time=self.j.risk_state().time_ms)
 
     def _known(self, owner, position, *, allow_unknown_increase=False):
+        protection = self.j.protection.state(owner['bot_id'])
         return (owner["position"] is not None and D(owner["position"]) == position
                 and owner["reconciled_revision"] is not None and owner["fills_reconciled"]
-                and (owner["unknown_count"] == 0 or allow_unknown_increase) and owner["conditional_open"] == 0)
+                and (owner["unknown_count"] == 0 or allow_unknown_increase)
+                and owner["conditional_open"] == int(protection['active'] is not None))
 
     def prepare(self, bot_id, intent_key, now_ms):
         ipc.integer(now_ms, "submit time")
@@ -95,12 +102,15 @@ class ExecutionJournal:
                 reduction |= bool(held["reduce_only"])
             s = state.snapshot
             position = D(owner["position"]) if owner["position"] is not None else D("0")
+            reduction |= self.reduction_conflict(position)
             verdict = risk.evaluate(state, self.j.risk_limits, self.j._checkpoint(bot).config.contract,
                 D(row["target"]), position, now_ms, held_buy=buys, held_sell=sells,
                 held_reduction=reduction, reconciled=self._known(owner, position))
             allowed = (s is not None and row["eligible"] and row["epoch"] == state.epoch
+                       and (verdict.reduce_only or not self.j.protection.blocked(bot_id))
                        and now_ms < deadline and verdict.accepted and verdict.quantity == qty
-                       and verdict.reduce_only == bool(row["reduce_only"]) and not self.unresolved())
+                       and verdict.reduce_only == bool(row["reduce_only"])
+                       and (verdict.reduce_only or not self.unresolved()))
             request = self._insert(intent_key, bot, qty, bool(row["reduce_only"]), deadline,
                                    state.epoch, D(row["amount"]), intent_key,
                                    "SUBMITTING" if allowed else "ABORTED")
@@ -157,6 +167,10 @@ class ExecutionJournal:
             quantity = D(row["quantity"])
             total = D(row["filled"])
             delta = D("0")
+            _, initial_owner = self.j._require_owner(row['bot_id'])
+            if initial_owner['position'] is None:
+                raise OwnershipError('fills require a reconciled initial position')
+            cost_position = D(initial_owner['position'])
             seen = set()
             for fill in report.fills:
                 contract = self.j._checkpoint(self.j._bot(row["bot_id"])).config.contract
@@ -174,6 +188,9 @@ class ExecutionJournal:
                     continue
                 self.db.execute("INSERT INTO execution_fills VALUES (?,?,?,?,?,?)",
                     (report.exchange_id, fill.trade_id, key, str(fill.quantity), str(fill.price), str(fill.fee)))
+                signed = fill.quantity if quantity > 0 else -fill.quantity
+                self.j.protection.fill(row['bot_id'], cost_position, signed, fill.price)
+                cost_position += signed
                 delta += fill.quantity
             total += delta
             previous_cumulative = D("0") if row["report_json"] is None else D(json.loads(row["report_json"])["cumulative"])
@@ -224,6 +241,8 @@ class ExecutionJournal:
         live = sum(row["state"] in ("LIVE", "PARTIAL") for row in unresolved)
         if evidence.ordinary_open != live:
             raise OwnershipError("ordinary order inventory disagrees with managed orders")
+        if evidence.conditional_open != int(self.j.protection.state(owner['bot_id'])['active'] is not None):
+            raise OwnershipError('conditional inventory disagrees with managed protection')
         if any(row["state"] in TERMINAL for row in unresolved) and evidence.fills_reconciled:
             raise OwnershipError("terminal order lacks complete fill evidence")
 

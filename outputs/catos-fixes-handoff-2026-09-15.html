@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>catOS 已知问题修补 · 开发交接 · 2026-09-15</title>
+<style>
+:root{color-scheme:dark;--bg:#111722;--panel:#192230;--line:#344257;--text:#e8edf5;--muted:#b0bdd0;--accent:#98c9ff;--amber:#ffd589}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 "Microsoft YaHei","Segoe UI",sans-serif}main{max-width:1100px;margin:auto;padding:48px 26px 72px}header{border-bottom:1px solid var(--line);padding-bottom:26px}h1{font-size:34px;line-height:1.35;margin:12px 0 18px}h2{font-size:24px;margin:36px 0 14px}h3{font-size:18px;margin:24px 0 8px}.eyebrow{color:var(--accent);letter-spacing:2px;font-size:13px}.lead{font-size:19px;max-width:870px}.muted,small{color:var(--muted)}.notice{border:1px solid #79633c;background:#28251f;color:#ffe4b0;border-radius:10px;padding:17px 20px;margin:20px 0}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:19px}.card strong{display:block;font-size:22px;margin:3px 0 8px}.card small{display:block}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th{text-align:left;color:var(--accent);background:var(--panel)}td,th{border-bottom:1px solid var(--line);padding:13px 12px;vertical-align:top}td:first-child{min-width:135px}td:last-child{min-width:220px}code{font:13px/1.6 Consolas,monospace;color:#b8dcff;overflow-wrap:anywhere}pre{background:#17202d;border:1px solid var(--line);border-radius:8px;padding:18px;overflow:auto;white-space:pre-wrap;word-break:break-word}pre code{color:var(--text)}ul,ol{padding-left:24px}li{margin:7px 0}a{color:var(--accent)}.badge{display:inline-block;padding:3px 9px;border:1px solid #79633c;border-radius:5px;color:var(--amber);font-size:12px}footer{margin-top:38px;border-top:1px solid var(--line);padding-top:20px;color:var(--muted);font-size:13px}@media(max-width:700px){main{padding:26px 16px}.cards{grid-template-columns:1fr}h1{font-size:27px}}@media print{body{background:white;color:#111}.notice,.card,th,pre{background:#f3f5f8;color:#111}code,pre code,.eyebrow,th,a,.muted,small,footer{color:#253b52}main{padding:0}.cards{display:block}.card{margin-bottom:8px}h2{break-after:avoid}}
+</style>
+</head>
+<body><main>
+<header>
+<div class="eyebrow">CATOS / DEVELOPMENT HANDOFF / 2026-09-15</div>
+<h1>已知问题修补<br>开发完成，等待独立验证</h1>
+<p class="lead">已实施本次静态审查确认、且能在既定政策内处理的代码与文档修补，并编写合成回归测试。<strong>没有执行测试，不能把补丁写入视为问题已验收关闭。</strong></p>
+<p class="muted">范围：额外研究入口、离线账户报告、普通减仓与人工恢复的交叉边界。没有推进 Demo 交易或 Live。</p>
+</header>
+<div class="cards">
+<div class="card"><small>开发交付</small><strong>代码与测试已写入</strong><small>完成针对性静态读回与接口核对。</small></div>
+<div class="card"><small>运行验证</small><strong>尚未执行</strong><small>未运行测试、编译、Git 或市场回测。</small></div>
+<div class="card"><small>真实账户</small><strong>对账仍未通过</strong><small>未读凭证、重跑采集、下单或修改账户。</small></div>
+</div>
+<div class="notice"><strong>授权边界不变：</strong>原 I-b-4 单次授权已执行并停止。此报告及下方验证命令均不授权重新采集。<code>reconciled=false</code>、<code>trade_authorized=false</code> 仍保持。</div>
+
+<section>
+<h2>01 / 修补清单</h2>
+<p><span class="badge">以下均为：已实施 · 待验证</span></p>
+<div class="scroll"><table>
+<thead><tr><th>问题</th><th>已实施的最小修补</th><th>源码及回归文件</th></tr></thead>
+<tbody>
+<tr><td>报告可能覆盖文件</td><td>拒绝输入同路径、非 HTML 和已有输出；渲染后独占创建；写入失败仅尝试清理文件身份仍匹配的本次部分输出。不是恶意本地文件系统竞争的安全保证。</td><td><code>catos/cli.py</code><br><code>tests/test_cli_output.py</code></td></tr>
+<tr><td>任意 symbol 套固定规格</td><td>额外 CLI 与 study 要求显式、symbol 匹配的 ContractSpec；不再隐含同一组规格。未查询或核验交易所 metadata。</td><td><code>catos/cli.py</code><br><code>catos/optuna_study.py</code><br>两入口专属测试</td></tr>
+<tr><td>Sharpe 精度／周期</td><td>权益差分至年化全程 Decimal；样本方差、365 天年、零无风险利率、明示周期。样本不足／零方差显示 N/A；无效权益或采样不伪造零收益率。新增展示回归保证 N/A 时仍保留 PnL。</td><td><code>catos/optuna_study.py</code><br><code>tests/test_optuna_study.py</code></td></tr>
+<tr><td>测试访问不存在字段</td><td>移除 request.method，断言实际 WireRequest、host、target、Demo header；GET 由既有 wire 层请求行测试覆盖，不改生产数据结构迎合错误测试。</td><td><code>tests/test_demo_collection.py</code><br>参考：<code>tests/test_okx_http.py</code></td></tr>
+<tr><td>冲突内容共用来源列表</td><td>同业务身份下各内容版本持有独立 observations；A／B／A 只保留两版本，A 来源归回 A，冲突告警保持。覆盖五类身份及 Decimal 等值格式。</td><td><code>catos/account_report.py</code><br><code>tests/test_account_report.py</code></td></tr>
+<tr><td>页号／游标／完成证据不足</td><td>校验真正整数页序 1..N、首游标空、连续链、无循环及终页后无续页；完成来源非零页、末 next 为空、无 issue，批次／来源标志一致。重复 evidence 不二次解码。</td><td><code>catos/account_report.py</code><br><code>tests/test_account_report.py</code></td></tr>
+<tr><td>余额错误无法安全定位</td><td>新增固定字段路径和原因枚举；报告保留 page／row，runner 摘要只聚合 alias／field／reason／count。保留 invalid_record:balance，不输出坏值、ID 或异常文本。</td><td><code>catos/account_report.py</code><br><code>catos/demo_collection.py</code><br>各自专属测试</td></tr>
+<tr><td>合法普通减仓被全面阻挡</td><td>Journal 接受与 Execution 出站双阶段允许已核实的非冲突减仓；仍阻挡冲突减仓、反方向未结责任及普通 UNKNOWN 未核实部位，包含无 intent 的子单。原增仓订单与预约不取消、不释放。</td><td><code>catos/journal.py</code><br><code>catos/execution.py</code><br><code>tests/test_execution.py</code></td></tr>
+<tr><td>P5 恢复漏查 P6 责任</td><td>rearm 复用 protection.obligations，涵盖 active／pending／uncertain／triggered；拒绝时保持锁存、epoch 和成功审计不变。failed-only 不扩张恢复政策，独立 P6 禁增仓仍有效。</td><td><code>catos/journal.py</code><br><code>tests/test_p5.py</code><br><code>tests/test_protection.py</code></td></tr>
+<tr><td>阶段与历史授权冲突</td><td>同步首页／交接，区分历史验收与本轮待验证；旧单次授权明确失效，不改变一般专用子账户交易政策。P6 本机模拟与实际交易所保护接入分开描述。</td><td><code>AGENTS.md</code>、<code>README.md</code>、<code>WORK_PLAN.md</code>及下列四份 docs 文件</td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+<h2>02 / 必须保留的行为</h2>
+<ul>
+<li><strong>合法不完整采集仍可返回已观测小计。</strong><code>incomplete_collection</code> 本身不阻断有效数据小计；新增 <code>page_chain_invalid</code>／<code>manifest_completion_mismatch</code> 才与原证据错误一起阻断。已观测小计不是全账户合计。</li>
+<li>不把 HTTP 单页或空页结束规则强加给通用 CollectionResult。合法部分前缀可零页，末 next 可为空或非空；重试使 requests 大于页数不算错误。</li>
+<li>Float 余额测试分层：采集层先拒绝 Float，因此直接调用 decoder 验证其固定诊断；没有放宽生产 JSON／金融数值检查。</li>
+<li>减仓仍要求已核实部位，保留普通 UNKNOWN 门控、永不盲重送、固定 tag <code>41cb53c54d6dABDE</code>、单 writer 原子预约与风险锁存。</li>
+<li>不取消／释放原增仓责任来换取减仓放行；Hard／Kill 紧急路径未改。没有数据库 schema 迁移或第二条交易出口。</li>
+<li>标准 <code>research_cli --config</code>、研究撮合核心及 Optuna 最终搜索评分转换边界未改。</li>
+</ul>
+<h3>接口兼容性变化</h3>
+<ul>
+<li><code>run_cli(..., *, contract=ContractSpec(...))</code> 与 <code>run_study(..., *, contract=ContractSpec(...), timeframe_ms=...)</code> 必须提供匹配 symbol 的规格。</li>
+<li>两个额外 CLI 均要求 <code>--symbol --base-per-contract --tick-size --lot-size --min-size</code>；study 的 <code>--timeframe-ms</code> 默认 3600000。</li>
+<li><code>compute_annualized_sharpe(..., *, timeframe_ms=...)</code> 返回 <code>Decimal | None</code>；旧 <code>hours_per_year</code> 参数不再支持。</li>
+<li>study 固定最大预热 80 根，实际 CSV 必须另有正式评估数据；评分不是账户风控依据。</li>
+</ul>
+</section>
+
+<section>
+<h2>03 / 独立验证交接</h2>
+<p><strong>以下命令尚未执行。</strong>仅供既定验证模型在项目根目录中运行。先检查目标测试只使用合成数据、临时目录／数据库与 FakeExchange；不得调用真实凭证 loader 或正式采集入口。</p>
+<h3>A. 直接受影响的七个测试文件</h3>
+<p>使用 Python 3.11+ 的隔离环境。下方选择已提供的托管 Python；执行前须确认该解释器环境具备 <code>requirements-research.txt</code> 指定的 <code>optuna==4.9.0</code>。本轮未检查／安装依赖；缺失时应记录环境阻塞，不能跳过后宣称通过，也不要全局安装。</p>
+<pre><code># PowerShell；在当前项目根目录执行，不是现在自动执行。
+$python = "C:\Users\user\.workbuddy-ai\binaries\python\versions\3.13.12\python.exe"
+$tests = @(
+    "test_cli_output.py",
+    "test_optuna_study.py",
+    "test_account_report.py",
+    "test_demo_collection.py",
+    "test_execution.py",
+    "test_p5.py",
+    "test_protection.py"
+)
+foreach ($test in $tests) {
+    &amp; $python -B -m unittest discover -s tests -p $test -v
+    if ($LASTEXITCODE -ne 0) { throw "Test failed: $test" }
+}</code></pre>
+<h3>B. 对应调用链回归，不运行全套或市场回测</h3>
+<p>在 A 组通过后，按本次修改的共享边界核对下列文件。全部仍是本地验证；<code>test_okx_http.py</code> 中的 wire 测试只允许本机合成 TLS，不能替换成真实站点；程序中断测试使用临时数据库和子进程。</p>
+<div class="scroll"><table>
+<thead><tr><th>共享边界</th><th>回归文件</th><th>验证目的</th></tr></thead>
+<tbody>
+<tr><td>Journal／Supervisor</td><td><code>test_journal.py</code><br><code>test_supervisor.py</code><br><code>test_risk_journal.py</code><br><code>test_risk_supervisor.py</code></td><td>原子预约、已接受意图、恢复拒绝的事务不变性、所有权与旧 epoch 不复活。</td></tr>
+<tr><td>执行生命周期</td><td><code>test_execution_supervisor.py</code><br><code>test_execution_process.py</code></td><td>实际模拟派送、重启、SUBMITTING／UNKNOWN、终态与 settled 区别。</td></tr>
+<tr><td>采集证据及 wire</td><td><code>test_bounded_pagination.py</code><br><code>test_okx_collection.py</code><br><code>test_okx_http.py</code></td><td>collector 与更严格报告契约一致；有效部分页及重试不被误判；GET 请求行保持。</td></tr>
+</tbody></table></div>
+<p>单文件命令模板：<code>&amp; $python -B -m unittest discover -s tests -p test_journal.py -v</code>。每项记录实际命令、解释器、退出码、通过／失败／跳过数及错误。失败须定位并修正后重验，不能沿用历史通过数。</p>
+<h3>C. 验收出口</h3>
+<ol>
+<li>重点确认多空方向、Soft、撤单中、UNKNOWN、无 intent 子单及 P6 首次 create 超时均走到实际被修改分支，不仅检查函数存在。</li>
+<li>检查未验证字段仍是未知，不补零、不自选冲突版本、不默认归因。测试日志和摘要不含真实数据或凭证。</li>
+<li>仅由验证模型按既有权限补语法与补丁格式核对；本轮未执行编译或任何 Git 操作，不提供提交／推送授权。</li>
+<li>独立验证完成后才把相应代码问题标为验收关闭。验收本地补丁仍不意味着账户已对账、获得交易许可或可自动继续下一阶段。</li>
+</ol>
+</section>
+
+<section>
+<h2>04 / 未关闭的问题与证据缺口</h2>
+<div class="notice"><strong>不能凭本轮代码修补消除真实账户差异。</strong>历史完整响应没有保留，新字段诊断无法恢复旧响应，也不能证明当时的余额或模式错误已经修复。</div>
+<ul>
+<li><code>invalid_record:balance</code> 的历史具体失败字段仍未知；<code>mode_mismatch</code> 仍需实际证据核实。</li>
+<li>本地归因未载入、陌生 algo、P6 子单／保护／触发关联与结案仍未完成。不得从 tag 或 ID 猜测并接管责任。</li>
+<li>来源新鲜度、窗口覆盖、固定日初基准及未定义资金流分类不能自行定案。</li>
+<li>DNS 没有硬时限、普通 Worker 不是 OS 安全沙箱等已有边界未在本轮扩张保证。</li>
+<li>若后续需要新采集或保存私人报告，先明确新的授权、范围与保存政策；不要复用历史一次性授权。</li>
+</ul>
+<p class="muted">阶段依据为本地 <code>WORK_PLAN.md</code> 与 <code>docs/demo-collection-handoff.md</code> 的历史记录：最后一轮 config gate 与 13 个来源分页完成、driver／wire 各 41 次，但未对账。以上不是本轮重新运行或外部查证的结果。</p>
+</section>
+
+<section>
+<h2>05 / 文件清单与交付范围</h2>
+<h3>生产文件（六个）</h3>
+<pre><code>catos/cli.py
+catos/optuna_study.py
+catos/account_report.py
+catos/demo_collection.py
+catos/journal.py
+catos/execution.py</code></pre>
+<h3>新增测试文件</h3>
+<pre><code>tests/test_cli_output.py
+tests/test_optuna_study.py</code></pre>
+<h3>修改的既有测试文件</h3>
+<pre><code>tests/test_account_report.py
+tests/test_demo_collection.py
+tests/test_execution.py
+tests/test_p5.py
+tests/test_protection.py</code></pre>
+<h3>同步的规则与文档</h3>
+<pre><code>AGENTS.md
+README.md
+WORK_PLAN.md
+docs/account-decoder-handoff.md
+docs/demo-collection-handoff.md
+docs/execution.md
+docs/risk.md</code></pre>
+<p>另追加项目工作记录，并新增本交接文件：<code>outputs/catos-fixes-handoff-2026-09-15.html</code>。清单依据本次编辑记录与源码读取，不是 Git diff 输出。</p>
+<p>先前 <code>outputs/catos-review-2026-09-15.html</code> 保留为原审查时点记录，不覆盖、不将其中的旧发现冒充当前补丁状态。本交接文件说明后续修补进展。</p>
+</section>
+<footer>本地、自包含交接页；无脚本、无外部资源、无真实账户数据。完成范围是代码／测试编写与静态核对；运行验证、真实账户对账、Demo 交易和 Live 均不在本次完成声明内。</footer>
+</main></body></html>

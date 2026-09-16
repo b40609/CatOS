@@ -51,7 +51,7 @@ class RiskTests(unittest.TestCase):
                 self.assertFalse(verdict(snapshot(**changes)).accepted)
 
     def test_legal_reduction_survives_all_increase_gates(self):
-        state = risk.observe(risk.State(), snapshot(position=D("10"), equity=D("900"),
+        state = risk.observe(risk.State(), snapshot(position=D("10"), equity=D("800"),
                                                    risk_equity=D("0"), margin_ok=False))
         self.assertEqual(state.mode, "FLAT")
         for target in (D("0"), D("5")):
@@ -78,17 +78,17 @@ class RiskTests(unittest.TestCase):
         self.assertEqual(verdict(snapshot(position=D("10")), target="-1").reason, "cross_zero_forbidden")
 
     def test_soft_hard_boundaries_and_fixed_external_flow_denominator(self):
-        for equity, expected in (("970.0001", "RUN"), ("970", "NO_INCREASE"), ("950", "FLAT")):
+        for equity, expected in (("900.0001", "RUN"), ("900", "NO_INCREASE"), ("800", "FLAT")):
             self.assertEqual(risk.observe(risk.State(), snapshot(equity=D(equity))).mode, expected)
         # A 100 deposit is excluded, and does not dilute the original 1000 denominator.
-        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("1070"), external_net=D("100"))).mode, "NO_INCREASE")
-        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("850"), external_net=D("-100"))).mode, "FLAT")
+        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("1000"), external_net=D("100"))).mode, "NO_INCREASE")
+        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("700"), external_net=D("-100"))).mode, "FLAT")
 
     def test_taipei_midnight_requires_explicit_basis_and_keeps_latches(self):
         midnight = risk.DAY_MS - risk.TAIPEI_OFFSET_MS
         self.assertEqual(risk.taipei_day(midnight - 1), 0)
         self.assertEqual(risk.taipei_day(midnight), 1)
-        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1, equity=D("950")))
+        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1, equity=D("800")))
         op = state.flatten_id
         state = risk.observe(state, snapshot(2, midnight, basis=None, equity=D("2000")))
         self.assertEqual((state.mode, state.health, state.flatten_id), ("FLAT", "DEGRADED", op))
@@ -105,7 +105,7 @@ class RiskTests(unittest.TestCase):
             risk.observe(restored, snapshot())
 
     def test_bounce_deposit_kill_and_progress_never_rearm(self):
-        state = risk.observe(risk.State(), snapshot(equity=D("950")))
+        state = risk.observe(risk.State(), snapshot(equity=D("800")))
         epoch = state.epoch
         op = state.flatten_id
         state = risk.observe(state, snapshot(2, 1, equity=D("3000"), external_net=D("2000")))

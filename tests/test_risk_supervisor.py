@@ -74,7 +74,7 @@ class RiskSupervisorTests(unittest.IsolatedAsyncioTestCase):
             task = asyncio.create_task(self.event(2))
             try:
                 await asyncio.wait_for(entered.wait(), 2)
-                self.observe(equity=D("950"))
+                self.observe(equity=D("800"))
                 op = self.supervisor.risk_state.flatten_id
                 self.observe(equity=D("1100"))
                 self.assertEqual(self.supervisor.risk_state.mode, "FLAT")
@@ -119,7 +119,7 @@ class RiskSupervisorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.supervisor.total_reserved, D("2"))
 
     async def test_failed_control_commit_is_not_reported_durable(self):
-        self.observe(equity=D("950"))
+        self.observe(equity=D("800"))
         old = self.supervisor._risk_persisted
         with patch.object(self.supervisor._journal, "_commit", side_effect=sqlite3.OperationalError("synthetic full disk")):
             with self.assertRaises(sqlite3.OperationalError):

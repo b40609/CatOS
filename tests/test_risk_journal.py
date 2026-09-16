@@ -67,7 +67,7 @@ class RiskJournalTests(unittest.TestCase):
 
     def test_halt_invalidates_increase_but_retains_obligation_and_restart(self):
         prepare_and_commit(self.journal, 2, target=D("2"))
-        self.observe(equity=D("950"))
+        self.observe(equity=D("800"))
         state = self.journal.risk_state()
         self.assertEqual(self.journal.connection.execute("SELECT eligible FROM risk_orders").fetchone()[0], 0)
         self.assertEqual(self.journal.total_reserved(), D("2"))
@@ -82,7 +82,7 @@ class RiskJournalTests(unittest.TestCase):
         self.assertEqual(prepare_and_commit(self.journal, 3, target=D("2")).reason, "risk_snapshot_stale")
 
     def test_reduction_under_hard_latch_has_reduce_only_and_no_new_exposure(self):
-        self.observe(position=D("10"), equity=D("950"))
+        self.observe(position=D("10"), equity=D("800"))
         self.journal.reconcile("bot", proof(self.journal.snapshot("bot")["revision"], position=D("10"), attributed_bot_id="bot"))
         cp = self.journal.snapshot("bot")["checkpoint"]
         payload = input_for(2)
@@ -127,7 +127,7 @@ class RiskJournalTests(unittest.TestCase):
         self.addCleanup(journal.close)
         self.assertEqual(journal.snapshot("bot")["checkpoint"].event_seq, 1)
         self.assertEqual(journal.risk_state().mode, "FLAT")
-        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 3)
+        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 5)
 
     def test_enabling_risk_refuses_existing_fixture_obligations(self):
         legacy = self.path.parent / "legacy.sqlite3"

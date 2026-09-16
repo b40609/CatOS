@@ -1,11 +1,14 @@
 """Command-line interface for catOS dual-moving-average strategy research.
 
 Usage:
-    py -3 -B -m catos.cli --csv data/BTC-USDT-SWAP-1H.csv --symbol BTC-USDT-SWAP --fast 10 --slow 30 --report reports/btc_real_1h.html
+    Supply --csv, --symbol, --base-per-contract, --tick-size, --lot-size,
+    --min-size and --report explicitly. Specs are research inputs, not verified
+    exchange metadata. See README.md for the synthetic example.
 """
 
 import argparse
 import csv
+import os
 from collections import deque
 from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
@@ -82,26 +85,27 @@ def run_cli(
     initial_balance: str = "10000",
     fee_rate: str = "0.0005",
     slippage_bps: str = "1",
+    *,
+    contract: ContractSpec | None = None,
 ) -> Path:
-    """Execute backtest and render HTML report."""
+    """Execute research with explicit caller-supplied, symbol-matched specs."""
     csv_p = Path(csv_path).resolve()
     if not csv_p.exists():
         raise FileNotFoundError(f"CSV 檔案不存在: {csv_path}")
 
     report_p = Path(report_path).resolve()
-    report_p.parent.mkdir(parents=True, exist_ok=True)
+    if report_p == csv_p:
+        raise ValueError("output path cannot be the same as input CSV path")
+    if report_p.suffix.lower() != ".html":
+        raise ValueError("output path must end with .html")
+    if report_p.exists():
+        raise ValueError(f"output file already exists: {report_p}")
 
+    if not isinstance(contract, ContractSpec) or contract.inst_id != symbol:
+        raise ValueError("explicit ContractSpec matching symbol is required")
     timeframe_ms = detect_timeframe_ms(csv_p)
 
     with localcontext(_CONTEXT):
-        # Default OKX USDT-margined SWAP specs for BTC/ETH/major swaps
-        contract = ContractSpec(
-            inst_id=symbol,
-            base_per_contract=Decimal("0.01"),
-            tick_size=Decimal("0.1"),
-            lot_size=Decimal("1"),
-            min_size=Decimal("1"),
-        )
         config = BacktestConfig(
             contract=contract,
             timeframe_ms=timeframe_ms,
@@ -124,9 +128,31 @@ def run_cli(
             warmup_bars=slow,
         )
 
-        # Render self-contained HTML report
+        # Render before creating the output; never truncate an existing file.
         html_report = render_report(result)
-        report_p.write_text(html_report, encoding="utf-8")
+        report_p.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            stream = open(report_p, mode="x", encoding="utf-8")
+        except FileExistsError as exc:
+            raise ValueError(f"output file already exists: {report_p}") from exc
+        created_stat = None
+        try:
+            created_stat = os.fstat(stream.fileno())
+            stream.write(html_report)
+            stream.flush()
+            stream.close()
+        except BaseException:
+            try:
+                stream.close()
+            except BaseException:
+                pass
+            # Only remove our partial output, not a replacement at this path.
+            try:
+                if created_stat is not None and os.path.samestat(created_stat, report_p.stat()):
+                    report_p.unlink()
+            except OSError:
+                pass
+            raise
 
         # Print backtest summary
         p = result.performance
@@ -149,7 +175,11 @@ def main(argv: list[str] | None = None) -> int:
         description="catOS Dual SMA Strategy Backtest CLI"
     )
     parser.add_argument("--csv", required=True, help="Path to candle CSV file")
-    parser.add_argument("--symbol", default="BTC-USDT-SWAP", help="Contract symbol")
+    parser.add_argument("--symbol", required=True, help="Contract symbol matching caller-supplied specs")
+    parser.add_argument("--base-per-contract", required=True, help="Explicit base-asset units per contract")
+    parser.add_argument("--tick-size", required=True, help="Explicit price tick")
+    parser.add_argument("--lot-size", required=True, help="Explicit contract quantity step")
+    parser.add_argument("--min-size", required=True, help="Explicit minimum contract quantity")
     parser.add_argument("--fast", type=int, default=10, help="Fast SMA period")
     parser.add_argument("--slow", type=int, default=30, help="Slow SMA period")
     parser.add_argument("--quantity", default="2", help="Target contract size")
@@ -165,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             slow=args.slow,
             report_path=args.report,
             quantity=args.quantity,
+            contract=ContractSpec(args.symbol, Decimal(args.base_per_contract),
+                                  Decimal(args.tick_size), Decimal(args.lot_size), Decimal(args.min_size)),
         )
         return 0
     except Exception as e:

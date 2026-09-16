@@ -54,6 +54,24 @@ class ExecutionSupervisorTests(unittest.IsolatedAsyncioTestCase):
     def observe(self, **changes):
         return self.s.observe_risk(snapshot(self.s.risk_state.seq + 1, 3 * STEP, valid_until_ms=10 * STEP, **changes))
 
+    async def test_rearm_does_not_revive_old_intent_and_new_intent_can_dispatch(self):
+        self.observe(equity=D("900"))
+        self.observe()
+        await self.s.persist_controls()
+        with self.assertRaises(SupervisorUnavailable):
+            await self.s.rearm(now_ms=3 * STEP, actor="operator", evidence_id="blocked-held")
+        # Explicit control tick retires never-sent work; re-arm cannot do that.
+        await self.s.control_step(now_ms=3 * STEP, expires_at_ms=4 * STEP)
+        await self.reconcile()
+        await self.s.rearm(now_ms=3 * STEP, actor="operator", evidence_id="reconciled")
+        self.assertIsNone(await self.s.dispatch(self.key, now_ms=3 * STEP))
+        receipt = await self.s.process_bar(4, bar(3, "102"), account(3),
+            expires_at_ms=5 * STEP, now_ms=4 * STEP)
+        self.assertEqual(receipt.reason, "exposure_reserved")
+        self.exchange.enqueue("submit", report(receipt.intent_key))
+        await self.s.dispatch(receipt.intent_key, now_ms=4 * STEP)
+        self.assertEqual(sum(op == "submit" for op, _ in self.exchange.calls), 1)
+
     async def test_ack_lost_query_fill_restart_and_no_resubmit(self):
         self.exchange.enqueue("submit", TimeoutError("accepted but ACK lost"))
         first = await self.s.dispatch(self.key, now_ms=3 * STEP)
@@ -140,7 +158,7 @@ class ExecutionSupervisorTests(unittest.IsolatedAsyncioTestCase):
     async def test_soft_control_tick_cancels_increase_and_keeps_latch(self):
         self.exchange.enqueue("submit", report(self.key))
         await self.s.dispatch(self.key, now_ms=3 * STEP)
-        self.observe(equity=D("970"))
+        self.observe(equity=D("900"))
         self.exchange.enqueue("cancel", report(self.key, 2, "CANCELED", complete=True))
         await self.s.control_step(now_ms=3 * STEP, expires_at_ms=4 * STEP)
         self.assertEqual(self.s.risk_state.mode, "NO_INCREASE")
@@ -151,13 +169,13 @@ class ExecutionSupervisorTests(unittest.IsolatedAsyncioTestCase):
         self.exchange.enqueue("submit", report(self.key, status="FILLED", fills=(Fill("entry", D("2"), D("100")),), complete=True))
         await self.s.dispatch(self.key, now_ms=3 * STEP)
         await self.reconcile(position=D("2"), attributed_bot_id="bot")
-        self.observe(position=D("2"), equity=D("950"))
+        self.observe(position=D("2"), equity=D("800"))
         op = self.s.risk_state.flatten_id
         child = canonical(dict(kind="flatten", account_id="fake-account", bot_id="bot", flatten_id=op, child=0))
         self.exchange.enqueue("submit", report(child, status="FILLED", fills=(Fill("exit", D("2"), D("99")),), complete=True))
         await self.s.flatten_step(now_ms=3 * STEP, expires_at_ms=4 * STEP)
         await self.reconcile()
-        self.observe(equity=D("950"))
+        self.observe(equity=D("800"))
         await self.s.flatten_step(now_ms=3 * STEP, expires_at_ms=4 * STEP)
         await self.s.flatten_progress("DONE", now_ms=3 * STEP)
         self.assertEqual((self.s.risk_state.mode, self.s.risk_state.phase, self.s.risk_state.flatten_id), ("FLAT", "DONE", op))

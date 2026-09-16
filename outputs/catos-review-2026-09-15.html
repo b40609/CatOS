@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>catOS 项目静态审查 · 2026-09-15</title>
+<style>
+:root{color-scheme:dark;--bg:#11151c;--panel:#1b222d;--text:#e8edf5;--muted:#acb8ca;--line:#344156;--blue:#99bdff;--green:#95d8b8;--amber:#f6ce89;--red:#ffabab}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,"Microsoft YaHei",sans-serif;line-height:1.75}main{max-width:1080px;margin:auto;padding:48px 28px 60px}h1{font-size:34px;line-height:1.3;margin:12px 0 18px}h2{font-size:23px;margin:38px 0 16px}h3{font-size:18px;margin:8px 0}p{margin:10px 0}.eyebrow{color:var(--blue);font-size:13px;letter-spacing:2px}.lead{font-size:20px;max-width:900px}.muted,small{color:var(--muted)}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:23px;margin:16px 0}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:26px 0}.metric{padding:20px;border:1px solid var(--line);border-radius:10px}.metric strong{display:block;font-size:28px}.metric span{color:var(--muted);font-size:14px}.badge{display:inline-block;border-radius:5px;padding:2px 9px;font-size:12px;border:1px solid var(--line);color:var(--amber);margin-right:8px}.high{color:var(--red)}.ok{color:var(--green)}code{font-family:Consolas,monospace;font-size:.92em;color:#c1d6ff;overflow-wrap:anywhere}.source{font-size:13px;color:var(--muted);margin-top:14px}.source code{color:var(--muted)}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:13px 11px;vertical-align:top}th{color:var(--muted)}.table-wrap{overflow-x:auto}li{margin:7px 0}.notice{border-left:3px solid var(--amber);padding:10px 18px;background:var(--panel)}footer{margin-top:38px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}@media(max-width:680px){main{padding:28px 17px}h1{font-size:28px}.metrics{grid-template-columns:1fr}.card{padding:17px}table{min-width:630px}}@media print{body{background:white;color:#111}main{max-width:none;padding:12px}.card,.metric,.notice{background:white;border-color:#888;break-inside:avoid}code,.source code,.muted,small,th,.source,footer{color:#333}.badge{color:#111}.eyebrow{color:#333}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">CATOS / CODE &amp; DELIVERY REVIEW</div>
+<h1>已有可审查的底座，<br>当前卡点是账户对账，而非功能数量。</h1>
+<p class="lead">研究核心与本机模拟交易底座已有实现和历史验收记录。最新交接记载 Demo 只读采集完成，但账户对账未通过；这不是可下单的 Demo 产品，更不是 Live 验收。</p>
+<p class="muted">审查日期：2026-09-15 ｜ 项目：CatOS_Astra - 複製 ｜ 方法：静态源码与文档核对</p>
+<div class="metrics"><div class="metric"><strong>24</strong><span>catos 下 Python 文件</span></div><div class="metric"><strong>23 / 307</strong><span>测试模块 / 静态 test_ 方法数</span></div><div class="metric"><strong>未执行</strong><span>测试、交易入口、采集及 Git 操作</span></div></div>
+<p class="source">计数来源：本地 catos/**/*.py 与 tests/test_*.py；测试方法包含 async def。307 是静态定义数量，不是测试发现或通过数量；tests 下另有 3 个 fixture 脚本。</p>
+
+<h2>01 · 实际开发阶段</h2>
+<div class="table-wrap"><table><thead><tr><th>模块</th><th>静态核对与历史记录</th><th>不能据此声称</th></tr></thead><tbody>
+<tr><td>研究核心、CSV、报告、标准研究 CLI、Optuna</td><td>已有实现及历史验收。Closed Bar、预热隔离、次根开盘成交、Decimal 与顺序搜索边界清楚。</td><td>未验证真实市场可成交性、保证金、强平或策略盈利能力。</td></tr>
+<tr><td>D–G 本机模拟交易底座</td><td>Worker、JSON IPC、Supervisor、SQLite、风控、FakeExchange 和恢复流程已实现；工作计划记载 v0.2-simulation-base 封版。</td><td>FakeExchange 通过不等于 OKX 实盘行为通过。</td></tr>
+<tr><td>P5 / P6</td><td>本机日损门槛与人工恢复、灾难保护生命周期已有实现和历史测试记录。</td><td>尚不等于交易所端保护与真实账户日损闭环。</td></tr>
+<tr><td>I-b-1 至 I-b-3</td><td>采集 driver、decoder、受限 HTTP transport 已实现；最新工作计划记载独立验收完成。</td><td>本轮没有重新运行测试或核验其历史提交。</td></tr>
+<tr><td>I-b-4</td><td>最新记录为 13 个来源的分页采集均完成、driver / wire 各 41 次、config gate 通过。</td><td><code>reconciled=false</code>，<code>trade_authorized=false</code>。</td></tr>
+<tr><td>J Demo 下单 / Live / 产品 UI</td><td>J / Live 未启动；完整本机 UI 仍不属于已交付能力。</td><td>不能把“HTTP 采集成功”解释成“可以交易”。</td></tr>
+</tbody></table></div>
+<p class="source">依据：<code>WORK_PLAN.md:3–21,39,51–56,80–89</code>；<code>docs/demo-collection-handoff.md:63–73</code>；<code>docs/demo-entry-contract.md:83–89</code>。历史记录仅作为项目交接证据引用。</p>
+
+<h2>02 · 按处理优先级排列的发现</h2>
+<div class="notice">以下 3 项代码问题位于额外研究入口 <code>catos/cli.py</code> / <code>catos/optuna_study.py</code>。项目在 <code>docs/local-simulation-plan.md:11</code> 已明确把它们排除在当时的已验收基线外；不能据此否定标准 <code>research_cli.py</code> 或 <code>optimization.py</code> 的历史验收。</div>
+
+<section class="card"><span class="badge high">高优先级 · 数据损坏</span><h3>1. 额外 CLI 可直接覆盖输入 CSV 或已有报告</h3>
+<p><code>run_cli()</code> 解析输入及输出路径后，没有拒绝同一路径，也没有检查输出是否已存在。K 线读入并完成回测后，直接用 <code>write_text()</code> 截断写入。</p>
+<p><strong>触发条件：</strong>对一份可成功回测的 CSV，将 <code>--report</code> 指向同一份 CSV，或指向已有文件。该入口不检查输出扩展名，因此会把原内容替换为 HTML。</p>
+<p><strong>最小修复：</strong>复用标准入口的路径检查与独占创建；补“输入=输出”“已有输出”“写入中断”测试，不需要重构研究核心。</p>
+<p class="source">代码：<code>catos/cli.py:87–94,127–129</code>。已有可复用实现：<code>catos/research_cli.py:206–221,243–265</code>。本轮仅静态确认，未执行覆盖操作。</p></section>
+
+<section class="card"><span class="badge high">高优先级 · 研究结果正确性</span><h3>2. 允许自选 symbol，却始终使用同一套合约规格</h3>
+<p>两个额外入口接受 <code>--symbol</code>，但均固定每张标的数量 <code>0.01</code>、tick <code>0.1</code>、lot / min <code>1</code>。更换合约名称不会更换计算规格。</p>
+<p><strong>影响：</strong>当输入合约规格与硬编码不同、且 OHLC 恰好仍满足固定 tick 时，校验可能通过，但名义价值、手续费和盈亏按错误单位计算。Decimal 只能保证所用数值的十进位计算，不能纠正错误合约单位。</p>
+<p><strong>最小修复：</strong>沿用现有 JSON 配置，显式提供合约规格；若暂不支持配置，限制为明示的合成样例，不把固定值宣称为多合约通用默认。</p>
+<p class="source">代码：<code>catos/cli.py:97–111,152</code>；<code>catos/optuna_study.py:103–116,194</code>。传播路径：<code>catos/research.py:264,278–289</code>。无需查询或猜测当前交易所规格即可确认该接口缺口。</p></section>
+
+<section class="card"><span class="badge">中优先级 · 统计精度</span><h3>3. 夏普比率在求收益率前将权益转为 Float</h3>
+<p><code>compute_annualized_sharpe()</code> 先对相邻权益调用 <code>float()</code>，再相减及计算收益率。大权益下的小额变化可能被抹平，并在标准差为零时返回 <code>0.0</code>。</p>
+<p><strong>触发示例：</strong>相邻 Decimal 权益为 <code>10000000000000000</code> 与 <code>10000000000000001</code>，二进制浮点无法保留这个差异。此为数值反例，不是真实账户数据。</p>
+<p><strong>最小修复：</strong>收益率、均值及方差保持 Decimal；明确零方差、非正权益和时间频率的统计语义，补大基数小变化测试。该问题影响额外脚本显示的 Sharpe，未发现其回流至账务或风控。</p>
+<p class="source">代码：<code>catos/optuna_study.py:59–84,170–182</code>。已验收优化控制器的转换边界另见 <code>catos/optimization.py:102–110,162–177</code>，不要混为一谈。</p></section>
+
+<section class="card"><span class="badge">中优先级 · 交接与授权一致性</span><h3>4. 当前状态和单次例外散落在互相冲突的文件中</h3>
+<ul><li><code>README.md:3–7</code> 仍称 I-b-4 待执行、I-b-3 待验证；<code>WORK_PLAN.md:3–13</code> 已记载采集与验收完成。</li>
+<li><code>docs/demo-collection-handoff.md:5</code> 仍称 config gate 未通过；同文件 <code>65–73</code> 已记载 gate 通过及剩余对账差异。</li>
+<li><code>AGENTS.md:21</code> 保留旧的指定来源与“Demo 子账户”单次例外；<code>WORK_PLAN.md:7–9</code> 和实际入口 <code>catos/demo_collection.py:30,249–250</code> 已反映更新后的来源与 Demo 主账户。</li></ul>
+<p><strong>影响：</strong>后续开发者可能误判完成阶段、执行角色或沿用已消耗的单次授权。文档里的历史授权不是本轮重新采集权限。</p>
+<p><strong>最小修复：</strong>统一一个“当前状态”入口，旧记录保留日期并明确为历史；对齐单次主账户例外与正式交易子账户政策，不扩大例外、不自动重跑。</p></section>
+
+<section class="card"><span class="badge">中优先级 · 测试接口错误</span><h3>5. 新增模式查询测试访问不存在的 request.method</h3>
+<p><code>test_config_mode_read_is_one_demo_get_and_exposes_only_mode</code> 在第 206 行断言 <code>request.method</code>，但 <code>WireRequest</code> 只有 host、target、headers、timeout_ms、max_body_bytes 字段，未定义 method。测试执行到这里会触发 AttributeError。</p>
+<p><strong>最小修复：</strong>在真实固定 GET 的 sender 边界验证 HTTP 方法，或明确调整请求契约；不要为了让测试通过而伪造方法字段。<code>tests/test_demo_collection.py</code> 当前静态已有 11 个测试，交接中的旧 9/9 记录不能代表这份代码现状。</p>
+<p class="source">证据：<code>tests/test_demo_collection.py:197–213</code>；<code>catos/okx_http.py:90–99,188,452</code>。这是静态可确定的接口不一致，并非本轮实际运行出的失败日志。</p></section>
+
+<section class="card"><span class="badge">中优先级 · 审计来源准确性</span><h3>6. 同 ID 冲突记录共享 observations 列表</h3>
+<p>同一订单 ID 的两条不同版本记录分别保留为 fact，但 <code>observations[key]</code> 始终复用同一列表。第二个版本追加来源时，第一个版本的 observations 也被改变，导致每个版本看起来均由两条来源支持。</p>
+<p><strong>影响：</strong>总体 <code>conflicting_observation</code> 仍会报警，未看到交易放行；但逐版本来源证据不准确。应按“身份＋内容版本”保存观察来源，另保留身份级冲突关系，并补“同 ID / 不同内容 / 不同来源”的测试。</p>
+<p class="source">代码：<code>catos/account_report.py:210–229</code>。现有冲突测试仅核对合计被抑制，未断言各版本来源隔离：<code>tests/test_account_report.py:97–100</code>。</p></section>
+
+<section class="card"><span class="badge">待专项复现 · P5 / P6 交叉边界</span><h3>7. 人工恢复未直接检查 pending / uncertain 保护责任</h3>
+<p><code>Journal.rearm()</code> 检查 ownership 的条件单数量、未知单数及普通执行表，但没有调用 <code>protection.obligations()</code> 或检查保护状态。当首次保护建立请求未确认且 active 仍为空时，条件单数量可能仍为零；该保护的 pending / uncertain 不在普通执行表里。</p>
+<p><strong>候选场景：</strong>Soft 锁存原因已经消失、普通订单均终结且部位对账完成，同时首次保护建立待查询。此时 re-arm 可能清除账户锁存，却仍有保护 UNKNOWN。独立 <code>protection.blocked()</code> 仍阻止增仓，不能把该问题描述为已证明的交易绕过。</p>
+<p><strong>下一步：</strong>以该组合状态补 P5 × P6 合成测试，确认恢复条件应拒绝未决责任；不要把合法已确认保护单与未决保护操作混同，也不要自行扩大恢复政策。</p>
+<p class="source">证据：<code>catos/journal.py:340–366,389–390</code>；<code>catos/protection.py:113–129,175–218</code>；<code>catos/execution.py:226–238</code>。本项为跨状态待复现风险，不计为已执行测试确证缺陷。</p></section>
+
+<h2>03 · 当前阻断：采集完成，账户证据仍不足</h2>
+<p>最新采集记录明确列出 <code>invalid_record:balance</code>、<code>missing_or_ambiguous:balance</code>、<code>mode_mismatch</code>、归因未加载、P6 关联缺口，以及新鲜度、窗口与日初基准未核实。完整报告当时只在内存中，程序退出后没有保留。</p>
+<p><strong>本次不能确定余额失败的具体字段。</strong>解码器要求多个数值字段，但在报告边界把错误统一压缩成 <code>invalid_record:&lt;source&gt;</code>；模式不符也汇总成一个代码。仅凭摘要无法区分空值、不适用字段、格式问题或具体历史记录，不应猜测原因，更不能用零补值或放宽检查“消除错误”。</p>
+<p><strong>建议下一片：</strong>先增加不含数值、凭证和原始 ID 的结构化诊断（来源、字段名、错误类别、记录索引），用合成样本验证。若后续确需新账户证据，应另行确认采集及保存范围；本轮不执行。之后才核对适用账户模式、完成归因与对账证据，满足 J 的进入条件。</p>
+<p class="source">依据：<code>docs/demo-collection-handoff.md:69–73</code>；<code>catos/account_report.py:67–82,198–203,235–245</code>；<code>catos/demo_collection.py:296–325,345–348</code>。</p>
+
+<h2>04 · 值得保留的设计</h2>
+<ul><li><strong>研究时序清晰：</strong>预热不决策，正式期只使用已收盘 K 线，下一根开盘撮合；未发现原指定研究核心的高置信具体缺陷。<code>research.py:331–385</code></li>
+<li><strong>精度边界明确：</strong>核心 Decimal context 隔离；标准优化器仅转换最终衍生评分。<code>research.py:307–317</code>、<code>optimization.py:137–179</code></li>
+<li><strong>Worker 职责克制：</strong>严格 JSON、单在途事件、有界通讯及显式 ACK；普通进程隔离没有被夸大为 OS 安全沙箱。<code>worker_host.py:138–206</code></li>
+<li><strong>持久化与失败语义已有基础：</strong>SQLite WAL / FULL，以及显式 SUBMITTING / UNKNOWN 状态；这些是应继续验证的机制，不是已经完成真实交易保证。<code>journal.py:163–166,237</code>、<code>execution.py:120–136,231–233</code></li>
+<li><strong>阶段隔离正确：</strong>只读报告始终不给交易授权；当前缺数据时保持阻断，比绕过检查继续交易更符合项目约束。</li></ul>
+
+<h2>05 · 建议处理顺序与验收</h2>
+<ol><li><strong>先修正新增测试接口并补交叉验证：</strong>模式查询测试核对真实 GET 边界；针对冲突来源隔离与 P5 × P6 未决保护恢复补最小合成测试。本轮没有执行这些测试。</li><li><strong>限定额外入口的使用范围：</strong>修复覆盖风险与硬编码规格，或保持为未验收实验入口。专属测试只用临时文件与合成数据。</li>
+<li><strong>统一项目当前状态：</strong>更新首页及授权例外说明，保留历史验收记录；不把文档更新当成新的账户授权。</li>
+<li><strong>补足解码诊断及契约样本：</strong>验证缺值保持未知、模式错误定位准确、诊断不泄露数据。</li>
+<li><strong>再完成账户对账：</strong>补真实权益 / 保证金适配、归因、P6、来源新鲜度与日初证据；完成并另获 Demo 写入授权后才考虑 J。</li></ol>
+<p>现在不建议优先加入多租户、跨平台沙箱、新数据库或复杂并行；也无需为了增加测试数量而默认跑全市场历史回测。</p>
+<footer>审查范围：本地项目文档、核心及相关测试静态阅读与搜索；不是完整安全审计。没有读取凭证、运行项目测试/编译/采集/交易入口，未核查 Git 工作树和远端，也未修改业务源码、交易数据库或账户设置。本报告不评估策略投资收益；代码缺陷与待集成能力已分开标识。所有行号对应本次读取版本。</footer>
+</main></body></html>

@@ -26,15 +26,19 @@ def taipei_day(time_ms):
 class Limits:
     leverage: Decimal = D("3.0")
     symbol_share: Decimal = D("0.50")
+    soft_loss: Decimal = D("0.10")
+    hard_loss: Decimal = D("0.20")
 
     def __post_init__(self):
         if decimal(self.leverage, "leverage") <= 0:
             raise ipc.ProtocolError("leverage must be positive")
         if not 0 < decimal(self.symbol_share, "symbol_share") <= 1:
             raise ipc.ProtocolError("symbol_share must be in (0,1]")
+        if not 0 < decimal(self.soft_loss, "soft_loss") < decimal(self.hard_loss, "hard_loss") <= 1:
+            raise ipc.ProtocolError("loss limits require 0 < soft < hard <= 1")
 
     def to_wire(self):
-        return dict(leverage=str(self.leverage), symbol_share=str(self.symbol_share))
+        return {name: str(value) for name, value in vars(self).items()}
 
 
 @dataclass(frozen=True)
@@ -154,7 +158,18 @@ def halt(state, reasons):
     return replace(state, mode=mode, reasons=merged, epoch=epoch, flatten_id=flatten_id, phase=phase)
 
 
-def observe(state, snapshot):
+def loss_reasons(state, limits):
+    s, basis = state.snapshot, state.basis
+    if (s is None or basis is None or basis.day != taipei_day(s.time_ms)
+            or not s.valuation_known or not s.flows_known):
+        return frozenset()
+    with localcontext(research._CONTEXT):
+        loss = (s.equity - basis.equity - s.external_net) / basis.equity
+        return frozenset(name for name, limit in (("soft_loss", limits.soft_loss),
+                         ("hard_loss", limits.hard_loss)) if loss <= -limit)
+
+
+def observe(state, snapshot, limits=Limits()):
     if snapshot.seq != state.seq + 1 or snapshot.time_ms < state.time_ms:
         raise ipc.ProtocolError("risk observation must follow sequence and time")
     basis = state.basis
@@ -168,17 +183,27 @@ def observe(state, snapshot):
                             and snapshot.margin_ok) else "DEGRADED"
     result = replace(state, seq=snapshot.seq, time_ms=snapshot.time_ms, snapshot=snapshot,
                      basis=basis, health=health, epoch=state.epoch + (state.health != health))
-    if basis_known and snapshot.valuation_known and snapshot.flows_known:
-        with localcontext(research._CONTEXT):
-            loss = (snapshot.equity - basis.equity - snapshot.external_net) / basis.equity
-        reasons = {"soft_loss"} if loss <= D("-0.03") else set()
-        if loss <= D("-0.05"):
-            reasons.add("hard_loss")
-        result = halt(result, reasons)
+    result = halt(result, loss_reasons(result, limits))
     if result.mode == "FLAT" and result.phase == "DONE" and (snapshot.position != 0
             or snapshot.pending_buy != 0 or snapshot.pending_sell != 0 or snapshot.other_notional != 0):
         result = replace(result, phase="WORKING")
     return result
+
+
+def rearm(state, limits, now_ms, *, reconciled, manual_cause_cleared=False):
+    """Explicit manual action; never called by observation/configuration changes."""
+    current = expire(state, now_ms)
+    s = current.snapshot
+    if (not current.reasons or current.health != "HEALTHY" or not reconciled
+            or s is None or not s.position_verified or s.reduction_conflict
+            or s.pending_buy != 0 or s.pending_sell != 0
+            or loss_reasons(current, limits)
+            or ("manual_kill" in current.reasons and not manual_cause_cleared)
+            or (current.mode == "FLAT" and (current.phase != "DONE" or s.position != 0
+                                           or s.other_notional != 0))):
+        raise ipc.ProtocolError("re-arm conditions not satisfied")
+    return replace(current, mode="RUN", reasons=frozenset(), phase="IDLE",
+                   flatten_id=None, epoch=current.epoch + 1)
 
 
 def expire(state, now_ms):

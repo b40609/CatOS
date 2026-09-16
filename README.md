@@ -1,6 +1,14 @@
 # catOS：最小 Closed Bar 研究核心
 
-目前完成單合約、單週期的純記憶體研究核心、最小 Optuna 搜尋、CSV 已收盤 K 線匯入與離線 HTML 報告。核心採 Jesse research 的介面風格與自有 Decimal Core，只用標準函式庫；搜尋另使用 Optuna，不依賴 Jesse。需要 Python 3.11+；目前在 Python 3.14.6、Optuna 4.9.0 執行驗證。
+2026-09-15 最新狀態：[I-b-4 單次 Demo 唯讀採集](docs/demo-collection-handoff.md) 已由執行模型依各輪明確指令執行；最後一輪 config gate 通過，13 個來源分頁完成，driver／wire 各 41 次。這是歷史交接結果，不是本輪重驗。餘額解碼、模式、歸因、P6 關聯、新鮮度／窗口／日初基準差異仍在，`reconciled=false`、`trade_authorized=false`，J／Live 未啟動。完整記憶體報告未保留，舊授權不允許自動重跑。
+
+[I-b-3 受限 HTTP transport](docs/http-transport-handoff.md) 與 [I-b-2 decoder](docs/account-decoder-handoff.md) 已有另一模型獨立驗收紀錄，詳見 WORK_PLAN；歷史測試數字不代表目前修補版本已通過測試。
+
+本輪已修補已知研究入口、輸出保護、來源歸併／證據鏈、欄位診斷、合法減倉與 P6 恢復交叉問題，並補合成回歸測試；僅靜態核對，未執行測試、編譯、Git、憑證讀取或帳戶請求。開發與執行驗證分工不變。以下各切片描述保留其交付時點邊界。
+
+最新本機切片：[P6 災難保護模擬](docs/protection-simulation.md) 已支援持久化設定、成交平均成本更新、FakeExchange 保護建立／更新／取消／UNKNOWN 與失敗禁增倉告警。預設 0% 停用；已確認 mark 觸發、tick 向提早觸發方向取整、0% 停用等待取消終態。P6 交易所保護生命週期尚未接入，I-b 唯讀資料亦未完成 P6 責任對帳；J 未啟動。
+
+目前完成單合約、單週期的純記憶體研究核心、最小 Optuna 搜尋、CSV 已收盤 K 線匯入與離線 HTML 報告。核心採 Jesse research 的介面風格與自有 Decimal Core，只用標準函式庫；搜尋另使用 Optuna，不依賴 Jesse。需要 Python 3.11+；研究模組歷史驗收環境為 Python 3.14.6、Optuna 4.9.0，不代表本輪已重驗。
 
 CSV 格式見 [資料匯入](docs/data-io.md)，報告介面與視覺驗收見 [研究報告](docs/reporting.md)。執行 `py -3 -B -m examples.report_demo` 可重新產出 `reports/visual-qa/synthetic-report.html`；產生的 CSV、HTML、截圖與本機資料庫不納入 Git，驗收腳本保留。此版本為已驗收的研究模組，尚非 Demo／Live 執行器。
 
@@ -28,6 +36,18 @@ py -3 -B -m unittest discover -s tests -p test_research.py -v
 ```
 
 示範以固定的合成 15 分鐘 K 線執行 SMA 多倉／空倉策略，預熱 2 根。輸出金額以十進位字串呈現；沒有下載行情、寫入資料庫或發送交易。
+
+## 額外研究入口（本輪修補，待驗證）
+
+`catos.cli`／`catos.optuna_study` 不再對任意 symbol 套用固定合約規格。兩者必須明示 `--symbol --base-per-contract --tick-size --lot-size --min-size`；程式呼叫必須傳入與 symbol 一致的 `contract=ContractSpec(...)`。這些只是本地研究輸入，未查核交易所 metadata，不代表可交易。標準 `catos.research_cli --config` 不受影響。
+
+只使用合成資料的額外 CLI 範例（不會自動下載資料）：
+
+```powershell
+py -3 -B -m catos.cli --csv reports/visual-qa/synthetic.csv --symbol SYNTHETIC-USDT-SWAP --base-per-contract 0.01 --tick-size 0.01 --lot-size 1 --min-size 1 --fast 1 --slow 2 --report reports/dual-sma-synthetic.html
+```
+
+額外 Optuna study 使用同樣四個規格參數，另有 `--timeframe-ms`（預設 3600000，即 1H）；固定預熱 80 根，輸入必須另含正式評估資料。權益差分、收益率、樣本標準差及夏普年化全程 Decimal；365 天年、零無風險利率，按指定週期換算。少於兩個收益率或零方差顯示 N/A；非正／非有限權益不補零。此評分不是帳戶風控依據。旧调用的隐含规格已移除，须更新参数；没有新增真实行情验证。
 
 ## 介面
 
@@ -112,6 +132,8 @@ py -3 -B -m unittest discover -s tests -p test_optimization.py -v
 
 [F：合成帳戶風控](docs/risk.md) 已接入 Decimal 曝險、含在途／UNKNOWN 的數量保留、固定日初權益的台北日損、Soft／Hard／Kill 鎖存與合法 reduceOnly 減倉裁決。以 `risk_limits` 明示啟用，獨立合成快照不等待 Worker。
 
-[G：假交易所與恢復閉環](docs/execution.md) 已接入固定 tag 的唯一模擬建單、SUBMITTING／UNKNOWN、查單、撤單、成交去重、原操作 reduceOnly 清倉及重啟對帳。以 `FakeExchange` 明示啟用，只使用本機腳本回報；D–G 本機模擬底座已完成，真實估值、保證金與 Demo／Live 尚未接入，待決金融政策維持原狀。
+[G：假交易所與恢復閉環](docs/execution.md) 已接入固定 tag 的唯一模擬建單、SUBMITTING／UNKNOWN、查單、撤單、成交去重、原操作 reduceOnly 清倉及重啟對帳。以 `FakeExchange` 明示啟用，只使用本機腳本回報；D–G 本機模擬底座已完成，真實估值、保證金與 Demo／Live 尚未接入，政策更新與實作差距見下方 I-a 契約。
 
 專屬測試採合成資料驗證預熱、可見時間、tick／lot 與合約單位、雙向淨倉、費用／資金費、帳務守恆、期末狀態及 Decimal context 隔離。沒有執行全市場歷史回測或存取真實憑證。
+
+D–G 已封版為 `v0.2-simulation-base`。下一階段見 [H：Demo 進入條件與驗收矩陣](docs/demo-entry-contract.md)；P2–P5 已依 2026-09-12 決策更新。[I-a：官方映射、離線對帳與 P6 選項](docs/okx-readonly-contract.md) 已交付，尚未啟動 I-b 唯讀帳戶連線或 J Demo 交易。新日損政策為可配置 10%／20%、無 equity buffer、合格可隨時人工 re-arm；P5 本機遷移已完成：可配置 10%／20%、原子保存門檻、合格人工 re-arm、schema 4 控制稽核；舊意圖不復活。實際帳戶資料與交易所適配仍未接入。[P6 災難停損政策](docs/disaster-stop-policy.md) 已定稿：每 Bot 預設 0% 停用，mark 觸發、tick 向提早觸發方向取整，0% 停用須確認取消終態；平均成本變動時更新，失敗禁增倉並告警、不自動減持。
