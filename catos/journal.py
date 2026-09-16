@@ -11,7 +11,7 @@ import sqlite3
 from catos import ipc, research, risk
 from catos.account_lock import ENVIRONMENT
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 HALT_REASONS = frozenset(("manual_kill", "soft_loss", "hard_loss"))
 
 
@@ -133,6 +133,9 @@ class Journal:
     def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False):
         from catos.execution import ExecutionJournal, SCHEMA as EXECUTION_SCHEMA
         from catos.protection import ProtectionJournal
+        from catos.lot_journal import LotJournal, install_schema as install_lot_schema
+        if sqlite3.sqlite_version_info < (3, 37, 0):
+            raise JournalError("SQLite 3.37+ required for Lot STRICT tables")
         if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
             raise JournalError("local execution requires installed risk")
         self.execution = None
@@ -153,7 +156,7 @@ class Journal:
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version not in (1, 2, 3, 4, SCHEMA_VERSION):
+            elif version not in (1, 2, 3, 4, 5, SCHEMA_VERSION):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -185,6 +188,11 @@ class Journal:
                         after_json TEXT NOT NULL, limits_json TEXT NOT NULL)""")
                 if version < 5:
                     self.connection.execute("CREATE TABLE IF NOT EXISTS protection (bot_id TEXT PRIMARY KEY REFERENCES bots(bot_id), state_json TEXT NOT NULL)")
+                if version < 6:
+                    install_lot_schema(self.connection)
+                self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                self.lots = LotJournal(self)
+                self.lots._recover_in_transaction()
                 self.protection = ProtectionJournal(self)
                 for row in self.connection.execute('SELECT bot_id FROM protection'):
                     state = self.protection.state(row[0])
@@ -192,7 +200,6 @@ class Journal:
                         state['uncertain'] = True
                         state['alert'] = 'restart_protection_reconciliation'
                         self.protection.save(row[0], state)
-                self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
                 installed = self.connection.execute("SELECT 1 FROM execution_mode").fetchone() is not None
                 if installed and not execution_enabled:
                     raise JournalError("execution mode cannot be disabled in place")

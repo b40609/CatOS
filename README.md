@@ -1,5 +1,9 @@
 # catOS：最小 Closed Bar 研究核心
 
+最新開發交接：使用者已核准 **S2 SQLite Lot 狀態帳本與重啟重放**，程式與專屬測試已編寫，**尚未執行驗證**。沿用單 Journal writer、WAL／FULL，新增 schema 6 的三張隔離表；同 write_id 重送、版本條件更新與重啟完整性校驗，僅接合成 local-sim 快照。未接入多 Bot 交易、成交分配、Gross 或 P6。詳見 [S2 交接與 Sol 驗證範圍](docs/lot-journal-handoff.md)。
+
+schema 6 需要 SQLite 3.37+，舊版程式不能直接開啟；Lot 歷史損毀會拒絕 Journal 啟動。本輪沒有執行資料庫遷移。S1 基線 `720c632`／409 項全綠為使用者提供的 Sol 驗收結果，不代表 S2 已通過。
+
 2026-09-15 最新狀態：[I-b-4 單次 Demo 唯讀採集](docs/demo-collection-handoff.md) 已由執行模型依各輪明確指令執行；最後一輪 config gate 通過，13 個來源分頁完成，driver／wire 各 41 次。這是歷史交接結果，不是本輪重驗。餘額解碼、模式、歸因、P6 關聯、新鮮度／窗口／日初基準差異仍在，`reconciled=false`、`trade_authorized=false`，J／Live 未啟動。完整記憶體報告未保留，舊授權不允許自動重跑。
 
 [I-b-3 受限 HTTP transport](docs/http-transport-handoff.md) 與 [I-b-2 decoder](docs/account-decoder-handoff.md) 已有另一模型獨立驗收紀錄，詳見 WORK_PLAN；歷史測試數字不代表目前修補版本已通過測試。

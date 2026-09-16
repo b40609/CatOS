@@ -17,6 +17,7 @@ from catos.supervisor import LocalSupervisor, SupervisorUnavailable
 from test_ipc import config
 from test_journal import proof
 from test_risk import snapshot
+from lot_journal_helpers import drop_empty_lot_schema
 
 
 class PolicyTests(unittest.TestCase):
@@ -222,6 +223,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         basis = self.s.risk_state.basis
         await self.s.close()
         with closing(sqlite3.connect(self.path)) as db, db:
+            drop_empty_lot_schema(db)
             db.execute('UPDATE risk_control SET limits_json=?', (json.dumps({'leverage': '3.0', 'symbol_share': '0.50'}),))
             db.execute('DROP TABLE risk_actions')
             db.execute('PRAGMA user_version=3')

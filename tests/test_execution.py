@@ -16,6 +16,7 @@ from test_ipc import STEP, config
 from test_journal import prepare_and_commit, proof, input_for, result_for
 from catos.journal import FixtureDecision
 from test_risk import snapshot
+from lot_journal_helpers import drop_empty_lot_schema
 
 D = Decimal
 
@@ -166,6 +167,7 @@ class ExecutionTests(unittest.TestCase):
         self.j.close()
         self.j = None
         with closing(sqlite3.connect(self.path)) as db:
+            drop_empty_lot_schema(db)
             db.execute("DROP TABLE execution_fills")
             db.execute("DROP TABLE execution_orders")
             db.execute("DROP TABLE execution_mode")

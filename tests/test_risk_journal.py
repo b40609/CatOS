@@ -1,6 +1,7 @@
 """Risk verdict, quantity reservation, checkpoint, and latches share E's writer."""
 
 from dataclasses import replace
+from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 import sqlite3
@@ -13,6 +14,7 @@ from catos.journal import FixtureDecision, Journal, JournalError
 from test_ipc import STEP, config
 from test_journal import input_for, prepare_and_commit, proof, result_for
 from test_risk import snapshot
+from lot_journal_helpers import drop_empty_lot_schema
 
 D = Decimal
 
@@ -116,18 +118,20 @@ class RiskJournalTests(unittest.TestCase):
         journal.reconcile("bot", proof(0))
         prepare_and_commit(journal, 0)
         journal.record_halts({"hard_loss"})
-        journal.connection.execute("DROP TABLE risk_orders")
-        journal.connection.execute("DROP TABLE risk_control")
-        journal.connection.execute("DROP TABLE execution_fills")
-        journal.connection.execute("DROP TABLE execution_orders")
-        journal.connection.execute("DROP TABLE execution_mode")
-        journal.connection.execute("PRAGMA user_version=1")
         journal.close()
+        with closing(sqlite3.connect(legacy)) as db, db:
+            drop_empty_lot_schema(db)
+            db.execute("DROP TABLE risk_orders")
+            db.execute("DROP TABLE risk_control")
+            db.execute("DROP TABLE execution_fills")
+            db.execute("DROP TABLE execution_orders")
+            db.execute("DROP TABLE execution_mode")
+            db.execute("PRAGMA user_version=1")
         journal = Journal(legacy, "legacy", D("100"), risk.Limits())
         self.addCleanup(journal.close)
         self.assertEqual(journal.snapshot("bot")["checkpoint"].event_seq, 1)
         self.assertEqual(journal.risk_state().mode, "FLAT")
-        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 5)
+        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 6)
 
     def test_enabling_risk_refuses_existing_fixture_obligations(self):
         legacy = self.path.parent / "legacy.sqlite3"

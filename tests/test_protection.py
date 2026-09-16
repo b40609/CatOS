@@ -17,6 +17,7 @@ from test_execution import report
 from test_ipc import STEP, config
 from test_journal import proof, prepare_and_commit, input_for, result_for
 from test_risk import snapshot
+from lot_journal_helpers import drop_empty_lot_schema
 
 
 def policy(ratio='.10', **changes):
@@ -313,6 +314,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_schema_four_nonflat_migration_does_not_invent_cost(self):
         await self.s.close()
         with closing(sqlite3.connect(self.path)) as db, db:
+            drop_empty_lot_schema(db)
             db.execute('DROP TABLE protection')
             db.execute('PRAGMA user_version=4')
         self.s = self.make()
