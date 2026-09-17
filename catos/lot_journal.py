@@ -370,8 +370,24 @@ class LotJournal:
         return self._write(scope, bot_id, write_id, "REPLACE", None, expected_revision,
                            after, opening_unresolved, closing_unresolved)
 
-    def _write(self, scope, bot_id, write_id, operation, open_seq, expected, after, opening, closing):
-        with self._access():
+    @contextmanager
+    def _write_access(self, internal, after):
+        if internal:
+            if self._failed or not self.db.in_transaction:
+                raise LotStorageError("storage_unavailable")
+            yield
+        else:
+            with self._access():
+                fills = getattr(self.j, "lot_fills", None)
+                if fills is not None and fills._managed(after.lot_id):
+                    raise LotStorageError("managed_lot")
+                yield
+
+    def _write(self, scope, bot_id, write_id, operation, open_seq, expected, after, opening, closing,
+               *, _in_transaction=False):
+        if not _in_transaction and isinstance(write_id, str) and write_id.startswith("s3_"):
+            raise LotStorageError("reserved_write_id")
+        with self._write_access(_in_transaction, after):
             binding = self._binding(scope, bot_id)
             ipc.token(write_id, "write_id")
             ipc.integer(expected, "expected_revision", 0 if operation == "CREATE" else 1)
@@ -504,7 +520,7 @@ class LotJournal:
     def _scan(self):
         if not self.db.in_transaction:
             raise LotStorageError("storage_unavailable")
-        if (self.db.execute("PRAGMA user_version").fetchone()[0] != 6
+        if (self.db.execute("PRAGMA user_version").fetchone()[0] != 7
                 or self.db.execute("PRAGMA foreign_keys").fetchone()[0] != 1
                 or self.db.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal"
                 or self.db.execute("PRAGMA synchronous").fetchone()[0] != 2):

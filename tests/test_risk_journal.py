@@ -131,7 +131,7 @@ class RiskJournalTests(unittest.TestCase):
         self.addCleanup(journal.close)
         self.assertEqual(journal.snapshot("bot")["checkpoint"].event_seq, 1)
         self.assertEqual(journal.risk_state().mode, "FLAT")
-        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 6)
+        self.assertEqual(journal.connection.execute("PRAGMA user_version").fetchone()[0], 7)
 
     def test_enabling_risk_refuses_existing_fixture_obligations(self):
         legacy = self.path.parent / "legacy.sqlite3"

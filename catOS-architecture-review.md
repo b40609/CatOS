@@ -1,5 +1,7 @@
 # catOS 生產級架構評估
 
+2026-09-16 切片更新：S2 已由使用者回報驗收；S3 已依執行指示編寫，待 Sol 質檢。允許同 Journal 內合成逐筆成交的一訂單一 Lot 帳務與原子重放；不接交易所成交適配、實際交易、多 Lot 分配、Gross 或 P6。詳見 [S3 交接](docs/lot-fill-handoff.md)；下文較早階段的延後描述以本段及 AGENTS 最新範圍為準。
+
 **已確認：單一 Supervisor 獨佔資金副作用，v1 單合約單 Bot；研究採 Jesse research 介面風格＋最小 Decimal 核心，不依賴 Jesse 完整套件。僅處理已收盤 K 線，支援只算指標的 warmup_bars；允許隔離 Lot domain／IPC 與同 writer 狀態持久化研發，儲存失效緊急通道、多 Bot 交易與內部對沖仍延後。**
 
 本評估以分鐘至小時級、已收盤 K 線決策為 v1 範圍。Python 3.11+ 與 SQLite 是執行及儲存底座，FastAPI、Optuna 等本機套件可存在，不需要 Docker、PostgreSQL、Redis、Celery 或其他常駐服務。使用者已選擇先完成研究與本機模擬，Demo／Live 分階段再上。本文以專案根目錄 AGENTS.md 與使用者最新決策為準；第 15 節區分已確認原則、延後項目與剩餘政策細節，不把候選方案當核准要求。本文完成的是架構文件，不代表產品已實作、測試通過或獲准接觸真實憑證／發送 Live 請求。外部事實沿用 2026-09-10 已查核的官方文件及原始碼；本次僅同步使用者確認的 P7 選型、Closed Bar 與 warmup_bars 邊界。

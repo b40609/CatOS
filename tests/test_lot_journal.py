@@ -81,7 +81,7 @@ class LotJournalTests(unittest.TestCase):
 
     def test_s01_schema_wal_full_foreign_keys_and_strict_tables(self):
         db = self.j.connection
-        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 6)
+        self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 7)
         self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
         self.assertEqual(db.execute("PRAGMA synchronous").fetchone()[0], 2)
         self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
@@ -132,7 +132,7 @@ class LotJournalTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 5)
             self.assertIsNone(db.execute("SELECT 1 FROM sqlite_master WHERE name='lot_bindings'").fetchone())
         with closing(Journal(path, "fake-account", D("100"))) as upgraded:
-            self.assertEqual(upgraded.connection.execute("PRAGMA user_version").fetchone()[0], 6)
+            self.assertEqual(upgraded.connection.execute("PRAGMA user_version").fetchone()[0], 7)
 
     def test_s04_invalid_schema_and_scope_do_not_rebuild(self):
         for sql in ("PRAGMA user_version=99", "PRAGMA user_version=5",

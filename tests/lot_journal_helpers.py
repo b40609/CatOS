@@ -47,8 +47,22 @@ def drop_empty_lot_schema(connection):
     """Test-only legacy fixture construction, never a production downgrade."""
     if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 0:
         raise AssertionError("legacy fixture requires its own FK-disabled connection")
+    drop_empty_fill_schema(connection)
     for table in TABLES:
         if connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]:
             raise AssertionError("refusing to discard nonempty S2 fixture")
     for table in reversed(TABLES):
+        connection.execute(f"DROP TABLE {table}")
+
+
+def drop_empty_fill_schema(connection):
+    from catos.lot_fills import TABLES as fill_tables
+    if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 0:
+        raise AssertionError("legacy fixture requires FK-disabled connection")
+    existing = [table for table in fill_tables if connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone()]
+    for table in existing:
+        if connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]:
+            raise AssertionError("refusing nonempty S3 fixture")
+    for table in reversed(existing):
         connection.execute(f"DROP TABLE {table}")

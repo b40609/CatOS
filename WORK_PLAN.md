@@ -1,5 +1,21 @@
 # catOS 階段與分工規劃
 
+## 2026-09-17：S3 序列化阻斷修正，待 Sol 重驗
+
+首次驗收由使用者回報：純帳務 11/11 OK，儲存 35 errors、程序 4 errors，停止 Commit。依確認方案將 `_key()`／`_write_id()` 的雜湊輸入由 list 改成具名 object；不放寬 S2／IPC 契約、不改 Schema。新增三個回歸方法，目前 S3 共 53 個方法待重新驗證。Astra 僅補丁與靜態核對，未執行測試、編譯或 Git。詳見 [S3 交接](docs/lot-fill-handoff.md)。
+
+## 最新：S3 已編寫，待 Sol 質檢
+
+使用者在 S3 規格交付後明確要求「執行」，已完成純帳務 reducer、schema7 三張事件表、同交易 S2 版本更新、受管 Lot 寫入閘門、重啟帳務重算及專屬測試編寫。詳見 [S3 開發交接](docs/lot-fill-handoff.md)。本輪未執行測試、編譯、Git 或既有 DB 遷移；下方「S3 待審查」為先前歷史。
+
+## 最新：S2 已驗收；S3 規格待審查
+
+使用者回報 Sol 已完成 S2 質檢與提交：`690d8549dd4d078d5e62a12acf536ba0f768bdcb`，447/447 OK、0 failure/error/skip，含 Windows 程序中斷 4/4；Python 3.14.6、SQLite 3.50.4。當時 working tree clean、main ahead 2，未 push；以下舊交接狀態保留為歷史，本輪未重新核對 Git。
+
+已交付 [S3 合成成交歸屬與帳務規格](outputs/catos-s3-fill-accounting-spec.md)，待審查帳務政策後實作。本輪僅文件，未執行測試、編譯、Git 或資料庫遷移。
+
+依使用者新指示：每次驗收回報後主動評估並提出下一片，不等待「下一步」提示；新帳務／交易政策仍明列審查，不自行擴大實作範圍，不建立背景排程。
+
 ## S2：設計已核准，開發交接待 Sol 驗證
 
 使用者確認 [S2 規格](outputs/catos-s2-lot-journal-spec.md) 後，已編寫 `catos/lot_journal.py` 與 Journal schema 6 接點；新增三張 STRICT Lot 表、同 writer 原子快照／收據、版本與寫入去重、重啟重放及完整性拒絕。新增 34 個儲存測試方法與 4 個 Windows 程序中斷方法，並調整 schema 1／2／3／4 的既有測試夾具。詳見 [交接文件](docs/lot-journal-handoff.md)。
