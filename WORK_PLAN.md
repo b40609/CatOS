@@ -1,5 +1,19 @@
 # catOS 階段與分工規劃
 
+## 2026-09-18：S4 已編寫，待 Sol 質檢
+
+依使用者「同意刪除並執行」，刪除已確認舊草稿，保留正式 [S4 規格](outputs/catos-s4-exposure-spec.md)。新增 `catos/lot_exposure.py` 及36個 E01–E36測試方法；純Decimal觀測、資料品質降級與在途身份核對，不修改Schema／risk.evaluate／3x與50%／P6／交易路徑。Astra只做補丁與靜態核對，未執行測試、編譯或Git。Sol驗證範圍見 [S4交接](docs/lot-exposure-handoff.md)。
+
+## 2026-09-17：S4 觀測契約與驗收規格已交付
+
+依使用者「同意 執行」完成 [S4 曝險觀測規格](outputs/catos-s4-exposure-spec.md)：單帳戶／單合約、純Decimal Gross/Net與實體淨量差異、來源完整性／共同截點／新鮮度、held與exchange共同責任身份、UNKNOWN可空數量，以及36個驗收情境群。此輪只交付已提出的下一項設計文件，不編寫業務程式、不改Schema／風控門檻、不執行測試或Git。後續實作限觀測範圍；Gross限額與交易接線仍不在授權範圍。
+
+## 2026-09-17：S3 已驗收，後續評估 S4 曝險觀測
+
+依使用者提供的 Sol 報告：commit `604e983fdaef3bfaeade8648e67679a678149c17`，S3 53/53、必要回歸190/190，本輪實際243/243 OK；Windows中斷4/4、0 skip。Python3.14.6／SQLite3.50.4；diff/staged檢查通過，提交後 working tree clean、main ahead3、未 push。未執行全量測試，不推算全量通過數。本段文件更新發生於該提交之後，未重新查 Git 或執行測試。
+
+主動評估結果：下一片建議 S4「純資料 Gross／淨曝險觀測與差異報告」。既有 risk.Snapshot 已區分交易所在途與本地 held intents，risk.evaluate 不抵銷相反在途委託；但未有完整 Lot 視圖／同截點實體部位的對照契約。先設計帳戶／合約／截點與完整性、mark新鮮度、Lot Gross與Net、實體Net差異及在途來源去重；未知數量不得當0，CLOSE不得預扣已持有曝險。S4先不修改風控裁決、3x／50%門檻、Schema或交易路徑。虛擬Gross是否成為新限額屬另需定案的政策，不能直接套用既有實體曝險預算。尚未開始S4程式實作。
+
 ## 2026-09-17：S3 序列化阻斷修正，待 Sol 重驗
 
 首次驗收由使用者回報：純帳務 11/11 OK，儲存 35 errors、程序 4 errors，停止 Commit。依確認方案將 `_key()`／`_write_id()` 的雜湊輸入由 list 改成具名 object；不放寬 S2／IPC 契約、不改 Schema。新增三個回歸方法，目前 S3 共 53 個方法待重新驗證。Astra 僅補丁與靜態核對，未執行測試、編譯或 Git。詳見 [S3 交接](docs/lot-fill-handoff.md)。

@@ -1,8 +1,8 @@
 # catOS：最小 Closed Bar 研究核心
 
-最新開發交接：**S3 合成成交歸屬與 Lot 帳務**已編寫，待 Sol 獨立質檢。schema 7 沿用單 Journal writer／WAL／FULL，加入訂單綁定、逐筆成交、終態紀錄及逐版本帳務重算；僅 local-sim、一訂單一 Lot、完整 USDT 費用。未接交易或 Gross／P6。詳見 [S3 交接與驗證範圍](docs/lot-fill-handoff.md)。
+最新開發交接：**S4 純資料 Gross／Net 曝險觀測**與36個專屬測試方法已編寫，待Sol質檢。僅合成local-sim、完整性／截點／價格新鮮度及在途責任核對，不修改風控裁決或交易路徑。詳見 [S4 交接與驗證範圍](docs/lot-exposure-handoff.md)。
 
-schema 7 需要 SQLite 3.37+，舊版程式不能直接開啟；Lot／成交歷史損毀會拒絕 Journal 啟動。本輪沒有執行測試或資料庫遷移。S2 基線 `690d8549dd4d078d5e62a12acf536ba0f768bdcb`／447 項通過為使用者提供的 Sol 驗收結果，不代表 S3 已通過。
+既有schema 7維持不變，要求SQLite 3.37+；S4不讀寫資料庫。本輪未執行測試或Git。S3基線 `604e983fdaef3bfaeade8648e67679a678149c17`／53項專屬＋190項回歸為使用者提供的驗收結果，不是全量套件通過，也不代表S4已通過。
 
 2026-09-15 最新狀態：[I-b-4 單次 Demo 唯讀採集](docs/demo-collection-handoff.md) 已由執行模型依各輪明確指令執行；最後一輪 config gate 通過，13 個來源分頁完成，driver／wire 各 41 次。這是歷史交接結果，不是本輪重驗。餘額解碼、模式、歸因、P6 關聯、新鮮度／窗口／日初基準差異仍在，`reconciled=false`、`trade_authorized=false`，J／Live 未啟動。完整記憶體報告未保留，舊授權不允許自動重跑。
 
