@@ -1,5 +1,19 @@
 # catOS 階段與分工規劃
 
+## S5 已編寫，待 Sol 質檢
+
+依正式S5規格新增`catos/lot_snapshot.py`，Journal增加`capture_lot_snapshot()`及BEGIN DEFERRED／metadata首讀／ROLLBACK的唯讀範圍。新增39個測試方法，含真實雙connection WAL一致性、完整內容身份、無寫入與4096輸出邊界。未改Schema7、S2/S3/S4業務邏輯、Risk、P6或交易路徑；本輪未執行測試、編譯或Git。詳見 [S5開發交接](docs/lot-snapshot-handoff.md)。
+
+## 2026-09-18：S5 正式 API／快照身份／驗收規格已交付
+
+依 S5 範圍評估完成 [S5 一致快照正式規格](outputs/catos-s5-snapshot-spec.md)：公開入口為 `Journal.capture_lot_snapshot()`，只用既有 Journal connection 的 `BEGIN DEFERRED` 一致讀取；輸出完整 matching Bot 水位、current Lot、S3 synthetic pending 與未受 S3 管理的 unresolved Lot。`capture_id` 採逐筆具名 object＋8-byte 長度前綴的 streaming SHA256，排除時間與 DB path；未成交 OPEN、零剩餘但未 terminal 責任均保留。規格明確禁止猜 HELD／WORKING／UNKNOWN、反推 physical 或接風控／交易。此輪僅文件，不改 Schema 或程式，不執行測試或 Git。
+
+## 2026-09-18：S4 已驗收；S5 一致快照範圍評估
+
+依使用者回報，S4 commit `8b16c0b244af611294ec0a98b8add835bb14008b`，36＋26＋14合計76/76、0 failure/error/skip；Python3.14.6／SQLite3.50.4，diff/staged檢查通過，未跑全量；提交後working tree clean、main ahead4。本輪僅記錄驗收及新增 [S5評估](outputs/catos-s5-snapshot-assessment.md)，未執行測試或Git；文件修改發生於該提交之後。
+
+建議先做同一讀取交易的Lot＋S3合成未決責任匯出；S3缺乏HELD／WORKING／UNKNOWN來源證據，不直接映射成S4交易所在途。保留首次成交前OPEN與零剩餘但未terminal責任；不從Lot反推physical。正式API與驗收規格為下一交付，尚未開始S5程式實作，不改Schema／Gross限制／Demo／Live。
+
 ## 2026-09-18：S4 已編寫，待 Sol 質檢
 
 依使用者「同意刪除並執行」，刪除已確認舊草稿，保留正式 [S4 規格](outputs/catos-s4-exposure-spec.md)。新增 `catos/lot_exposure.py` 及36個 E01–E36測試方法；純Decimal觀測、資料品質降級與在途身份核對，不修改Schema／risk.evaluate／3x與50%／P6／交易路徑。Astra只做補丁與靜態核對，未執行測試、編譯或Git。Sol驗證範圍見 [S4交接](docs/lot-exposure-handoff.md)。

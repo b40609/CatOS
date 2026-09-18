@@ -258,6 +258,64 @@ class Journal:
     def close(self):
         self.connection.close()
 
+    @contextmanager
+    def _lot_read_snapshot(self):
+        """Pin one WAL snapshot without acquiring the writer reservation."""
+        from catos.lot_journal import LotStorageError
+        if self.lots._failed:
+            raise LotStorageError("storage_unavailable")
+        started = False
+        try:
+            if self.connection.in_transaction:
+                raise LotStorageError("storage_unavailable")
+            self.connection.execute("BEGIN DEFERRED")
+            started = True
+            metadata = self.connection.execute("SELECT * FROM metadata").fetchall()
+            if (len(metadata) != 1 or metadata[0]["account_id"] != self.account_id
+                    or metadata[0]["environment"] != ENVIRONMENT
+                    or ipc.decimal_text(metadata[0]["fixture_budget"], "stored budget", derived=True) != self.budget):
+                raise LotStorageError("integrity_error")
+            yield
+        except LotStorageError as exc:
+            if exc.code == "integrity_error":
+                self.lots._failed = True
+                cause = exc.__cause__
+                while cause is not None:
+                    if isinstance(cause, sqlite3.Error):
+                        code = getattr(cause, "sqlite_errorcode", None)
+                        # Existing replay wrappers also wrap I/O errors as integrity errors.
+                        if code is None or (code & 255) not in (1, 11, 17, 19, 26):
+                            raise LotStorageError("storage_unavailable") from exc
+                        break
+                    cause = cause.__cause__
+            raise
+        except sqlite3.Error as exc:
+            self.lots._failed = True
+            code = getattr(exc, "sqlite_errorcode", None)
+            reason = ("integrity_error" if started and code is not None
+                      and (code & 255) in (1, 11, 17, 19, 26) else "storage_unavailable")
+            raise LotStorageError(reason) from exc
+        except (ValueError, TypeError, KeyError, IndexError) as exc:
+            self.lots._failed = True
+            raise LotStorageError("integrity_error") from exc
+        except BaseException:
+            self.lots._failed = True
+            raise
+        finally:
+            if started:
+                try:
+                    self.connection.rollback()
+                except sqlite3.Error as exc:
+                    self.lots._failed = True
+                    raise LotStorageError("storage_unavailable") from exc
+
+    def capture_lot_snapshot(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
+        from catos.lot_snapshot import validate_request, _materialize
+        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
+        with self._lot_read_snapshot():
+            capture = _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms)
+        return capture
+
     def _bot(self, bot_id):
         row = self.connection.execute("SELECT * FROM bots WHERE bot_id=?", (bot_id,)).fetchone()
         if row is None:

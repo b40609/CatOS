@@ -1,8 +1,8 @@
 # catOS：最小 Closed Bar 研究核心
 
-最新開發交接：**S4 純資料 Gross／Net 曝險觀測**與36個專屬測試方法已編寫，待Sol質檢。僅合成local-sim、完整性／截點／價格新鮮度及在途責任核對，不修改風控裁決或交易路徑。詳見 [S4 交接與驗證範圍](docs/lot-exposure-handoff.md)。
+最新開發交接：**S5 一致 Lot／合成未決責任快照**與39個測試方法已編寫，待Sol質檢。沿用Journal單一connection，以BEGIN DEFERRED取得一致快照，提供穩定內容身份；不猜交易所在途狀態，不接風控或交易。詳見 [S5交接與驗證範圍](docs/lot-snapshot-handoff.md)。
 
-既有schema 7維持不變，要求SQLite 3.37+；S4不讀寫資料庫。本輪未執行測試或Git。S3基線 `604e983fdaef3bfaeade8648e67679a678149c17`／53項專屬＋190項回歸為使用者提供的驗收結果，不是全量套件通過，也不代表S4已通過。
+既有schema7維持不變，要求SQLite3.37+；S5只讀取，不執行遷移。本輪未執行測試或Git。S4基線`8b16c0b244af611294ec0a98b8add835bb14008b`／76項通過為使用者回報，不是全量套件驗收，也不代表S5已通過。
 
 2026-09-15 最新狀態：[I-b-4 單次 Demo 唯讀採集](docs/demo-collection-handoff.md) 已由執行模型依各輪明確指令執行；最後一輪 config gate 通過，13 個來源分頁完成，driver／wire 各 41 次。這是歷史交接結果，不是本輪重驗。餘額解碼、模式、歸因、P6 關聯、新鮮度／窗口／日初基準差異仍在，`reconciled=false`、`trade_authorized=false`，J／Live 未啟動。完整記憶體報告未保留，舊授權不允許自動重跑。
 
