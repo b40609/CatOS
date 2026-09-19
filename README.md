@@ -1,6 +1,6 @@
 # catOS：最小 Closed Bar 研究核心
 
-下一片：[S8 固定合成範例正式規格](outputs/catos-s8-scenario-example-spec.md)已通過文件驗收；評估已提交 `8c0000a`。規格明定新目錄保存合成 Journal 與完整／降級報告、拒絕覆寫及失敗保留產物；程式尚未實作，啟動命令尚不可用。
+最新開發：**S8 已實作並通過修正後 Sol 驗收**。入口 `python -B -m examples.lot_scenario_demo --output-dir <new-dir>` 以全新 Journal 走真實 S3→S5→S7，保存合成 DB 與 complete／degraded HTML，拒絕覆寫且失敗保留產物。Astra 獨立審查後將 S8 專屬測試由 16 增至 22 個方法；Sol 重驗 S8 22/22＋S7 21/21，共 43/43，0 failure／error／skip，`py_compile` 通過，生產程式未改。詳見 [S8 開發交接](docs/lot-scenario-demo-handoff.md)。
 
 最新驗收：**S7 本機合成情境報告已通過 Sol 驗收**。純函式 `render_synthetic_scenario_report()` 呼叫 S6 後回傳離線繁體中文 HTML，保留 Decimal 精度、空值／零、品質與降級原因。S7 21/21、S6 回歸 34/34，共 55/55 通過；Python 3.14.6、SQLite 3.50.4，新增 Python 檔編譯通過。F01 以完整／降級樣本在 1280 px 與 390 px 實際渲染，無整頁水平溢位或裁切，長 Decimal、品質旗標與降級原因可讀。詳見 [S7 開發交接](docs/lot-scenario-report-handoff.md)。
 

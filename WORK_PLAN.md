@@ -1,5 +1,17 @@
 # catOS 階段與分工規劃
 
+## 2026-09-19：S8 修正後通過 Sol 重驗與限定範圍驗收
+
+依使用者授權審查 Sol 已完成的實作與正式規格，未發現主要流程阻斷缺陷，生產程式維持原狀。補強精確狀態／數值與原因集合、capture 次數、細部資料及輸出故障、雙重例外物件、關閉順序與 console 失敗等測試，專屬方法由 16 增至 22。詳見 [S8 交接審查紀錄](docs/lot-scenario-demo-handoff.md)。
+
+原 37/37 為 Sol 實作者自測歷史。修正後由 Sol 實際執行 S8 22/22、S7 報告回歸 21/21，共 43/43，0 failure／error／skip；新增 Python 檔 `py_compile` 通過，Python 3.14.6、SQLite 3.50.4。生產程式與 HTML 未改，本輪不重做既有視覺矩陣；限定範圍 staged review 僅納入 S8 五檔。其他未提交功能與紀錄不在本輪範圍。
+
+## 2026-09-19：S8 固定合成範例入口初版實作自測（歷史）
+
+依 [S8 正式規格](outputs/catos-s8-scenario-example-spec.md)新增 `examples/lot_scenario_demo.py` 與 `tests/test_lot_scenario_demo.py`。固定新 Journal 經 S3 部分成交→S5 capture→S7 complete／degraded HTML；目標目錄原子拒絕既有項目，Journal 關閉成功後才 exclusive create HTML，失敗保留本次產物、不自動清理。未修改 Journal、S3／S5／S6／S7、Schema7、Risk、P6 或交易路徑。詳見 [S8 開發交接](docs/lot-scenario-demo-handoff.md)。
+
+該次自測實際執行 S8 專屬 16/16、S7 報告回歸 21/21，共 37/37，0 failure／error／skip；新增 Python 檔編譯通過。Python 3.14.6、SQLite 3.50.4。另實際執行入口並以本機 Chrome 1280 px 開啟 complete／degraded HTML；QA 產物位於忽略的 `reports/s8-qa-20260919-impl/`。該次未執行全量測試且尚未建立 S8 commit；既有 S5／S6／S7 補記、market、yaozi 等未提交內容保持獨立。
+
 ## 2026-09-19：S8 正式規格已通過文件驗收
 
 使用者回報 S8 評估已驗收並提交 `8c0000a`，技術敘述、本地連結、格式及 diff 檢查通過，純文件未執行 Python／DB。依指示完成 [S8 正式規格](outputs/catos-s8-scenario-example-spec.md)：固定 3 張 OPEN／1 張成交、同 capture 的完整與降級情境、必填新輸出目錄、關閉 Journal 後 exclusive create 兩份 HTML，以及失敗保留產物與非零結束碼。
