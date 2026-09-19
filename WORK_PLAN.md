@@ -1,5 +1,11 @@
 # catOS 階段與分工規劃
 
+## 2026-09-19：S8 固定合成範例入口評估完成
+
+依使用者同意完成 [S8 範圍評估](outputs/catos-s8-scenario-example-assessment.md)。建議採全新輸出目錄中的合成 Journal，經 S3 部分成交→S5 capture→S7 renderer 產生完整／降級 HTML；固定資料與時間，HTML 可重現，拒絕既有目錄及覆寫，保留合成 DB 與失敗產物、不自動清理。範例不引用 tests，不接受使用者 DB 或交易參數。此為評估建議，正式常數、入口及錯誤契約為下一交付，未開始 S8 程式。
+
+本輪僅閱讀與文件補丁，未執行 Python、測試、DB、報告生成或 Git；S7 及其他未提交功能維持獨立。
+
 ## 2026-09-19：S7 renderer 已通過 Sol 驗收
 
 使用者回報 S7 正式規格已驗收並提交 `299884f`，40/40 欄位與 16/16 原因碼、本地連結及 diff／staged 檢查通過；純文件未執行 Python 測試。依此完成 `lot_scenario_report.py` 與 21 個專屬測試方法，純函式先呼叫一次 S6，再產生離線 HTML。含真實 Journal 成交生命週期、空值／過期資料、精度、HTML 逸出與錯誤傳遞案例，詳見 [S7 開發交接](docs/lot-scenario-report-handoff.md)。

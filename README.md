@@ -1,5 +1,7 @@
 # catOS：最小 Closed Bar 研究核心
 
+下一片：[S8 固定合成範例入口評估](outputs/catos-s8-scenario-example-assessment.md)已完成，建議以全新目錄保存合成 Journal 與完整／降級報告；尚未實作，評估中的啟動命令尚不可用。
+
 最新驗收：**S7 本機合成情境報告已通過 Sol 驗收**。純函式 `render_synthetic_scenario_report()` 呼叫 S6 後回傳離線繁體中文 HTML，保留 Decimal 精度、空值／零、品質與降級原因。S7 21/21、S6 回歸 34/34，共 55/55 通過；Python 3.14.6、SQLite 3.50.4，新增 Python 檔編譯通過。F01 以完整／降級樣本在 1280 px 與 390 px 實際渲染，無整頁水平溢位或裁切，長 Decimal、品質旗標與降級原因可讀。詳見 [S7 開發交接](docs/lot-scenario-report-handoff.md)。
 
 最新驗收：**S6 合成情境轉接已驗收並提交**，commit `ecc897e3afc19ab03527a4e1529f060b83f21df7`。以明示scenario cut及精確capture binding將S5資料轉接至S4；pending標示`SYNTHETIC_LEDGER / UNTERMINATED`，report保留`SYNTHETIC_SCENARIO`，不作交易所對帳或交易授權。詳見 [S6交接與驗證範圍](docs/lot-scenario-handoff.md)。
