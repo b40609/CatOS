@@ -1,5 +1,11 @@
 # catOS 階段與分工規劃
 
+## 2026-09-19：S7 renderer 已通過 Sol 驗收
+
+使用者回報 S7 正式規格已驗收並提交 `299884f`，40/40 欄位與 16/16 原因碼、本地連結及 diff／staged 檢查通過；純文件未執行 Python 測試。依此完成 `lot_scenario_report.py` 與 21 個專屬測試方法，純函式先呼叫一次 S6，再產生離線 HTML。含真實 Journal 成交生命週期、空值／過期資料、精度、HTML 逸出與錯誤傳遞案例，詳見 [S7 開發交接](docs/lot-scenario-report-handoff.md)。
+
+Sol 驗收結果：S7 21/21、S6 34/34，共 55/55，0 failure／error／skip；Python 3.14.6、SQLite 3.50.4，新增 Python 檔編譯通過。F01 以完整／降級樣本分別在 1280 px／390 px 渲染並檢視全頁；四組皆無整頁水平溢位、無裁切儲存格，長 Decimal、`不可用`／`未提供`、品質旗標及原因可讀。未執行全量測試；未修改既有 S4／S5／S6、Schema、Risk、P6 或交易路徑，其他未提交工作保持獨立。
+
 ## 2026-09-19：S7 正式報告規格已交付
 
 依使用者同意，完成 [S7 正式 API／欄位映射／驗收規格](outputs/catos-s7-scenario-report-spec.md)。單一純函式接收 capture／scenario／now_ms，先呼叫一次 S6，再產生離線繁體中文 HTML；完整保留 Decimal、None／零、來源、品質旗標與降級原因，不重算 S4 或增加交易裁決。明定過期但有值時仍保留數值與旗標、synthetic 分項零不代表交易所無委託，以及錯誤原樣傳遞。
