@@ -1,5 +1,17 @@
 # catOS 階段與分工規劃
 
+## 2026-09-19：S7 正式報告規格已交付
+
+依使用者同意，完成 [S7 正式 API／欄位映射／驗收規格](outputs/catos-s7-scenario-report-spec.md)。單一純函式接收 capture／scenario／now_ms，先呼叫一次 S6，再產生離線繁體中文 HTML；完整保留 Decimal、None／零、來源、品質旗標與降級原因，不重算 S4 或增加交易裁決。明定過期但有值時仍保留數值與旗標、synthetic 分項零不代表交易所無委託，以及錯誤原樣傳遞。
+
+本輪僅制定文件並靜態核對既有契約，未編寫 S7 程式，未執行測試、編譯、Git 或資料庫操作。後續實作依正式規格，Astra 編寫、Sol 驗證與 Git；yaoI／yaozi、market 及 S5 未提交驗收紀錄不在本片範圍。
+
+## 2026-09-19：S6 已驗收；S7 報告入口範圍評估
+
+依使用者回報，S6 commit `ecc897e3afc19ab03527a4e1529f060b83f21df7`（`feat(lots): add S6 synthetic scenario adapter`）；S6 34/34、S4 42/42、S5 39/39，合計 115/115，0 failure／error／skip。Python 3.14.6、SQLite 3.50.4；`py_compile`、`git diff --check`、staged check 通過，未執行全量測試。Schema、Risk、P6、execution／protection／交易路徑未變。回報時 `main` ahead 6；S5 驗收紀錄與 market／yaozi 工作未納入 S6 commit，工作區並非全乾淨。
+
+本輪依使用者同意補齊驗收紀錄，完成 [S7 本機合成情境報告入口評估](outputs/catos-s7-scenario-report-assessment.md)。建議以純函式輸出離線 HTML，沿用 S6 校驗與 S4 計算，呈現來源、曝險、完整性與降級原因；本輪僅評估，未開始 S7 程式或新增帳務／交易政策。yaoI／yaozi 為獨立功能，market 相關工作也不納入本片。Astra 未執行測試、編譯、Git 或資料庫操作；以下保留各階段歷史。
+
 ## 2026-09-18：S6 已編寫，待 Sol 質檢
 
 依 [S6 正式規格](outputs/catos-s6-scenario-spec.md)新增純資料`lot_scenario.py`，驗證S5內容身份及內部一致性，以明示scenario cut／capture binding轉接到S4。S4加上synthetic來源分類、evidence kind與專屬buckets；保留既有OBSERVED預設。新增S6測試及S4回歸，包含真實S3→S5→S6生命週期、容量、派生精度與不完整降級。詳見 [S6開發交接](docs/lot-scenario-handoff.md)。Astra未執行測試、編譯或Git；未修改Schema7、S5、Risk、execution、protection或交易路徑，未處理其他工作區草稿與market-intel檔案。

@@ -1,8 +1,8 @@
 # catOS：最小 Closed Bar 研究核心
 
-最新開發交接：**S6 合成情境轉接**已編寫，待Sol質檢。以明示scenario cut及精確capture binding將S5資料轉接至S4；pending標示`SYNTHETIC_LEDGER / UNTERMINATED`，report保留`SYNTHETIC_SCENARIO`，不作交易所對帳或交易授權。詳見 [S6交接與驗證範圍](docs/lot-scenario-handoff.md)。
+最新驗收：**S6 合成情境轉接已驗收並提交**，commit `ecc897e3afc19ab03527a4e1529f060b83f21df7`。以明示scenario cut及精確capture binding將S5資料轉接至S4；pending標示`SYNTHETIC_LEDGER / UNTERMINATED`，report保留`SYNTHETIC_SCENARIO`，不作交易所對帳或交易授權。詳見 [S6交接與驗證範圍](docs/lot-scenario-handoff.md)。
 
-既有schema7維持不變，要求SQLite3.37+；S6不存取資料庫。本輪未執行測試或Git。S5基線`274891981027cf554c590224f68f4ea7c46bb716`／180項通過為使用者回報，不是全量套件驗收，也不代表S6已通過。
+依使用者回報，S6／S4／S5 為 34＋42＋39，共 115/115 通過，0 failure／error／skip；Python 3.14.6、SQLite 3.50.4，編譯及 diff／staged 檢查通過，未執行全量測試。既有 schema7 維持不變，要求 SQLite 3.37+；S6 不存取資料庫。Astra 本輪僅更新文件，未重跑驗證或執行 Git。下一片 [S7 離線合成情境報告正式規格](outputs/catos-s7-scenario-report-spec.md)已交付，尚未實作。
 
 2026-09-15 最新狀態：[I-b-4 單次 Demo 唯讀採集](docs/demo-collection-handoff.md) 已由執行模型依各輪明確指令執行；最後一輪 config gate 通過，13 個來源分頁完成，driver／wire 各 41 次。這是歷史交接結果，不是本輪重驗。餘額解碼、模式、歸因、P6 關聯、新鮮度／窗口／日初基準差異仍在，`reconciled=false`、`trade_authorized=false`，J／Live 未啟動。完整記憶體報告未保留，舊授權不允許自動重跑。
 
