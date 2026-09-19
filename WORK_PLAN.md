@@ -1,5 +1,19 @@
 # catOS 階段與分工規劃
 
+## 2026-09-18：S6 已編寫，待 Sol 質檢
+
+依 [S6 正式規格](outputs/catos-s6-scenario-spec.md)新增純資料`lot_scenario.py`，驗證S5內容身份及內部一致性，以明示scenario cut／capture binding轉接到S4。S4加上synthetic來源分類、evidence kind與專屬buckets；保留既有OBSERVED預設。新增S6測試及S4回歸，包含真實S3→S5→S6生命週期、容量、派生精度與不完整降級。詳見 [S6開發交接](docs/lot-scenario-handoff.md)。Astra未執行測試、編譯或Git；未修改Schema7、S5、Risk、execution、protection或交易路徑，未處理其他工作區草稿與market-intel檔案。
+
+## 2026-09-18：S6 合成情境轉接正式規格已交付
+
+依既有 [S6 範圍評估](outputs/catos-s6-scenario-assessment.md)完成 [S6 正式規格](outputs/catos-s6-scenario-spec.md)。定案採 `SYNTHETIC_LEDGER / UNTERMINATED`，不把 S5 本機責任偽裝成 HELD／EXCHANGE／WORKING／UNKNOWN；S4 以 additive `evidence_kind=SYNTHETIC_SCENARIO` 與 synthetic buy/sell buckets 保留 provenance。Lot／Pending／synthetic physical 的共同截點只能由明示 `scenario_cut_id` + 精確 `source_capture_id` attestation 成立，`capture_id` 本身不當共同 cut；unmanaged unresolved 使 pending 降級為 incomplete，不補造未知委託。本輪只交付設計文件，不重做 S5 驗收、不執行測試、不做 git add／commit／push；僅以 diff/status 做文件與工作區檢查，也不處理其他無關工作區檔案。
+
+## 2026-09-18：S5 已驗收；S6 轉接範圍評估
+
+依使用者回報，S5 commit `274891981027cf554c590224f68f4ea7c46bb716`（`feat(lots): add S5 consistent snapshot capture`）；S5 39/39、S2/S3/S4/Journal 必要回歸141/141，合計180/180、0 failure/error/skip。真實雙connection WAL隔離及4096/4097容量邊界通過；Python3.14.6／SQLite3.50.4，diff/staged檢查通過，未執行全量測試。Schema7、Risk、execution、protection與交易路徑未變。回報時main ahead5；另有未提交的`outputs/yaozi-functional-parity-spec-v0.1.md`，未納入S5，本輪不處理該檔案。
+
+下一片評估見 [S6 合成情境轉接評估](outputs/catos-s6-scenario-assessment.md)。先釐清S5本機責任與S4來源／狀態／共同截點語義，尚未核准新政策或開始S6程式。Astra本輪僅更新文件，未執行測試或Git；本段及評估文件不包含在上述已完成的S5提交。
+
 ## S5 已編寫，待 Sol 質檢
 
 依正式S5規格新增`catos/lot_snapshot.py`，Journal增加`capture_lot_snapshot()`及BEGIN DEFERRED／metadata首讀／ROLLBACK的唯讀範圍。新增39個測試方法，含真實雙connection WAL一致性、完整內容身份、無寫入與4096輸出邊界。未改Schema7、S2/S3/S4業務邏輯、Risk、P6或交易路徑；本輪未執行測試、編譯或Git。詳見 [S5開發交接](docs/lot-snapshot-handoff.md)。

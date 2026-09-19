@@ -88,6 +88,7 @@ class ExposureRequest:
     physical_view: PhysicalPosition
     mark_view: MarkObservation | None
     pending_view: PendingInventory | None
+    evidence_kind: str = "OBSERVED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +130,9 @@ class ExposureReport:
     pending_unique_count: int
     pending_duplicate_count: int
     reasons: tuple[str, ...]
+    synthetic_buy_qty: Decimal | None = ZERO
+    synthetic_sell_qty: Decimal | None = ZERO
+    evidence_kind: str = "OBSERVED"
 
 
 def _reject(code):
@@ -243,7 +247,7 @@ def _inventory(view, contract):
     return entries
 
 
-def _pending(view, entries, contract, reasons):
+def _pending(view, entries, contract, reasons, evidence_kind):
     _bool(view.complete)
     _tuple(view.orders, MAX_PENDING)
     unique, linked = {}, {}
@@ -251,8 +255,10 @@ def _pending(view, entries, contract, reasons):
         if not isinstance(order, PendingObligation):
             _reject("pending_conflict")
         _token(order.obligation_id, "pending_conflict")
-        if (order.origin not in ("HELD", "EXCHANGE") or
-                order.state not in (("HELD",) if order.origin == "HELD" else ("WORKING", "UNKNOWN"))):
+        allowed = {"HELD": ("HELD",), "EXCHANGE": ("WORKING", "UNKNOWN")}
+        if evidence_kind == "SYNTHETIC_SCENARIO":
+            allowed = {"SYNTHETIC_LEDGER": ("UNTERMINATED",)}
+        if not isinstance(order.origin, str) or order.state not in allowed.get(order.origin, ()):
             _reject("pending_conflict")
         if order.side not in ("BUY", "SELL") or order.effect not in ("OPEN", "CLOSE", "UNCLASSIFIED"):
             _reject("invalid_pending_direction")
@@ -311,6 +317,8 @@ def observe_exposure(request: ExposureRequest) -> ExposureReport:
 def _observe(request):
     if not isinstance(request, ExposureRequest):
         _reject("identity_mismatch")
+    if request.evidence_kind not in ("OBSERVED", "SYNTHETIC_SCENARIO"):
+        _reject("identity_mismatch")
     _scope(request.scope)
     _integer(request.now_ms)
     try:
@@ -358,7 +366,7 @@ def _observe(request):
             reasons.add("pending_lot_link_incomplete")
     else:
         pending_fresh = _source(pend, PendingInventory, request, reasons, "pending")
-        orders, duplicates = _pending(pend, entries, contract, reasons)
+        orders, duplicates = _pending(pend, entries, contract, reasons, request.evidence_kind)
         if not pend.complete:
             reasons.add("pending_incomplete")
         if pend.cut_id != lv.cut_id or pend.cut_id != pv.cut_id:
@@ -370,19 +378,23 @@ def _observe(request):
     usable = (comparable and pend is not None and pend.complete and pending_fresh
               and not reasons.intersection(("pending_cut_mismatch", "pending_quantity_unknown", "pending_lot_link_incomplete")))
     buckets = {name: None for name in ("held_buy_qty", "held_sell_qty", "exchange_buy_qty", "exchange_sell_qty")}
+    buckets.update(synthetic_buy_qty=ZERO, synthetic_sell_qty=ZERO)
+    if request.evidence_kind == "SYNTHETIC_SCENARIO":
+        buckets.update(synthetic_buy_qty=None, synthetic_sell_qty=None)
     buys = sells = physical_upper = virtual_upper = None
     if usable:
-        for origin in ("HELD", "EXCHANGE"):
+        for origin, bucket in (("HELD", "held"), ("EXCHANGE", "exchange"),
+                               ("SYNTHETIC_LEDGER", "synthetic")):
             for side in ("BUY", "SELL"):
-                buckets[f"{origin.lower()}_{side.lower()}_qty"] = _result(sum(
+                buckets[f"{bucket}_{side.lower()}_qty"] = _result(sum(
                     (o.remaining_quantity for o in orders if o.origin == origin and o.side == side), ZERO))
-        buys = _result(buckets["held_buy_qty"] + buckets["exchange_buy_qty"])
-        sells = _result(buckets["held_sell_qty"] + buckets["exchange_sell_qty"])
+        buys = _result(buckets["held_buy_qty"] + buckets["exchange_buy_qty"] + buckets["synthetic_buy_qty"])
+        sells = _result(buckets["held_sell_qty"] + buckets["exchange_sell_qty"] + buckets["synthetic_sell_qty"])
         physical_upper = _result(max(abs(pv.quantity - sells), abs(pv.quantity + buys)))
         if "pending_effect_unknown" not in reasons:
             virtual_upper = _result(gross + sum((o.remaining_quantity for o in orders if o.effect == "OPEN"), ZERO))
     return ExposureReport(
-        scope=request.scope, contract=contract, now_ms=request.now_ms,
+        scope=request.scope, contract=contract, now_ms=request.now_ms, evidence_kind=request.evidence_kind,
         lot_cut_id=lv.cut_id, physical_cut_id=pv.cut_id, pending_cut_id=None if pend is None else pend.cut_id,
         quote_id=None if mv is None else mv.quote_id,
         observed_long_qty=long, observed_short_qty=short, observed_gross_qty=gross, observed_net_qty=net,

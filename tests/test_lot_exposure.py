@@ -337,5 +337,58 @@ class LotExposureTests(unittest.TestCase):
         self.assertEqual(risk.worst_notional(D(2), D(2), D(4), r.contract.base_per_contract, r.mark_view.mark), D(4))
 
 
+class SyntheticExposureTests(unittest.TestCase):
+    def test_observed_defaults_preserve_buckets_and_unknown(self):
+        r = request(orders=(order(state="UNKNOWN"),))
+        result = observe_exposure(r)
+        self.assertEqual(result.evidence_kind, "OBSERVED")
+        self.assertTrue(result.has_unknown)
+        self.assertEqual(result.exchange_buy_qty, D(1))
+        self.assertEqual((result.synthetic_buy_qty, result.synthetic_sell_qty), (D(0), D(0)))
+        missing = observe_exposure(replace(r, pending_view=None))
+        self.assertEqual((missing.synthetic_buy_qty, missing.synthetic_sell_qty), (D(0), D(0)))
+
+    def test_observed_rejects_synthetic_origin(self):
+        r = request(orders=(order(origin="SYNTHETIC_LEDGER", state="UNTERMINATED"),))
+        with self.assertRaises(ExposureInputError):
+            observe_exposure(r)
+
+    def test_synthetic_rejects_legacy_override_and_invalid_pairs(self):
+        for origin, state in (("HELD", "HELD"), ("EXCHANGE", "WORKING"),
+                              ("EXCHANGE", "UNKNOWN"), ("SYNTHETIC_LEDGER", "UNKNOWN")):
+            r = replace(request(orders=(order(origin=origin, state=state),)), evidence_kind="SYNTHETIC_SCENARIO")
+            with self.assertRaises(ExposureInputError):
+                observe_exposure(r)
+        with self.assertRaises(ExposureInputError):
+            observe_exposure(replace(request(), evidence_kind="OTHER"))
+
+    def test_synthetic_buckets_aggregate_without_unknown(self):
+        orders = (order("buy", D(2), origin="SYNTHETIC_LEDGER", state="UNTERMINATED"),
+                  order("sell", D(4), side="SELL", lot_id=snapshot(seq=8).lot_id,
+                        origin="SYNTHETIC_LEDGER", state="UNTERMINATED"))
+        result = observe_exposure(replace(request(orders=orders), evidence_kind="SYNTHETIC_SCENARIO"))
+        self.assertEqual((result.synthetic_buy_qty, result.synthetic_sell_qty), (D(2), D(4)))
+        self.assertEqual((result.pending_buy_qty, result.pending_sell_qty), (D(2), D(4)))
+        self.assertEqual((result.held_buy_qty, result.exchange_sell_qty), (D(0), D(0)))
+        self.assertEqual(result.physical_scenario_upper_qty, D(4))
+        self.assertEqual(result.virtual_gross_scenario_upper_qty, D(8))
+        self.assertFalse(result.has_unknown)
+
+    def test_synthetic_close_does_not_precredit_gross(self):
+        value = item(closing=True)
+        obligation = order(quantity=D(1), side="SELL", effect="CLOSE", lot_id=value.lot.lot_id,
+                           origin="SYNTHETIC_LEDGER", state="UNTERMINATED")
+        result = observe_exposure(replace(request(items=(value,), orders=(obligation,)),
+                                          evidence_kind="SYNTHETIC_SCENARIO"))
+        self.assertEqual((result.observed_gross_qty, result.virtual_gross_scenario_upper_qty), (D(2), D(2)))
+
+    def test_synthetic_incomplete_buckets_are_not_zero(self):
+        r = replace(request(), evidence_kind="SYNTHETIC_SCENARIO")
+        result = observe_exposure(replace(r, pending_view=replace(r.pending_view, complete=False)))
+        self.assertIsNone(result.synthetic_buy_qty)
+        self.assertIsNone(result.synthetic_sell_qty)
+        self.assertIsNone(result.physical_scenario_upper_qty)
+
+
 if __name__ == "__main__":
     unittest.main()
