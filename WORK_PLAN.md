@@ -1,5 +1,11 @@
 # catOS 階段與分工規劃
 
+## 2026-09-19：S8 正式規格已通過文件驗收
+
+使用者回報 S8 評估已驗收並提交 `8c0000a`，技術敘述、本地連結、格式及 diff 檢查通過，純文件未執行 Python／DB。依指示完成 [S8 正式規格](outputs/catos-s8-scenario-example-spec.md)：固定 3 張 OPEN／1 張成交、同 capture 的完整與降級情境、必填新輸出目錄、關閉 Journal 後 exclusive create 兩份 HTML，以及失敗保留產物與非零結束碼。
+
+Astra 開發階段僅制定文件並靜態核對，未編寫或執行 S8 程式、測試、DB、編譯或 Git。Sol 文件驗收確認固定常數與現行 S3／S5／S7 契約一致，本地連結、格式與 diff 檢查通過；純文件未執行 Python、測試或 DB。下一片依驗收規格實作範例與專屬測試；其他功能及既有補記維持獨立。
+
 ## 2026-09-19：S8 固定合成範例入口評估完成
 
 依使用者同意完成 [S8 範圍評估](outputs/catos-s8-scenario-example-assessment.md)。建議採全新輸出目錄中的合成 Journal，經 S3 部分成交→S5 capture→S7 renderer 產生完整／降級 HTML；固定資料與時間，HTML 可重現，拒絕既有目錄及覆寫，保留合成 DB 與失敗產物、不自動清理。範例不引用 tests，不接受使用者 DB 或交易參數。此為評估建議，正式常數、入口及錯誤契約為下一交付，未開始 S8 程式。

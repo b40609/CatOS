@@ -1,5 +1,7 @@
 # S8 範圍評估：固定合成情境範例入口
 
+後續進度：本評估已由使用者驗收並提交 `8c0000a`（`docs(lots): assess S8 fixed scenario example`）。依後續指示制定 [S8 正式規格](catos-s8-scenario-example-spec.md)，固定常數、入口、目錄生命週期及驗收契約以該文件為準；程式尚未實作。以下保留評估歷史。
+
 狀態：2026-09-19，依使用者同意完成下一片評估；尚非正式實作規格，未編寫或執行 S8 程式。基線為 S7 commit `e00c2b5`，55/55 測試及四組 F01 渲染通過，來源為 [S7 驗收交接](../docs/lot-scenario-report-handoff.md)，本輪未重驗。
 
 ## 1. 需求與目前缺口
