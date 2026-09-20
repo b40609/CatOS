@@ -1,5 +1,11 @@
 # catOS 階段與分工規劃
 
+## 2026-09-20：S9 fee completion assessment 通過 Sol 契約審查
+
+使用者確認 S8 已完成重驗及限定提交，`b069082` 為 S9 前穩定基線。依指示完成 [S9 費用補齊評估與待審契約](outputs/catos-s9-fee-completion-assessment.md)：缺費成交先更新部位與價差帳務，費用以已知小計＋未補齊成交數表達；補費綁定原成交、只允許 unknown→known，terminal 後不重開訂單。列明補零版本證據、active CLOSE 旗標、舊 schema7／replay 相容及 S5–S8 品質傳遞風險。
+
+Sol 依現行 S2／S3／S5 實碼交叉核對，未發現阻斷缺陷；unknown→known、terminal 後補費、補 0 版本證據、舊 schema7 相容與品質分離可進正式規格。正式規格須明定 completion revision 使用事件當下的 Lot head／active order 旗標，並使 fee subtotal／unknown count／coverage 成為明示版本化 payload、replay/hash 與 capture identity。評估不構成 Schema／DB 變更授權；其他未提交工作保持獨立。
+
 ## 2026-09-19：S8 修正後通過 Sol 重驗與限定範圍驗收
 
 依使用者授權審查 Sol 已完成的實作與正式規格，未發現主要流程阻斷缺陷，生產程式維持原狀。補強精確狀態／數值與原因集合、capture 次數、細部資料及輸出故障、雙重例外物件、關閉順序與 console 失敗等測試，專屬方法由 16 增至 22。詳見 [S8 交接審查紀錄](docs/lot-scenario-demo-handoff.md)。
