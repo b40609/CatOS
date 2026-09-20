@@ -1,5 +1,11 @@
 # catOS 階段與分工規劃
 
+## 2026-09-20：S9 正式規格通過 Sol 文件驗收
+
+使用者回報 assessment 已通過並提交 `bb29389`。依指示完成 [S9 正式規格](outputs/catos-s9-fee-completion-spec.md)，明定新建 schema8、版本化 Lot／event／capture、費用 API、原子重放及驗收矩陣；completion 保留事件當下 head／active flags，fee subtotal／count／coverage 全部進 payload、replay/hash 與 capture identity。保留 schema7，禁止靜默 migration 或 nullable 化舊費用契約。
+
+Sol 依現行 Journal、S2–S7 實碼交叉核對，未發現阻斷缺陷；確認 `PRAGMA user_version` 維持單一 Journal schema 標記，`lot_schema_version` 僅選擇 schema7／8 路徑，不能形成第二個持久化版本來源。正式規格可進實作授權階段；本輪仍僅文件，未執行 Python、DB、測試或編譯，尚未修改程式或取得既有 DB migration 授權。其他未提交補記與功能保持獨立。
+
 ## 2026-09-20：S9 fee completion assessment 通過 Sol 契約審查
 
 使用者確認 S8 已完成重驗及限定提交，`b069082` 為 S9 前穩定基線。依指示完成 [S9 費用補齊評估與待審契約](outputs/catos-s9-fee-completion-assessment.md)：缺費成交先更新部位與價差帳務，費用以已知小計＋未補齊成交數表達；補費綁定原成交、只允許 unknown→known，terminal 後不重開訂單。列明補零版本證據、active CLOSE 旗標、舊 schema7／replay 相容及 S5–S8 品質傳遞風險。

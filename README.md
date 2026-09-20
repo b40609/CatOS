@@ -1,5 +1,7 @@
 # catOS：最小 Closed Bar 研究核心
 
+S9 [正式規格](outputs/catos-s9-fee-completion-spec.md)已通過 Sol 文件驗收，assessment 基線為 `bb29389`。明示 schema8 與版本化費用狀態，保留 schema7；目前僅文件，尚未實作或執行 DB 變更。
+
 下一片：[S9 成交費用補齊評估](outputs/catos-s9-fee-completion-assessment.md)已通過 Sol 契約審查，使用者確認以 S8 `b069082` 為穩定基線。評估不修改 S3 或 Schema；下一步可制定正式資料型別、schema／payload 版本、API、重放順序與驗收矩陣。
 
 最新開發：**S8 已實作並通過修正後 Sol 驗收**。入口 `python -B -m examples.lot_scenario_demo --output-dir <new-dir>` 以全新 Journal 走真實 S3→S5→S7，保存合成 DB 與 complete／degraded HTML，拒絕覆寫且失敗保留產物。Astra 獨立審查後將 S8 專屬測試由 16 增至 22 個方法；Sol 重驗 S8 22/22＋S7 21/21，共 43/43，0 failure／error／skip，`py_compile` 通過，生產程式未改。詳見 [S8 開發交接](docs/lot-scenario-demo-handoff.md)。

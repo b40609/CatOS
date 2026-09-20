@@ -1,5 +1,7 @@
 # S9 Fee Completion Assessment：成交費用延遲補齊
 
+後續：assessment 已限定提交 `bb29389`；[S9 正式規格](catos-s9-fee-completion-spec.md)已通過 Sol 文件驗收，明列型別、版本、API、重放及驗收矩陣。以下保留 assessment 與契約審查歷史，程式尚未實作。
+
 狀態：2026-09-20，**Sol 契約審查通過，可進正式規格**。使用者確認 S8 已重驗並限定提交，`b069082` 為 S9 前穩定基線；Astra 本輪未查 Git 或重跑驗證。本文件仍僅為評估契約，**不是正式實作規格，也不授權 Schema 變更或修改 S3**。正式資料型別、schema／payload 版本、API 與驗收矩陣仍須下一片定案。
 
 ## Sol 契約審查（2026-09-20）
