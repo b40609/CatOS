@@ -4,7 +4,7 @@
 
 ## 結論狀態
 
-目前狀態是 **runtime / DB 封版條件已驗收，待 Git 固定版本**。2026-09-21 已依使用者授權保留原 v12 主庫，透過 SQLite backup 產生獨立備份與 `outputs/catos-market-intel-v14.sqlite`，只對新檔執行 v12→v14 migration。主要 release gate 不使用歷史 parity 分數。
+目前狀態是 **Yaozi 唯讀情報模組 v0.1 已完成封版驗收**。固定程式／測試／專屬文件與 verification evidence 的 Git commit 為 `292b20f5e51ac352d7de356eca265f415ecd8d80`。2026-09-21 已依使用者授權保留原 v12 主庫，透過 SQLite backup 產生獨立備份與 `outputs/catos-market-intel-v14.sqlite`，只對新檔執行 v12→v14 migration。主要 release gate 不使用歷史 parity 分數。
 
 ## 1. 啟動 / 停止入口
 
@@ -92,6 +92,6 @@ Sol 驗收結果：
 | Y03 Dashboard / missing / freshness | API + visual QA 通過 | **通過** |
 | Y04 核心隔離 | 最小 smoke 未載入 market 模組 | **通過** |
 | Y05 時間 / source / coverage / 限制 | source、timestamp、coverage、unknown 邊界保持 | **通過** |
-| Y06 固定版本驗收證據 | runtime/hash 證據已固定；market 檔仍未納入 Git commit | **待 Git 固定版本** |
+| Y06 固定版本驗收證據 | focused 70/70、`py_compile`、scoped `git diff --check` 通過；固定 commit `292b20f5e51ac352d7de356eca265f415ecd8d80` | **通過** |
 
-目前唯一剩餘 release 動作是由 Git 負責線將本輪 market 檔與文件固定到可重現 commit；在 commit 前不宣稱 Git-level 封版。
+Y01–Y06 全部通過，可封版為可選唯讀情報模組 v0.1。產品 runtime DB 為本機忽略檔 `outputs/catos-market-intel-v14.sqlite`，不以 Git 保存 DB bytes；原 v12 DB 與 backup 仍保留在本機且未納入 commit。
