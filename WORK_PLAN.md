@@ -6,7 +6,7 @@
 
 Sol 已以全新 schema8 合成 DB 執行 S9 專屬 32/32 與必要回歸 312/312，共 344/344 通過，0 failure／error／skip；修改／新增 Python 檔 `py_compile` 通過，Python 3.14.6、SQLite 3.50.4。驗收發現 schema7 舊 `apply_fill()` 對 raw cumulative dict 被版本 gate 提前改錯誤碼，已修回既有 `TypeError` 語義並重驗 S9 32/32、lot_fills 38/38。既有 DB 未遷移、未修改。
 
-視覺樣本已由新建 schema8 DB 產生，F04／F05 與 HTML viewport／responsive CSS／table overflow／費用品質與 funding 文案靜態核對通過；但本機瀏覽器安全政策封鎖 `file://`，未能執行 1280／390 px 實際像素截圖矩陣，故不宣稱該項通過。限定提交仍只包含 S9 程式、測試、交接與 README／WORK_PLAN 的 S9 hunk；既有 S7 補記、market 與 yaoI／yaozi 工作維持獨立。
+視覺樣本已由本輪新建 schema8 DB 產生，F04／F05 與 HTML 語義測試通過；1280／390 px 均以 Chrome DevTools Protocol 強制實際 CSS viewport 後完成完整／缺費像素驗收，`scrollWidth` 與 viewport 相等，長 Decimal、費用品質、缺費筆數與 funding 文案可讀，無整頁水平溢位或裁切。限定提交仍只包含 S9 程式、測試、交接與 README／WORK_PLAN 的 S9 hunk；既有 S7 補記、market 與 yaoI／yaozi 工作維持獨立。
 
 ## 2026-09-20：S9 正式規格通過 Sol 文件驗收
 

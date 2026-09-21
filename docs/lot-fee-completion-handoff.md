@@ -1,8 +1,8 @@
 # S9 成交費用補齊開發交接
 
-2026-09-21：**Sol 已完成 S9 功能、資料完整性與必要回歸驗收；待限定提交**。Astra 原交付的程式與測試已實際執行，並修正一項 schema7 舊 API 錯誤語義相容問題。既有 DB 未遷移、未修改；所有 schema8 驗證均使用新建合成 DB。
+2026-09-21：**Sol 本輪已完成 S9 獨立功能、資料完整性、必要回歸與視覺驗收**。開始驗收時 `HEAD` 已是 `b783460`（`feat(lots): add S9 fee completion`），因此本輪不改寫既有 commit，只補上重新執行後的驗收證據。既有 DB 未遷移、未修改；所有 schema8 驗證均使用本輪新建合成 DB。
 
-瀏覽器介面因本機安全政策拒絕直接開啟 `file://` 測試報告，因此 1280／390 px 的實際像素截圖矩陣**未能執行，不能宣稱已通過**。已完成 F04／F05 報告語義測試與生成 HTML 的 viewport、responsive media rule、table `overflow-x`、品質／funding 文案靜態核對；此限制保留到可使用允許本機報告渲染的驗收環境再補證據。
+1280／390 px 已以 Chrome DevTools Protocol 強制實際 CSS viewport 後完成完整／缺費四張像素截圖。量測結果在 1280 px 時 `innerWidth`、`clientWidth`、`scrollWidth`、`body.scrollWidth` 全為 1280；390 px 時四者全為 390。長 Decimal、費用品質、缺費筆數與 funding 未知文案均可讀，未見整頁水平溢位或右側裁切。直接使用 Chrome `--window-size=390` 會被瀏覽器下限提升為 500 px，因此該次探針未列入 390 px 驗收證據。
 
 ## 基線與授權
 
@@ -56,9 +56,9 @@ py -3 -B -m unittest discover -s tests -p test_lot_scenario_demo.py -v
 
 - S9 專屬：32/32 通過，0 failure／error／skip；涵蓋真實 Windows process kill、WAL capture 競爭、補零版本、terminal／closed Lot 後補費、active CLOSE 旗標、損毀拒絕與報告品質。
 - 必要回歸：`lots` 26、`ipc_lots` 23、`lot_accounting` 11、`lot_journal` 34、`lot_journal_process` 4、`lot_fills` 38、`lot_fills_process` 4、`lot_exposure` 42、`lot_snapshot` 39、`lot_scenario` 34、`lot_scenario_report` 21、`lot_scenario_demo` 22、`journal` 14，共 312/312 通過。加上 S9 專屬，最終驗收集合共 344/344 通過。
-- 發現並修正一項 schema7 相容缺陷：舊 `apply_fill()` 對 raw cumulative dict 原應維持既有 `TypeError`，S9 初稿的版本 gate 提前改成 `unsupported_fee_version`。修正後 `test_lot_fills.py` 38/38 與 S9 32/32 重新通過；schema7 傳入真正 `SyntheticFillV2` 仍明確拒絕 `unsupported_fee_version`。
+- 既有 `b783460` 已包含一項 schema7 相容修正：舊 `apply_fill()` 對 raw cumulative dict 維持既有 `TypeError`，schema7 傳入真正 `SyntheticFillV2` 仍明確拒絕 `unsupported_fee_version`。本輪獨立審查未發現新的程式或測試缺陷，`test_lot_fills.py` 38/38 與 S9 32/32 均重新通過。
 - 修改／新增 Python 檔及 S9 測試 helper `py_compile` 通過。實際環境 Python 3.14.6、SQLite 3.50.4。
-- 視覺樣本成功以全新 schema8 合成 DB 產生 `complete.html`／`incomplete.html`；F04／F05 測試通過，HTML 具 viewport、600 px media rule、table `overflow-x:auto`、費用品質與 funding 未知文案。因瀏覽器安全政策封鎖 `file://`，未執行 1280／390 px 實際截圖，不把靜態核對寫成像素驗收。
+- 視覺樣本以本輪新建 schema8 合成 DB 產生 `complete.html`／`incomplete.html`；F04／F05 測試通過。1280／390 px 均以實際 CSS viewport 渲染並讀圖驗收，四組 `scrollWidth` 與 viewport 相等；長 Decimal、完整／缺費狀態、缺費筆數與 funding 未知文案可讀，無整頁水平溢位或裁切。
 
 ## 視覺驗收
 
@@ -68,7 +68,7 @@ py -3 -B -m unittest discover -s tests -p test_lot_scenario_demo.py -v
 py -3 -B -c "import sys; sys.path.insert(0, 'tests'); from lot_fee_completion_visual import build; build('reports/s9-qa-20260920')"
 ```
 
-以 1280 px／390 px 渲染 incomplete.html 與 complete.html；確認品質區、長 Decimal、缺費筆數可讀，無整頁水平溢位／裁切，費用降級不改 pending／MATCH；funding 未知文字必須保留。UNVERIFIED／空集合／逸出另有專屬測試。實際視覺證據與結果由 Sol 補記。
+以 1280 px／390 px 渲染 incomplete.html 與 complete.html；確認品質區、長 Decimal、缺費筆數可讀，無整頁水平溢位／裁切，費用降級不改 pending／MATCH；funding 未知文字必須保留。UNVERIFIED／空集合／逸出另有專屬測試。本輪已完成四張實際像素截圖與 viewport／scrollWidth 量測，結果見上節。
 
 ## 限定提交範圍
 
@@ -78,4 +78,4 @@ py -3 -B -c "import sys; sys.path.insert(0, 'tests'); from lot_fee_completion_vi
 
 文件：本交接、README 的 S9 段落、WORK_PLAN 的本輪 S9 新段落。README／WORK_PLAN 既有 S7 補記須逐 hunk 分離。正式規格未改。所有 DB、HTML、快取與其他功能不得納入提交。
 
-功能與資料完整性驗收後執行 `git diff --check`、限定 staged review 與 staged check、Git commit。交付前保留實際案例數與失敗／錯誤／跳過數；視覺像素矩陣的環境限制不得被改寫為已通過。S9 不因此擴張到下一個帳務政策切片。
+功能、資料完整性與視覺驗收後執行 `git diff --check`、限定 staged review 與 staged check、Git commit。交付前保留實際案例數與失敗／錯誤／跳過數。S9 不因此擴張到下一個帳務政策切片。
