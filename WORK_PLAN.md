@@ -1,5 +1,13 @@
 # catOS 階段與分工規劃
 
+## 2026-09-21：S9 功能／資料完整性通過 Sol 執行驗收
+
+使用者明示授權「Astra 依規格編寫 S9 程式與測試，Sol 在全新 schema8 合成 DB 執行驗證與 Git；既有 DB 不遷移、不修改」。已新增嚴格費用品質型別、獨立 snapshot v2 codec、固定 schema8 DDL、completion 事件及同 writer 重放，並接入 S5／S6／S7 的明示 v2 入口；部位與曝險共用原算術，S8 仍走 schema7。
+
+Sol 已以全新 schema8 合成 DB 執行 S9 專屬 32/32 與必要回歸 312/312，共 344/344 通過，0 failure／error／skip；修改／新增 Python 檔 `py_compile` 通過，Python 3.14.6、SQLite 3.50.4。驗收發現 schema7 舊 `apply_fill()` 對 raw cumulative dict 被版本 gate 提前改錯誤碼，已修回既有 `TypeError` 語義並重驗 S9 32/32、lot_fills 38/38。既有 DB 未遷移、未修改。
+
+視覺樣本已由新建 schema8 DB 產生，F04／F05 與 HTML viewport／responsive CSS／table overflow／費用品質與 funding 文案靜態核對通過；但本機瀏覽器安全政策封鎖 `file://`，未能執行 1280／390 px 實際像素截圖矩陣，故不宣稱該項通過。限定提交仍只包含 S9 程式、測試、交接與 README／WORK_PLAN 的 S9 hunk；既有 S7 補記、market 與 yaoI／yaozi 工作維持獨立。
+
 ## 2026-09-20：S9 正式規格通過 Sol 文件驗收
 
 使用者回報 assessment 已通過並提交 `bb29389`。依指示完成 [S9 正式規格](outputs/catos-s9-fee-completion-spec.md)，明定新建 schema8、版本化 Lot／event／capture、費用 API、原子重放及驗收矩陣；completion 保留事件當下 head／active flags，fee subtotal／count／coverage 全部進 payload、replay/hash 與 capture identity。保留 schema7，禁止靜默 migration 或 nullable 化舊費用契約。

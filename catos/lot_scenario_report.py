@@ -124,6 +124,31 @@ def render_synthetic_scenario_report(*, capture: LocalLotCapture,
     """Validate once through S6, then return HTML without I/O or new arithmetic."""
     observation = lot_scenario.observe_synthetic_scenario(
         capture=capture, scenario=scenario, now_ms=now_ms)
+    return _render(capture, scenario, observation)
+
+
+def render_synthetic_scenario_report_v2(*, capture, scenario, now_ms):
+    observation = lot_scenario.observe_synthetic_scenario_v2(capture=capture, scenario=scenario, now_ms=now_ms)
+    return _render(capture, scenario, observation)
+
+
+def _fee_section(quality):
+    rows = []
+    for item in quality:
+        status = ("費用涵蓋範圍未驗證／fee_coverage_unverified" if item.coverage == "UNVERIFIED" else
+                  "費用已完整" if item.fee_complete else "費用不完整／fee_incomplete")
+        for name, label, value in (
+            ("lot_id", "Lot", item.lot_id), ("bot_id", "Bot", item.bot_id),
+            ("revision", "版本", item.revision), ("coverage", "費用涵蓋範圍", item.coverage),
+            ("known_fee_subtotal", "已知費用小計，非全部費用", item.known_fee_subtotal),
+            ("fee_unknown_fill_count", "缺費成交筆數", item.fee_unknown_fill_count),
+            ("fee_complete", "費用完整性", item.fee_complete), ("status", "費用品質", status)):
+            rows.append(_row("fee_quality." + name, label, value, "USDT" if name == "known_fee_subtotal" else "—"))
+    return _section("費用品質", rows,
+        "funding 未知；費用已完整仍不代表完整淨損益。" if quality else "無 Lot 費用資料")
+
+
+def _render(capture, scenario, observation):
     report = observation.report
     identity = [
         _row("observation.evidence_kind", "外層合成證據種類", observation.evidence_kind),
@@ -172,6 +197,8 @@ def render_synthetic_scenario_report(*, capture: LocalLotCapture,
                  "mark 缺席時 mark_fresh 亦為 false。has_unknown=false 不表示無未決責任或完整對帳。"),
         _reason_section(report.reasons),
     ]
+    if isinstance(observation, lot_scenario.SyntheticScenarioObservationV2):
+        sections.append(_fee_section(observation.fee_quality))
     return ('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             '<title>catOS 本機合成情境報告</title><style>' + _STYLE + '</style></head><body><main>'

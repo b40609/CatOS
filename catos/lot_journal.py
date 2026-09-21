@@ -96,6 +96,14 @@ class StoredLot:
 
 
 @dataclass(frozen=True, slots=True)
+class StoredLotV2:
+    lot: lots.LotV2
+    opening_unresolved: bool
+    closing_unresolved: bool
+    commit_seq: int
+
+
+@dataclass(frozen=True, slots=True)
 class LotWriteReceipt:
     bot_id: str
     lot_id: str
@@ -167,11 +175,14 @@ def _numeric_identity(value):
 
 
 def _request(binding, write_id, operation, open_event_seq, expected_revision,
-             after, opening, closing):
-    wire = ipc_lots.lot_to_wire(after)
-    for name in _FINANCIAL:
+             after, opening, closing, *, v2=False):
+    from catos import lot_snapshot_codec
+    wire = (lot_snapshot_codec if v2 else ipc_lots).lot_to_wire(after)
+    for name in (lot_snapshot_codec.FINANCIAL if v2 else _FINANCIAL):
         if wire[name] is not None:
             wire[name] = _numeric_identity(getattr(after, name))
+    if v2 and after.fee_quality.known_fee_subtotal is not None:
+        wire["fee_quality"]["known_fee_subtotal"] = _numeric_identity(after.fee_quality.known_fee_subtotal)
     for name in ("take_profit", "stop_loss"):
         if wire["protection"][name] is not None:
             wire["protection"][name] = _numeric_identity(getattr(after.protection, name))
@@ -179,7 +190,7 @@ def _request(binding, write_id, operation, open_event_seq, expected_revision,
     for name in contract:
         if name != "inst_id":
             contract[name] = _numeric_identity(getattr(binding.contract, name))
-    return _json(dict(format_version=1,
+    return _json(dict(format_version=2 if v2 else 1,
                      scope=dict(account_ref=binding.scope.account_ref,
                                 environment=binding.scope.environment),
                      bot_id=binding.bot_id, inst_id=binding.contract.inst_id,
@@ -200,10 +211,21 @@ def install_schema(connection):
 
 
 class LotJournal:
+    schema_version = 7
+    schema = SCHEMA
+
     def __init__(self, journal):
         self.j = journal
         self.db = journal.connection
         self._failed = False
+        from catos import lot_snapshot_codec
+        self.v2 = self.schema_version == 8
+        self.codec = lot_snapshot_codec if self.v2 else ipc_lots
+        self.financial = lot_snapshot_codec.FINANCIAL if self.v2 else _FINANCIAL
+        self.validator = lots.validate_lot_v2 if self.v2 else lots.validate_lot
+
+    def _request(self, *args):
+        return _request(*args, v2=self.v2)
 
     @contextmanager
     def _access(self):
@@ -303,17 +325,20 @@ class LotJournal:
                          side=row["side"], revision=revision,
                          protection={name: row[name] for name in
                                      ("trigger_price_type", "take_profit", "stop_loss")},
-                         **{name: row[name] for name in _FINANCIAL})
-            lot = ipc_lots.lot_from_wire(value)
-            lots.validate_lot(lot, binding.contract)
+                         **{name: row[name] for name in self.financial})
+            if self.v2:
+                value.update(snapshot_version=2, fee_quality=dict(coverage=row["fee_coverage"],
+                    known_fee_subtotal=row["known_fee_subtotal"], fee_unknown_fill_count=row["fee_unknown_fill_count"]))
+            lot = self.codec.lot_from_wire(value)
+            self.validator(lot, binding.contract)
             opening, closing = bool(row["opening_unresolved"]), bool(row["closing_unresolved"])
-            request = _request(binding, row["write_id"], row["operation"],
+            request = self._request(binding, row["write_id"], row["operation"],
                                row["open_event_seq"] if expected == 0 else None,
                                expected, lot, opening, closing)
             _decode_json(row["request_json"])
             if row["request_json"] != request or row["request_hash"] != _hash(request):
                 raise ValueError("stored fingerprint mismatch")
-            return StoredLot(lot, opening, closing, seq)
+            return (StoredLotV2 if self.v2 else StoredLot)(lot, opening, closing, seq)
         except (ValueError, TypeError) as exc:
             raise LotStorageError("integrity_error") from exc
 
@@ -362,11 +387,29 @@ class LotJournal:
 
     def create(self, *, scope, bot_id, write_id, open_event_seq, after,
                opening_unresolved, closing_unresolved):
+        if self.v2:
+            raise LotStorageError("unsupported_fee_version")
         return self._write(scope, bot_id, write_id, "CREATE", open_event_seq, 0,
                            after, opening_unresolved, closing_unresolved)
 
     def replace(self, *, scope, bot_id, write_id, expected_revision, after,
                 opening_unresolved, closing_unresolved):
+        if self.v2:
+            raise LotStorageError("unsupported_fee_version")
+        return self._write(scope, bot_id, write_id, "REPLACE", None, expected_revision,
+                           after, opening_unresolved, closing_unresolved)
+
+    def create_v2(self, *, scope, bot_id, write_id, open_event_seq, after,
+                  opening_unresolved, closing_unresolved):
+        if not self.v2 or type(after) is not lots.LotV2:
+            raise LotStorageError("unsupported_fee_version")
+        return self._write(scope, bot_id, write_id, "CREATE", open_event_seq, 0,
+                           after, opening_unresolved, closing_unresolved)
+
+    def replace_v2(self, *, scope, bot_id, write_id, expected_revision, after,
+                   opening_unresolved, closing_unresolved):
+        if not self.v2 or type(after) is not lots.LotV2:
+            raise LotStorageError("unsupported_fee_version")
         return self._write(scope, bot_id, write_id, "REPLACE", None, expected_revision,
                            after, opening_unresolved, closing_unresolved)
 
@@ -385,7 +428,7 @@ class LotJournal:
 
     def _write(self, scope, bot_id, write_id, operation, open_seq, expected, after, opening, closing,
                *, _in_transaction=False):
-        if not _in_transaction and isinstance(write_id, str) and write_id.startswith("s3_"):
+        if not _in_transaction and isinstance(write_id, str) and write_id.startswith(("s3_", "s9_")):
             raise LotStorageError("reserved_write_id")
         with self._write_access(_in_transaction, after):
             binding = self._binding(scope, bot_id)
@@ -396,17 +439,19 @@ class LotJournal:
             if type(opening) is not bool or type(closing) is not bool:
                 raise LotStorageError("invalid_transition")
             # Reconstruct to validate even locally forged/mutated frozen objects.
-            after = ipc_lots.lot_from_wire(ipc_lots.lot_to_wire(after))
+            after = self.codec.lot_from_wire(self.codec.lot_to_wire(after))
+            if self.v2 and not _in_transaction and after.fee_quality.coverage != "UNVERIFIED":
+                raise LotStorageError("unmanaged_lot")
             if (after.scope != scope or after.bot_id != bot_id
                     or after.inst_id != binding.contract.inst_id):
                 raise LotStorageError("identity_conflict")
-            lots.validate_lot(after, binding.contract)
+            self.validator(after, binding.contract)
             if operation == "CREATE":
                 ipc.integer(open_seq, "open_event_seq", 1)
                 origin = lots.IntentContext(scope, bot_id, binding.contract, open_seq, False)
                 if after.open_intent_key != lots.make_intent_key(origin):
                     raise LotStorageError("identity_conflict")
-            request = _request(binding, write_id, operation, open_seq, expected, after, opening, closing)
+            request = self._request(binding, write_id, operation, open_seq, expected, after, opening, closing)
             prior = self.db.execute(_SELECT + " WHERE r.bot_id=? AND r.write_id=?",
                                     (bot_id, write_id)).fetchone()
             if prior is not None:
@@ -437,13 +482,17 @@ class LotJournal:
                     self.db.execute("INSERT INTO lot_heads VALUES (?,?,?,?,?,?)",
                                     (after.lot_id, bot_id, open_seq, after.open_intent_key,
                                      after.side, after.revision))
-                wire = ipc_lots.lot_to_wire(after)
+                wire = self.codec.lot_to_wire(after)
                 values = dict(lot_id=after.lot_id, bot_id=bot_id, revision=after.revision,
                               expected_revision=expected, write_id=write_id, commit_seq=seq,
-                              operation=operation, **{name: wire[name] for name in _FINANCIAL},
+                              operation=operation, **{name: wire[name] for name in self.financial},
                               **wire["protection"], opening_unresolved=int(opening),
                               closing_unresolved=int(closing), request_json=request,
                               request_hash=_hash(request))
+                if self.v2:
+                    quality = wire["fee_quality"]
+                    values.update(fee_coverage=quality["coverage"], known_fee_subtotal=quality["known_fee_subtotal"],
+                                  fee_unknown_fill_count=quality["fee_unknown_fill_count"])
                 columns = ",".join(values)
                 self.db.execute(f"INSERT INTO lot_revisions ({columns}) VALUES ({','.join('?' for _ in values)})",
                                 tuple(values.values()))
@@ -520,14 +569,14 @@ class LotJournal:
     def _scan(self):
         if not self.db.in_transaction:
             raise LotStorageError("storage_unavailable")
-        if (self.db.execute("PRAGMA user_version").fetchone()[0] != 7
+        if (self.db.execute("PRAGMA user_version").fetchone()[0] != self.schema_version
                 or self.db.execute("PRAGMA foreign_keys").fetchone()[0] != 1
                 or self.db.execute("PRAGMA journal_mode").fetchone()[0].lower() != "wal"
                 or self.db.execute("PRAGMA synchronous").fetchone()[0] != 2):
             raise LotStorageError("integrity_error")
         # Compare the fixed local DDL, including CHECKs, keys and deferred FKs.
         # No user-provided SQL or generic migration framework is involved.
-        for name, statement in zip(TABLES, SCHEMA):
+        for name, statement in zip(TABLES, self.schema):
             row = self.db.execute("SELECT type,sql FROM sqlite_master WHERE name=?", (name,)).fetchone()
             if (row is None or row["type"] != "table"
                     or "".join(row["sql"].split()) != "".join(statement.split())):

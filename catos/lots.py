@@ -147,27 +147,75 @@ class Lot:
     revision: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.scope, LotScope):
-            raise LotError("lot_scope_mismatch")
-        _token(self.bot_id, "lot_scope_mismatch")
-        _token(self.inst_id, "invalid_contract")
-        _hex_id(self.open_intent_key)
-        _hex_id(self.lot_id)
-        _validate_side(self.side)
-        opened = _decimal(self.opened_qty, "invalid_quantity", derived=True, positive=True)
-        remaining = _decimal(self.remaining_qty, "invalid_quantity", derived=True, nonnegative=True)
-        if remaining > opened:
-            raise LotError("invalid_quantity")
-        _decimal(self.average_entry, "invalid_decimal", derived=True, positive=True)
-        _decimal(self.realized_pnl, "invalid_decimal", derived=True)
+        _validate_lot_fields(self)
         _decimal(self.fees_paid, "invalid_decimal", derived=True)
-        if self.funding_paid is not None:
-            _decimal(self.funding_paid, "invalid_decimal", derived=True)
-        if not isinstance(self.protection, LotProtection):
-            raise LotError("invalid_protection")
-        _integer(self.revision, "invalid_revision", minimum=1)
-        if self.lot_id != make_lot_id(self.open_intent_key):
-            raise LotError("lot_identity_mismatch")
+
+
+def _validate_lot_fields(self) -> None:
+    if not isinstance(self.scope, LotScope):
+        raise LotError("lot_scope_mismatch")
+    _token(self.bot_id, "lot_scope_mismatch")
+    _token(self.inst_id, "invalid_contract")
+    _hex_id(self.open_intent_key)
+    _hex_id(self.lot_id)
+    _validate_side(self.side)
+    opened = _decimal(self.opened_qty, "invalid_quantity", derived=True, positive=True)
+    remaining = _decimal(self.remaining_qty, "invalid_quantity", derived=True, nonnegative=True)
+    if remaining > opened:
+        raise LotError("invalid_quantity")
+    _decimal(self.average_entry, "invalid_decimal", derived=True, positive=True)
+    _decimal(self.realized_pnl, "invalid_decimal", derived=True)
+    if self.funding_paid is not None:
+        _decimal(self.funding_paid, "invalid_decimal", derived=True)
+    if not isinstance(self.protection, LotProtection):
+        raise LotError("invalid_protection")
+    _integer(self.revision, "invalid_revision", minimum=1)
+    if self.lot_id != make_lot_id(self.open_intent_key):
+        raise LotError("lot_identity_mismatch")
+
+
+@dataclass(frozen=True, slots=True)
+class FeeQuality:
+    coverage: Literal["MANAGED", "UNVERIFIED"]
+    known_fee_subtotal: Decimal | None
+    fee_unknown_fill_count: int | None
+
+    def __post_init__(self) -> None:
+        if type(self.coverage) is not str:
+            raise LotError("invalid_fee_quality")
+        if self.coverage == "MANAGED":
+            _decimal(self.known_fee_subtotal, "invalid_fee_quality", derived=True)
+            _integer(self.fee_unknown_fill_count, "invalid_fee_quality", minimum=0)
+        elif self.coverage != "UNVERIFIED" or self.known_fee_subtotal is not None or self.fee_unknown_fill_count is not None:
+            raise LotError("invalid_fee_quality")
+
+    @property
+    def fee_complete(self) -> bool | None:
+        return self.fee_unknown_fill_count == 0 if self.coverage == "MANAGED" else None
+
+
+@dataclass(frozen=True, slots=True)
+class LotV2:
+    scope: LotScope
+    bot_id: str
+    inst_id: str
+    lot_id: str
+    open_intent_key: str
+    side: Side
+    opened_qty: Decimal
+    remaining_qty: Decimal
+    average_entry: Decimal
+    realized_pnl: Decimal
+    fee_quality: FeeQuality
+    funding_paid: Decimal | None
+    protection: LotProtection
+    revision: int
+
+    def __post_init__(self) -> None:
+        _validate_lot_fields(self)
+        if type(self.fee_quality) is not FeeQuality:
+            raise LotError("invalid_fee_quality")
+        self.fee_quality.__post_init__()
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,6 +352,17 @@ def validate_protection(protection: LotProtection, side: Side, contract: Contrac
 def validate_lot(lot: Lot, contract: ContractSpec) -> None:
     if not isinstance(lot, Lot):
         raise LotError("invalid_view")
+    _validate_lot_contract(lot, contract)
+
+
+def validate_lot_v2(lot: LotV2, contract: ContractSpec) -> None:
+    if type(lot) is not LotV2:
+        raise LotError("invalid_view")
+    lot.__post_init__()
+    _validate_lot_contract(lot, contract)
+
+
+def _validate_lot_contract(lot, contract) -> None:
     contract = _validate_contract(contract)
     if lot.inst_id != contract.inst_id:
         raise LotError("invalid_contract")
@@ -313,7 +372,7 @@ def validate_lot(lot: Lot, contract: ContractSpec) -> None:
 
 
 def _bound_lot(intent: CloseLot | UpdateLotProtection, context: IntentContext,
-               view: LotValidationView) -> Lot:
+               view: LotValidationView, validator=validate_lot) -> Lot:
     if view.lot is None:
         if view.opening_unresolved or view.closing_unresolved:
             raise LotError("invalid_view")
@@ -324,7 +383,7 @@ def _bound_lot(intent: CloseLot | UpdateLotProtection, context: IntentContext,
         raise LotError("lot_scope_mismatch")
     if intent.lot_id != lot.lot_id:
         raise LotError("lot_identity_mismatch")
-    validate_lot(lot, context.contract)
+    validator(lot, context.contract)
     if intent.expected_revision != lot.revision:
         raise LotError("revision_conflict")
     if lot.remaining_qty == 0:
@@ -338,6 +397,30 @@ def validate_intent(intent: LotIntent, context: IntentContext,
                     view: LotValidationView) -> ValidatedLotIntent:
     if not isinstance(context, IntentContext) or not isinstance(view, LotValidationView):
         raise LotError("invalid_view")
+    return _validate_intent(intent, context, view, validate_lot)
+
+
+@dataclass(frozen=True, slots=True)
+class LotValidationViewV2:
+    lot: LotV2 | None
+    opening_unresolved: bool
+    closing_unresolved: bool
+
+    def __post_init__(self):
+        if self.lot is not None and type(self.lot) is not LotV2:
+            raise LotError("invalid_view")
+        if type(self.opening_unresolved) is not bool or type(self.closing_unresolved) is not bool:
+            raise LotError("invalid_view")
+
+
+def validate_intent_v2(intent, context, view):
+    if not isinstance(context, IntentContext) or type(view) is not LotValidationViewV2:
+        raise LotError("invalid_view")
+    view.__post_init__()
+    return _validate_intent(intent, context, view, validate_lot_v2)
+
+
+def _validate_intent(intent, context, view, validator):
     if not isinstance(intent, (OpenLot, CloseLot, UpdateLotProtection)):
         raise LotError("invalid_view")
     if context.warmup:
@@ -355,7 +438,7 @@ def validate_intent(intent: LotIntent, context: IntentContext,
         return ValidatedLotIntent(intent_key, context.scope, context.bot_id,
                                   context.contract.inst_id, lot_id, intent, intent.quantity)
 
-    lot = _bound_lot(intent, context, view)
+    lot = _bound_lot(intent, context, view, validator)
     if isinstance(intent, CloseLot):
         quantity = lot.remaining_qty if intent.quantity is None else intent.quantity
         _multiple(quantity, context.contract.lot_size, "invalid_quantity")

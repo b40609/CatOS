@@ -7,7 +7,7 @@ from typing import Literal
 
 from catos import ipc, ipc_lots, lots
 from catos.lot_accounting import exact_quantity
-from catos.lot_journal import LotStorageError, StoredLot, _json, _numeric_identity
+from catos.lot_journal import LotStorageError, StoredLot, StoredLotV2, _json, _numeric_identity
 from catos.research import ContractSpec
 
 
@@ -51,6 +51,22 @@ class LocalLotCapture:
     unmanaged_unresolved_lot_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class LocalLotCaptureV2:
+    source: Literal["synthetic_ledger"]
+    scope: lots.LotScope
+    contract: ContractSpec
+    capture_id: str
+    observed_at_ms: int
+    valid_until_ms: int
+    bot_watermarks: tuple[BotWatermark, ...]
+    lots: tuple[StoredLotV2, ...]
+    pending: tuple[SyntheticPendingObligation, ...]
+    unmanaged_unresolved_lot_ids: tuple[str, ...]
+    capture_version: int = 2
+    schema_version: int = 8
+
+
 def validate_request(journal, scope, inst_id, observed_at_ms, valid_until_ms):
     try:
         journal.lots._scope(scope)
@@ -68,19 +84,27 @@ def validate_request(journal, scope, inst_id, observed_at_ms, valid_until_ms):
 
 
 def _fragments(capture):
+    from catos import lot_snapshot_codec
+    v2 = type(capture) is LocalLotCaptureV2
     contract = {f.name: (capture.contract.inst_id if f.name == "inst_id" else
                          _numeric_identity(getattr(capture.contract, f.name)))
                 for f in fields(ContractSpec)}
-    yield dict(kind="header", format=_FORMAT, schema_version=7, source=capture.source,
-               scope=ipc_lots._scope_to_wire(capture.scope), contract=contract)
+    header = dict(kind="header", format="catos-local-lot-capture-v2" if v2 else _FORMAT,
+                  schema_version=8 if v2 else 7, source=capture.source,
+                  scope=ipc_lots._scope_to_wire(capture.scope), contract=contract)
+    if v2:
+        header["capture_version"] = 2
+    yield header
     for watermark in capture.bot_watermarks:
         yield dict(kind="bot_watermark", bot_id=watermark.bot_id,
                    last_commit_seq=watermark.last_commit_seq)
     for stored in capture.lots:
-        wire = ipc_lots.lot_to_wire(stored.lot)
-        for name in ("opened_qty", "remaining_qty", "average_entry", "realized_pnl", "fees_paid", "funding_paid"):
+        wire = (lot_snapshot_codec if v2 else ipc_lots).lot_to_wire(stored.lot)
+        for name in (lot_snapshot_codec.FINANCIAL if v2 else ("opened_qty", "remaining_qty", "average_entry", "realized_pnl", "fees_paid", "funding_paid")):
             if wire[name] is not None:
                 wire[name] = _numeric_identity(getattr(stored.lot, name))
+        if v2 and stored.lot.fee_quality.known_fee_subtotal is not None:
+            wire["fee_quality"]["known_fee_subtotal"] = _numeric_identity(stored.lot.fee_quality.known_fee_subtotal)
         for name in ("take_profit", "stop_loss"):
             if wire["protection"][name] is not None:
                 wire["protection"][name] = _numeric_identity(getattr(stored.lot.protection, name))
@@ -96,7 +120,16 @@ def _fragments(capture):
 
 
 def _capture_id(capture):
-    digest = hashlib.sha256(_FORMAT.encode("ascii"))
+    if type(capture) is LocalLotCaptureV2:
+        if (type(capture.capture_version) is not int or capture.capture_version != 2
+                or type(capture.schema_version) is not int or capture.schema_version != 8):
+            raise LotStorageError("unsupported_fee_version")
+        domain = "catos-local-lot-capture-v2"
+    elif type(capture) is LocalLotCapture:
+        domain = _FORMAT
+    else:
+        raise LotStorageError("unsupported_fee_version")
+    digest = hashlib.sha256(domain.encode("ascii"))
     for fragment in _fragments(capture):
         encoded = _json(fragment).encode("utf-8")
         digest.update(len(encoded).to_bytes(8, "big"))
@@ -104,7 +137,7 @@ def _capture_id(capture):
     return digest.hexdigest()
 
 
-def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms):
+def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms, *, v2=False):
     """Internal only: caller pins and owns the read transaction."""
     db = journal.connection
     if not db.in_transaction:
@@ -150,7 +183,7 @@ def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms):
             key, validated.intent_key, validated.bot_id, validated.lot_id,
             "OPEN" if opening else "CLOSE", side, validated.resolved_quantity, order["total"],
             exact_quantity(validated.resolved_quantity, order["total"].copy_negate()), order["count"]))
-    capture = LocalLotCapture(
+    capture = (LocalLotCaptureV2 if v2 else LocalLotCapture)(
         "synthetic_ledger", scope, contract, "", observed_at_ms, valid_until_ms,
         tuple(BotWatermark(b.bot_id, b.last_commit_seq) for b in bindings), tuple(stored_lots), tuple(pending),
         tuple(s.lot.lot_id for s in stored_lots if s.lot.lot_id not in managed
