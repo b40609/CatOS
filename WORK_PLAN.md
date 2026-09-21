@@ -1,10 +1,10 @@
 # catOS 階段與分工規劃
 
-## 2026-09-21：S10 帳務缺口評估通過 Sol 契約審查
+## 2026-09-21：S10 帳務缺口評估完成 Sol 獨立契約審查
 
-依使用者同意完成 [S10 assessment](outputs/catos-s10-accounting-gap-assessment.md)，比較已知費用更正與 funding 的失敗情境、依賴及驗證成本。Sol 契約審查確認下一片可先做受管成交費用更正：每筆更正使用穩定 identity＋目前有效費用來源的精確前驅事件，先查舊 identity 重送再驗證前驅；新 identity 同值視為無變化。Decimal 固定沿研究 context「subtotal 扣舊有效 fee，再加新 fee」，不得改成先算差額或重算歷史。funding 另需期間涵蓋與結算時歸屬證據。
+依使用者同意完成 [S10 assessment](outputs/catos-s10-accounting-gap-assessment.md)，比較已知費用更正與 funding 的失敗情境、依賴及驗證成本。Sol 獨立靜態核對確認先評估受管成交費用更正的排序理由成立：每筆更正需穩定 identity＋目前有效費用來源的精確前驅，先查舊 identity 重送再驗證前驅；funding 另需期間涵蓋與結算時歸屬證據。文件結論為「附待決政策可進正式規格」；新 identity 同值如何處理、Decimal 更新順序仍待使用者定案。
 
-基線依使用者回報為 S9 實作 `b783460` 與驗收紀錄 `132654d`。Sol 唯讀交叉核對現行程式，另執行最小 Decimal 探針證明不同運算順序在 50 位 context 下可得不同末位；未執行 DB、單元測試、migration 或全量測試。schema8 固定不改，下一步正式規格採新建 schema9，並須明示新版 capture/hash 與 S6／S7 版本邊界。既有 S7 補記與 market／yaoI／yaozi 工作保持獨立。
+基線依使用者回報為 S9 實作 `b783460` 與驗收紀錄 `132654d`。Sol 本輪只做唯讀原始碼與文件交叉核對，未執行 Python、Decimal 探針、DB、單元測試、migration 或全量測試。schema8 固定不改；若後續更正持久化需要新 DDL，必須使用新的 Journal schema 版本，但 schema／payload／capture 的實際版本號尚未定案。既有 S7 補記與 market／yaoI／yaozi 工作保持獨立。
 
 ## 2026-09-21：S9 功能／資料完整性通過 Sol 執行驗收
 
