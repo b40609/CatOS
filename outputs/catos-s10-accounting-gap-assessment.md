@@ -1,0 +1,122 @@
+# S10：S9 後帳務缺口與下一片評估
+
+狀態：2026-09-21，Astra 完成評估；Sol 已完成契約審查，**「受管成交已知費用更正」可進正式規格**。本輪只定案下一片的最小政策邊界，未授權實作、Schema 變更、既有 DB migration 或交易接線。
+
+## Sol 契約審查（2026-09-21）
+
+未發現阻斷缺陷。下一片維持 local-sim、單訂單單 Lot、USDT，只更正已有逐筆證據且目前已知費用的受管成交；原 KNOWN fill 與由 S9 completion 轉為 KNOWN 的成交都可作起點。UNKNOWN 仍走 S9 completion，UNVERIFIED 不接受更正；funding、非 USDT 換算、多 Lot 分配、帳戶 net PnL、風控與真實 adapter 均留後續。
+
+正式規格須把每次更正定義為**新的不可變事件**，並至少同時帶穩定 `correction_id` 與目前有效費用來源的精確前驅引用。Sol 建議直接引用前驅事件的全域 `event_seq`：第一個前驅只能是原 KNOWN fill 或其 S9 completion，之後只能是同成交上一筆 correction。僅比對舊金額、只用 `trade_id` 或只用 Lot revision 都不足以防止 0.02→0.015→0.02 的往返分叉。
+
+重送優先序定案為：先以 correction identity 查已存在事件；同 identity＋同 canonical payload 永遠回原收據，即使後續已有新更正；同 identity＋不同內容為 `write_conflict`。只有 identity 不存在時，才驗證 target、目前前驅與可更正狀態。新的 identity 若新費用與目前有效費用數值等價，視為無變化並拒絕，不新增事件或 Lot revision。錯誤碼名稱與 wire 精確欄位由正式規格鎖定。
+
+Decimal 政策亦可定案：沿用 `research._CONTEXT`（prec=50、ROUND_HALF_EVEN）與 S9 的派生值邊界，**固定依序執行 `subtotal_without_target = subtotal - old_effective_fee`，再執行 `new_subtotal = subtotal_without_target + new_fee`**；不先算 `new-old`、不排序重加全部成交、不提高精度重算歷史。Sol 以現行 context 做最小探針，合法新舊 fee `-2.7008E-10`／`-0.00004511699904` 搭配派生 subtotal `1.375295816121544753856E+36` 時，固定扣舊加新得到尾數 `...2711`，而先算差額再加得到 `...2710`，已證明運算順序是契約而非等價實作細節。正式規格須明定 Underflow／DecimalException、每一步派生界限與整筆 rollback；往返更正不保證還原先前 subtotal 的最後有效位。
+
+schema8 DDL 已固定，故更正事件不得塞回 schema8。正式規格應使用**全新 schema9 路徑**、`PRAGMA user_version=9`，只允許新建或重開 schema9，不遷移 schema7／8。另因現行 `LocalLotCaptureV2` 明確綁定 `capture_version=2`、`schema_version=8`，schema9 不能靜默重用 v2 capture；正式規格須定義新版 capture/hash domain 與對應 S6／S7 明示入口，或明確縮小交付到不含下游呈現，不能放寬既有 v2 驗證來混用版本。
+
+Sol 本輪實際做了唯讀實碼交叉核對與上述 Decimal 小探針；未執行 DB、migration、單元測試或全量測試。S9 的 344/344 仍是既有驗收紀錄，不因本輪文件審查而重新宣稱重驗。
+
+## 1. 建議與依據
+
+建議下一個實作候選為「受管成交已知費用更正」，先完成契約審查與正式規格，再另行實作。理由是 S9 已有不可變成交身份、補費收據、Lot 版本及同 writer 重放，可用較小範圍處理 known→different known；funding 還需要獨立結算身份、期間完整性與歸屬政策，直接累加 funding_paid 不能解決這些缺口。
+
+此排序依目前 local-sim 開發邊界與驗證成本，不代表已觀察到真實費用更正事故，也不代表 funding 必須依賴費用更正。若下一個產品目標改為含資金費的期間損益，應重新評估 funding 的優先性，不把本建議當成永久順序。
+
+S9 基線依使用者回報：實作 `b783460`、獨立驗收紀錄 `132654df560f2e5f60a490100a8d8be2c8c5349d`，344/344 通過，未 push。已閱讀 [S9 handoff](../docs/lot-fee-completion-handoff.md) 的驗收紀錄；Astra 評估階段未執行 Git 或重跑測試，Sol 本輪也未重跑 S9 測試，不宣稱重新驗證 344/344。
+
+## 2. 現行能力與缺口
+
+| 證據來源 | 現行行為 | 尚缺能力 |
+|---|---|---|
+| [S9 正式契約](catos-s9-fee-completion-spec.md) | 僅 unknown→known；known→different known 明確排除 | 費用更正的事件身份、先後關係與失效前提 |
+| [lot_accounting](../catos/lot_accounting.py) | completion 小計加費用、unknown count 減一、revision 前進；保留其他 Lot 欄位 | 替換某一成交的有效費用，而非再次加上整筆新費用 |
+| [lot_fills](../catos/lot_fills.py) | 原 KNOWN 成交補費拒絕；completion 同鍵不同內容衝突；按全域 seq 重放 | 允許後續更正但仍保留原 fill／completion 的不可變性 |
+| [schema8](../catos/lot_schema8.py) | completion 主鍵為 order_key＋trade_id，一筆原成交最多一筆 completion | 同成交多次合法更正的順序與唯一前驅證據 |
+| [S7 renderer](../catos/lot_scenario_report.py) | 費用完整性獨立呈現，保留 funding 未知文案 | funding 的涵蓋範圍、結算證據與完整性投影 |
+| [research](../catos/research.py) | 研究模型接受明示 funding_events；同時間先結算舊部位再撮合 | Virtual Lot 持久化結算、遲到事件及歸屬；研究假設不能直接當作該政策 |
+| [架構文件](../catOS-architecture-review.md) | 日損與權益需要帳務及估值；分類和基準重建仍有待決項 | 從 Lot 局部帳務到完整帳戶損益、權益及日損的證據閉環 |
+
+S9 的 fee_complete 只表示受管成交集合沒有尚缺費用的成交，不是費用永不更動的保證，更不是 funding／帳戶完整性。未受管 S2 快照仍為 UNVERIFIED；不能藉更正 API 接管或補造逐筆證據。
+
+## 3. 兩個候選的比較
+
+| 面向 | 已知費用更正 | funding 帳務 |
+|---|---|---|
+| 具體失敗情境 | 成交已記 0.02，後續證據改為 0.015；S9 拒絕不同金額，現行無合法更正入口 | 持有期間有結算費用，或無法證明是否遺漏；只看成交 fee 無法形成期間損益 |
+| 已有身份依據 | 原 scope／source／inst／order／trade 與不可變收據 | 尚須定義結算事件 identity，不能借用某筆成交 identity |
+| 最小可行範圍 | 單筆受管成交、USDT、追加更正、保留原事件與目前 Lot head | 明示合成結算事件、明確期間與唯一可證明歸屬；無法歸屬時不強塞 Lot |
+| 新政策 | 更正順序、前驅版本、無變化請求、Decimal 調整順序 | 結算時點持倉、同時事件順序、遲到／缺漏、涵蓋期間、歸屬與零費用證據 |
+| 主要驗證成本 | 更正鏈、去重、失效前驅、Decimal、原子收據、跨層相容 | 上述事件完整性再加時間窗口、歷史部位、歸屬、完整性與守恆 |
+| 相對成本判斷 | 中；可重用 S9，但不是改掉衝突判斷即可 | 高；不能用「已經有 funding_paid 欄位」視為完成基礎 |
+| 對 net PnL 的貢獻 | 修正 fee，funding 仍未知 | 補上另一類成本；仍須定義損益期間、其他帳務及估值範圍 |
+
+成本為設計比較，未量測工時或預估測試方法數。兩者皆維持 Decimal／SQLite TEXT、同 writer、local-sim，不接真實 adapter 或風控。
+
+## 4. 費用更正候選：已通過契約審查
+
+以下政策已通過 Sol 契約審查，可交下一步正式規格鎖定資料型別、wire、DDL、API、錯誤碼與驗收矩陣；本文件本身仍不是實作規格或 Schema 變更授權。
+
+### 4.1 原成交與更正鏈
+
+- 目標限定既有受管成交；首次 KNOWN fill 與由 S9 completion 補為 KNOWN 的成交均可作起點。UNKNOWN 仍走 completion；UNVERIFIED 不接受更正。
+- 保留原 fill、completion 及所有更正。新事件提供「更正後的絕對費用」，不讓 caller 自填要累加的差額，也不修改 qty／price／Bot／Lot 歸屬。
+- 每次更正需要穩定 `correction_id`，以及對該成交目前有效費用來源的明確前驅引用；正式規格優先採前驅事件全域 `event_seq`。不能僅以 trade_id 去重，也不能只檢查舊金額或 Lot revision。
+- 只檢查舊金額會漏掉 0.02→0.015→0.02 的往返：最初的 0.02 與目前的 0.02 金額相同，但版本不同。失效前驅的新更正應拒絕，不能以換 ID 繞過。
+- 同 identity 同 canonical 內容先回原收據，即使該成交後續又更正也應可重送；同 identity 不同合法內容衝突。不存在該 identity 才檢查目前前驅及可更正狀態。
+- 新 identity 的相同有效金額請求拒絕為無變化，不增加版本；它不同於 S9 補 0，後者會改 unknown count。錯誤名稱、identity 範圍與前驅 wire 精確格式留正式規格定案。
+
+### 4.2 更新目前 Lot，而非歷史版本
+
+新更正只更新當下 Lot head 的費用小計與 revision／收據水位；coverage 維持 MANAGED，unknown count 不變。該 Lot 仍可能有其他 UNKNOWN 成交，所以更正一筆 KNOWN 不得把整個 Lot 標成完整。
+
+沿 S9 檢查並保留當下 active OPEN／CLOSE 旗標，允許 terminal 後及全平 Lot 更正。qty、average entry、realized_pnl、funding、protection、order total、fill_seq、done 與 active order 都不改。已接受 CLOSE binding 繼續有效；尚未接受且引用舊 Lot revision 的意圖仍須遵守 revision_conflict。
+
+### 4.3 Decimal 是必要契約，不能憑直覺推定
+
+概念上需要扣除該成交舊有效費用並加入新有效費用；不能把新絕對費用完整再加一次。例如小計 0.03 含目標費用 0.02，改為 0.015 後應為 0.025，unknown count 不變。
+
+但是 50 位 context 下，「先算新舊差額再加小計」、「小計先減舊再加新」及「重新加總全部有效費用」不保證等價。S9 小計已按事件順序捨入，也不能宣稱減回舊值就恢復無限精度真值。
+
+已定案在事件當下以固定順序「目前 subtotal 扣舊有效 fee，再加新 fee」，兩步都在 `research._CONTEXT` 下執行並沿 S9 派生界限；正式規格必須明定 Underflow／DecimalException、每步中間值驗證與失敗原子性。不得改成先算差額、float、排序加總或提高精度重算舊版本；重放必須依同一事件順序得到完全相同結果。
+
+### 4.4 儲存、重放與呈現
+
+更正事件、canonical payload/hash、前驅、Lot revision、head 與水位須同交易提交，並與既有事件一起按全域順序重放。驗證事件→版本與版本→事件雙向唯一，拒絕缺前驅、分叉、跨成交引用、刪尾端事件及殘留版本；COMMIT 後 ACK 遺失仍以原 identity 查詢／重送。
+
+新增事件不能悄悄改寫 schema8 的固定 DDL 或舊版 replay。下一片使用明示的新建 schema9 路徑；`PRAGMA user_version` 仍是唯一持久化 schema 版本，無既有 DB migration。既有 schema7／8 必須保持原 DDL、hash、receipt 與錯版拒絕。現行 V2 capture 精確綁定 schema8，因此 schema9 的 capture／hash domain 與 S6／S7 入口必須明示升版或明確不納入首片，不能把 schema9 偽裝成 V2。
+
+報告須能識別使用的是更正後版本；capture identity 必須隨相關內容與版本變更。費用完整性仍與 pending／曝險品質分離，不新增帳戶 net PnL。是否需在 observation 額外呈現最後更正來源，須以最小稽核需求定案，不先加完整歷史 UI。
+
+## 5. funding 後續的獨立前置決策
+
+1. **事件來源與金額：** 合成情境輸入已結算金額，或按費率／mark／部位推算，是兩種不同證據；不能把推算值包裝成已結算帳務。正式規格需先選最小範圍。
+2. **時間與順序：** 明示結算時間、接收／追加順序、相同時間先後與遲到規則。不能用收到事件時的剩餘部位替代結算時部位。
+3. **歸屬：** 一訂單一 Lot 不代表一筆 funding 一定一 Lot。若結算時有多 Lot，或不能證明唯一歸屬，首片應拒絕 Lot 歸屬或保留未歸屬狀態；具體方式待定，不任意按當前 qty 分攤。
+4. **完整性：** 定義期間及涵蓋證據；沒有事件不等於已知零，收到一筆不等於期間完整。沒有預期集合或窗口證據就不能計算有意義的「缺幾筆」。不能直接套用 fee_unknown_fill_count。
+5. **符號與守恆：** 支出／收入、零、重送、衝突、後續更正與來源總額核對需定義。研究模型的 funding 算術僅供比較，不能取代持久化來源與歸屬契約。
+
+funding 不必等待費用更正才可評估，但在以上決策完成前，不建置新的帳本、通用分配框架或把 funding_paid 的 None 改成 0。即使未來 fee 與 funding 完整，完整帳戶損益仍需額外定義外部資金流、估值與期間邊界。
+
+## 6. 建議驗收情境與審查出口
+
+| 類別 | 正式規格應鎖定的證據 |
+|---|---|
+| 身份 | 原 KNOWN／completion 起點均可；跨 scope／trade／來源與 UNVERIFIED 拒絕 |
+| 去重 | 同鍵同內容、Decimal 等價重送回原收據；不同內容衝突；後續更正後仍可重送舊收據 |
+| 順序 | 連續更正、兩個請求同前驅、往返同金額、遲到失效前驅；禁止鏈分叉 |
+| 數值 | 正費、返佣、零、無變化、大／小數混合、界限與外部 Decimal context；明示捨入結果 |
+| 狀態 | active OPEN／CLOSE、terminal、全平、其他成交缺費；費用更正不改交易狀態或 unknown count |
+| 完整性 | 前驅／事件／版本雙向關聯、跨表 seq、尾端刪除、孤立與重複歸屬 |
+| 原子性 | 各寫入點 rollback、真實程序 COMMIT 前／後 ACK 前終止、重開收據一致 |
+| 下游 | capture 競爭與 hash、品質呈現、數量／曝險不變、仍明示 funding 未知 |
+| 相容 | 舊 schema7／8、S9 completion／收據、S8 範例維持；錯版開啟在變更前拒絕 |
+
+Sol 已完成排序理由、最小範圍、前驅與重送優先序及 Decimal 政策審查；上述項目足以進正式規格。正式規格仍須把 schema9 完整 DDL、correction wire/API、前驅查詢方式、錯誤優先序、capture 版本與故障驗收逐項鎖死後，才可進實作授權。
+
+後續順序：正式資料型別／schema9／API／驗收矩陣→Astra 編寫→Sol 在新建 schema9 合成 DB 驗證與限定提交。此文件完成不代表更正或 funding 已實作。
+
+## 7. 本輪範圍與交接
+
+本輪只修改本評估及 README／WORK_PLAN 的 S10 入口與審查結論；不更動程式、測試、正式 S9 規格、AGENTS、Schema 或 DB。Sol 僅對這三份 S10 文件做格式／連結、diff 與限定 staged review；不藉本輪清理其他工作樹內容。
+
+既有 README／WORK_PLAN 的 S7 補記、S5–S7 handoff、market、yaoI／yaozi 與 S9 QA 證據維持原樣；不得因 S10 文件工作而清理或混入提交。
