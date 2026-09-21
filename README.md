@@ -1,6 +1,6 @@
 # catOS：最小 Closed Bar 研究核心
 
-S10 [帳務缺口與下一片評估](outputs/catos-s10-accounting-gap-assessment.md)已通過 Sol 契約審查；下一片定為受管成交的已知費用更正，可進正式規格。更正需穩定 identity＋精確前驅事件、防分叉與固定 Decimal「扣舊再加新」順序；schema8 不改，正式規格使用新建 schema9。funding 仍另需結算身份、期間完整性及歸屬政策。本輪未修改程式、Schema 或 DB。
+S10 [帳務缺口與下一片評估](outputs/catos-s10-accounting-gap-assessment.md)經 Sol 獨立靜態契約審查，結論為「附待決政策可進正式規格」：先處理受管成交已知費用更正的方向成立，需穩定 correction identity＋精確前驅以防分叉；funding 仍另需結算身份、期間完整性及歸屬政策。新 identity 同金額的處理與 Decimal 更新順序待使用者定案；schema8 固定不改，後續新 schema／payload／capture 版本號尚未定案。本輪未修改程式、Schema 或 DB，也未執行 Python／測試。
 
 S9 已依[正式規格](outputs/catos-s9-fee-completion-spec.md)完成 Sol 功能／資料完整性驗收：S9 專屬 32/32、必要回歸 312/312，共 344/344 通過，`py_compile` 通過；驗收中修正 schema7 `apply_fill()` raw payload 的既有錯誤語義相容。`Journal(..., lot_schema_version=8)` 只用於新建合成 DB，既有 DB 不遷移、不修改。詳見 [S9 開發交接](docs/lot-fee-completion-handoff.md)。
 

@@ -1,6 +1,6 @@
 # S10：S9 後帳務缺口與下一片評估
 
-狀態：2026-09-21，Astra 完成評估；Sol 已完成契約審查，**「受管成交已知費用更正」可進正式規格**。本輪只定案下一片的最小政策邊界，未授權實作、Schema 變更、既有 DB migration 或交易接線。
+狀態：2026-09-21，Astra 完成評估；Sol 獨立契約審查結論為**「附待決政策可進正式規格」**。現行實碼支持先評估「受管成交已知費用更正」的方向，未發現阻斷性的事實錯誤；但新 identity 同金額請求、Decimal 更新順序與後續版本編號仍未定案。使用者定案必要帳務政策後，再由 Astra 制定正式規格。本輪未授權實作、Schema 變更、既有 DB migration 或交易接線。
 
 ## Sol 契約審查（2026-09-21）
 
@@ -8,13 +8,13 @@
 
 正式規格須把每次更正定義為**新的不可變事件**，並至少同時帶穩定 `correction_id` 與目前有效費用來源的精確前驅引用。Sol 建議直接引用前驅事件的全域 `event_seq`：第一個前驅只能是原 KNOWN fill 或其 S9 completion，之後只能是同成交上一筆 correction。僅比對舊金額、只用 `trade_id` 或只用 Lot revision 都不足以防止 0.02→0.015→0.02 的往返分叉。
 
-重送優先序定案為：先以 correction identity 查已存在事件；同 identity＋同 canonical payload 永遠回原收據，即使後續已有新更正；同 identity＋不同內容為 `write_conflict`。只有 identity 不存在時，才驗證 target、目前前驅與可更正狀態。新的 identity 若新費用與目前有效費用數值等價，視為無變化並拒絕，不新增事件或 Lot revision。錯誤碼名稱與 wire 精確欄位由正式規格鎖定。
+重送優先序可作為正式規格的必要契約：先以 correction identity 查已存在事件；同 identity＋同 canonical payload 永遠回原收據，即使後續已有新更正；同 identity＋不同內容為 `write_conflict`。只有 identity 不存在時，才驗證 target、目前前驅與可更正狀態。**新的 identity 若新費用與目前有效費用數值等價時如何處理仍待使用者定案**；不能因 S9 補零會建立 revision，就推導更正同值也必須建立 revision。錯誤碼名稱與 wire 精確欄位由正式規格鎖定。
 
-Decimal 政策亦可定案：沿用 `research._CONTEXT`（prec=50、ROUND_HALF_EVEN）與 S9 的派生值邊界，**固定依序執行 `subtotal_without_target = subtotal - old_effective_fee`，再執行 `new_subtotal = subtotal_without_target + new_fee`**；不先算 `new-old`、不排序重加全部成交、不提高精度重算歷史。Sol 以現行 context 做最小探針，合法新舊 fee `-2.7008E-10`／`-0.00004511699904` 搭配派生 subtotal `1.375295816121544753856E+36` 時，固定扣舊加新得到尾數 `...2711`，而先算差額再加得到 `...2710`，已證明運算順序是契約而非等價實作細節。正式規格須明定 Underflow／DecimalException、每一步派生界限與整筆 rollback；往返更正不保證還原先前 subtotal 的最後有效位。
+Decimal 順序不能在 assessment 階段假定等價。現行 `research._CONTEXT` 為 prec=50、ROUND_HALF_EVEN，S9 亦在該 context 逐事件更新 subtotal；因此「先算差額再加」、「subtotal 先減舊再加新」與「重新加總有效費用」都必須視為不同候選契約。正式規格前需由使用者定案採用哪一種，再鎖定 context、每一步中間值界限、Underflow／DecimalException 與整筆 rollback。無論採哪一種，都不得宣稱扣回舊值可恢復無限精度真值，往返更正也不保證還原先前 subtotal 的最後有效位。本輪只做靜態核對，未執行 Decimal 探針。
 
-schema8 DDL 已固定，故更正事件不得塞回 schema8。正式規格應使用**全新 schema9 路徑**、`PRAGMA user_version=9`，只允許新建或重開 schema9，不遷移 schema7／8。另因現行 `LocalLotCaptureV2` 明確綁定 `capture_version=2`、`schema_version=8`，schema9 不能靜默重用 v2 capture；正式規格須定義新版 capture/hash domain 與對應 S6／S7 明示入口，或明確縮小交付到不含下游呈現，不能放寬既有 v2 驗證來混用版本。
+schema8 DDL 已固定，若更正持久化需要新增事件表或固定 DDL，必須走**新的 Journal schema 版本**，不能原地改寫 schema8；但新版本號目前未定案，assessment 不預設一定是 schema9。現行 `LocalLotCaptureV2` 明確綁定 `capture_version=2`、`schema_version=8`，因此後續若把更正狀態送入 capture／S6／S7，必須另定 capture/hash domain 與入口版本，或把首片交付明確縮到不含下游呈現；同樣不預設版本號。
 
-Sol 本輪實際做了唯讀實碼交叉核對與上述 Decimal 小探針；未執行 DB、migration、單元測試或全量測試。S9 的 344/344 仍是既有驗收紀錄，不因本輪文件審查而重新宣稱重驗。
+Sol 本輪只做唯讀實碼與文件交叉核對；未執行 Python、Decimal 探針、DB、migration、單元測試或全量測試。S9 的 344/344 仍是既有驗收紀錄，不因本輪文件審查而重新宣稱重驗。
 
 ## 1. 建議與依據
 
@@ -52,9 +52,9 @@ S9 的 fee_complete 只表示受管成交集合沒有尚缺費用的成交，不
 
 成本為設計比較，未量測工時或預估測試方法數。兩者皆維持 Decimal／SQLite TEXT、同 writer、local-sim，不接真實 adapter 或風控。
 
-## 4. 費用更正候選：已通過契約審查
+## 4. 費用更正候選：方向可接受，含待決政策
 
-以下政策已通過 Sol 契約審查，可交下一步正式規格鎖定資料型別、wire、DDL、API、錯誤碼與驗收矩陣；本文件本身仍不是實作規格或 Schema 變更授權。
+以下不涉及新政策選擇的邊界已通過 Sol 靜態契約核對；待決項仍須由使用者定案後，才交 Astra 正式規格鎖定資料型別、wire、DDL、API、錯誤碼與驗收矩陣。本文件本身不是實作規格或 Schema 變更授權。
 
 ### 4.1 原成交與更正鏈
 
@@ -63,7 +63,7 @@ S9 的 fee_complete 只表示受管成交集合沒有尚缺費用的成交，不
 - 每次更正需要穩定 `correction_id`，以及對該成交目前有效費用來源的明確前驅引用；正式規格優先採前驅事件全域 `event_seq`。不能僅以 trade_id 去重，也不能只檢查舊金額或 Lot revision。
 - 只檢查舊金額會漏掉 0.02→0.015→0.02 的往返：最初的 0.02 與目前的 0.02 金額相同，但版本不同。失效前驅的新更正應拒絕，不能以換 ID 繞過。
 - 同 identity 同 canonical 內容先回原收據，即使該成交後續又更正也應可重送；同 identity 不同合法內容衝突。不存在該 identity 才檢查目前前驅及可更正狀態。
-- 新 identity 的相同有效金額請求拒絕為無變化，不增加版本；它不同於 S9 補 0，後者會改 unknown count。錯誤名稱、identity 範圍與前驅 wire 精確格式留正式規格定案。
+- **待決政策 P1：新 identity、同有效金額。** 選項 A：拒絕為 no-change，不增加事件／revision，狀態最小且避免無經濟效果的版本噪音。選項 B：接受為新的不可變更正事件並前進 revision，可保留新的外部證據到達紀錄，但會增加事件、capture 與 recovery 的版本負擔。S9 補 0 不能作為此題先例，因為 S9 補 0 會把 unknown count 減一，狀態確實改變。錯誤名稱、identity 範圍與前驅 wire 精確格式留正式規格定案。
 
 ### 4.2 更新目前 Lot，而非歷史版本
 
@@ -77,13 +77,13 @@ S9 的 fee_complete 只表示受管成交集合沒有尚缺費用的成交，不
 
 但是 50 位 context 下，「先算新舊差額再加小計」、「小計先減舊再加新」及「重新加總全部有效費用」不保證等價。S9 小計已按事件順序捨入，也不能宣稱減回舊值就恢復無限精度真值。
 
-已定案在事件當下以固定順序「目前 subtotal 扣舊有效 fee，再加新 fee」，兩步都在 `research._CONTEXT` 下執行並沿 S9 派生界限；正式規格必須明定 Underflow／DecimalException、每步中間值驗證與失敗原子性。不得改成先算差額、float、排序加總或提高精度重算舊版本；重放必須依同一事件順序得到完全相同結果。
+**待決政策 P2：Decimal 更新順序。** 選項 A：在現行 `research._CONTEXT` 下依序做「目前 subtotal 扣舊有效 fee，再加新 fee」，只依賴 current subtotal 與目標成交目前有效 fee，實作與 recovery 較小，但往返更正可能保留有限精度捨入痕跡。選項 B：從不可變事件重建全部目前有效 fee，再依正式規格指定的固定順序加總，可減少對 current subtotal 反向調整的依賴，但 recovery 與事件狀態會更複雜，且仍須明定加總順序與中間界限。若改採「先算 new-old 再加 subtotal」也必須作為獨立契約明示，不能視為與 A 等價。所有選項都禁止 float，並須鎖定 context、Underflow／DecimalException、每步中間值驗證與失敗原子性；重放必須依同一契約得到完全相同結果。
 
 ### 4.4 儲存、重放與呈現
 
 更正事件、canonical payload/hash、前驅、Lot revision、head 與水位須同交易提交，並與既有事件一起按全域順序重放。驗證事件→版本與版本→事件雙向唯一，拒絕缺前驅、分叉、跨成交引用、刪尾端事件及殘留版本；COMMIT 後 ACK 遺失仍以原 identity 查詢／重送。
 
-新增事件不能悄悄改寫 schema8 的固定 DDL 或舊版 replay。下一片使用明示的新建 schema9 路徑；`PRAGMA user_version` 仍是唯一持久化 schema 版本，無既有 DB migration。既有 schema7／8 必須保持原 DDL、hash、receipt 與錯版拒絕。現行 V2 capture 精確綁定 schema8，因此 schema9 的 capture／hash domain 與 S6／S7 入口必須明示升版或明確不納入首片，不能把 schema9 偽裝成 V2。
+新增事件不能悄悄改寫 schema8 的固定 DDL 或舊版 replay。若正式規格納入更正持久化，應使用明示的**新 Journal schema 版本（版本號待定）**；`PRAGMA user_version` 仍是唯一持久化 schema 版本，且不因此取得既有 schema7／8 migration 授權。既有 schema7／8 必須保持原 DDL、hash、receipt 與錯版拒絕。現行 V2 capture 精確綁定 schema8，因此新 schema 的 capture／hash domain 與 S6／S7 入口須明示升版，或明確不納入首片；不能把新 schema 偽裝成 V2，capture／payload 版本號同樣待正式規格決定。
 
 報告須能識別使用的是更正後版本；capture identity 必須隨相關內容與版本變更。費用完整性仍與 pending／曝險品質分離，不新增帳戶 net PnL。是否需在 observation 額外呈現最後更正來源，須以最小稽核需求定案，不先加完整歷史 UI。
 
@@ -111,9 +111,9 @@ funding 不必等待費用更正才可評估，但在以上決策完成前，不
 | 下游 | capture 競爭與 hash、品質呈現、數量／曝險不變、仍明示 funding 未知 |
 | 相容 | 舊 schema7／8、S9 completion／收據、S8 範例維持；錯版開啟在變更前拒絕 |
 
-Sol 已完成排序理由、最小範圍、前驅與重送優先序及 Decimal 政策審查；上述項目足以進正式規格。正式規格仍須把 schema9 完整 DDL、correction wire/API、前驅查詢方式、錯誤優先序、capture 版本與故障驗收逐項鎖死後，才可進實作授權。
+Sol 已完成排序理由、最小範圍、前驅／重送要求與現行版本邊界的靜態核對，未發現阻斷問題；**文件結論為「附待決政策可進正式規格」**。在 Astra 起草正式規格前，使用者仍須定案 P1「新 identity 同金額」與 P2「Decimal 更新順序」。正式規格再鎖定新 schema 的實際版本號、完整 DDL、correction wire/API、前驅查詢方式、錯誤優先序、capture／payload 版本與故障驗收。
 
-後續順序：正式資料型別／schema9／API／驗收矩陣→Astra 編寫→Sol 在新建 schema9 合成 DB 驗證與限定提交。此文件完成不代表更正或 funding 已實作。
+後續順序：使用者定案 P1／P2→Astra 制定正式資料型別／新 schema 版本／API／驗收矩陣→Sol 再做正式規格獨立審查。只有後續另獲實作授權，才進程式與新建合成 DB 驗證。此文件完成不代表更正或 funding 已實作。
 
 ## 7. 本輪範圍與交接
 
