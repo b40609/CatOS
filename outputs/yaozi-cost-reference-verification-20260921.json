@@ -1,0 +1,29 @@
+{
+  "contract": "catos_yaozi_cost_reference_verification_v1",
+  "date": "2026-09-21",
+  "implementation_contract": "catos-closed-candle-cost-reference-v1",
+  "method": "volume_weighted_close_over_trailing_contiguous_4h_candles",
+  "windows": {
+    "7d": 42,
+    "30d": 180
+  },
+  "decimal_only": true,
+  "same_venue_only": true,
+  "closed_candles_only": true,
+  "fail_closed_on": [
+    "insufficient_contiguous_4h_candles",
+    "volume_basis_incomplete_or_inconsistent",
+    "nonpositive_total_volume"
+  ],
+  "yaozi_equivalence_status": "not_claimed_private_formula_unpublished",
+  "holder_share_status": "not_materialized_no_verified_holder_source",
+  "schema_change": false,
+  "network_io": false,
+  "verification": {
+    "focused_test_market_api": "19/19 OK",
+    "all_test_market": "168/168 OK",
+    "py_compile": "OK"
+  },
+  "functional_parity": "68.75 / 84 = 81.8%",
+  "parity_change": "none_no_verified_holder_source_added"
+}

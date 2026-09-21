@@ -1,0 +1,148 @@
+{
+  "schema": "catos-yaozi-signal-surface-sample-v1",
+  "sample_date": "2026-09-20",
+  "timezone": "Asia/Taipei",
+  "capture_anchor": "2026-09-20T09:05:23.261000+08:00",
+  "capture_policy": "authenticated rendered UI only; no credential, cookie, token, local-storage, private-key or API-secret extraction; no trading action",
+  "today": {
+    "updated_text": "09:02:37",
+    "pool_count": 141,
+    "cycle_count": 140,
+    "focus_count": 7,
+    "retreat_count": 3,
+    "holding_count": 4,
+    "focus_symbols": ["MSTR", "NIL", "MINIMAX", "SNXX", "ZIL", "PHA", "CTSI"],
+    "retreat_symbols": ["MARSCOIN", "COTI", "PROM"],
+    "holding_symbols": ["META", "RAVE", "SKHY", "PUMP"]
+  },
+  "signal_surface": {
+    "window": "24h",
+    "visible_total": 245,
+    "recent_1h_count_text": "31",
+    "events": [
+      {
+        "observed_at_text": "09/20 09:03",
+        "symbol": "PONS",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 09:03",
+        "symbol": "SKYAI",
+        "view": "risk",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 風險解除（25）"
+      },
+      {
+        "observed_at_text": "09/20 08:56",
+        "symbol": "USELESS",
+        "view": "risk",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 24h 高回落 -16.9%(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 08:56",
+        "symbol": "VTHO",
+        "view": "risk",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 主力評級翻空(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 08:55",
+        "symbol": "APT",
+        "view": "leading",
+        "category_text": "先行 · 資金流速度監控（5 分鐘）",
+        "event_title": "資金流蓄勢 · 先行視角"
+      },
+      {
+        "observed_at_text": "09/20 08:54",
+        "symbol": "ZEN",
+        "view": "risk",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 主力評級翻空(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 08:52",
+        "symbol": "XTZ",
+        "view": "momentum",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · OI 靜默下滑(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 08:43",
+        "symbol": "DASH",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 08:43",
+        "symbol": "CAP",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 08:43",
+        "symbol": "HOME",
+        "view": "momentum",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 降級至先行"
+      },
+      {
+        "observed_at_text": "09/20 08:43",
+        "symbol": "IMX",
+        "view": "momentum",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 降級至先行"
+      },
+      {
+        "observed_at_text": "09/20 08:35",
+        "symbol": "CRV",
+        "view": "onchain",
+        "category_text": "鏈上 · 巨鯨錢包追蹤",
+        "event_title": "鏈上巨鯨掃貨 · 單一大戶連續買入"
+      },
+      {
+        "observed_at_text": "09/20 08:32",
+        "symbol": "EGLD",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 08:31",
+        "symbol": "SYN",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 08:31",
+        "symbol": "AVAX",
+        "view": "momentum",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 異動視角"
+      }
+    ]
+  },
+  "public_collection": {
+    "baseline_observed_at_ms": 1789866323261,
+    "baseline_symbols": ["PONS-USDT-SWAP", "SKYAI-USDT-SWAP", "USELESS-USDT-SWAP", "VTHO-USDT-SWAP", "APT-USDT-SWAP", "ZEN-USDT-SWAP", "XTZ-USDT-SWAP", "DASH-USDT-SWAP", "CAP-USDT-SWAP", "HOME-USDT-SWAP", "IMX-USDT-SWAP", "CRV-USDT-SWAP", "EGLD-USDT-SWAP", "SYN-USDT-SWAP", "AVAX-USDT-SWAP", "UAI-USDT-SWAP"],
+    "oi_snapshots": 16,
+    "oi_delta_5m_available": 0,
+    "oi_candidates": 0,
+    "issues": [
+      ["oi:SKYAI-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:SKYAI-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:VTHO-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:VTHO-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:SYN-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:SYN-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:UAI-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:UAI-USDT-SWAP:okx_oi", "api_error"]
+    ]
+  },
+  "interpretation": "rendered signal facts plus same-session public OI baseline; no private threshold or causal inference"
+}

@@ -1,0 +1,77 @@
+{
+  "date": "2026-09-21",
+  "slice": "blockscout-ethereum-token-outgoing-address-provider",
+  "schema_version": 13,
+  "contract": "catos-blockscout-token-outgoing-address-v1",
+  "provider": {
+    "source": "blockscout-ethereum-v2-token-transfers",
+    "host": "eth.blockscout.com",
+    "path": "/api/v2/tokens/{contract}/transfers",
+    "authentication": "none",
+    "chain": "ethereum"
+  },
+  "semantics": {
+    "window_boundary": "caller_supplied_24h_not_inferred",
+    "target_windows": 15,
+    "baseline_days": 14,
+    "metric": "distinct_nonzero_nonself_erc20_transfer_from_address_count",
+    "beneficial_owner_aggregation": false,
+    "whale_identity_inferred": false,
+    "smf_eligible": false,
+    "direction_signal": null,
+    "partial_window_materializes_activity": false
+  },
+  "coverage_contract": {
+    "cursor": "block_number+index",
+    "page_budget_bounded": true,
+    "all_15_windows_required_for_reducer": true,
+    "truncation_is_missing_data": true,
+    "source_run_evidence_persisted_before_activity": true
+  },
+  "verification": {
+    "focused_onchain_p1_intel_api": "72/72 OK",
+    "all_test_market": "192/192 OK",
+    "py_compile": "OK",
+    "scoped_diff_check": "OK",
+    "deterministic_cases": [
+      "complete_15_window_reducer_linkage",
+      "page_budget_truncation_no_activity",
+      "mint_and_self_transfer_exclusion",
+      "token_scope_mismatch_fail_closed",
+      "repeated_cursor_fail_closed",
+      "fixed_path_and_validated_cursor_transport",
+      "sqlite_source_run_and_activity_linkage"
+    ],
+    "live_upstream": {
+      "wbtc_token_contract": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+      "raw_keyless_get": "HTTP_200_verified",
+      "first_page_items": 50,
+      "payload_fields_verified": [
+        "timestamp",
+        "from.hash",
+        "to.hash",
+        "token.address_hash",
+        "token_type",
+        "transaction_hash",
+        "log_index"
+      ],
+      "next_cursor_verified": "block_number+index",
+      "complete_15_day_window": "not_verified",
+      "adapter_end_to_end_live_collection": "blocked_by_runtime_safety_review",
+      "main_db_live_materialization": "not_claimed"
+    }
+  },
+  "parity": {
+    "onchain_i_s_v_u_before": "0.75/0/1/1",
+    "onchain_i_s_v_u_after": "1/0.5/1/1",
+    "onchain_score": "3.5/4",
+    "total": "73.5/88",
+    "percent": "83.5%"
+  },
+  "boundaries": [
+    "A verified public Blockscout token-transfer endpoint and live cursor/payload do not prove a complete 15-day source window.",
+    "No persisted live onchain_activity is claimed until all required windows are proven complete.",
+    "Direct ERC-20 transfer-from address activity is not beneficial-owner consolidation, wallet classification, or a whale identity signal.",
+    "The provider calendar boundary is caller-supplied because the YAOZI day/timezone contract is unpublished."
+  ]
+}

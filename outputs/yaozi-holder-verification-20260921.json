@@ -1,0 +1,48 @@
+{
+  "slice": "blockscout-address-level-holder-concentration",
+  "date": "2026-09-21",
+  "contract": "catos-blockscout-address-holder-v1",
+  "implementation": {
+    "module": "catos.market_holders",
+    "chain": "ethereum",
+    "host": "eth.blockscout.com",
+    "endpoint_family": "/api/v2/tokens/{contract} + /holders",
+    "ordering_contract": "blockscout_v2_balance_desc",
+    "top10_calculation": "sum first 10 direct-address raw balances / token total_supply * 100",
+    "numeric_contract": "Decimal only",
+    "persistence": "existing dealer_snapshot.chip_json",
+    "schema_change": false
+  },
+  "boundaries": {
+    "identity_scope": "direct_token_balance_address",
+    "beneficial_owner_aggregation": "not_available",
+    "custody_pool_vault_collapse": false,
+    "yaozi_equivalence_status": "not_claimed_source_semantics_only",
+    "solana_token_accounts_are_owner_identity": false,
+    "private_dealer_direction_inferred": false
+  },
+  "verification": {
+    "focused_command": "py -3 -B -m unittest tests.test_market_holders tests.test_market_p1 -v",
+    "focused_result": "26/26 OK",
+    "market_command": "py -3 -B -m unittest discover -s tests -p test_market*.py -v",
+    "market_result": "182/182 OK",
+    "live_smoke": "success_blockscout_current_v2_weth",
+    "live_source_verified": true,
+    "live_evidence": {
+      "symbol": "ETH-USDT-SWAP",
+      "contract_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "source": "blockscout-ethereum-v2-token-holders",
+      "holder_count": 3348933,
+      "top10_address_count": 10,
+      "top10_holding_pct": "58.669906871554692593137817787784214245784532916141",
+      "top10_complete": true,
+      "identity_scope": "direct_token_balance_address",
+      "beneficial_owner_aggregation": "not_available"
+    }
+  },
+  "parity": {
+    "before": "72.25 / 88 = 82.1%",
+    "after": "72.25 / 88 = 82.1%",
+    "reason": "direct-address holder source is now live verified, but Dealer profile source coverage remains partial because beneficial-owner aggregation, holder-cost reconstruction, and private Dealer direction source/formula are still unavailable; no scored row changes"
+  }
+}

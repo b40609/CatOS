@@ -1,0 +1,64 @@
+{
+  "contract": "catos-coinpaprika-social-metric-v1",
+  "date": "2026-09-21",
+  "provider": {
+    "host": "api.coinpaprika.com",
+    "path_contract": "/v1/coins/{coinpaprika_id}",
+    "credential_mode": "keyless_public",
+    "mapping_contract": "caller_supplied_coinpaprika_id_provider_symbol_verified",
+    "official_endpoint_contract": {
+      "available_plan": "Free",
+      "documented_update_interval": "Every 1 minute",
+      "links_extended_stats": "twitter followers / reddit subscribers / telegram members"
+    }
+  },
+  "live_verification": {
+    "observed_at_ms": 1789992172738,
+    "assets": [
+      {
+        "symbol": "BTC-USDT-SWAP",
+        "asset_id": "btc-bitcoin",
+        "issues": [],
+        "metrics": {
+          "reddit_subscribers": 5958815,
+          "twitter_followers": 161310
+        }
+      },
+      {
+        "symbol": "ETH-USDT-SWAP",
+        "asset_id": "eth-ethereum",
+        "issues": [],
+        "metrics": {
+          "reddit_subscribers": 2616197,
+          "twitter_followers": 3059760
+        }
+      }
+    ],
+    "temporary_schema_version": 14,
+    "persisted_run_rows": 2,
+    "persisted_metric_rows": 4,
+    "source_coverage_status": "materialized_public_count_source"
+  },
+  "semantic_boundary": {
+    "metric_semantics": "provider_reported_raw_counts_only",
+    "provider_counter_timestamp": null,
+    "freshness_note": "endpoint update interval is documented; individual social counters do not carry a source timestamp",
+    "social_heat": null,
+    "yaozi_heat": null,
+    "ranking": null,
+    "yaozi_equivalence_status": "unknown_unpublished"
+  },
+  "verification": {
+    "social_tests": "7/7 OK",
+    "focused_tests": "54/54 OK",
+    "py_compile": "passed",
+    "trailing_whitespace_scan": "passed",
+    "git_diff_check": "exit_0_but_scope_untracked",
+    "git_provenance": "historical_snapshot_80747fe_market_intel_schema10_only_current_social_v14_files_untracked"
+  },
+  "main_database": {
+    "path": "outputs/catos-market-intel.sqlite",
+    "migration_executed": false,
+    "live_social_materialization_executed": false
+  }
+}

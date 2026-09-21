@@ -1,0 +1,102 @@
+{
+  "contract": "catos-coinpaprika-universe-mapping-verification-v1",
+  "observed_at_ms": 1789993440816,
+  "official_evidence": {
+    "list_endpoint": "https://api.coinpaprika.com/v1/coins",
+    "docs": "https://docs.coinpaprika.com/api-reference/coins/list-coins",
+    "plan": "Free",
+    "security": "none",
+    "documented_update_interval": "every 1 minute",
+    "identity_fields": [
+      "id",
+      "name",
+      "symbol",
+      "rank",
+      "is_active",
+      "type"
+    ]
+  },
+  "mapping_contract": {
+    "name": "catos-coinpaprika-identity-list-v1",
+    "auto_map_from_unique_ticker": false,
+    "resolved_requirement": "caller_supplied_coinpaprika_id_present_as_current_active_same_symbol_identity",
+    "detail_identity_requirement": "response_id_and_base_symbol_must_match_explicit_mapping",
+    "unresolved_statuses": [
+      "ambiguous_mapping",
+      "missing_asset",
+      "unverified_identity",
+      "identity_mismatch"
+    ],
+    "persistence_change": "none_schema_v14_already_persists_used_asset_id"
+  },
+  "live_universe": {
+    "source": "catos.market_collectors.collect_universe_https_public_okx_plus_binance",
+    "instrument_refs": 1124,
+    "active_symbols": 734,
+    "symbol_sha256": "7452d1d06b8032122769eb142db14bc319d5300ead8769148a001a7f42d6a9fd"
+  },
+  "coinpaprika_list": {
+    "rows": 61607,
+    "active_rows": 13096,
+    "body_limit_bytes": 8000000,
+    "initial_4000000_byte_limit_result": "source_body_too_large"
+  },
+  "coverage": {
+    "resolved": 2,
+    "ambiguous_mapping": 242,
+    "unverified_identity": 324,
+    "missing_asset": 166,
+    "coverage_sha256": "f6e0a0f42d4e6d9f28afe524537e1b64881af1e95867c381e797b8834e86689f",
+    "resolved_assets": [
+      {
+        "symbol": "BTC-USDT-SWAP",
+        "coinpaprika_id": "btc-bitcoin"
+      },
+      {
+        "symbol": "ETH-USDT-SWAP",
+        "coinpaprika_id": "eth-ethereum"
+      }
+    ],
+    "why_unique_ticker_is_not_identity": [
+      {
+        "symbol": "APP-USDT-SWAP",
+        "single_coinpaprika_candidate": "app-dappsy"
+      },
+      {
+        "symbol": "ARM-USDT-SWAP",
+        "single_coinpaprika_candidate": "arm-aramis"
+      }
+    ]
+  },
+  "temporary_db_verification": {
+    "schema_version": 14,
+    "social_source_runs": 2,
+    "social_metric_rows": 4,
+    "persisted_symbols": [
+      "BTC-USDT-SWAP",
+      "ETH-USDT-SWAP"
+    ],
+    "batch_issues": {
+      "BTC-USDT-SWAP": [],
+      "ETH-USDT-SWAP": []
+    },
+    "reader_item_count": 4,
+    "social_heat": null,
+    "yaozi_heat": null,
+    "ranking": null
+  },
+  "main_db": {
+    "path": "outputs/catos-market-intel.sqlite",
+    "schema_before": 12,
+    "schema_after": 12,
+    "migration_performed": false,
+    "social_live_materialization_performed": false
+  },
+  "boundaries": [
+    "raw_social_counts_are_not_social_heat",
+    "documented_endpoint_update_interval_is_not_individual_counter_source_timestamp",
+    "unique_ticker_candidate_is_not_cross_provider_asset_identity",
+    "unresolved_assets_are_not_materialized_as_social_metrics",
+    "no_private_yaozi_formula_inferred"
+  ]
+}

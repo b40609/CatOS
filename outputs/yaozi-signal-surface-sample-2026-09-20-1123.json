@@ -1,0 +1,111 @@
+{
+  "schema": "catos-yaozi-signal-surface-sample-v1",
+  "sample_date": "2026-09-20",
+  "timezone": "Asia/Taipei",
+  "capture_anchor": "2026-09-20T11:23:38.7769132+08:00",
+  "capture_policy": "authenticated rendered UI only; no credential, cookie, token, local-storage, private-key or API-secret extraction; no trading action",
+  "sample_scope": "30m candidate-symbol follow-up for the six public OI-positive candidates; non-candidate symbol rows are intentionally omitted from this checkpoint",
+  "signal_surface": {
+    "window": "24h",
+    "visible_total": 254,
+    "recent_1h_count_text": "99",
+    "events": [
+      {
+        "observed_at_text": "09/20 10:49",
+        "symbol": "AGLD",
+        "view": "momentum",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 異動視角"
+      },
+      {
+        "observed_at_text": "09/20 10:50",
+        "symbol": "AGLD",
+        "view": "leading",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 晉級至異動"
+      },
+      {
+        "observed_at_text": "09/20 10:53",
+        "symbol": "AVA",
+        "view": "opportunity",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 被風險覆蓋"
+      },
+      {
+        "observed_at_text": "09/20 10:57",
+        "symbol": "ZEC",
+        "view": "risk",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/20 11:04",
+        "symbol": "AGLD",
+        "view": "momentum",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 24h 高回落 -9.2%(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 11:04",
+        "symbol": "ENA",
+        "view": "momentum",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 24h 高回落 -12.2%(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 11:08",
+        "symbol": "ZEC",
+        "view": "risk",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      }
+    ]
+  },
+  "global_events": [
+    {
+      "observed_at_text": "09/20 10:46",
+      "category_text": "大盤 · 市場階段",
+      "event_title": "★ 市場下跌 · 方向確立",
+      "alignment_status": "excluded_no_symbol"
+    }
+  ],
+  "public_collection": {
+    "baseline_observed_at_ms": 1789871949944,
+    "comparison_observed_at_ms": 1789872249944,
+    "interval_ms": 300000,
+    "oi_symbols": 22,
+    "oi_candidates": 6,
+    "candidates": [
+      {
+        "symbol": "AGLD-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      },
+      {
+        "symbol": "AVA-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      },
+      {
+        "symbol": "BANK-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      },
+      {
+        "symbol": "ENA-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      },
+      {
+        "symbol": "T-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      },
+      {
+        "symbol": "ZEC-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE"
+      }
+    ],
+    "candidate_contract": {
+      "threshold": null,
+      "threshold_status": "unknown_unpublished",
+      "yaozi_event_triggered": false
+    }
+  },
+  "interpretation": "authenticated rendered UI follow-up after the synchronized 10:44:09.944 public OI candidate snapshot; only the six candidate symbols are retained in this 30m checkpoint; UI timestamps have minute precision, so 10:44 rows parse before the snapshot and are excluded; BANK and T have no post-snapshot rendered event through the matured 30m cutoff 11:14:09.944; timing alignment is descriptive only and does not reproduce or prove Yaozi private thresholds, taxonomy, gates, weights, formulas, or causality"
+}

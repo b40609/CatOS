@@ -1,0 +1,25 @@
+{
+  "contract": "catos_yaozi_okx_options_live_coverage_evidence_v1",
+  "provider": "okx-public",
+  "host": "www.okx.com",
+  "inst_family": "BTC-USD",
+  "smoke_observed_at_ms": 1789967939737,
+  "main_db_observed_at_ms": 1789967956682,
+  "option_summary": {
+    "path": "/api/v5/public/opt-summary",
+    "item_count": 734,
+    "issues": []
+  },
+  "open_interest": {
+    "path": "/api/v5/public/open-interest",
+    "item_count": 1726,
+    "issues": []
+  },
+  "transport_boundary": {
+    "credential_free": true,
+    "fixed_public_host": true,
+    "timeout_seconds": 10,
+    "max_source_bytes": 4194304
+  },
+  "boundary": "raw_public_option_facts_only_no_signed_gex_dealer_sign_or_yaozi_gamma_aggregation"
+}

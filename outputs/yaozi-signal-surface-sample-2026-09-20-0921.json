@@ -1,0 +1,158 @@
+{
+  "schema": "catos-yaozi-signal-surface-sample-v1",
+  "sample_date": "2026-09-20",
+  "timezone": "Asia/Taipei",
+  "capture_anchor": "2026-09-20T09:21:37.7332549+08:00",
+  "capture_policy": "authenticated rendered UI only; no credential, cookie, token, local-storage, private-key or API-secret extraction; no trading action",
+  "signal_surface": {
+    "window": "24h",
+    "visible_total": 247,
+    "recent_1h_count_text": "29",
+    "events": [
+      {
+        "observed_at_text": "09/20 09:14",
+        "symbol": "HOME",
+        "view": "momentum",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 異動視角"
+      },
+      {
+        "observed_at_text": "09/20 09:14",
+        "symbol": "DASH",
+        "view": "risk",
+        "category_text": "結構撤離監控",
+        "event_title": "結構撤離確認 · 標籤轉空(主表連動)"
+      },
+      {
+        "observed_at_text": "09/20 09:13",
+        "symbol": "H",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 09:13",
+        "symbol": "F",
+        "view": "risk",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/20 09:13",
+        "symbol": "DASH",
+        "view": "risk",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 風險視角"
+      },
+      {
+        "observed_at_text": "09/20 09:08",
+        "symbol": "HBAR",
+        "view": "momentum",
+        "category_text": "新進候選監控",
+        "event_title": "首次入池 · 異動視角"
+      }
+    ]
+  },
+  "global_events": [
+    {
+      "observed_at_text": "09/20 09:16",
+      "category_text": "大盤 · 市場階段",
+      "event_title": "★ 市場下跌 · 方向確立",
+      "alignment_status": "excluded_no_symbol"
+    }
+  ],
+  "public_collection": {
+    "baseline_observed_at_ms": 1789866883605,
+    "comparison_observed_at_ms": 1789867184567,
+    "interval_ms": 300962,
+    "oi_symbols": 19,
+    "oi_snapshots": 19,
+    "oi_delta_5m_available": 16,
+    "oi_candidates": 11,
+    "candidates": [
+      {
+        "symbol": "IMX-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.14714204687230233624530790156286010212585632335164",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "AVAX-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.39452003647880697571824853408902842562514337706242",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "USELESS-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.017888965512532517632921158822605643900340709686670",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "HOME-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.94235660587694546220177725808968254117452433813397",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "CAP-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.16160030589348064519374930821786860667532023223755",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "UAI-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.020316324026060345844231051582988349853600507949772",
+        "oi_source": "binance"
+      },
+      {
+        "symbol": "DASH-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.14791739994401687253861311501761251361470859673580",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "SKYAI-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.15343902205832157553420868342457827019458831743494",
+        "oi_source": "binance"
+      },
+      {
+        "symbol": "APT-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.077953282422229954134152086707660434428569634098854",
+        "oi_source": "okx"
+      },
+      {
+        "symbol": "VTHO-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.0010857848380275431965315541061553091507766887207620",
+        "oi_source": "binance"
+      },
+      {
+        "symbol": "PONS-USDT-SWAP",
+        "candidate_type": "OI_POSITIVE_CHANGE",
+        "oi_delta_5m_text": "0.092885479107320738889568515055661383058667272504850",
+        "oi_source": "okx"
+      }
+    ],
+    "candidate_contract": {
+      "threshold": null,
+      "threshold_status": "unknown_unpublished",
+      "yaozi_event_triggered": false
+    },
+    "issues": [
+      ["oi:SKYAI-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:SKYAI-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:VTHO-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:VTHO-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:SYN-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:SYN-USDT-SWAP:okx_oi", "api_error"],
+      ["oi:UAI-USDT-SWAP:okx_ticker", "api_error"],
+      ["oi:UAI-USDT-SWAP:okx_oi", "api_error"]
+    ],
+    "fallback_note": "SKYAI, VTHO and UAI candidates use same-window Binance OI; SYN also has Binance OI but did not produce a positive-change candidate."
+  },
+  "interpretation": "valid synchronized 5m public OI window; OI_POSITIVE_CHANGE means positive public OI change with Yaozi threshold unknown, not a reproduced Yaozi trigger; no symbol-scoped Yaozi event after the candidate timestamp was observed by capture time"
+}

@@ -1,0 +1,41 @@
+{
+  "contract": "catos_yaozi_dex_live_coverage_evidence_v1",
+  "observed_at_ms": 1789967650609,
+  "symbol": "ETH-USDT-SWAP",
+  "chain": "ethereum",
+  "provider": "geckoterminal",
+  "pools": [
+    {
+      "pool_address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+      "venue": "uniswap-v3",
+      "base_token_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "coverage_status": "verified_pool_window"
+    },
+    {
+      "pool_address": "0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc",
+      "venue": "uniswap-v2",
+      "base_token_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "coverage_status": "verified_pool_window"
+    }
+  ],
+  "collector": {
+    "dex_runs": 2,
+    "dex_observations": 600,
+    "dex_candidates": 1,
+    "issues": []
+  },
+  "signal_dex_window": {
+    "coverage_status": "verified_multi_pool_window",
+    "coverage_scope": "multi_pool",
+    "swap_count": 253,
+    "net_flow_text": "-5777.3319289809519240",
+    "quote_currency": "USD",
+    "issues": []
+  },
+  "source_coverage_default_limit": {
+    "limit": 500,
+    "both_pool_runs_visible": true,
+    "provider_identity_status": "explicit_pool_identity"
+  },
+  "boundary": "configured_pool_coverage_only_not_full_market_dex_equivalence"
+}

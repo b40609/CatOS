@@ -1,0 +1,242 @@
+{
+  "contract": "catos_yaozi_candidate_evidence_score_v1",
+  "interpretation": "descriptive_observed_surface_hit_rates_only_no_private_gate_or_causality_inference",
+  "sample_source": "yaozi-signal-surface-sample-2026-09-20-1000.json",
+  "capture_anchor_ms": 1789869600110,
+  "candidate_snapshot_ms": 1789867184567,
+  "candidate_population_count": 11,
+  "candidate_persistence_status": "complete",
+  "public_symbol_coverage_status": "exact_derivative_snapshot",
+  "public_symbol_coverage_count": 19,
+  "public_symbol_coverage_symbols": [
+    "APT-USDT-SWAP",
+    "AVAX-USDT-SWAP",
+    "CAP-USDT-SWAP",
+    "CRV-USDT-SWAP",
+    "DASH-USDT-SWAP",
+    "EGLD-USDT-SWAP",
+    "F-USDT-SWAP",
+    "H-USDT-SWAP",
+    "HBAR-USDT-SWAP",
+    "HOME-USDT-SWAP",
+    "IMX-USDT-SWAP",
+    "PONS-USDT-SWAP",
+    "SKYAI-USDT-SWAP",
+    "SYN-USDT-SWAP",
+    "UAI-USDT-SWAP",
+    "USELESS-USDT-SWAP",
+    "VTHO-USDT-SWAP",
+    "XTZ-USDT-SWAP",
+    "ZEN-USDT-SWAP"
+  ],
+  "observed_event_count": 34,
+  "observed_event_count_after_candidate_snapshot": 34,
+  "recall_status": "not_true_recall_signal_surface_filter_and_event_taxonomy_incomplete",
+  "negative_control_contract": "candidate_miss_means_no_event_in_captured_signal_surface_window_only",
+  "windows_minutes": [
+    5,
+    15,
+    30,
+    60
+  ],
+  "windows": {
+    "5m": {
+      "candidate_evaluable_count": 11,
+      "candidate_non_evaluable_count": 0,
+      "candidate_hit_count": 0,
+      "candidate_miss_count": 11,
+      "candidate_hit_rate_text": "0.000000",
+      "candidate_miss_rate_text": "1.000000",
+      "candidate_hit_symbols": [],
+      "candidate_miss_symbols": [
+        "APT-USDT-SWAP",
+        "AVAX-USDT-SWAP",
+        "CAP-USDT-SWAP",
+        "DASH-USDT-SWAP",
+        "HOME-USDT-SWAP",
+        "IMX-USDT-SWAP",
+        "PONS-USDT-SWAP",
+        "SKYAI-USDT-SWAP",
+        "UAI-USDT-SWAP",
+        "USELESS-USDT-SWAP",
+        "VTHO-USDT-SWAP"
+      ],
+      "candidate_non_evaluable_symbols": [],
+      "linked_observed_event_count": 0,
+      "observed_event_count_after_candidate_snapshot": 34,
+      "observed_event_link_rate_text": "0.000000",
+      "public_coverage_observed_event_count": 10,
+      "public_coverage_linked_event_count": 0,
+      "public_coverage_event_link_rate_text": "0.000000"
+    },
+    "15m": {
+      "candidate_evaluable_count": 11,
+      "candidate_non_evaluable_count": 0,
+      "candidate_hit_count": 3,
+      "candidate_miss_count": 8,
+      "candidate_hit_rate_text": "0.272727",
+      "candidate_miss_rate_text": "0.727273",
+      "candidate_hit_symbols": [
+        "HOME-USDT-SWAP",
+        "SKYAI-USDT-SWAP",
+        "USELESS-USDT-SWAP"
+      ],
+      "candidate_miss_symbols": [
+        "APT-USDT-SWAP",
+        "AVAX-USDT-SWAP",
+        "CAP-USDT-SWAP",
+        "DASH-USDT-SWAP",
+        "IMX-USDT-SWAP",
+        "PONS-USDT-SWAP",
+        "UAI-USDT-SWAP",
+        "VTHO-USDT-SWAP"
+      ],
+      "candidate_non_evaluable_symbols": [],
+      "linked_observed_event_count": 4,
+      "observed_event_count_after_candidate_snapshot": 34,
+      "observed_event_link_rate_text": "0.117647",
+      "public_coverage_observed_event_count": 10,
+      "public_coverage_linked_event_count": 4,
+      "public_coverage_event_link_rate_text": "0.400000"
+    },
+    "30m": {
+      "candidate_evaluable_count": 11,
+      "candidate_non_evaluable_count": 0,
+      "candidate_hit_count": 3,
+      "candidate_miss_count": 8,
+      "candidate_hit_rate_text": "0.272727",
+      "candidate_miss_rate_text": "0.727273",
+      "candidate_hit_symbols": [
+        "HOME-USDT-SWAP",
+        "SKYAI-USDT-SWAP",
+        "USELESS-USDT-SWAP"
+      ],
+      "candidate_miss_symbols": [
+        "APT-USDT-SWAP",
+        "AVAX-USDT-SWAP",
+        "CAP-USDT-SWAP",
+        "DASH-USDT-SWAP",
+        "IMX-USDT-SWAP",
+        "PONS-USDT-SWAP",
+        "UAI-USDT-SWAP",
+        "VTHO-USDT-SWAP"
+      ],
+      "candidate_non_evaluable_symbols": [],
+      "linked_observed_event_count": 4,
+      "observed_event_count_after_candidate_snapshot": 34,
+      "observed_event_link_rate_text": "0.117647",
+      "public_coverage_observed_event_count": 10,
+      "public_coverage_linked_event_count": 4,
+      "public_coverage_event_link_rate_text": "0.400000"
+    },
+    "60m": {
+      "candidate_evaluable_count": 0,
+      "candidate_non_evaluable_count": 11,
+      "candidate_hit_count": 0,
+      "candidate_miss_count": 0,
+      "candidate_hit_rate_text": null,
+      "candidate_miss_rate_text": null,
+      "candidate_hit_symbols": [],
+      "candidate_miss_symbols": [],
+      "candidate_non_evaluable_symbols": [
+        "APT-USDT-SWAP",
+        "AVAX-USDT-SWAP",
+        "CAP-USDT-SWAP",
+        "DASH-USDT-SWAP",
+        "HOME-USDT-SWAP",
+        "IMX-USDT-SWAP",
+        "PONS-USDT-SWAP",
+        "SKYAI-USDT-SWAP",
+        "UAI-USDT-SWAP",
+        "USELESS-USDT-SWAP",
+        "VTHO-USDT-SWAP"
+      ],
+      "linked_observed_event_count": 5,
+      "observed_event_count_after_candidate_snapshot": 34,
+      "observed_event_link_rate_text": "0.147059",
+      "public_coverage_observed_event_count": 10,
+      "public_coverage_linked_event_count": 5,
+      "public_coverage_event_link_rate_text": "0.500000"
+    }
+  },
+  "candidates": [
+    {
+      "symbol": "APT-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-a839bf1052ea69ee4c6ee89b70253b8f",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "AVAX-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-2e14f7bc2eba144b7309be1436f9b951",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "CAP-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-4e18806d0dec67626bc8a2cff0e6c454",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "DASH-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-65d0ca19e18399e30ef861c3574628eb",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "HOME-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-48d3f69ca9160b0848240383519917fb",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "IMX-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-16c40ea0eb465725624fce74d6be8dc9",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "PONS-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-ece04fe021d7a660d46f0ce9e35ec840",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "SKYAI-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-69e35afa636d91b006b90ed30e32e168",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "UAI-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-588ffd43336f95b655caef34b672970f",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "USELESS-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-46f76cb91aba4ba66f2fe1b16789489c",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "VTHO-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789867184567,
+      "candidate_id": "public-candidate-de4427c0f81ac87805b5e804e83772d5",
+      "persistence_status": "matched"
+    }
+  ],
+  "issues": []
+}

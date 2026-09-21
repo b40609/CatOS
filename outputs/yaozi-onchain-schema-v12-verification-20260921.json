@@ -1,0 +1,18 @@
+{
+  "contract": "catos_onchain_source_run_schema_v12_verification_v1",
+  "schema_version": 12,
+  "main_db": "outputs/catos-market-intel.sqlite",
+  "onchain_source_run_table": true,
+  "main_db_source_run_count": 0,
+  "focused_tests": {
+    "modules": [
+      "tests.test_market_intel",
+      "tests.test_market_api",
+      "tests.test_market_p1"
+    ],
+    "passed": 58,
+    "failed": 0
+  },
+  "live_provider_status": "not_verified_network_smoke_blocked_by_runtime_safety_review",
+  "parity_change": "none_until_live_provider_verified"
+}

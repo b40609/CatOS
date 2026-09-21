@@ -1,0 +1,27 @@
+{
+  "symbols": [
+    "PONS-USDT-SWAP",
+    "ALLO-USDT-SWAP",
+    "JTO-USDT-SWAP",
+    "T-USDT-SWAP",
+    "SKYAI-USDT-SWAP",
+    "UB-USDT-SWAP",
+    "ZEC-USDT-SWAP",
+    "ZEN-USDT-SWAP",
+    "BANK-USDT-SWAP",
+    "AR-USDT-SWAP",
+    "ZAMA-USDT-SWAP",
+    "STX-USDT-SWAP",
+    "ENA-USDT-SWAP",
+    "DASH-USDT-SWAP",
+    "PROM-USDT-SWAP",
+    "SOPH-USDT-SWAP",
+    "AGLD-USDT-SWAP",
+    "ZIL-USDT-SWAP",
+    "AVA-USDT-SWAP",
+    "HEI-USDT-SWAP",
+    "STAR-USDT-SWAP",
+    "SKL-USDT-SWAP"
+  ],
+  "hyperliquid_symbols": []
+}

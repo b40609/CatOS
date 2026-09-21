@@ -1,0 +1,182 @@
+{
+  "contract": "catos_yaozi_candidate_evidence_score_v1",
+  "interpretation": "descriptive_observed_surface_hit_rates_only_no_private_gate_or_causality_inference",
+  "sample_source": "yaozi-signal-surface-sample-2026-09-20-1049.json",
+  "capture_anchor_ms": 1789872558800,
+  "candidate_snapshot_ms": 1789872249944,
+  "candidate_population_count": 6,
+  "candidate_persistence_status": "complete",
+  "public_symbol_coverage_status": "exact_derivative_snapshot",
+  "public_symbol_coverage_count": 22,
+  "public_symbol_coverage_symbols": [
+    "AGLD-USDT-SWAP",
+    "ALLO-USDT-SWAP",
+    "AR-USDT-SWAP",
+    "AVA-USDT-SWAP",
+    "BANK-USDT-SWAP",
+    "DASH-USDT-SWAP",
+    "ENA-USDT-SWAP",
+    "HEI-USDT-SWAP",
+    "JTO-USDT-SWAP",
+    "PONS-USDT-SWAP",
+    "PROM-USDT-SWAP",
+    "SKL-USDT-SWAP",
+    "SKYAI-USDT-SWAP",
+    "SOPH-USDT-SWAP",
+    "STAR-USDT-SWAP",
+    "STX-USDT-SWAP",
+    "T-USDT-SWAP",
+    "UB-USDT-SWAP",
+    "ZAMA-USDT-SWAP",
+    "ZEC-USDT-SWAP",
+    "ZEN-USDT-SWAP",
+    "ZIL-USDT-SWAP"
+  ],
+  "observed_event_count": 12,
+  "observed_event_count_after_candidate_snapshot": 7,
+  "recall_status": "not_true_recall_signal_surface_filter_and_event_taxonomy_incomplete",
+  "negative_control_contract": "candidate_miss_means_no_event_in_captured_signal_surface_window_only",
+  "windows_minutes": [5, 15, 30, 60],
+  "windows": {
+    "5m": {
+      "candidate_evaluable_count": 6,
+      "candidate_non_evaluable_count": 0,
+      "candidate_hit_count": 1,
+      "candidate_miss_count": 5,
+      "candidate_hit_rate_text": "0.166667",
+      "candidate_miss_rate_text": "0.833333",
+      "candidate_hit_symbols": ["AGLD-USDT-SWAP"],
+      "candidate_miss_symbols": [
+        "AVA-USDT-SWAP",
+        "BANK-USDT-SWAP",
+        "ENA-USDT-SWAP",
+        "T-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "candidate_non_evaluable_symbols": [],
+      "linked_observed_event_count": 1,
+      "observed_event_count_after_candidate_snapshot": 7,
+      "observed_event_link_rate_text": "0.142857",
+      "public_coverage_observed_event_count": 2,
+      "public_coverage_linked_event_count": 1,
+      "public_coverage_event_link_rate_text": "0.500000"
+    },
+    "15m": {
+      "candidate_evaluable_count": 0,
+      "candidate_non_evaluable_count": 6,
+      "candidate_hit_count": 0,
+      "candidate_miss_count": 0,
+      "candidate_hit_rate_text": null,
+      "candidate_miss_rate_text": null,
+      "candidate_hit_symbols": [],
+      "candidate_miss_symbols": [],
+      "candidate_non_evaluable_symbols": [
+        "AGLD-USDT-SWAP",
+        "AVA-USDT-SWAP",
+        "BANK-USDT-SWAP",
+        "ENA-USDT-SWAP",
+        "T-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "linked_observed_event_count": 1,
+      "observed_event_count_after_candidate_snapshot": 7,
+      "observed_event_link_rate_text": "0.142857",
+      "public_coverage_observed_event_count": 2,
+      "public_coverage_linked_event_count": 1,
+      "public_coverage_event_link_rate_text": "0.500000"
+    },
+    "30m": {
+      "candidate_evaluable_count": 0,
+      "candidate_non_evaluable_count": 6,
+      "candidate_hit_count": 0,
+      "candidate_miss_count": 0,
+      "candidate_hit_rate_text": null,
+      "candidate_miss_rate_text": null,
+      "candidate_hit_symbols": [],
+      "candidate_miss_symbols": [],
+      "candidate_non_evaluable_symbols": [
+        "AGLD-USDT-SWAP",
+        "AVA-USDT-SWAP",
+        "BANK-USDT-SWAP",
+        "ENA-USDT-SWAP",
+        "T-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "linked_observed_event_count": 1,
+      "observed_event_count_after_candidate_snapshot": 7,
+      "observed_event_link_rate_text": "0.142857",
+      "public_coverage_observed_event_count": 2,
+      "public_coverage_linked_event_count": 1,
+      "public_coverage_event_link_rate_text": "0.500000"
+    },
+    "60m": {
+      "candidate_evaluable_count": 0,
+      "candidate_non_evaluable_count": 6,
+      "candidate_hit_count": 0,
+      "candidate_miss_count": 0,
+      "candidate_hit_rate_text": null,
+      "candidate_miss_rate_text": null,
+      "candidate_hit_symbols": [],
+      "candidate_miss_symbols": [],
+      "candidate_non_evaluable_symbols": [
+        "AGLD-USDT-SWAP",
+        "AVA-USDT-SWAP",
+        "BANK-USDT-SWAP",
+        "ENA-USDT-SWAP",
+        "T-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "linked_observed_event_count": 1,
+      "observed_event_count_after_candidate_snapshot": 7,
+      "observed_event_link_rate_text": "0.142857",
+      "public_coverage_observed_event_count": 2,
+      "public_coverage_linked_event_count": 1,
+      "public_coverage_event_link_rate_text": "0.500000"
+    }
+  },
+  "candidates": [
+    {
+      "symbol": "AGLD-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-62fc22d683239bbec4bbdb3e95d2db47",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "AVA-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-a75d8dc6adaa21968eab77f1d9d11cc4",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "BANK-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-046533db967d37571e144d9dcaa8b6c0",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "ENA-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-59e44f554750a3a100b839d1918848e2",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "T-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-dbc40ae22ff07b99739f9e8520ecfbce",
+      "persistence_status": "matched"
+    },
+    {
+      "symbol": "ZEC-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789872249944,
+      "candidate_id": "public-candidate-b1a7f0b94dcbcf8913b2a06efcceeefa",
+      "persistence_status": "matched"
+    }
+  ],
+  "issues": []
+}

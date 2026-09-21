@@ -1,0 +1,90 @@
+{
+  "schema": "catos-yaozi-signal-surface-sample-v1",
+  "sample_date": "2026-09-19",
+  "timezone": "Asia/Taipei",
+  "capture_anchor": "2026-09-20T09:03:00+08:00",
+  "capture_policy": "historical events read from authenticated rendered /signals UI on 2026-09-20; no credential, cookie, token, local-storage, private-key or API-secret extraction; no trading action",
+  "signal_surface": {
+    "window": "24h",
+    "events": [
+      {
+        "observed_at_text": "09/19 11:04",
+        "symbol": "LSK",
+        "view": "risk",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/19 11:17",
+        "symbol": "AVA",
+        "view": "risk",
+        "category_text": "風險監控 · 看跌風險分",
+        "event_title": "風險迫近 · 多項看跌條件同時成立"
+      },
+      {
+        "observed_at_text": "09/19 12:07",
+        "symbol": "JUP",
+        "view": "momentum",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/19 12:07",
+        "symbol": "JUP",
+        "view": "opportunity",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/19 12:42",
+        "symbol": "JUP",
+        "view": "opportunity",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/19 12:42",
+        "symbol": "BR",
+        "view": "opportunity",
+        "category_text": "主力資金流向監控",
+        "event_title": "升 S 級 · 主力強力流入"
+      },
+      {
+        "observed_at_text": "09/19 12:43",
+        "symbol": "JUP",
+        "view": "momentum",
+        "category_text": "主力資金流向 · 風險監控",
+        "event_title": "降 D 級 · 主力出逃"
+      },
+      {
+        "observed_at_text": "09/19 12:43",
+        "symbol": "BR",
+        "view": "momentum",
+        "category_text": "主力資金流向監控",
+        "event_title": "升 S 級 · 主力強力流入"
+      },
+      {
+        "observed_at_text": "09/19 13:18",
+        "symbol": "UB",
+        "view": "onchain_forensics",
+        "category_text": "鏈上鑑識 · 內幕錢包監控",
+        "event_title": "鏈上派發預警 · 早期持有者在出貨"
+      },
+      {
+        "observed_at_text": "09/19 13:46",
+        "symbol": "CRV",
+        "view": "onchain",
+        "category_text": "鏈上 · 巨鯨錢包追蹤",
+        "event_title": "鏈上巨鯨掃貨 · 單一大戶連續買入"
+      },
+      {
+        "observed_at_text": "09/19 13:46",
+        "symbol": "CRV",
+        "view": "onchain",
+        "category_text": "鏈上 · DEX 大單監控",
+        "event_title": "鏈上大單爆發 · 1 小時內大額成交異常密集"
+      }
+    ]
+  },
+  "interpretation": "rendered historical signal-surface facts only; event titles are UI facts and are not mapped to unpublished Yaozi taxonomy"
+}

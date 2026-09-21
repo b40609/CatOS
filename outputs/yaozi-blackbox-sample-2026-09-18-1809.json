@@ -1,0 +1,232 @@
+{
+  "schema": "catos-yaozi-blackbox-sample-v1",
+  "sample_date": "2026-09-18",
+  "timezone": "Asia/Taipei",
+  "yaozi_today_updated_text": "18:09:03",
+  "catos_observed_at_ms": 1789726190810,
+  "catos_observed_at_text": "2026-09-18 18:09:50.810 +08:00",
+  "capture_completed_at_text": "2026-09-18 18:12:15.390 +08:00",
+  "precision_policy": "decimal values are stored as strings; missing values remain null",
+  "sources": {
+    "yaozi": "authenticated rendered UI only; no credential or token extraction",
+    "catos": "public-only market scan materialized into outputs/catos-market-intel.sqlite"
+  },
+  "yaozi_today": {
+    "pool_count": 159,
+    "cycle_count": 158,
+    "pick_count": 15,
+    "focus_count": 8,
+    "retreat_count": 4,
+    "holding_count": 3,
+    "pump_count": 0,
+    "market_phase": "漲勢衰竭",
+    "direction_score_text": "+10",
+    "direction_score_2h_previous_text": "+34",
+    "mainstream_axis_text": "0.19",
+    "breadth_axis_text": "0.01",
+    "market_risk_text": "2/100",
+    "focus": [
+      {
+        "symbol": "NEAR",
+        "smf_grade": "B",
+        "label": "FOMO",
+        "advice": "觀察",
+        "yaozi_price_text": "3.5384",
+        "since_first_push_pct_text": "+39.36",
+        "taker_net_24h_usd_text": "+23591323",
+        "dex_net_24h_usd_text": "+51956"
+      },
+      {
+        "symbol": "AKE",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "觀察",
+        "yaozi_price_text": "0.026013",
+        "since_first_push_pct_text": "+20.88",
+        "taker_net_24h_usd_text": "-183095",
+        "dex_net_24h_usd_text": "-138"
+      },
+      {
+        "symbol": "ARX",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "續抱",
+        "yaozi_price_text": "0.175427",
+        "since_first_push_pct_text": "+13.40",
+        "taker_net_24h_usd_text": "-15371",
+        "dex_net_24h_usd_text": "+200",
+        "whale_event_count_24h": 37616,
+        "dealer_today_direction_score_text": "-14",
+        "dealer_today_coverage_text": "1/3"
+      },
+      {
+        "symbol": "KMNO",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "續抱",
+        "yaozi_price_text": "0.027732",
+        "since_first_push_pct_text": "+11.64",
+        "taker_net_24h_usd_text": "-250396",
+        "dex_net_24h_usd_text": "-4146"
+      },
+      {
+        "symbol": "META",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "續抱",
+        "yaozi_price_text": "685.62",
+        "since_first_push_pct_text": "+18.68",
+        "taker_net_24h_usd_text": "+1290947",
+        "onchain_volume_ratio_text": "4.67"
+      },
+      {
+        "symbol": "MINIMAX",
+        "smf_grade": "B",
+        "label": "FOMO",
+        "advice": "減倉",
+        "yaozi_price_text": "38.0837",
+        "since_first_push_pct_text": "+25.36",
+        "taker_net_24h_usd_text": "+873338"
+      },
+      {
+        "symbol": "PHA",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "續抱",
+        "yaozi_price_text": "0.030670",
+        "since_first_push_pct_text": "+18.10",
+        "taker_net_24h_usd_text": "-164360"
+      },
+      {
+        "symbol": "INTW",
+        "smf_grade": "B",
+        "label": null,
+        "advice": "觀察",
+        "yaozi_price_text": "27.6556",
+        "since_first_push_pct_text": "+17.88",
+        "taker_net_24h_usd_text": "-553832"
+      }
+    ],
+    "retreat": [
+      {
+        "symbol": "ADA",
+        "smf_grade": "B",
+        "advice": "退場",
+        "yaozi_price_text": "0.216092",
+        "since_first_push_pct_text": "+7.29",
+        "taker_net_24h_usd_text": "+7970616",
+        "dex_net_24h_usd_text": "-646",
+        "dealer_today_direction_score_text": "-21",
+        "dealer_today_coverage_text": "1/3"
+      },
+      {
+        "symbol": "OPEN",
+        "smf_grade": "B",
+        "advice": "退場",
+        "yaozi_price_text": "0.138650",
+        "since_first_push_pct_text": "+5.12",
+        "taker_net_24h_usd_text": "-18520",
+        "dealer_today_direction_score_text": "-21",
+        "dealer_today_coverage_text": "1/3"
+      },
+      {
+        "symbol": "VIRTUAL",
+        "smf_grade": "A",
+        "advice": "退場",
+        "yaozi_price_text": "0.647700",
+        "since_first_push_pct_text": "+10.10",
+        "dealer_today_direction_score_text": "-21",
+        "dealer_today_coverage_text": "1/3"
+      },
+      {
+        "symbol": "EIGEN",
+        "smf_grade": "B",
+        "advice": "退場",
+        "yaozi_price_text": "0.216423",
+        "since_first_push_pct_text": "+14.21",
+        "taker_net_24h_usd_text": "-464820",
+        "dex_net_24h_usd_text": "+52",
+        "dealer_today_direction_score_text": "-21",
+        "dealer_today_coverage_text": "2/3"
+      }
+    ],
+    "holding": [
+      {"symbol": "SUSHI", "since_text": "+10.8%", "advice": "續抱"},
+      {"symbol": "XMR", "since_text": "+8.3%", "advice": "觀察", "peak_drawdown_text": "-1%"},
+      {"symbol": "SKHY", "since_text": "+3.9%", "advice": "續抱"}
+    ]
+  },
+  "yaozi_detail_samples": [
+    {
+      "symbol": "ARX",
+      "detail_direction_score_text": "-22",
+      "detail_direction_label": "偏空・出貨跡象",
+      "coverage_text": "2/3",
+      "components": [
+        {"name": "鏈上籌碼", "score_text": "-80", "label": "派發預警"},
+        {"name": "資金週期", "score_text": "+50", "label": "markup"},
+        {"name": "價格-OI", "score_text": "-30", "label": "看跌背離"}
+      ],
+      "funnel_score_text": "64",
+      "funnel_peak_text": "107",
+      "oi_1h_text": "+7.8%",
+      "funding_text": "0.0005",
+      "top10_holding_pct_text": "91.5%",
+      "whale_or_insider_event_count_24h": 500
+    },
+    {
+      "symbol": "ADA",
+      "detail_direction_score_text": "-28",
+      "detail_direction_label": "偏空・出貨跡象",
+      "coverage_text": "2/3",
+      "components": [
+        {"name": "資金週期", "score_text": "-60", "label": "retreat"},
+        {"name": "價格-OI", "score_text": "-30", "label": "看跌背離"}
+      ],
+      "top10_holding_pct_text": "58.8%",
+      "large_ls_ratio_text": "1.64",
+      "large_long_pct_text": "62%",
+      "hl_top_trader_short_usd_text": "3700000"
+    },
+    {
+      "symbol": "EIGEN",
+      "detail_direction_score_text": "-21",
+      "detail_direction_label": "偏空・出貨跡象",
+      "coverage_text": "2/3",
+      "components": [
+        {"name": "資金週期", "score_text": "-60", "label": "retreat"}
+      ],
+      "top10_holding_pct_text": "40.4%",
+      "large_ls_ratio_text": "2.93",
+      "large_long_pct_text": "75%",
+      "recent_whale_cluster_usd_text": "87000",
+      "recent_whale_cluster_trade_count": 4,
+      "recent_whale_cluster_wallet_count": 1
+    }
+  ],
+  "catos_scan": {
+    "instrument_refs": 653,
+    "active_symbols": 523,
+    "materialized_symbols": 523,
+    "missing_market_symbols": 0,
+    "momentum_hits": 74,
+    "collection_issues": []
+  },
+  "catos_symbol_comparison": [
+    {"symbol":"NEAR","present":true,"price_text":"3.5200","change_24h_text":"26.482","momentum_status":"HIT","smf_grade":null,"dealer_direction":null},
+    {"symbol":"AKE","present":true,"price_text":"0.0260380","change_24h_text":"22.021","momentum_status":"HIT","smf_grade":null,"dealer_direction":null},
+    {"symbol":"ARX","present":true,"price_text":"0.1757000","change_24h_text":"9.198","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"KMNO","present":true,"price_text":"0.0277000","change_24h_text":"0.181","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"META","present":false},
+    {"symbol":"MINIMAX","present":false},
+    {"symbol":"PHA","present":true,"price_text":"0.0306700","change_24h_text":"8.952","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"INTW","present":false},
+    {"symbol":"ADA","present":true,"price_text":"0.21570","change_24h_text":"8.720","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"OPEN","present":true,"price_text":"0.1386000","change_24h_text":"3.048","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"VIRTUAL","present":true,"price_text":"0.6471000","change_24h_text":"6.959","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"EIGEN","present":true,"price_text":"0.2162000","change_24h_text":"8.589","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"SUSHI","present":true,"price_text":"0.2512","change_24h_text":"14.703","momentum_status":"HIT","smf_grade":null,"dealer_direction":null},
+    {"symbol":"XMR","present":true,"price_text":"539.28","change_24h_text":"8.851","momentum_status":"MISS","smf_grade":null,"dealer_direction":null},
+    {"symbol":"SKHY","present":false}
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "contract": "catos_yaozi_capital_flow_semantic_verification_v1",
+  "date": "2026-09-21",
+  "schema_version": 12,
+  "schema_changed": false,
+  "taxonomy_contract": "yaozi-capital-flow-guide-taxonomy-v1",
+  "guide_event_kind_count": 31,
+  "group_counts": {
+    "inflow": 10,
+    "outflow": 6,
+    "lifecycle": 9,
+    "structural_quality": 6
+  },
+  "semantic_coverage": "complete_31_of_31",
+  "trigger_coverage": "partial_source_explicit_only",
+  "display_only": true,
+  "smf_eligible": false,
+  "local_trigger_status": "not_inferred",
+  "network_io": false,
+  "focused_regression": {
+    "command": "py -3 -B -m unittest tests.test_market_p1 tests.test_market_api -v",
+    "passed": 37,
+    "failed": 0
+  },
+  "market_regression": {
+    "command": "py -3 -B -m unittest discover -s tests -p \"test_market*.py\" -v",
+    "passed": 166,
+    "failed": 0
+  },
+  "parity_before": "68.5 / 84 = 81.5%",
+  "parity_after": "68.75 / 84 = 81.8%",
+  "boundary": "31-kind semantic representation and read surface are complete; private event trigger thresholds and full upstream source equivalence remain unpublished or partial"
+}

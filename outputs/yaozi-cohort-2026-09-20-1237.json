@@ -1,0 +1,536 @@
+{
+  "schema": "yaozi-synchronized-cohort-v1",
+  "cohort_id": "2026-09-20-1237",
+  "source_url": "https://yaozi.yalgo.io/signals",
+  "watchlist_config": "outputs/yaozi-active-watchlist-2026-09-20-1038.json",
+  "selection_policy": "fixed_previous_22_symbol_watchlist_selected_before_new_candidate_outcomes",
+  "baseline_observed_at_ms": 1789879076370,
+  "baseline_observed_at": "2026-09-20T12:37:56.370+08:00",
+  "comparison_due_at_ms": 1789879376370,
+  "comparison_observed_at_ms": 1789879376370,
+  "status": "comparison_complete_60m_followup_complete",
+  "baseline": {
+    "oi_symbols": 22,
+    "oi_snapshots": 22,
+    "oi_delta_5m_available": 0,
+    "oi_candidates": 0,
+    "oi_sources": {
+      "okx": 14,
+      "binance": 8
+    },
+    "fallback_symbols": [
+      "T-USDT-SWAP",
+      "SKYAI-USDT-SWAP",
+      "BANK-USDT-SWAP",
+      "PROM-USDT-SWAP",
+      "AVA-USDT-SWAP",
+      "HEI-USDT-SWAP",
+      "STAR-USDT-SWAP",
+      "SKL-USDT-SWAP"
+    ],
+    "fallback_reason": "okx_ticker_and_oi_api_error_binance_current_round_snapshots_verified"
+  },
+  "surface_filter": {
+    "window": "24h",
+    "view": "all",
+    "search": "",
+    "preset": "default",
+    "selected_type_count": 13,
+    "available_type_count": 17,
+    "selected_labels": [
+      "主力流入 · 穩健看多",
+      "強流入 · 高beta看多",
+      "神級 · 高強度看多",
+      "主力出逃 · 看空",
+      "風險迫近",
+      "鏈上大單爆發",
+      "鏈上巨鯨掃貨",
+      "交易所出入金",
+      "其他鏈上訊號",
+      "鏈上派發預警",
+      "市場方向",
+      "首次入池",
+      "主力撤退確認"
+    ],
+    "excluded_labels": [
+      "主力轉弱 · 弱看空",
+      "大戶轉空",
+      "SMF 中性轉換",
+      "持續異動中"
+    ],
+    "selection_evidence": "rendered_expanded_filter_buttons_and_visual_selected_style",
+    "private_event_taxonomy": "unknown_unpublished"
+  },
+  "interpretation": "captured_default_filtered_surface_only_not_private_gate_or_causality",
+  "verification": {
+    "command": "py -3 -B -m unittest tests.test_market_evidence_collect tests.test_market_candidate_evidence tests.test_market_candidate_alignment tests.test_market_api -q",
+    "tests_passed": 35,
+    "zero_candidate_regression": {
+      "tests_passed": 31,
+      "legacy_reports_unchanged": 5
+    }
+  },
+  "comparison_observed_at": "2026-09-20T12:42:56.370+08:00",
+  "interval_ms": 300000,
+  "comparison": {
+    "schema_version": 8,
+    "observed_at_ms": 1789879376370,
+    "oi_symbols": 22,
+    "oi_snapshots": 22,
+    "oi_delta_5m_available": 22,
+    "oi_candidates": 12,
+    "hyperliquid_runs": 0,
+    "hyperliquid_observations": 0,
+    "hyperliquid_candidates": 0,
+    "dex_runs": 0,
+    "dex_observations": 0,
+    "dex_candidates": 0,
+    "issues": [
+      [
+        "oi:T-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:T-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:SKYAI-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:SKYAI-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:BANK-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:BANK-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:PROM-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:PROM-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:AVA-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:AVA-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:HEI-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:HEI-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:STAR-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:STAR-USDT-SWAP:okx_oi",
+        "api_error"
+      ],
+      [
+        "oi:SKL-USDT-SWAP:okx_ticker",
+        "api_error"
+      ],
+      [
+        "oi:SKL-USDT-SWAP:okx_oi",
+        "api_error"
+      ]
+    ]
+  },
+  "candidates": [
+    {
+      "candidate_id": "public-candidate-04f859a5b4b36961d61706724b40f98c",
+      "symbol": "AVA-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.19000452580901150913591852819268306521497328977142"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-b9c2277bedcce9223c07f6935b39e99f",
+      "symbol": "DASH-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.38913925067289834709148936365733231759147879577616"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-b50107365c8dd589e300f2b1e84f065c",
+      "symbol": "ENA-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.040926494662643919202305413120831247547792675172162"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-ddda2358e64b4468ab3bfbe8ed9b0aa8",
+      "symbol": "HEI-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.27634234923460578282404434403096572945295121710876"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-ee91bf0869fe7dc6bf52bef34437128b",
+      "symbol": "JTO-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.052007205258225751996901559768170857312510359696819"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-d76e4c3173e33728bf3b7ece623044d2",
+      "symbol": "PROM-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.010570562142556180034152653785551463861579640722536"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-ba43739c0da5080a4b3338eb674934f1",
+      "symbol": "SKL-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "1.0014431608686792721873901119397115826614206246934"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-77203dd76baeec1b21b9b46e2660d6eb",
+      "symbol": "SKYAI-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.015731964401082041450181690680913460645552550104310"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-2ec0e14b3fcdcb1582513f966032424c",
+      "symbol": "T-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.0032561568374702326036693703129074202571625834764854"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-ff2605bd1d1622d283cf44454b61c2b6",
+      "symbol": "ZEC-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.28067479344950727754802378790155161496542944193807"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-a17abd7f04788fff48fcbf8a9572d9c2",
+      "symbol": "ZEN-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.63463981735334294966709016745794446089622956927104"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    },
+    {
+      "candidate_id": "public-candidate-2fb2379ece87908a18162693912f4ec9",
+      "symbol": "ZIL-USDT-SWAP",
+      "candidate_type": "OI_POSITIVE_CHANGE",
+      "observed_at_ms": 1789879376370,
+      "evidence": {
+        "contract": "catos_public_event_candidate_v1",
+        "oi_delta": {
+          "oi_delta_5m_text": "0.63145565118357404709167657960171279305641963024583"
+        },
+        "source_kind": "materialized_derivative_snapshot",
+        "threshold": null,
+        "threshold_status": "unknown_unpublished",
+        "yaozi_event_triggered": false
+      }
+    }
+  ],
+  "comparison_snapshots": [
+    {
+      "symbol": "AGLD-USDT-SWAP",
+      "oi_delta_5m_text": "-0.15262795115636575565854287267367901954081604061710",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ALLO-USDT-SWAP",
+      "oi_delta_5m_text": "-0.050553129333690758381371119071088886965735743278756",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "AR-USDT-SWAP",
+      "oi_delta_5m_text": "-0.54722285503387379531033491658725901103378560994470",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "AVA-USDT-SWAP",
+      "oi_delta_5m_text": "0.19000452580901150913591852819268306521497328977142",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "BANK-USDT-SWAP",
+      "oi_delta_5m_text": "-0.079868809033758244262744599976323586169926310000951",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "DASH-USDT-SWAP",
+      "oi_delta_5m_text": "0.38913925067289834709148936365733231759147879577616",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ENA-USDT-SWAP",
+      "oi_delta_5m_text": "0.040926494662643919202305413120831247547792675172162",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "HEI-USDT-SWAP",
+      "oi_delta_5m_text": "0.27634234923460578282404434403096572945295121710876",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "JTO-USDT-SWAP",
+      "oi_delta_5m_text": "0.052007205258225751996901559768170857312510359696819",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "PONS-USDT-SWAP",
+      "oi_delta_5m_text": "-0.040092514735886365399656529607022061367548967596777",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "PROM-USDT-SWAP",
+      "oi_delta_5m_text": "0.010570562142556180034152653785551463861579640722536",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "SKL-USDT-SWAP",
+      "oi_delta_5m_text": "1.0014431608686792721873901119397115826614206246934",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "SKYAI-USDT-SWAP",
+      "oi_delta_5m_text": "0.015731964401082041450181690680913460645552550104310",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "SOPH-USDT-SWAP",
+      "oi_delta_5m_text": "-0.021046015007211767809137899102597920092490220618360",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "STAR-USDT-SWAP",
+      "oi_delta_5m_text": "-0.054954532029865263265078544024392521667110645082157",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "STX-USDT-SWAP",
+      "oi_delta_5m_text": "-0.042688830913972794598878201407991346286656895223381",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "T-USDT-SWAP",
+      "oi_delta_5m_text": "0.0032561568374702326036693703129074202571625834764854",
+      "oi_source": "binance"
+    },
+    {
+      "symbol": "UB-USDT-SWAP",
+      "oi_delta_5m_text": "-1.0984596313215950047060443975115355478524368127453",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ZAMA-USDT-SWAP",
+      "oi_delta_5m_text": "-0.052866550821106003344274966237579628899020052576430",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ZEC-USDT-SWAP",
+      "oi_delta_5m_text": "0.28067479344950727754802378790155161496542944193807",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ZEN-USDT-SWAP",
+      "oi_delta_5m_text": "0.63463981735334294966709016745794446089622956927104",
+      "oi_source": "okx"
+    },
+    {
+      "symbol": "ZIL-USDT-SWAP",
+      "oi_delta_5m_text": "0.63145565118357404709167657960171279305641963024583",
+      "oi_source": "okx"
+    }
+  ],
+  "followup_checkpoints": {
+    "5m": {
+      "status": "complete",
+      "capture_anchor": "2026-09-20T12:50:16.274+08:00",
+      "sample": "outputs/yaozi-signal-surface-sample-2026-09-20-1250.json",
+      "evidence_score": "outputs/yaozi-candidate-evidence-score-2026-09-20-1250.json",
+      "alignment": "outputs/yaozi-candidate-alignment-2026-09-20-1250.json",
+      "candidate_evaluable_count": 12,
+      "candidate_hit_count": 1,
+      "candidate_miss_count": 11,
+      "candidate_hit_rate_text": "0.083333",
+      "candidate_hit_symbols": ["JTO-USDT-SWAP"],
+      "captured_post_snapshot_events": 2,
+      "alignment_link_count": 2,
+      "interpretation": "descriptive_observed_surface_hit_rate_only; candidate_miss means no same-symbol event in the captured surface/window and does not prove a Yaozi gate failure"
+    },
+    "15m": {
+      "status": "complete",
+      "capture_anchor": "2026-09-20T12:58:26.039+08:00",
+      "sample": "outputs/yaozi-signal-surface-sample-2026-09-20-1258.json",
+      "evidence_score": "outputs/yaozi-candidate-evidence-score-2026-09-20-1258.json",
+      "alignment": "outputs/yaozi-candidate-alignment-2026-09-20-1258.json",
+      "candidate_evaluable_count": 12,
+      "candidate_hit_count": 2,
+      "candidate_miss_count": 10,
+      "candidate_hit_rate_text": "0.166667",
+      "candidate_hit_symbols": ["JTO-USDT-SWAP", "ZEC-USDT-SWAP"],
+      "captured_post_snapshot_events": 5,
+      "alignment_link_count": 3,
+      "interpretation": "descriptive_observed_surface_hit_rate_only; 12:57 minute-precision events are inside the 15m cutoff, while the 12:58 event is outside it; candidate_miss means no same-symbol event in the captured surface/window and does not prove a Yaozi gate failure"
+    },
+    "30m": {
+      "status": "complete",
+      "capture_anchor": "2026-09-20T13:16:53.743+08:00",
+      "sample": "outputs/yaozi-signal-surface-sample-2026-09-20-1316.json",
+      "evidence_score": "outputs/yaozi-candidate-evidence-score-2026-09-20-1316.json",
+      "alignment": "outputs/yaozi-candidate-alignment-2026-09-20-1316.json",
+      "candidate_evaluable_count": 12,
+      "candidate_hit_count": 2,
+      "candidate_miss_count": 10,
+      "candidate_hit_rate_text": "0.166667",
+      "candidate_hit_symbols": [
+        "JTO-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "captured_post_snapshot_events": 12,
+      "alignment_link_count": 3,
+      "interpretation": "descriptive_observed_surface_hit_rate_only; all explicit single-symbol rendered events through the 13:12:56.370 cutoff are captured; the 13:01 global market event is excluded from symbol alignment; candidate_miss means no same-symbol event in the captured surface/window and does not prove a Yaozi gate failure"
+    },
+    "60m": {
+      "status": "complete",
+      "capture_anchor": "2026-09-20T13:44:27.955+08:00",
+      "sample": "outputs/yaozi-signal-surface-sample-2026-09-20-1344.json",
+      "evidence_score": "outputs/yaozi-candidate-evidence-score-2026-09-20-1344.json",
+      "alignment": "outputs/yaozi-candidate-alignment-2026-09-20-1344.json",
+      "candidate_evaluable_count": 12,
+      "candidate_hit_count": 2,
+      "candidate_miss_count": 10,
+      "candidate_hit_rate_text": "0.166667",
+      "candidate_hit_symbols": [
+        "JTO-USDT-SWAP",
+        "ZEC-USDT-SWAP"
+      ],
+      "captured_post_snapshot_events": 26,
+      "alignment_link_count": 6,
+      "alignment_linked_event_count": 5,
+      "interpretation": "descriptive_observed_surface_hit_rate_only; all explicit single-symbol rendered events through the 13:42:56.370 cutoff are captured; ONG at 13:43 is excluded as after cutoff; alignment sees 6 stored candidate links across 5 events because older DB candidate history can add links, while this fixed cohort remains 2 hit / 10 miss by evidence scorer; candidate_miss means no same-symbol event in the captured surface/window and does not prove a Yaozi gate failure"
+    }
+  },
+  "followup_due_at": {
+    "5m": "2026-09-20T12:47:56.370+08:00",
+    "15m": "2026-09-20T12:57:56.370+08:00",
+    "30m": "2026-09-20T13:12:56.370+08:00",
+    "60m": "2026-09-20T13:42:56.370+08:00"
+  }
+}

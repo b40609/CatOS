@@ -1,0 +1,44 @@
+{
+  "schema": "catos-yaozi-blackbox-sample-v1",
+  "sample_date": "2026-09-18",
+  "timezone": "Asia/Taipei",
+  "capture_window_text": "2026-09-18 22:44-22:49 Asia/Taipei",
+  "capture_completed_at": "2026-09-18T22:49:13.5751269+08:00",
+  "capture_policy": "authenticated rendered UI only for Yaozi; no credential, cookie, token, local-storage, private-key or API-secret extraction; no live trading",
+  "precision_policy": "exact decimal values remain strings; missing or not-yet-materialized values remain null; displayed rounded values are not expanded into hidden precision",
+  "purpose": "constrain Dealer/op_v1 DEX 1h materialization using symbols whose /signals surface already exposes 1h DEX activity",
+  "signal_dex_observations": [
+    {"symbol": "CRV", "signal_time_text": "09/18 22:31", "large_swap_count": 5, "dex_net_h1_usd_text": "-13961"},
+    {"symbol": "ETH", "signal_time_text": "09/18 17:30", "large_swap_count": 21, "dex_net_h1_usd_text": "+476100"},
+    {"symbol": "ARK", "signal_time_text": "09/18 16:30", "large_swap_count": 37, "dex_net_h1_usd_text": "-16632"},
+    {"symbol": "KMNO", "signal_time_text": "09/18 12:30", "large_swap_count": 7, "dex_net_h1_usd_text": "-5714"},
+    {"symbol": "GENIUS", "signal_time_text": "09/18 10:42", "large_swap_count": 34, "dex_net_h1_usd_text": "+14997"},
+    {"symbol": "AAPL", "signal_time_text": "09/18 10:42", "large_swap_count": 300, "dex_net_h1_usd_text": "+305"},
+    {"symbol": "GOOGL", "signal_time_text": "09/18 07:42", "large_swap_count": 300, "dex_net_h1_usd_text": "+51"},
+    {"symbol": "AERO", "signal_time_text": "09/18 06:57", "large_swap_count": 19, "dex_net_h1_usd_text": "-60535"},
+    {"symbol": "CAKE", "signal_time_text": "09/18 06:57", "large_swap_count": 20, "dex_net_h1_usd_text": "-61299"},
+    {"symbol": "NEAR", "signal_time_text": "09/17 23:47", "large_swap_count": 18, "dex_net_h1_usd_text": "-1295"}
+  ],
+  "dealer_scan": [
+    {"symbol": "CRV", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 拉升期", "dealer_direction_score_text": "+18", "dealer_direction_label": "偏多背景", "capital_component_text": "markup +50"},
+    {"symbol": "ETH", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢", "dealer_direction_score_text": "+10", "dealer_direction_label": "中性", "capital_component_text": "accumulation +30"},
+    {"symbol": "ARK", "coverage_text": "1/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢"},
+    {"symbol": "KMNO", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢"},
+    {"symbol": "GENIUS", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 主力撤退"},
+    {"symbol": "AERO", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · FOMO 過熱"},
+    {"symbol": "CAKE", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢"},
+    {"symbol": "AAPL", "coverage_text": "1/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢"},
+    {"symbol": "GOOGL", "coverage_text": "1/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · 低位蓄勢"},
+    {"symbol": "NEAR", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · FOMO 過熱"},
+    {"symbol": "JUP", "coverage_text": "2/3", "dealer_dex_net_h1_usd_text": null, "rendered_dex_axis_text": "DEX 淨流 1h — · FOMO 過熱", "dealer_direction_score_text": "+4", "dealer_direction_label": "中性"}
+  ],
+  "reverse_engineering_status": {
+    "dealer_formula": "unknown",
+    "whale_thresholds": "unknown",
+    "three_axis_coverage_found": false,
+    "dealer_symbols_scanned_this_batch": 11,
+    "signal_symbols_with_exact_h1_dex_value_this_batch": 10,
+    "finding": "The /signals surface exposes non-null 1h DEX net values for multiple symbols, while every inspected Dealer/op_v1 card still renders DEX 淨流 1h as missing. This supports a separate or unsynchronized Dealer DEX materialization pipeline; it does not identify the third-axis transform or weight.",
+    "blocker": "No authenticated rendered 3/3 Dealer sample was found. Do not infer or hardcode the third-axis weight, and do not substitute 24h DEX netflow or signal alert_extra.dex_net_1h into operator_profile.dex_flow unless a verified contract explicitly establishes that mapping."
+  }
+}

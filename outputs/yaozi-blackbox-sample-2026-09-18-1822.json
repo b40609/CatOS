@@ -1,0 +1,98 @@
+{
+  "schema": "catos-yaozi-blackbox-sample-v1",
+  "sample_date": "2026-09-18",
+  "timezone": "Asia/Taipei",
+  "capture_policy": "authenticated rendered UI only for Yaozi; public-only fixed-host APIs for catOS; no credential or token extraction",
+  "precision_policy": "exact decimal values remain strings; missing values remain null",
+  "yaozi_detail_samples": [
+    {
+      "symbol": "NEAR",
+      "capital_cycle_state": "FOMO 過熱",
+      "capital_inflow_score_text": "155",
+      "capital_retreat_score_text": "165",
+      "dealer_label": "拉升",
+      "dealer_direction_score_text": "+4",
+      "dealer_direction_label": "中性",
+      "dealer_coverage_text": "2/3",
+      "large_ls_ratio_text": "2.71",
+      "large_long_pct_text": "73%",
+      "top10_holding_pct_text": "37.5%",
+      "whale_events": [
+        {
+          "event_type": "WHALE_BUY_CLUSTER",
+          "trade_count": 11,
+          "notional_usd_text": "150000",
+          "wallet_count": 9
+        },
+        {
+          "event_type": "SMART_WALLET_ACCUMULATION",
+          "description": "3 HL top traders long $41.4M",
+          "notional_usd_text": "41400000"
+        }
+      ]
+    },
+    {
+      "symbol": "SKHY",
+      "capital_cycle_state": "低位蓄勢",
+      "capital_inflow_score_text": "101",
+      "capital_retreat_score_text": "195",
+      "dealer_label": "蓄勢",
+      "dealer_direction_score_text": "+10",
+      "dealer_direction_label": "中性",
+      "dealer_coverage_text": "2/3",
+      "large_ls_ratio_text": "0.68",
+      "large_long_pct_text": "40%",
+      "top10_holding_pct_text": "84.0%",
+      "whale_events": [
+        {
+          "event_type": "WHALE_BUY_CLUSTER",
+          "trade_count": 3,
+          "notional_usd_text": "32000",
+          "wallet_count": 2
+        },
+        {
+          "event_type": "SINGLE_VENUE_DOMINANCE",
+          "venue": "binance",
+          "oi_share_pct_text": "79.1"
+        },
+        {
+          "event_type": "FLOW_FLIP_TO_OUTFLOW",
+          "previous_net_flow_usd_text": "50000",
+          "current_net_flow_usd_text": "-25000"
+        }
+      ]
+    }
+  ],
+  "universe_root_cause": {
+    "before_fix_active_symbols": 523,
+    "missing_today_symbols_before_fix": ["META", "MINIMAX", "INTW", "SKHY"],
+    "verified_okx_public_instrument_rows": [
+      {"instId": "META-USDT-SWAP", "quoteCcy": "", "settleCcy": "USDT", "ctValCcy": "META", "state": "live"},
+      {"instId": "MINIMAX-USDT-SWAP", "quoteCcy": "", "settleCcy": "USDT", "ctValCcy": "MINIMAX", "state": "live"},
+      {"instId": "INTW-USDT-SWAP", "quoteCcy": "", "settleCcy": "USDT", "ctValCcy": "INTW", "state": "live"},
+      {"instId": "SKHY-USDT-SWAP", "quoteCcy": "", "settleCcy": "USDT", "ctValCcy": "SKHY", "state": "live"}
+    ],
+    "collector_bug": "OKX SWAP filtering incorrectly required quoteCcy == USDT in addition to settleCcy == USDT; public SWAP rows expose quoteCcy as an empty string",
+    "fixed_rule": "for OKX instType=SWAP, canonical USDT-margined membership is gated by settleCcy == USDT plus canonical instId validation",
+    "after_fix_scan": {
+      "observed_at_ms": 1789726964544,
+      "instrument_refs": 1120,
+      "active_symbols": 730,
+      "materialized_symbols": 730,
+      "missing_market_symbols": 0,
+      "momentum_hits": 90,
+      "collection_issues": []
+    },
+    "verified_present_after_fix": [
+      "META-USDT-SWAP",
+      "MINIMAX-USDT-SWAP",
+      "INTW-USDT-SWAP",
+      "SKHY-USDT-SWAP"
+    ]
+  },
+  "reverse_engineering_status": {
+    "dealer_formula": "unknown",
+    "whale_thresholds": "unknown",
+    "finding": "positive and negative Dealer samples plus multiple whale event taxonomies rule out a single whale notional threshold and a direct component sum; insufficient evidence remains for deterministic private weights or gates"
+  }
+}

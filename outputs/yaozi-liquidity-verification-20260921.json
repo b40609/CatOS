@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-21",
+  "slice": "multi-venue-spot-liquidity-2pct",
+  "schema_version": 13,
+  "contract": "catos-spot-depth-2pct-v1",
+  "configured_venues": [
+    "okx",
+    "binance",
+    "bybit",
+    "gate",
+    "coinbase",
+    "bitget"
+  ],
+  "semantics": {
+    "price_basis": "single-venue spot mid",
+    "threshold_pct": "2",
+    "decimal_only": true,
+    "full_depth_requires_boundary_crossing": true,
+    "partial_book_is_lower_bound_only": true,
+    "asymmetry_requires_both_sides_complete": true,
+    "asymmetry_signal_eligible": false,
+    "one_source_failure_isolated": true
+  },
+  "surfaces": [
+    "/intel/liquidity",
+    "/intel/picks/{symbol}/liquidity",
+    "/intel/source-coverage",
+    "single-coin dashboard detail"
+  ],
+  "verification": {
+    "focused_liquidity_intel_api": "52/52 OK",
+    "all_test_market": "187/187 OK",
+    "py_compile": "OK",
+    "live_upstream_smoke": {
+      "okx": "verified_public_orderbook_400_levels_partial_boundary_coverage",
+      "binance": "verified_public_orderbook_500_levels_partial_boundary_coverage",
+      "bybit": "verified_fixed_allowlist_transport_parser_200_levels_partial_boundary_coverage",
+      "gate": "verified_fixed_allowlist_transport_parser_100_levels_partial_boundary_coverage",
+      "coinbase": "verified_fixed_allowlist_transport_parser_100_levels_partial_boundary_coverage_bid_boundary_reached_ask_boundary_not_reached",
+      "bitget": "verified_fixed_allowlist_transport_parser_150_levels_partial_boundary_coverage",
+      "combined_four_venue_single_command_historical": "blocked_by_runtime_safety_review_after_individual_source_verification"
+    },
+    "main_db_v12_to_v13_migration": "blocked_by_runtime_safety_review",
+    "main_db_last_verified_schema_version": 12
+  },
+  "parity": {
+    "liquidity_i_s_v_u": "1/1/1/1",
+    "score": "4/4",
+    "total": "72.75/88",
+    "percent": "82.7%"
+  },
+  "boundaries": [
+    "Direct live source verification exists for all six configured venues: OKX, Binance, Bybit, Gate, Coinbase, and Bitget.",
+    "The bounded books do not become full-depth claims unless both +/-2% boundaries are reached. Coinbase reached the bid-side -2% boundary in this live probe but not the ask-side +2% boundary; Bitget reached neither side, so both remain partial overall.",
+    "No main database v12-to-v13 migration or live liquidity materialization into the main database is claimed.",
+    "Orderbook asymmetry is descriptive only and is not promoted to YAOZI direction, SMF, or a private signal."
+  ]
+}

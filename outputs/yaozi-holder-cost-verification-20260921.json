@@ -1,0 +1,63 @@
+{
+  "date": "2026-09-21",
+  "slice": "direct-address-holder-cost-public-subset",
+  "contract": "catos-direct-address-stablecoin-cost-v1",
+  "source": {
+    "provider": "Blockscout Ethereum v2",
+    "host": "eth.blockscout.com",
+    "paths": [
+      "/api/v2/addresses/{address}",
+      "/api/v2/addresses/{address}/token-transfers?token={contract}",
+      "/api/v2/transactions/{transaction_hash}/token-transfers"
+    ],
+    "credentials_required": false
+  },
+  "availability_contract": {
+    "address_kind": "direct EOA only",
+    "complete_bounded_address_history_required": true,
+    "target_outflow_allowed": false,
+    "quote_counterflow": "single direct same-transaction net spend",
+    "allowed_quote_assets": [
+      "USDT",
+      "USDC"
+    ],
+    "current_balance_must_be_fully_explained": true,
+    "beneficial_owner_aggregation": "not_available",
+    "inventory_policy": "not_inferred",
+    "yaozi_equivalence_status": "not_claimed_private_formula_unpublished"
+  },
+  "live_weth_top10": {
+    "contract_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+    "address_kind_counts": {
+      "contract": 9,
+      "eoa": 1
+    },
+    "first_holder": {
+      "address": "0xf04a5cc80b1e94c69b48f5ee68a08cd2f09a7c3e",
+      "address_kind": "contract",
+      "status": "MISSING_DATA",
+      "missing_reason": "contract_holder_not_cost_attributable"
+    },
+    "only_eoa": {
+      "address": "0x4553e3bc6327006a63c5aa4cdac887f66b6a433e",
+      "status": "MISSING_DATA",
+      "missing_reason": "address_history_not_complete_bounded_page"
+    },
+    "top10_cost_available_count": 0
+  },
+  "verification": {
+    "focused_command": "py -3 -B -m unittest tests.test_market_holders tests.test_market_p1 -v",
+    "focused_result": "29/29 OK",
+    "market_command": "py -3 -B -m unittest discover -s tests -p test_market*.py -v",
+    "market_result": "186/186 OK",
+    "py_compile": "OK",
+    "trailing_whitespace_check": "OK",
+    "live_source_verified": true,
+    "schema_change": false
+  },
+  "parity": {
+    "before": "72.75 / 88 = 82.7%",
+    "after": "72.75 / 88 = 82.7%",
+    "reason": "A fail-closed public subset was implemented, but no WETH top10 holder cost became available and beneficial-owner/YAOZI main-cost semantics remain unavailable."
+  }
+}

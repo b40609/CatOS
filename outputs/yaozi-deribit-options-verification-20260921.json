@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-21",
+  "slice": "deribit-second-public-options-provider",
+  "schema_version": 13,
+  "provider": {
+    "source": "deribit-book-summary",
+    "host": "www.deribit.com",
+    "path": "/api/v2/public/get_book_summary_by_currency",
+    "query_contract": "currency={base}&kind=option",
+    "authentication": "none",
+    "supported_family_shape": "inverse *-USD"
+  },
+  "semantics": {
+    "materialized_facts": false,
+    "persisted_source_run": true,
+    "fact_fields": [
+      "expiry_code",
+      "strike",
+      "option_type",
+      "open_interest_base",
+      "mark_iv",
+      "mark_price",
+      "underlying_price",
+      "premium_currency"
+    ],
+    "snapshot_boundary": "deribit facts are not mixed into OKX-shaped option snapshots because those tables have no source column",
+    "signed_gex": null,
+    "dealer_sign": null,
+    "yaozi_gamma_aggregation": "unknown_unpublished"
+  },
+  "verification": {
+    "focused_test_market_options": "8/8 OK",
+    "py_compile": "OK",
+    "scoped_diff_check": "OK",
+    "live_upstream": {
+      "inst_family": "BTC-USD",
+      "endpoint_mode": "fixed_public_get",
+      "items": 918,
+      "issues": 0,
+      "source_run_status": "ok",
+      "temporary_db_option_summary_snapshots": 0,
+      "temporary_db_option_open_interest_snapshots": 0,
+      "sample": {
+        "inst_id": "BTC-22SEP26-69000-C",
+        "open_interest_base": "0.0",
+        "mark_iv": "88.74",
+        "premium_currency": "BTC"
+      }
+    }
+  },
+  "parity": {
+    "options_i_s_v_u": "1/1/1/1",
+    "total": "73.5/88",
+    "percent": "83.5%",
+    "score_change": "0"
+  },
+  "boundaries": [
+    "Deribit inverse option premium currency is BTC/ETH and is not treated as the same snapshot semantics as OKX BTC-USD/ETH-USD rows.",
+    "The second provider expands public source breadth but does not reconstruct signed GEX, dealer positioning, or YAOZI Gamma aggregation.",
+    "No schema migration or main database write was required for this verification."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "slice": "yaozi-guide-money-flow-public-v1",
+  "date": "2026-09-21",
+  "schema_change": false,
+  "network_io": false,
+  "new_provider": false,
+  "contract": {
+    "windows": ["5m", "1h", "4h", "24h"],
+    "selection": "verified_dex_first_else_complete_cex_taker",
+    "dex_coverage": "must_cover_requested_window",
+    "cex_coverage": "complete_contiguous_unambiguous_trade_windows",
+    "delta": "same_source_class_and_quote_currency_only",
+    "flow_market_cap_ratio": "decimal_only",
+    "large_swap_display_threshold_usd_text": "1000",
+    "peak_90d_status": "calendar_day_timezone_contract_unpublished",
+    "observation_only": true,
+    "smf_eligible": false
+  },
+  "surface": {
+    "reader": "MarketIntelReader.money_flow",
+    "http": "/intel/picks/{symbol}/money-flow",
+    "dashboard": "single-coin detail Money Flow"
+  },
+  "verification": {
+    "focused": {
+      "command": "py -3 -B -m unittest tests.test_market_api -v",
+      "passed": 21,
+      "failed": 0
+    },
+    "market_regression": {
+      "command": "py -3 -B -m unittest discover -s tests -p test_market*.py -v",
+      "passed": 176,
+      "failed": 0
+    },
+    "py_compile": {
+      "files": [
+        "catos/market_api.py",
+        "catos/market_dashboard.py",
+        "tests/test_market_api.py"
+      ],
+      "status": "passed"
+    }
+  },
+  "parity": {
+    "score": "72.25/88",
+    "percent": "82.1%",
+    "change": "none",
+    "reason": "current parity matrix has no independent MoneyFlow scored row and this slice adds no live provider"
+  }
+}
