@@ -2,7 +2,7 @@
 
 S9 已依[正式規格](outputs/catos-s9-fee-completion-spec.md)完成 Sol 功能／資料完整性驗收：S9 專屬 32/32、必要回歸 312/312，共 344/344 通過，`py_compile` 通過；驗收中修正 schema7 `apply_fill()` raw payload 的既有錯誤語義相容。`Journal(..., lot_schema_version=8)` 只用於新建合成 DB，既有 DB 不遷移、不修改。詳見 [S9 開發交接](docs/lot-fee-completion-handoff.md)。
 
-S9 文件基線：[assessment](outputs/catos-s9-fee-completion-assessment.md) `bb29389`、正式規格 `120dc58`；使用者確認 S8 `b069082` 為穩定基線。視覺樣本可生成且 F04／F05／responsive CSS 靜態核對通過，但本機瀏覽器安全政策封鎖 `file://`，1280／390 px 實際像素截圖矩陣未執行，不宣稱該項已通過。
+S9 文件基線：[assessment](outputs/catos-s9-fee-completion-assessment.md) `bb29389`、正式規格 `120dc58`；使用者確認 S8 `b069082` 為穩定基線。本輪以新建 schema8 合成 DB 產生完整／缺費報告，1280／390 px 實際 viewport 均完成像素驗收與 scrollWidth 量測，長 Decimal、費用品質、缺費筆數與 funding 文案可讀，無整頁水平溢位或裁切。
 
 最新開發：**S8 已實作並通過修正後 Sol 驗收**。入口 `python -B -m examples.lot_scenario_demo --output-dir <new-dir>` 以全新 Journal 走真實 S3→S5→S7，保存合成 DB 與 complete／degraded HTML，拒絕覆寫且失敗保留產物。Astra 獨立審查後將 S8 專屬測試由 16 增至 22 個方法；Sol 重驗 S8 22/22＋S7 21/21，共 43/43，0 failure／error／skip，`py_compile` 通過，生產程式未改。詳見 [S8 開發交接](docs/lot-scenario-demo-handoff.md)。
 
