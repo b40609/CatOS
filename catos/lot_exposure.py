@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from decimal import Context, Decimal, DecimalException, Inexact, ROUND_HALF_EVEN, Underflow, localcontext
 
 from catos import ipc, lots
-from catos.lot_journal import StoredLot
+from catos.lot_journal import StoredLot, StoredLotV2
 from catos.research import ContractSpec
 
 
@@ -34,6 +34,19 @@ class LotInventory:
     expected_bot_ids: tuple[str, ...]
     included_bot_ids: tuple[str, ...]
     lots: tuple[StoredLot, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LotInventoryV2:
+    scope: lots.LotScope
+    inst_id: str
+    cut_id: str
+    observed_at_ms: int
+    valid_until_ms: int
+    complete: bool
+    expected_bot_ids: tuple[str, ...]
+    included_bot_ids: tuple[str, ...]
+    lots: tuple[StoredLotV2, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +98,18 @@ class ExposureRequest:
     contract: ContractSpec
     now_ms: int
     lots_view: LotInventory
+    physical_view: PhysicalPosition
+    mark_view: MarkObservation | None
+    pending_view: PendingInventory | None
+    evidence_kind: str = "OBSERVED"
+
+
+@dataclass(frozen=True, slots=True)
+class ExposureRequestV2:
+    scope: lots.LotScope
+    contract: ContractSpec
+    now_ms: int
+    lots_view: LotInventoryV2
     physical_view: PhysicalPosition
     mark_view: MarkObservation | None
     pending_view: PendingInventory | None
@@ -208,7 +233,7 @@ def _source(value, cls, request, reasons, prefix):
     return fresh
 
 
-def _inventory(view, contract):
+def _inventory(view, contract, *, v2=False):
     _bool(view.complete)
     for names in (view.expected_bot_ids, view.included_bot_ids):
         _tuple(names, MAX_BOTS)
@@ -222,18 +247,18 @@ def _inventory(view, contract):
     _tuple(view.lots, MAX_LOTS)
     entries = {}
     for item in view.lots:
-        if not isinstance(item, StoredLot):
+        if not isinstance(item, StoredLotV2 if v2 else StoredLot):
             _reject("identity_mismatch")
         _bool(item.opening_unresolved)
         _bool(item.closing_unresolved)
         _integer(item.commit_seq, 1)
         try:
-            if not isinstance(item.lot, lots.Lot):
+            if not isinstance(item.lot, lots.LotV2 if v2 else lots.Lot):
                 _reject("identity_mismatch")
             # Reconstruct nested immutable values to detect forged local objects.
             lot = replace(item.lot, scope=lots.LotScope(item.lot.scope.account_ref, item.lot.scope.environment),
                           protection=replace(item.lot.protection))
-            lots.validate_lot(lot, contract)
+            (lots.validate_lot_v2 if v2 else lots.validate_lot)(lot, contract)
         except (ValueError, TypeError, AttributeError) as exc:
             if isinstance(exc, ExposureInputError):
                 raise
@@ -314,8 +339,16 @@ def observe_exposure(request: ExposureRequest) -> ExposureReport:
         raise ExposureInputError("decimal_range") from exc
 
 
-def _observe(request):
-    if not isinstance(request, ExposureRequest):
+def observe_exposure_v2(request: ExposureRequestV2) -> ExposureReport:
+    try:
+        with localcontext(_CONTEXT):
+            return _observe(request, v2=True)
+    except DecimalException as exc:
+        raise ExposureInputError("decimal_range") from exc
+
+
+def _observe(request, *, v2=False):
+    if not isinstance(request, ExposureRequestV2 if v2 else ExposureRequest):
         _reject("identity_mismatch")
     if request.evidence_kind not in ("OBSERVED", "SYNTHETIC_SCENARIO"):
         _reject("identity_mismatch")
@@ -327,9 +360,9 @@ def _observe(request):
         _reject("invalid_contract")
     contract, reasons = request.contract, set()
     lv, pv, mv, pend = request.lots_view, request.physical_view, request.mark_view, request.pending_view
-    lf = _source(lv, LotInventory, request, reasons, "lot")
+    lf = _source(lv, LotInventoryV2 if v2 else LotInventory, request, reasons, "lot")
     pf = _source(pv, PhysicalPosition, request, reasons, "physical")
-    entries = _inventory(lv, contract)
+    entries = _inventory(lv, contract, v2=v2)
     _bool(pv.verified)
     if pv.quantity is None:
         if pv.verified:

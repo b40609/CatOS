@@ -5,7 +5,8 @@ from decimal import Decimal
 import sqlite3
 
 from catos import ipc, ipc_lots, lots
-from catos.lot_accounting import SyntheticFill, apply_fill, exact_quantity
+from catos.lot_accounting import (SyntheticFill, SyntheticFillV2, FeeCompletion,
+                                  apply_fill, apply_fill_v2, complete_fee, exact_quantity)
 from catos.lot_journal import (LotStorageError, _json, _decode_json, _hash,
                                _contract_wire, _contract_from_wire, _numeric_identity)
 
@@ -88,7 +89,21 @@ class RecoveryReport:
     terminal_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class RecoveryReportV2:
+    storage_ready: bool
+    order_count: int
+    fill_count: int
+    terminal_count: int
+    fee_completion_count: int
+
+
 class LotFillJournal:
+    v2 = False
+    tables = TABLES
+    schema = SCHEMA
+    kinds = ("bind", "fill", "terminal")
+
     def __init__(self, journal):
         self.j = journal
         self.db = journal.connection
@@ -120,6 +135,8 @@ class LotFillJournal:
         return self._append(payload)
 
     def apply_fill(self, fill):
+        if self.v2 or type(fill) is SyntheticFillV2:
+            raise LotStorageError("unsupported_fee_version")
         fill = replace(fill)
         self.j.lots._scope(fill.scope)
         payload = dict(kind="fill", scope=ipc_lots._scope_to_wire(fill.scope),
@@ -128,6 +145,26 @@ class LotFillJournal:
                        quantity=_number(fill.quantity), price=_number(fill.price),
                        fee_paid=_number(fill.fee_paid), fee_currency=fill.fee_currency)
         return self._append(payload)
+
+    def apply_fill_v2(self, fill):
+        if not self.v2 or type(fill) is not SyntheticFillV2:
+            raise LotStorageError("unsupported_fee_version")
+        fill = replace(fill)
+        self.j.lots._scope(fill.scope)
+        return self._append(dict(kind="fill", scope=ipc_lots._scope_to_wire(fill.scope),
+            source_id=fill.source_id, inst_id=fill.inst_id, order_id=fill.order_id,
+            trade_id=fill.trade_id, fill_seq=fill.fill_seq, quantity=_number(fill.quantity),
+            price=_number(fill.price), fee_state=fill.fee_state,
+            fee_paid=None if fill.fee_paid is None else _number(fill.fee_paid), fee_currency=fill.fee_currency))
+
+    def complete_fee(self, completion):
+        if not self.v2 or type(completion) is not FeeCompletion:
+            raise LotStorageError("unsupported_fee_version")
+        completion = replace(completion)
+        self.j.lots._scope(completion.scope)
+        return self._append(dict(kind="fee_completion", scope=ipc_lots._scope_to_wire(completion.scope),
+            source_id=completion.source_id, inst_id=completion.inst_id, order_id=completion.order_id,
+            trade_id=completion.trade_id, fee_paid=_number(completion.fee_paid), fee_currency=completion.fee_currency))
 
     def finish_order(self, *, scope, source_id, inst_id, order_id, terminal_id,
                      status, final_fill_seq, final_filled_qty):
@@ -150,7 +187,7 @@ class LotFillJournal:
 
     def _rows(self):
         rows = []
-        for kind, table in zip(("bind", "fill", "terminal"), TABLES):
+        for kind, table in zip(self.kinds, self.tables):
             for row in self.db.execute(f"SELECT * FROM {table}"):
                 rows.append((row["seq"], kind, dict(row)))
         return sorted(rows, key=lambda entry: entry[0])
@@ -158,8 +195,13 @@ class LotFillJournal:
     def _evaluate(self, payloads):
         """One deterministic state machine for new events and startup replay."""
         orders, states, active, origins, used_events = {}, {}, {}, {}, set()
+        original_fills, completed, flags = {}, set(), {}
         results = []
         for p in payloads:
+            if self.v2:
+                if type(p.get("event_version")) is not int or p["event_version"] != 2:
+                    raise LotStorageError("unsupported_fee_version")
+                p = {k: v for k, v in p.items() if k != "event_version"}
             kind, key = p["kind"], self._identity(p)
             scope = ipc_lots._scope_from_wire(p["scope"])
             self.j.lots._scope(scope)
@@ -175,6 +217,11 @@ class LotFillJournal:
                     raise LotStorageError("binding_conflict")
                 context = lots.IntentContext(scope, p["bot_id"], contract, p["event_seq"], p["warmup"])
                 intent = ipc_lots.intent_from_wire(p["intent"])
+                if self.v2:
+                    canonical_contract = {n: v if n == "inst_id" else _number(getattr(contract, n))
+                                          for n, v in _contract_wire(contract).items()}
+                    if p["contract"] != canonical_contract or p["intent"] != ipc.decode_payload(ipc_lots.canonical_intent(intent)):
+                        raise LotStorageError("invalid_event")
                 if not isinstance(intent, (lots.OpenLot, lots.CloseLot)):
                     raise LotStorageError("invalid_intent")
                 event_key = (context.bot_id, context.event_seq)
@@ -191,13 +238,39 @@ class LotFillJournal:
                     origins[lot_id] = context.event_seq
                 elif lot_id not in origins or before is None:
                     raise LotStorageError("unmanaged_lot")
-                validated = lots.validate_intent(intent, context, lots.LotValidationView(before, False, False))
+                validated = (lots.validate_intent_v2 if self.v2 else lots.validate_intent)(intent, context,
+                    (lots.LotValidationViewV2 if self.v2 else lots.LotValidationView)(before, False, False))
                 order = dict(validated=validated, contract=contract, total=Decimal(0), count=0,
                              trades=set(), done=False, lot_id=lot_id, bot_id=context.bot_id)
                 orders[key] = order
                 active[lot_id] = key
                 if before is not None:
                     after, closing = replace(before, revision=before.revision + 1), True
+            elif kind == "fee_completion" and self.v2:
+                ipc.exact(p, ("kind", "scope", "source_id", "inst_id", "order_id", "trade_id", "fee_paid", "fee_currency"))
+                completion = FeeCompletion(scope, p["source_id"], p["inst_id"], p["order_id"],
+                    p["trade_id"], ipc.decimal_text(p["fee_paid"], "fee_paid"), p["fee_currency"])
+                if p["fee_paid"] != _number(completion.fee_paid):
+                    raise LotStorageError("invalid_event")
+                target = (key, completion.trade_id)
+                if target not in original_fills:
+                    raise LotStorageError("fee_target_not_found")
+                if original_fills[target].fee_state != "UNKNOWN":
+                    raise LotStorageError("fee_not_pending")
+                if target in completed:
+                    raise LotStorageError("write_conflict")
+                order = orders[key]
+                lot_id = order["lot_id"]
+                before = states[lot_id]
+                active_key = active.get(lot_id)
+                opening = active_key is not None and isinstance(orders[active_key]["validated"].intent, lots.OpenLot)
+                closing = active_key is not None and not opening
+                pending = sum(f.fee_state == "UNKNOWN" and k not in completed
+                    and orders[k[0]]["lot_id"] == lot_id for k, f in original_fills.items())
+                if flags[lot_id] != (opening, closing) or pending != before.fee_quality.fee_unknown_fill_count:
+                    raise LotStorageError("integrity_error")
+                after = complete_fee(before, completion)
+                completed.add(target)
             else:
                 order = orders.get(key)
                 if order is None or order["done"]:
@@ -205,17 +278,24 @@ class LotFillJournal:
                 validated, contract, lot_id = order["validated"], order["contract"], order["lot_id"]
                 before = states.get(lot_id)
                 if kind == "fill":
-                    ipc.exact(p, ("kind", "scope", "source_id", "inst_id", "order_id", "trade_id", "fill_seq", "quantity", "price", "fee_paid", "fee_currency"))
-                    fill = SyntheticFill(scope, p["source_id"], p["inst_id"], p["order_id"], p["trade_id"],
+                    ipc.exact(p, ("kind", "scope", "source_id", "inst_id", "order_id", "trade_id", "fill_seq", "quantity", "price", "fee_paid", "fee_currency", *(("fee_state",) if self.v2 else ())))
+                    fee = dict(fee_paid=None if self.v2 and p["fee_paid"] is None else ipc.decimal_text(p["fee_paid"], "fee_paid"), fee_currency=p["fee_currency"])
+                    if self.v2:
+                        fee["fee_state"] = p["fee_state"]
+                    fill = (SyntheticFillV2 if self.v2 else SyntheticFill)(scope, p["source_id"], p["inst_id"], p["order_id"], p["trade_id"],
                                          p["fill_seq"], ipc_lots._parse_decimal(p["quantity"], "quantity", derived=True, positive=True),
                                          ipc.decimal_text(p["price"], "price", positive=True),
-                                         ipc.decimal_text(p["fee_paid"], "fee_paid"), p["fee_currency"])
+                                         **fee)
+                    if self.v2 and (p["quantity"] != _number(fill.quantity) or p["price"] != _number(fill.price)
+                            or (fill.fee_paid is not None and p["fee_paid"] != _number(fill.fee_paid))):
+                        raise LotStorageError("invalid_event")
                     if fill.fill_seq != order["count"] + 1 or fill.trade_id in order["trades"]:
                         raise LotStorageError("fill_sequence_conflict")
                     total = exact_quantity(order["total"], fill.quantity)
                     if total > validated.resolved_quantity:
                         raise LotStorageError("over_fill")
-                    after = apply_fill(before, validated, contract, fill)
+                    after = (apply_fill_v2 if self.v2 else apply_fill)(before, validated, contract, fill)
+                    original_fills[(key, fill.trade_id)] = fill
                     opening = isinstance(validated.intent, lots.OpenLot)
                     closing = not opening
                     order.update(total=total, count=fill.fill_seq)
@@ -225,6 +305,8 @@ class LotFillJournal:
                     ipc.token(p["terminal_id"], "terminal_id")
                     ipc.integer(p["final_fill_seq"], "final_fill_seq")
                     total = ipc_lots._parse_decimal(p["final_filled_qty"], "final_filled_qty", derived=True)
+                    if self.v2 and p["final_filled_qty"] != _number(total):
+                        raise LotStorageError("invalid_event")
                     if (p["final_fill_seq"] != order["count"] or total != order["total"]
                             or p["status"] not in ("FILLED", "CANCELED", "REJECTED")
                             or (p["status"] == "FILLED" and total != validated.resolved_quantity)
@@ -238,6 +320,7 @@ class LotFillJournal:
                     raise LotStorageError("invalid_event")
             if after is not None:
                 states[lot_id] = after
+                flags[lot_id] = (opening, closing)
             results.append((order, after, opening, closing, origins[lot_id]))
         return orders, states, results
 
@@ -250,6 +333,10 @@ class LotFillJournal:
                            resolved_quantity=_number(order["validated"].resolved_quantity))
         elif p["kind"] == "fill":
             columns.update({n: p[n] for n in ("trade_id", "fill_seq", "quantity", "price", "fee_paid", "fee_currency")})
+            if self.v2:
+                columns["fee_state"] = p["fee_state"]
+        elif p["kind"] == "fee_completion":
+            columns.update({n: p[n] for n in ("trade_id", "fee_paid", "fee_currency")})
         else:
             columns.update({n: p[n] for n in ("terminal_id", "status", "final_fill_seq", "final_filled_qty")})
         return columns
@@ -258,7 +345,9 @@ class LotFillJournal:
         try:
             if not self.db.in_transaction:
                 raise LotStorageError("storage_unavailable")
-            for name, sql in zip(TABLES, SCHEMA):
+            if self.v2:
+                self.j.lots._recover_in_transaction()
+            for name, sql in zip(self.tables, self.schema):
                 row = self.db.execute("SELECT type,sql FROM sqlite_master WHERE name=?", (name,)).fetchone()
                 if row is None or row["type"] != "table" or "".join(row["sql"].split()) != "".join(sql.split()):
                     raise ValueError("schema")
@@ -298,8 +387,9 @@ class LotFillJournal:
                     raise ValueError("duplicate version")
                 referenced.add(reference)
             managed = {o["lot_id"] for o in orders.values()}
-            for row in self.db.execute("SELECT lot_id,revision,write_id FROM lot_revisions"):
-                if row["lot_id"] in managed or row["write_id"].startswith("s3_"):
+            for row in self.db.execute("SELECT * FROM lot_revisions"):
+                if (row["lot_id"] in managed or row["write_id"].startswith(("s3_", "s9_") if self.v2 else "s3_")
+                        or (self.v2 and row["fee_coverage"] == "MANAGED")):
                     if (row["lot_id"], row["revision"]) not in referenced:
                         raise ValueError("orphan version")
             return rows, payloads, orders, states
@@ -312,14 +402,16 @@ class LotFillJournal:
         return "s3_" + _hash(_json(dict(seq=seq, fingerprint=fingerprint)))[:61]
 
     def _append(self, p):
+        if self.v2:
+            p = dict(p, event_version=2)
         text = _json(p)
         fingerprint = _hash(text)
         key = self._identity(p)
-        table = dict(bind=TABLES[0], fill=TABLES[1], terminal=TABLES[2])[p["kind"]]
+        table = dict(zip(self.kinds, self.tables))[p["kind"]]
         with self.j.lots._access():
             rows, payloads, orders, states = self._recover_in_transaction()
             query, args = f"SELECT * FROM {table} WHERE order_key=?", [key]
-            if p["kind"] == "fill":
+            if p["kind"] in ("fill", "fee_completion"):
                 query += " AND trade_id=?"
                 args.append(p["trade_id"])
             old = self.db.execute(query, args).fetchone()
@@ -353,8 +445,19 @@ class LotFillJournal:
         with self.j.lots._access():
             self.j.lots._recover_in_transaction()
             rows, _, orders, _ = self._recover_in_transaction()
-            return RecoveryReport(True, len(orders), sum(k == "fill" for _, k, _ in rows),
-                                  sum(k == "terminal" for _, k, _ in rows))
+            counts = (True, len(orders), sum(k == "fill" for _, k, _ in rows), sum(k == "terminal" for _, k, _ in rows))
+            return RecoveryReportV2(*counts, sum(k == "fee_completion" for _, k, _ in rows)) if self.v2 else RecoveryReport(*counts)
+
+    def get_fee_completion(self, *, scope, source_id, inst_id, order_id, trade_id):
+        if not self.v2:
+            raise LotStorageError("unsupported_fee_version")
+        self.j.lots._scope(scope)
+        ipc.token(trade_id, "trade_id")
+        key = _key(scope, source_id, inst_id, order_id)
+        with self.j.lots._access():
+            self._recover_in_transaction()
+            row = self.db.execute("SELECT * FROM lot_fee_completions WHERE order_key=? AND trade_id=?", (key, trade_id)).fetchone()
+            return None if row is None else self._receipt(row)
 
     def get_order(self, *, scope, source_id, inst_id, order_id):
         self.j.lots._scope(scope)

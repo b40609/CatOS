@@ -130,11 +130,19 @@ _RISK_SCHEMA = (
 
 class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
-    def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False):
+    def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False, *, lot_schema_version=7):
         from catos.execution import ExecutionJournal, SCHEMA as EXECUTION_SCHEMA
         from catos.protection import ProtectionJournal
         from catos.lot_journal import LotJournal, install_schema as install_lot_schema
         from catos.lot_fills import LotFillJournal, install_schema as install_fill_schema
+        from catos.lot_journal import LotStorageError
+        if type(lot_schema_version) is not int or lot_schema_version not in (7, 8):
+            raise LotStorageError("schema_version_mismatch")
+        if lot_schema_version == 8:
+            if risk_limits is not None or execution_enabled is not False:
+                raise LotStorageError("unsupported_fee_version")
+            from catos.lot_schema8 import (LotJournalV2 as LotJournal,
+                LotFillJournalV2 as LotFillJournal, install_lot_schema, install_fill_schema)
         if sqlite3.sqlite_version_info < (3, 37, 0):
             raise JournalError("SQLite 3.37+ required for Lot STRICT tables")
         if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
@@ -154,10 +162,13 @@ class Journal:
         self.connection.row_factory = sqlite3.Row
         try:
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
+            if ((lot_schema_version == 8 and version not in (0, 8))
+                    or (lot_schema_version == 7 and version == 8)):
+                raise LotStorageError("schema_version_mismatch")
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version not in (1, 2, 3, 4, 5, 6, SCHEMA_VERSION):
+            elif version not in (1, 2, 3, 4, 5, 6, lot_schema_version):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -193,7 +204,7 @@ class Journal:
                     install_lot_schema(self.connection)
                 if version < 7:
                     install_fill_schema(self.connection)
-                self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                self.connection.execute(f"PRAGMA user_version={lot_schema_version}")
                 self.lots = LotJournal(self)
                 self.lots._recover_in_transaction()
                 self.lot_fills = LotFillJournal(self)
@@ -310,11 +321,23 @@ class Journal:
                     raise LotStorageError("storage_unavailable") from exc
 
     def capture_lot_snapshot(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
+        if self.lots.v2:
+            from catos.lot_journal import LotStorageError
+            raise LotStorageError("unsupported_fee_version")
         from catos.lot_snapshot import validate_request, _materialize
         validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
         with self._lot_read_snapshot():
             capture = _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms)
         return capture
+
+    def capture_lot_snapshot_v2(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
+        from catos.lot_journal import LotStorageError
+        from catos.lot_snapshot import validate_request, _materialize
+        if not self.lots.v2:
+            raise LotStorageError("unsupported_fee_version")
+        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
+        with self._lot_read_snapshot():
+            return _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms, v2=True)
 
     def _bot(self, bot_id):
         row = self.connection.execute("SELECT * FROM bots WHERE bot_id=?", (bot_id,)).fetchone()

@@ -39,6 +39,27 @@ class SyntheticScenarioObservation:
     report: exposure.ExposureReport
 
 
+@dataclass(frozen=True, slots=True)
+class LotFeeObservation:
+    lot_id: str
+    bot_id: str
+    revision: int
+    coverage: str
+    known_fee_subtotal: Decimal | None
+    fee_unknown_fill_count: int | None
+    fee_complete: bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticScenarioObservationV2:
+    evidence_kind: Literal["SYNTHETIC_SCENARIO"]
+    scenario_cut_id: str
+    source_capture_id: str
+    report: exposure.ExposureReport
+    fee_quality: tuple[LotFeeObservation, ...]
+    observation_version: int = 2
+
+
 def _reject(code):
     raise ScenarioInputError(code)
 
@@ -59,17 +80,17 @@ def _sequence(values, limit, key):
         _reject("invalid_capture")
 
 
-def _lot_view(capture, cut):
+def _lot_view(capture, cut, *, v2=False):
     bots = tuple(w.bot_id for w in capture.bot_watermarks)
-    return exposure.LotInventory(
+    return (exposure.LotInventoryV2 if v2 else exposure.LotInventory)(
         capture.scope, capture.contract.inst_id, cut, capture.observed_at_ms,
         capture.valid_until_ms, True, bots, bots, capture.lots)
 
 
-def _validate_capture(capture):
+def _validate_capture(capture, *, v2=False):
     # Hashes prove content identity, not provenance or semantic consistency.
     try:
-        if not isinstance(capture, snapshot.LocalLotCapture) or capture.source != "synthetic_ledger":
+        if type(capture) is not (snapshot.LocalLotCaptureV2 if v2 else snapshot.LocalLotCapture) or capture.source != "synthetic_ledger":
             _reject("invalid_capture")
         exposure._scope(capture.scope)
         lots._validate_contract(capture.contract)
@@ -88,7 +109,7 @@ def _validate_capture(capture):
             ipc.token(watermark.bot_id, "bot_id")
             exposure._integer(watermark.last_commit_seq)
             watermarks[watermark.bot_id] = watermark.last_commit_seq
-        entries = exposure._inventory(_lot_view(capture, "validation"), capture.contract)
+        entries = exposure._inventory(_lot_view(capture, "validation", v2=v2), capture.contract, v2=v2)
         for item in entries.values():
             if item.commit_seq > watermarks[item.lot.bot_id]:
                 _reject("invalid_capture")
@@ -210,8 +231,18 @@ def observe_synthetic_scenario(*, capture: snapshot.LocalLotCapture,
                                scenario: SyntheticScenarioEvidence,
                                now_ms: int) -> SyntheticScenarioObservation:
     """Observe only the explicitly attested simulation, preserving source times."""
+    return _observe_scenario(capture, scenario, now_ms, v2=False)
+
+
+def observe_synthetic_scenario_v2(*, capture: snapshot.LocalLotCaptureV2,
+                                  scenario: SyntheticScenarioEvidence,
+                                  now_ms: int) -> SyntheticScenarioObservationV2:
+    return _observe_scenario(capture, scenario, now_ms, v2=True)
+
+
+def _observe_scenario(capture, scenario, now_ms, *, v2):
     with localcontext(exposure._CONTEXT):
-        _validate_capture(capture)
+        _validate_capture(capture, v2=v2)
         _validate_scenario(capture, scenario, now_ms)
         cut = scenario.scenario_cut_id
         pending = exposure.PendingInventory(
@@ -225,7 +256,12 @@ def observe_synthetic_scenario(*, capture: snapshot.LocalLotCapture,
         mark = None if scenario.mark is None else exposure.MarkObservation(
             scenario.scope, scenario.contract.inst_id, scenario.mark_quote_id, scenario.mark_observed_at_ms,
             scenario.mark_valid_until_ms, scenario.mark)
-        report = exposure.observe_exposure(exposure.ExposureRequest(
-            capture.scope, capture.contract, now_ms, _lot_view(capture, cut), physical, mark, pending,
+        report = (exposure.observe_exposure_v2 if v2 else exposure.observe_exposure)((exposure.ExposureRequestV2 if v2 else exposure.ExposureRequest)(
+            capture.scope, capture.contract, now_ms, _lot_view(capture, cut, v2=v2), physical, mark, pending,
             evidence_kind="SYNTHETIC_SCENARIO"))
+        if v2:
+            quality = tuple(LotFeeObservation(s.lot.lot_id, s.lot.bot_id, s.lot.revision,
+                s.lot.fee_quality.coverage, s.lot.fee_quality.known_fee_subtotal,
+                s.lot.fee_quality.fee_unknown_fill_count, s.lot.fee_quality.fee_complete) for s in capture.lots)
+            return SyntheticScenarioObservationV2("SYNTHETIC_SCENARIO", cut, capture.capture_id, report, quality)
         return SyntheticScenarioObservation("SYNTHETIC_SCENARIO", cut, capture.capture_id, report)
