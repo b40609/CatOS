@@ -1,5 +1,7 @@
 # CatOS 目前接續入口
 
+Git 收斂（2026-09-24）：Sol 已重跑受影響測試模組與 changed/new Python compile，全部通過；將既有 Astra 未提交的 Q1／reconciliation／Demo bootstrap／trade authorization、S10、統一 shell／Yaozi 整合與 sanitized evidence 收斂為 checkpoint `8df0cbe`（`feat(v1): checkpoint validated Astra integration work`）。提交後工作樹乾淨；本機 visual QA/runtime/stage patch 產物保留在磁碟並以 `.git/info/exclude` 排除，不刪除、不納入 repository。尚未 push。
+
 最新接續（2026-09-24）：使用者已核准 D1-Q1，`quiescent interval exact-equivalence E₀` 已完成 local implementation／synthetic verification。`risk.BaselineEvidence` 現同時接受既有 synthetic midnight 與 `demo_quiescent_midnight_equivalence_v1`；Q1 evidence 綁 expected UID、Taipei day start/cutoff、report/balance/collection/zero-event digests。`orders_history` window provenance 已補為 `cTime + after_order_id`，fills/bills 維持 `ts + after_bill_id`。Q1 builder 只在完整 formal collection、single-USDT、零 position/order/algo/fill/bill、完整 window/page chain 與 F1/S1 成立時產生 basis，並在 D3 provider 前由既有 Supervisor→Journal 單 writer 提交；任何缺口均不寫入。production DB/binding 仍未建立，`bootstrap_ready=false`、`reconciled=false`、`trade_authorized=false`。
 
 所屬工作目錄：`C:/Users/user/Desktop/CatOS_Astra`；負責交易核心、風控、帳務與最終單一 localhost 網站整合。本入口只代表 Astra 工作樹；`CatOS_Yaozi` 的情報來源進度以該目錄的 `docs/current-handoff.md` 為準。接續 Astra 時不修改 Yaozi 來源目錄。
