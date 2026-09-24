@@ -54,9 +54,11 @@ DB 初始化成功後，operation 依同一 expected UID digest 建立既有 imm
 
 ## 真正 bootstrap 前仍需具體化
 
-DB/binding 目的地與 expected UID digest provenance contract 已固定；真正 Bot/config、fixture_budget/risk limits 值仍未提供。指定 Demo 的 expected UID digest／dedicated subaccount／`net_mode` 已由 production read-only 證據核對；清理後 24h accounting 當下 responsibility 為空、fills=0、bills=7，其中 6 筆非 USDT transfer 仍使現行 accounting contract `unknown=6`、forbidden=0。D1-Q1 已完成程式與 synthetic verification，但既有 production collection 有 bill 且缺新 `orders_history` window provenance，不能倒補成 Q1 E₀；因此實際 `bootstrap_ready` 仍不能成立。本文件不代填 bootstrap inputs、不建立實際 instance，也不核准「全新 DB 即可信起點」。
+2026-09-24 使用者已核准依 Sol 建議鎖定 production bootstrap inputs；單一機器可讀來源為 `catos/demo_production_inputs.py`，決策與 public instrument snapshot 見 [production bootstrap inputs](demo-production-bootstrap-inputs-20260924.md)。固定 Bot 為 `sma-trend-btc-usdt-swap-v1`，既有 SMA v1 使用 15m／warmup 2；BTC-USDT-SWAP contract 依當日 OKX public metadata 固定 `base_per_contract=0.01`、`tick_size=0.1`、`lot_size=min_size=0.01`；`fixture_budget=100` 僅為 risk mode 下的 legacy metadata identity；risk limits 沿用 3.0x／50%／10%／20%。bootstrap 前仍須重新核對最新 public instrument metadata，漂移即 fail closed。
 
-bootstrap operation 程式路徑已完成，且沿用現有 Supervisor writer；實際 production 呼叫仍被 planning contract 阻擋。現有 40 GET manifest 不能滿足 Q1：有 7 筆 bill，且舊採集沒有 Q1 新增的 `orders_history` window provenance。真實 Bot/config、fixture_budget/risk limits 等 bootstrap inputs 亦仍未提供。本輪不代填資料、不建立 production instance。preflight／planning／synthetic operation／Q1 local PASS 均不能當作 production E₀、formal reconciliation 或交易授權證據。
+指定 Demo 的 expected UID digest／dedicated subaccount／`net_mode` 已由 production read-only 證據核對；清理後 24h accounting 當下 responsibility 為空、fills=0、bills=7，其中 6 筆非 USDT transfer 仍使現行 accounting contract `unknown=6`、forbidden=0。D1-Q1 已完成程式與 synthetic verification，但既有 production collection 有 bill，不能建立 Q1 E₀；因此實際 `bootstrap_ready` 仍不能成立。production ledger/binding 仍未建立。
+
+bootstrap operation 程式路徑已完成，且沿用現有 Supervisor writer；實際 production 呼叫仍被 historical responsibility/Q1 planning contract 阻擋。preflight／planning／synthetic operation／Q1 local PASS 均不能當作 production E₀、formal reconciliation 或交易授權證據。
 
 2026-09-24 真實唯讀 evidence 已把「完整 accounting 尚未採集」更新為完整 40 GET manifest。`details[].liab` N/A sentinel 修補已由後續 production 40 GET 實證 record diagnostic=0。接著依使用者明確 Demo write 授權，以新建 fixed-host/fixed-endpoint operator maintenance tool 呼叫 Demo-only `POST /api/v5/account/demo-adjust-balance` 的 `reduce`，在重驗 expected UID／dedicated subaccount／net_mode／空 positions/orders/algo 與各資產完全可用、無 liability/frozen 後，只清除 BTC／ETH／OKB，USDT 不調整；post-verify 成功。再跑 40 GET 後 `unsupported_collateral` 消失，balance 已符合 acctLv=2 單一 USDT contract。
 
