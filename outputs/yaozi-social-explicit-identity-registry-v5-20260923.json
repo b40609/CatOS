@@ -1,0 +1,391 @@
+{
+  "contract": "catos-social-explicit-identity-registry-v5",
+  "observed_at_ms": 1790125348965,
+  "mapping_contract": "catos-coinpaprika-identity-list-v1",
+  "auto_map_from_unique_ticker": false,
+  "registry": [
+    {
+      "symbol": "AAVE-USDT-SWAP",
+      "coinpaprika_id": "aave-new",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9"
+      }
+    },
+    {
+      "symbol": "BTC-USDT-SWAP",
+      "coinpaprika_id": "btc-bitcoin",
+      "identity_evidence": {
+        "kind": "existing_explicit_mapping_verified_20260921"
+      }
+    },
+    {
+      "symbol": "ETH-USDT-SWAP",
+      "coinpaprika_id": "eth-ethereum",
+      "identity_evidence": {
+        "kind": "existing_explicit_mapping_verified_20260921"
+      }
+    },
+    {
+      "symbol": "LDO-USDT-SWAP",
+      "coinpaprika_id": "ldo-lido-dao",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x5a98fcbea516cf06857215779fd812ca3bef1b32"
+      }
+    },
+    {
+      "symbol": "ENA-USDT-SWAP",
+      "coinpaprika_id": "ena-ethena",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x57e114b691db790c35207b2e685d4a43181e6061"
+      }
+    },
+    {
+      "symbol": "MORPHO-USDT-SWAP",
+      "coinpaprika_id": "morpho-morpho",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x58d97b57bb95320f9a05dc918aef65434969c2b2"
+      }
+    },
+    {
+      "symbol": "ONDO-USDT-SWAP",
+      "coinpaprika_id": "ondo-ondo",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xfaba6f8e4a5e8ab82f62fe7c39859fa577269be3"
+      }
+    },
+    {
+      "symbol": "ETHFI-USDT-SWAP",
+      "coinpaprika_id": "ethfi-etherfi",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xfe0c30065b384f05761f15d0cc899d4f9f9cc0eb",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/ethfi-etherfi",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://www.okx.com/help/okx-to-list-ether-fi-ethfi-for-spot-trading",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "ETHFI-USDT-SWAP",
+          "binance": "ETHFIUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "LINK-USDT-SWAP",
+      "coinpaprika_id": "link-chainlink",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x514910771af9ca656af840dff83e8264ecf986ca",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/link-chainlink",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x514910771af9ca656af840dff83e8264ecf986ca",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "LINK-USDT-SWAP",
+          "binance": "LINKUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "PAXG-USDT-SWAP",
+      "coinpaprika_id": "paxg-pax-gold",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x45804880de22913dafe09f4980848ece6ecbaf78",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/paxg-pax-gold",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://www.okx.com/en-us/help/okx-to-list-paxg-pax-gold-for-spot-trading",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": null,
+          "binance": "PAXGUSDT",
+          "active_venues": [
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "PENDLE-USDT-SWAP",
+      "coinpaprika_id": "pendle-pendle",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x808507121b80c02388fad14726482e061b8da827",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/pendle-pendle",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://www.okx.com/help/okx-to-list-pendle-pendle-for-spot-trading",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "PENDLE-USDT-SWAP",
+          "binance": "PENDLEUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "QNT-USDT-SWAP",
+      "coinpaprika_id": "qnt-quant",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x4a220e6096b25eadb88358cb44068a3248254675",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/qnt-quant",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x4a220e6096b25eadb88358cb44068a3248254675",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "QNT-USDT-SWAP",
+          "binance": "QNTUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "AERO-USDT-SWAP",
+      "coinpaprika_id": "aero-aerodrome-finance",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "base-base",
+        "contract": "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/aero-aerodrome-finance",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://web3.okx.com/token/base/0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "AERO-USDT-SWAP",
+          "binance": "AEROUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "CAKE-USDT-SWAP",
+      "coinpaprika_id": "cake-pancakeswap",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "bnb-bnb",
+        "contract": "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/cake-pancakeswap",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://web3.okx.com/token/bsc/0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": null,
+          "binance": "CAKEUSDT",
+          "active_venues": [
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "CRV-USDT-SWAP",
+      "coinpaprika_id": "crv-curve-dao-token",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xd533a949740bb3306d119cc777fa900ba034cd52",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/crv-curve-dao-token",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://www.okx.com/en-gb/how-to-buy/crv/1/0xd533a949740bb3306d119cc777fa900ba034cd52",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "CRV-USDT-SWAP",
+          "binance": "CRVUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "GRT-USDT-SWAP",
+      "coinpaprika_id": "grt-the-graph",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xc944e90c64b2c07662a292be6244bdf05cda44a7",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/grt-the-graph",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0xc944e90c64b2c07662a292be6244bdf05cda44a7",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "GRT-USDT-SWAP",
+          "binance": "GRTUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "VIRTUAL-USDT-SWAP",
+      "coinpaprika_id": "virtual-virtual-protocol",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "base-base",
+        "contract": "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b",
+        "coinpaprika_detail": "https://api.coinpaprika.com/v1/coins/virtual-virtual-protocol",
+        "coinpaprika_contract_match": true,
+        "okx_identity_page": "https://www.okx.com/en-us/help/okx-to-list-virtuals-protocol-virtual-for-spot-trading",
+        "okx_contract_match": true,
+        "current_universe": {
+          "okx": "VIRTUAL-USDT-SWAP",
+          "binance": "VIRTUALUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    }
+  ],
+  "verification": {
+    "public_universe_instrument_refs": 1124,
+    "public_universe_active_symbols": 734,
+    "coinpaprika_provider_rows": 61614,
+    "coinpaprika_active_provider_rows": 12911,
+    "pre_explicit_status": {
+      "AERO-USDT-SWAP": "unverified_identity:aero-aerodrome-finance",
+      "CAKE-USDT-SWAP": "unverified_identity:cake-pancakeswap",
+      "CRV-USDT-SWAP": "unverified_identity:crv-curve-dao-token",
+      "GRT-USDT-SWAP": "unverified_identity:grt-the-graph",
+      "VIRTUAL-USDT-SWAP": "unverified_identity:virtual-virtual-protocol"
+    },
+    "note": "CoinPaprika active provider rows changed materially on 2026-09-23; only the five requested identities were checked against the current list."
+  },
+  "coverage": {
+    "active_symbols": 734,
+    "resolved": 17,
+    "ambiguous_mapping": 249,
+    "unverified_identity": 301,
+    "missing_asset": 167,
+    "derivation": "v1.25 2026-09-22 baseline plus five verified unverified_identity-to-resolved transitions observed 2026-09-23; full 734-symbol live mapping was not rerun",
+    "not_current_full_live_distribution": true
+  },
+  "social_probes": [
+    {
+      "symbol": "AERO-USDT-SWAP",
+      "asset_id": "aero-aerodrome-finance",
+      "metric_count": 0,
+      "issues": [],
+      "metrics": [],
+      "materialized_to_project_db": false
+    },
+    {
+      "symbol": "CAKE-USDT-SWAP",
+      "asset_id": "cake-pancakeswap",
+      "metric_count": 1,
+      "issues": [],
+      "metrics": [
+        {
+          "metric_kind": "twitter_followers",
+          "metric_value": 1673732,
+          "source_url": "https://twitter.com/pancakeswap"
+        }
+      ],
+      "materialized_to_project_db": false
+    },
+    {
+      "symbol": "CRV-USDT-SWAP",
+      "asset_id": "crv-curve-dao-token",
+      "metric_count": 2,
+      "issues": [],
+      "metrics": [
+        {
+          "metric_kind": "telegram_members",
+          "metric_value": 15030,
+          "source_url": "https://t.me/curvefi"
+        },
+        {
+          "metric_kind": "twitter_followers",
+          "metric_value": 334369,
+          "source_url": "https://twitter.com/curvefinance"
+        }
+      ],
+      "materialized_to_project_db": false
+    },
+    {
+      "symbol": "GRT-USDT-SWAP",
+      "asset_id": "grt-the-graph",
+      "metric_count": 3,
+      "issues": [],
+      "metrics": [
+        {
+          "metric_kind": "reddit_subscribers",
+          "metric_value": 23080,
+          "source_url": "https://reddit.com/r/thegraph"
+        },
+        {
+          "metric_kind": "telegram_members",
+          "metric_value": 20361,
+          "source_url": "https://t.me/GraphProtocol"
+        },
+        {
+          "metric_kind": "twitter_followers",
+          "metric_value": 292627,
+          "source_url": "https://twitter.com/graphprotocol"
+        }
+      ],
+      "materialized_to_project_db": false
+    },
+    {
+      "symbol": "VIRTUAL-USDT-SWAP",
+      "asset_id": "virtual-virtual-protocol",
+      "metric_count": 0,
+      "issues": [],
+      "metrics": [],
+      "materialized_to_project_db": false
+    }
+  ],
+  "boundaries": [
+    "registry_entries_require_explicit_identity_evidence",
+    "unique_ticker_candidate_is_not_identity_proof",
+    "catos_symbol_must_exist_in_current_public_perpetual_universe",
+    "provider_reported_counts_are_not_heat_or_rank",
+    "no_project_db_write_or_schema_change",
+    "no_social_heat_or_yaozi_heat_inference"
+  ]
+}

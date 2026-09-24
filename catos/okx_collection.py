@@ -15,6 +15,9 @@ from catos import bounded_pagination as pagination
 
 
 COLLECTOR_VERSION = "i-b-1.v1"
+SNAPSHOT_SEMANTICS_CONTRACT = "s1-bounded-sequential.v1"
+WINDOW_COVERAGE_CONTRACT = "w1-exact-window-pagination.v1"
+WINDOWED_EVENT_ENDPOINTS = frozenset(("orders_history", "fills", "fills_history", "bills", "bills_archive"))
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,7 @@ def _endpoint(alias: str, path: str) -> EndpointSpec:
 
 
 ENDPOINTS = MappingProxyType({
+    "account_subtypes": _endpoint("account_subtypes", "/api/v5/account/subtypes"),
     "account_config": _endpoint("account_config", "/api/v5/account/config"),
     "account_instruments": _endpoint("account_instruments", "/api/v5/account/instruments"),
     "balance": _endpoint("balance", "/api/v5/account/balance"),
@@ -151,12 +155,32 @@ class PageRequest:
 
 
 @dataclass(frozen=True)
+class WindowRequestEvidence:
+    begin_ms: int
+    end_ms: int
+    event_time_field: str = "ts"
+    cursor_semantics: str = "after_bill_id"
+
+    def __post_init__(self) -> None:
+        begin = _timestamp_ms(self.begin_ms, "window evidence begin_ms")
+        end = _timestamp_ms(self.end_ms, "window evidence end_ms")
+        if begin >= end:
+            raise ValueError("window evidence must have begin < end")
+        if (self.event_time_field, self.cursor_semantics) not in {
+                ("ts", "after_bill_id"),
+                ("cTime", "after_order_id"),
+        }:
+            raise ValueError("unsupported window evidence semantics")
+
+
+@dataclass(frozen=True)
 class PageResponse:
     account_alias: str
     environment: str
     source_ms: int
     payload: dict[str, Any]
     next_cursor: str | None = None
+    window_evidence: WindowRequestEvidence | None = None
 
     def __post_init__(self) -> None:
         _nonempty_text(self.account_alias, "account_alias")
@@ -166,6 +190,8 @@ class PageResponse:
             raise ValueError("payload must be a JSON object")
         if self.next_cursor is not None and (not isinstance(self.next_cursor, str) or not self.next_cursor):
             raise ValueError("next cursor must be non-empty text when present")
+        if self.window_evidence is not None and not isinstance(self.window_evidence, WindowRequestEvidence):
+            raise ValueError("invalid window request evidence")
 
 
 class PageTransport(Protocol):
@@ -220,6 +246,7 @@ class EndpointManifest:
     complete: bool
     issue: str
     pages: tuple[pagination.Evidence, ...]
+    window_evidence: WindowRequestEvidence | None = None
 
 
 @dataclass(frozen=True)
@@ -280,6 +307,7 @@ def collect_plan(
 
     for alias in plan.endpoint_aliases:
         spec = ENDPOINTS[alias]
+        accepted_window_evidence: list[WindowRequestEvidence | None] = []
         remaining_ms = plan.scope.max_runtime_ms - (active_clock.monotonic_ms() - run_started_mono)
         if not stop_issue:
             if requests >= plan.scope.max_requests:
@@ -310,6 +338,7 @@ def collect_plan(
                 raise pagination.FetchError('api_error')
             if not isinstance(response.payload.get('data'), list):
                 raise pagination.FetchError('malformed_response')
+            accepted_window_evidence.append(response.window_evidence)
             page_number += 1
             return pagination.Page(response.payload, response.source_ms, response.next_cursor)
 
@@ -322,9 +351,15 @@ def collect_plan(
         requests += result.requests
         collected.extend(CollectedPage(alias, evidence.page_number, payload, evidence.request_cursor)
                          for payload, evidence in zip(result.payloads_json, result.evidence))
+        window_evidence = None
+        if (alias in WINDOWED_EVENT_ENDPOINTS and result.evidence
+                and len(accepted_window_evidence) == len(result.evidence)
+                and accepted_window_evidence[0] is not None
+                and all(item == accepted_window_evidence[0] for item in accepted_window_evidence)):
+            window_evidence = accepted_window_evidence[0]
         manifests.append(EndpointManifest(alias, spec.path, spec.source_time_semantics,
             endpoint_started, active_clock.wall_ms(), result.requests, result.complete,
-            result.issue, result.evidence))
+            result.issue, result.evidence, window_evidence))
         if result.issue in ('scope_mismatch', 'rate_limited', 'interrupted'):
             stop_issue = result.issue
         elif alias in stop_on_incomplete and not result.complete:

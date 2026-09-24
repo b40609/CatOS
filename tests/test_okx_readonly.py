@@ -2,6 +2,9 @@
 from dataclasses import replace
 from decimal import Decimal as D, localcontext
 import unittest
+import hashlib
+import json
+from pathlib import Path
 
 from catos import okx_readonly as o
 
@@ -106,10 +109,120 @@ class ReadonlyTests(unittest.TestCase):
         self.assertEqual(o.external_flows([a, a, b, c], whitelist), (D(80), {"3"}))
         self.assertEqual(o.external_flows([a], {}), (D(0), {"1"}))
 
+        versioned = o.FlowClassification("synthetic-flow-map", (
+            o.FlowClassificationEntry("fixture", "deposit", "external", "synthetic evidence"),
+            o.FlowClassificationEntry("fixture", "withdraw", "external", "synthetic evidence"),
+        ))
+        self.assertEqual(o.flow_classification_id(versioned), versioned.classification_id)
+        self.assertTrue(versioned.classification_id.startswith("synthetic-flow-map:"))
+        self.assertEqual(o.external_flows([a, b, c], versioned), (D(80), {"3"}))
+        self.assertEqual(dict(versioned.mapping()), whitelist)
+
+    def test_static_okx_transfer_mapping_is_partial_and_explicit(self):
+        mapping = dict(o.OKX_STATIC_TRANSFER_FLOW_CLASSIFICATION.mapping())
+        self.assertEqual(mapping, {("1", "11"): "external", ("1", "12"): "external"})
+        self.assertFalse(o.OKX_STATIC_TRANSFER_FLOW_CLASSIFICATION.complete)
+        self.assertTrue(o.OKX_STATIC_TRANSFER_FLOW_CLASSIFICATION.classification_id.startswith(
+            "okx-v5-static-transfer-2026-09-21:"))
+        unknown = dict(billId="1", type="1", subType="999", ccy="USDT", balChg="1")
+        self.assertEqual(
+            o.external_flows([unknown], o.OKX_STATIC_TRANSFER_FLOW_CLASSIFICATION),
+            (D(0), {"1"}),
+        )
+
+    def test_demo_catalog_mapping_preserves_ambiguous_and_disabled_unknowns(self):
+        classification = o.OKX_DEMO_CATALOG_FLOW_CLASSIFICATION
+        catalog = json.loads((Path(__file__).resolve().parents[1] /
+            "docs/evidence/okx-demo-subtypes-20260922.json").read_text(encoding="utf-8"))
+        digest = hashlib.sha256(json.dumps(catalog, sort_keys=True,
+            separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+        self.assertEqual(digest, "84373423204fe2ccf65955ba096e11687e96879caf436d00efcf5af030506e4c")
+        labels = {(row["type"], sub["subType"]): row["typeDesc"] + " / " + sub["subTypeDesc"]
+                  for row in catalog for sub in row["subTypeDetails"]}
+        self.assertEqual(len(labels), 185)
+        self.assertFalse(classification.complete)
+        self.assertEqual(len(classification.entries), 166)
+        for pair in (("1", "292"), ("1", "290"), ("22", "259"), ("37", "421")):
+            bill = dict(billId="unknown", type=pair[0], subType=pair[1],
+                        ccy="USDT", balChg="1")
+            self.assertEqual(o.external_flows([bill], classification), (D(0), {"unknown"}))
+        for entry in classification.entries:
+            self.assertIn("84373423204fe2cc", entry.evidence)
+            self.assertIn(labels[(entry.bill_type, entry.sub_type)], entry.evidence)
+        self.assertEqual(classification.mapping()[("8", "173")], "internal")
+        self.assertEqual(classification.mapping()[("5", "104")], "internal")
+        self.assertEqual(classification.mapping()[("27", "318")], "internal")
+        self.assertEqual(classification.mapping()[("1", "288")], "external")
+        self.assertEqual(classification.mapping()[("7", "295")], "internal")
+        self.assertEqual(classification.mapping()[("12", "200")], "forbidden")
+        self.assertEqual(classification.mapping()[("13", "131")], "internal")
+        self.assertEqual(classification.mapping()[("4", "114")], "internal")
+        self.assertEqual(classification.mapping()[("16", "306")], "internal")
+        self.assertEqual(classification.mapping()[("29", "224")], "internal")
+        self.assertEqual(classification.mapping()[("1", "420")], "forbidden")
+        self.assertEqual(classification.mapping()[("6", "160")], "forbidden")
+        self.assertEqual(classification.mapping()[("15", "210")], "forbidden")
+        self.assertEqual(classification.mapping()[("4", "312")], "internal")
+        self.assertEqual(classification.mapping()[("4", "376")], "internal")
+        self.assertEqual(classification.mapping()[("4", "377")], "internal")
+        self.assertEqual(classification.mapping()[("5", "313")], "internal")
+        self.assertEqual(classification.mapping()[("5", "317")], "internal")
+        self.assertEqual(classification.mapping()[("6", "332")], "forbidden")
+        self.assertEqual(classification.mapping()[("6", "334")], "forbidden")
+        self.assertEqual(classification.mapping()[("33", "348")], "internal")
+        self.assertEqual(classification.mapping()[("33", "349")], "internal")
+        self.assertEqual(classification.mapping()[("33", "356")], "internal")
+        self.assertEqual(classification.mapping()[("33", "357")], "external")
+        self.assertEqual(classification.mapping()[("33", "358")], "external")
+        self.assertEqual(classification.mapping()[("33", "359")], "external")
+        self.assertEqual(classification.mapping()[("24", "274")], "internal")
+        self.assertEqual(classification.mapping()[("24", "275")], "internal")
+        self.assertEqual(classification.mapping()[("37", "422")], "internal")
+        self.assertEqual(classification.mapping()[("37", "427")], "internal")
+
+    def test_forbidden_flows_are_distinct_deduped_and_never_offset_external(self):
+        classification = o.FlowClassification("synthetic-policy", (
+            o.FlowClassificationEntry("fixture", "blocked", "forbidden", "synthetic evidence"),
+            o.FlowClassificationEntry("fixture", "capital", "external", "synthetic evidence"),
+        ), True)
+        for ccy in ("USDT", "BTC"):
+            for amount in ("0", "10", "-10"):
+                bill = dict(billId="blocked", type="fixture", subType="blocked", ccy=ccy, balChg=amount)
+                capital = bill | dict(billId="capital", subType="capital", ccy="USDT", balChg="20")
+                unknown = bill | dict(billId="unknown", subType="unmapped")
+                self.assertEqual(o.classify_bill_flows([bill, bill, capital, unknown], classification),
+                                 (D(20), {"unknown"}, {"blocked"}))
+                self.assertEqual(o.external_flows([bill], classification), (D(0), {"blocked"}))
+                with self.assertRaises(ValueError):
+                    o.classify_bill_flows([bill, bill | dict(balChg="999")], classification)
+        self.assertEqual(o.classify_bill_flows([], classification), (D(0), set(), set()))
+
     def test_bill_conflict_rejected(self):
         a = dict(billId="1", type="fixture", subType="deposit", ccy="USDT", balChg="100")
         with self.assertRaises(ValueError):
             o.external_flows([a, a | dict(balChg="200")], {})
+
+    def test_versioned_flow_classification_rejects_duplicate_keys(self):
+        entry = o.FlowClassificationEntry("1", "11", "external", "synthetic evidence")
+        with self.assertRaises(ValueError):
+            o.FlowClassification("duplicate", (entry, entry))
+
+    def test_flow_classification_id_binds_mapping_and_evidence(self):
+        base = o.FlowClassification("same-name", (
+            o.FlowClassificationEntry("1", "11", "external", "evidence-a"),
+        ))
+        changed_mapping = o.FlowClassification("same-name", (
+            o.FlowClassificationEntry("1", "11", "internal", "evidence-a"),
+        ))
+        changed_evidence = o.FlowClassification("same-name", (
+            o.FlowClassificationEntry("1", "11", "external", "evidence-b"),
+        ))
+        complete = o.FlowClassification("same-name", (
+            o.FlowClassificationEntry("1", "11", "external", "evidence-a"),
+        ), True)
+        self.assertNotEqual(base.classification_id, changed_mapping.classification_id)
+        self.assertNotEqual(base.classification_id, changed_evidence.classification_id)
+        self.assertNotEqual(base.classification_id, complete.classification_id)
 
 
 if __name__ == "__main__":

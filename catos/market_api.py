@@ -1,9 +1,10 @@
 """Read-only localhost API for materialized market-intelligence state.
 
-The API never recalculates scores or lifecycle transitions. It reads only the
-already-materialized market_intel.sqlite state. P1/P2 surfaces that do not yet
-have materialized backing tables are exposed as explicit unavailable responses
-instead of synthetic data.
+The API never recalculates persisted model scores or lifecycle transitions. It
+reads only the already-materialized market_intel.sqlite state. Read-only product
+surfaces may deterministically aggregate those facts while preserving missing
+and conflict semantics. P1/P2 surfaces that do not yet have materialized backing
+tables are exposed as explicit unavailable responses instead of synthetic data.
 """
 
 from __future__ import annotations
@@ -482,6 +483,86 @@ class MarketIntelReader:
             "signals": self.signals(limit),
             "proof": self.proof(limit),
         }
+
+    def decision_surface(self, limit=20):
+        """Aggregate materialized facts into the deterministic v0.2 decision surface."""
+        from catos.market_decision import build_decision_surface
+
+        limit = _limit(limit)
+        market_rows = self._rows(
+            """SELECT m.* FROM market_snapshot AS m
+               JOIN instrument AS i ON i.symbol=m.symbol AND i.active=1
+               WHERE m.observed_at_ms=(
+                   SELECT MAX(m2.observed_at_ms) FROM market_snapshot AS m2
+                   WHERE m2.symbol=m.symbol)
+               ORDER BY m.symbol ASC"""
+        )
+        derivative_rows = self._rows(
+            """SELECT d.* FROM derivative_snapshot AS d
+               JOIN instrument AS i ON i.symbol=d.symbol AND i.active=1
+               WHERE d.observed_at_ms=(
+                   SELECT MAX(d2.observed_at_ms) FROM derivative_snapshot AS d2
+                   WHERE d2.symbol=d.symbol)
+               ORDER BY d.symbol ASC"""
+        )
+        flow_rows = self._rows(
+            """SELECT f.* FROM flow_snapshot AS f
+               JOIN instrument AS i ON i.symbol=f.symbol AND i.active=1
+               WHERE f.observed_at_ms=(
+                   SELECT MAX(f2.observed_at_ms) FROM flow_snapshot AS f2
+                   WHERE f2.symbol=f.symbol)
+               ORDER BY f.symbol ASC"""
+        )
+        capital_flow_rows = [
+            self._decode(row, "evidence_json", "source_snapshot_ids_json")
+            for row in self._rows(
+                """SELECT e.* FROM capital_flow_event AS e
+                   JOIN instrument AS i ON i.symbol=e.symbol AND i.active=1
+                   WHERE e.event_type IN ('inflow','outflow')
+                     AND e.observed_at_ms=(
+                         SELECT MAX(e2.observed_at_ms) FROM capital_flow_event AS e2
+                         WHERE e2.symbol=e.symbol
+                           AND e2.event_type IN ('inflow','outflow'))
+                   ORDER BY e.symbol ASC,e.event_id ASC"""
+            )
+        ]
+        view_rows = [
+            self._decode(row, "evidence_json")
+            for row in self._rows(
+                """SELECT v.* FROM view_state AS v
+                   JOIN instrument AS i ON i.symbol=v.symbol AND i.active=1
+                   WHERE v.view_name IN ('opportunity','risk')
+                     AND v.observed_at_ms=(
+                         SELECT MAX(v2.observed_at_ms) FROM view_state AS v2
+                         WHERE v2.symbol=v.symbol AND v2.view_name=v.view_name)
+                   ORDER BY v.symbol ASC,v.view_name ASC"""
+            )
+        ]
+        return build_decision_surface(
+            market_rows=market_rows,
+            derivative_rows=derivative_rows,
+            flow_rows=flow_rows,
+            capital_flow_rows=capital_flow_rows,
+            view_rows=view_rows,
+            source_coverage=self.source_coverage(1000),
+            limit=limit,
+        )
+
+    def symbol_decision(self, symbol):
+        """Return the v0.3 decision projection for one known instrument."""
+        from catos.market_decision import build_symbol_decision
+
+        _symbol(symbol)
+        if not self.exists(symbol):
+            return None
+        return build_symbol_decision(self.decision_surface(1000), symbol)
+
+    def decision_compare(self, limit=20):
+        """Return the v0.4 watchlist-ranked side-by-side decision comparison."""
+        from catos.market_decision import build_decision_compare
+
+        limit = _limit(limit)
+        return build_decision_compare(self.decision_surface(limit), limit)
 
     def holdings(self, limit=100):
         """Expose only genuinely active lifecycle cycles as tracked holdings."""
@@ -1952,6 +2033,8 @@ class MarketIntelReader:
 
     def social(self, limit=200, symbol=None):
         """Read latest provider-reported social counts without deriving heat or rank."""
+        from catos.market_social import current_social_identity_registry
+
         limit = _limit(limit)
         if symbol is not None:
             symbol = _symbol(symbol)
@@ -1987,6 +2070,7 @@ class MarketIntelReader:
             "social_heat": None,
             "yaozi_heat": None,
             "yaozi_formula_status": "unknown_unpublished",
+            "identity_registry": current_social_identity_registry(),
             "items": metrics,
             "source_runs": decoded_runs,
         }
@@ -2208,10 +2292,11 @@ class MarketIntelReader:
         return {"status": "materialized_view", "items": items[:limit], "score": None}
 
 
-def create_app(db_path):
+def create_app(db_path, *, strategy_status_provider=None):
     """Create the read-only FastAPI adapter for one market-intelligence DB."""
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.responses import HTMLResponse
+    from catos.app_shell import read_strategy_status, render_app_shell, render_quant_surface
     from catos.market_dashboard import render_dashboard
 
     reader = MarketIntelReader(db_path)
@@ -2226,6 +2311,17 @@ def create_app(db_path):
         }
 
     @app.get("/", response_class=HTMLResponse)
+    def app_shell():
+        return HTMLResponse(render_app_shell())
+
+    @app.get("/quant", response_class=HTMLResponse)
+    def quant_surface():
+        return HTMLResponse(render_quant_surface(read_strategy_status(strategy_status_provider)))
+
+    @app.get("/system/strategy-status")
+    def strategy_status():
+        return read_strategy_status(strategy_status_provider)
+
     @app.get("/dashboard", response_class=HTMLResponse)
     def dashboard():
         return HTMLResponse(render_dashboard())
@@ -2233,6 +2329,24 @@ def create_app(db_path):
     @app.get("/intel/today")
     def today(limit: int = Query(default=1000, ge=1, le=1000)):
         return reader.today(limit)
+
+    @app.get("/intel/decision-surface")
+    def decision_surface(limit: int = Query(default=20, ge=1, le=100)):
+        return reader.decision_surface(limit)
+
+    @app.get("/intel/decision-surface/{symbol}")
+    def symbol_decision(symbol: str):
+        try:
+            result = reader.symbol_decision(symbol)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from None
+        if result is None:
+            raise HTTPException(status_code=404, detail="symbol_not_found")
+        return result
+
+    @app.get("/intel/decision-compare")
+    def decision_compare(limit: int = Query(default=20, ge=1, le=100)):
+        return reader.decision_compare(limit)
 
     @app.get("/intel/radar")
     def radar(limit: int = Query(default=1000, ge=1, le=1000)):

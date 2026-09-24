@@ -1,0 +1,184 @@
+{
+  "contract": "catos-social-explicit-identity-registry-v9-delta",
+  "observed_date": "2026-09-23",
+  "base_registry": "outputs/yaozi-social-explicit-identity-registry-v8-20260923.json",
+  "mapping_contract": "catos-coinpaprika-identity-list-v1",
+  "auto_map_from_unique_ticker": false,
+  "registry_delta": [
+    {
+      "symbol": "API3-USDT-SWAP",
+      "coinpaprika_id": "api3-api3",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x0b38210ea11411557c13457d4da7dc6ea731b88a",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/api3-api3/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/api3-api3",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x0b38210ea11411557c13457d4da7dc6ea731b88a",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x0b38210ea11411557c13457d4da7dc6ea731b88a",
+        "current_universe": {"okx": "API3-USDT-SWAP", "binance": "API3USDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "ARB-USDT-SWAP",
+      "coinpaprika_id": "arb-arbitrum",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "arb-arbitrum",
+        "contract": "0x912ce59144191c1204e64559fe8253a0e49e6548",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/arb-arbitrum/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/arb-arbitrum",
+        "coinpaprika_explorer_url": "https://arbiscan.io/token/0x912ce59144191c1204e64559fe8253a0e49e6548",
+        "okx_identity_page": "https://web3.okx.com/token/arbitrum-one/0x912ce59144191c1204e64559fe8253a0e49e6548",
+        "current_universe": {"okx": "ARB-USDT-SWAP", "binance": "ARBUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "BAT-USDT-SWAP",
+      "coinpaprika_id": "bat-basic-attention-token",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/bat-basic-attention-token/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/bat-basic-attention-token",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+        "current_universe": {"okx": "BAT-USDT-SWAP", "binance": "BATUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "CVX-USDT-SWAP",
+      "coinpaprika_id": "cvx-convex-finance",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x4e3fbd56cd56c3e72c1403e103b45db9da5b9d2b",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/cvx-convex-finance/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/cvx-convex-finance",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x4e3fbd56cd56c3e72c1403e103b45db9da5b9d2b",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x4e3fbd56cd56c3e72c1403e103b45db9da5b9d2b",
+        "current_universe": {"okx": "CVX-USDT-SWAP", "binance": "CVXUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "ENS-USDT-SWAP",
+      "coinpaprika_id": "ens-ethereum-name-service",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xc18360217d8f7ab5e7c516566761ea12ce7f9d72",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/ens-ethereum-name-service/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/ens-ethereum-name-service",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0xc18360217d8f7ab5e7c516566761ea12ce7f9d72",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0xc18360217d8f7ab5e7c516566761ea12ce7f9d72",
+        "current_universe": {"okx": "ENS-USDT-SWAP", "binance": "ENSUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "GMX-USDT-SWAP",
+      "coinpaprika_id": "gmx-gmx",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "arb-arbitrum",
+        "contract": "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/gmx-gmx/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/gmx-gmx",
+        "coinpaprika_explorer_url": "https://arbiscan.io/token/0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a",
+        "okx_identity_page": "https://web3.okx.com/token/arbitrum-one/0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a",
+        "current_universe": {"okx": "GMX-USDT-SWAP", "binance": "GMXUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "LPT-USDT-SWAP",
+      "coinpaprika_id": "lpt-livepeer",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x58b6a8a3302369daec383334672404ee733ab239",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/lpt-livepeer/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/lpt-livepeer",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x58b6a8a3302369daec383334672404ee733ab239",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x58b6a8a3302369daec383334672404ee733ab239",
+        "current_universe": {"okx": "LPT-USDT-SWAP", "binance": "LPTUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "OP-USDT-SWAP",
+      "coinpaprika_id": "op-optimism",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "op-optimism",
+        "contract": "0x4200000000000000000000000000000000000042",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/op-optimism/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/op-optimism",
+        "coinpaprika_explorer_url": "https://optimistic.etherscan.io/token/0x4200000000000000000000000000000000000042",
+        "okx_identity_page": "https://web3.okx.com/token/10/0x4200000000000000000000000000000000000042",
+        "current_universe": {"okx": "OP-USDT-SWAP", "binance": "OPUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    },
+    {
+      "symbol": "SPELL-USDT-SWAP",
+      "coinpaprika_id": "spell-spell-token",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x090185f2135308bad17527004364ebcc2d37e5f6",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/spell-spell-token/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/spell-spell-token",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x090185f2135308bad17527004364ebcc2d37e5f6",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x090185f2135308bad17527004364ebcc2d37e5f6",
+        "current_universe": {"binance": "SPELLUSDT", "active_venues": ["binance"], "catos_symbol_active": true, "okx_perpetual_status": "not_active_in_selected_probe"}
+      }
+    },
+    {
+      "symbol": "UMA-USDT-SWAP",
+      "coinpaprika_id": "uma-uma",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x04fa0d235c4abf4bcf4787af4cf447de572ef828",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/uma-uma/",
+        "coinpaprika_api_page": "https://api.coinpaprika.com/v1/coins/uma-uma",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x04fa0d235c4abf4bcf4787af4cf447de572ef828",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x04fa0d235c4abf4bcf4787af4cf447de572ef828",
+        "current_universe": {"okx": "UMA-USDT-SWAP", "binance": "UMAUSDT", "active_venues": ["okx", "binance"], "catos_symbol_active": true}
+      }
+    }
+  ],
+  "verification": {
+    "pre_explicit_status": {
+      "API3-USDT-SWAP": "unverified_identity:api3-api3",
+      "ARB-USDT-SWAP": "ambiguous_mapping:arb-arb-protocol,arb-arbitrage-loop,arb-arbitrum,arb6-dotarb",
+      "BAT-USDT-SWAP": "ambiguous_mapping:bat-basic-attention-token,bat2-batic",
+      "CVX-USDT-SWAP": "unverified_identity:cvx-convex-finance",
+      "ENS-USDT-SWAP": "unverified_identity:ens-ethereum-name-service",
+      "GMX-USDT-SWAP": "ambiguous_mapping:gmx-gamext,gmx-gmx",
+      "LPT-USDT-SWAP": "unverified_identity:lpt-livepeer",
+      "OP-USDT-SWAP": "ambiguous_mapping:op-one-path,op-optimism",
+      "SPELL-USDT-SWAP": "ambiguous_mapping:spell-spell-token,spell2-the-spellcaster",
+      "UMA-USDT-SWAP": "unverified_identity:uma-uma"
+    },
+    "coinpaprika_selected_symbol_probe": {"provider_rows": 61614, "active_provider_rows": 12958, "full_734_symbol_live_mapping_rerun": false},
+    "current_public_perpetual_selected_symbol_probe": true,
+    "social_detail_probe_run": false,
+    "note": "Identity-only slice; no project DB write and no social metric materialization."
+  },
+  "coverage": {
+    "active_symbols": 734,
+    "resolved": 34,
+    "ambiguous_mapping": 242,
+    "unverified_identity": 291,
+    "missing_asset": 167,
+    "derivation": "v1.29 baseline plus five verified ambiguous_mapping-to-resolved and five verified unverified_identity-to-resolved transitions; full 734-symbol live mapping was not rerun",
+    "not_current_full_live_distribution": true
+  },
+  "boundaries": [
+    "registry_entries_require_explicit_identity_evidence",
+    "unique_ticker_requires_explicit_cross_provider_evidence",
+    "ambiguous_ticker_requires_exact_contract_evidence",
+    "provider_reported_counts_are_not_heat_or_rank",
+    "no_project_db_write_or_schema_change",
+    "no_social_heat_or_yaozi_heat_inference"
+  ]
+}

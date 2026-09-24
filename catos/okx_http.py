@@ -24,7 +24,15 @@ from typing import Callable, Protocol
 from urllib.parse import urlencode
 
 from catos import bounded_pagination as pages
-from catos.okx_collection import ENDPOINTS, PageRequest, PageResponse, RunScope, TransportError
+from catos.okx_collection import (
+    ENDPOINTS,
+    WINDOWED_EVENT_ENDPOINTS,
+    PageRequest,
+    PageResponse,
+    RunScope,
+    TransportError,
+    WindowRequestEvidence,
+)
 
 
 # Only the Global documentation profile is implemented. No regional fallback.
@@ -384,7 +392,7 @@ class DemoReadTransport:
             except (ValueError, TypeError):
                 raise TransportError("invalid_cursor") from None
         params = dict(parts[partition])
-        if alias not in ("account_config", "balance", "bills", "bills_archive", "public_time", "order_algo"):
+        if alias not in ("account_subtypes", "account_config", "balance", "bills", "bills_archive", "public_time", "order_algo"):
             params["instType"] = "SWAP"
         # Detail /trade/order accepts instId+ordId, not instType.
         if alias == "order":
@@ -521,7 +529,20 @@ class DemoReadTransport:
             received = self._wall()
             if self._mono() >= deadline:
                 raise TransportError("timeout")
-            answer = PageResponse(self.scope.account_alias, self.scope.environment, received, payload, next_cursor)
+            window_evidence = None
+            if alias in WINDOWED_EVENT_ENDPOINTS:
+                if (params.get("begin") != str(self.scope.window_start_ms)
+                        or params.get("end") != str(self.scope.window_end_ms)):
+                    raise TransportError("window_filter_mismatch")
+                event_time_field, cursor_semantics = (
+                    ("cTime", "after_order_id") if alias == "orders_history"
+                    else ("ts", "after_bill_id"))
+                window_evidence = WindowRequestEvidence(
+                    int(params["begin"]), int(params["end"]),
+                    event_time_field, cursor_semantics)
+            answer = PageResponse(
+                self.scope.account_alias, self.scope.environment, received, payload,
+                next_cursor, window_evidence)
             self._known_orders.update(new_orders)
             self._known_algos.update(new_algos)
             if page_ids:
@@ -539,7 +560,7 @@ class DemoReadTransport:
                        "unexpected_cardinality", "unexpected_page_size", "instrument_scope_mismatch",
                        "detail_identity_mismatch", "partition_mismatch", "nonprogressing_page",
                        "body_limit_exceeded", "truncated_body", "unsupported_content_encoding",
-                       "invalid_retry_after", "transport_error"}
+                       "invalid_retry_after", "window_filter_mismatch", "transport_error"}
             code = exc.issue if exc.issue in allowed else "transport_error"
             entry["outcome"] = code
             raise TransportError(code) from None

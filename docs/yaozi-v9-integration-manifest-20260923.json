@@ -1,0 +1,79 @@
+{
+  "version": "catos-astra-yaozi-social-v9-integration-20260923.v1",
+  "source_root": "C:/Users/user/Desktop/CatOS_Yaozi",
+  "target_root": "C:/Users/user/Desktop/CatOS_Astra",
+  "source_git_reference": {
+    "branch": "yaozi/dev-v0.7",
+    "head": "a4fb910",
+    "working_tree": "uncommitted source state"
+  },
+  "target_git_reference": {
+    "branch": "main",
+    "head": "3925759",
+    "working_tree": "pre-existing dirty work preserved"
+  },
+  "method": "contextual patch; CRLF/LF normalized content comparison; no runtime cross-worktree import",
+  "files": [
+    {
+      "path": "catos/market_social.py",
+      "source_raw_sha256": "1d77a8d49515de24e94835dfaf6ab7adba80ea76a8c0b413289c9875063ed672",
+      "normalized_sha256": "4c3cdac922791c1edc79e22eae44f10997c939001305fd85b6ca849021fe8c7b",
+      "normalized_equal": true,
+      "scope": "registry V6-V9 plus current V9 runtime mapping entrypoint and read-only registry status"
+    },
+    {
+      "path": "catos/market_api.py",
+      "source_raw_sha256": "18ed741f9dbae8598a597b58597b46dafc64bd07afd4bed77ab56d127bd287b5",
+      "normalized_sha256": "0594876c929d6ae91d243772f670644738e0ad1fb7dcd7ff0e25fb865fa03b84",
+      "normalized_equal": true,
+      "scope": "/intel/social identity_registry status"
+    },
+    {
+      "path": "catos/market_dashboard.py",
+      "source_raw_sha256": "8f65277e6f6ee92d10c0febc8cdcf82c945e4bd637bd19b034b09f75fa185f95",
+      "normalized_sha256": "41c573d6392e118327d878e0cd0e9b045a6885118212b3f0c88cd5157917c865",
+      "normalized_equal": true,
+      "scope": "Social page registry V9 and baseline-derived coverage display separated from raw metrics"
+    },
+    {
+      "path": "tests/test_market_social.py",
+      "source_raw_sha256": "8d822e942a81c15dbdfbf8a51c19f53ef6899476ef8d0e2a8264d0c119fa680b",
+      "normalized_sha256": "79275bfb3e937c7d02a93112a121cf7010af74f229e24fab1c6cf1669554e379",
+      "normalized_equal": true,
+      "scope": "registry V6-V9 fail-closed regressions"
+    },
+    {
+      "path": "tests/test_yaozi_social_runtime_sync.py",
+      "source_raw_sha256": "411ef14cf8a61ea5ac58526624022d501d74961e0bf9d195142c4ea96e50463a",
+      "normalized_sha256": "411ef14cf8a61ea5ac58526624022d501d74961e0bf9d195142c4ea96e50463a",
+      "normalized_equal": true,
+      "scope": "dedicated V9 runtime mapping and Web-observable status"
+    }
+  ],
+  "evidence_files": [
+    "outputs/yaozi-social-explicit-identity-registry-v5-20260923.json",
+    "outputs/yaozi-social-explicit-identity-registry-v6-20260923.json",
+    "outputs/yaozi-social-explicit-identity-registry-v7-20260923.json",
+    "outputs/yaozi-social-explicit-identity-registry-v8-20260923.json",
+    "outputs/yaozi-social-explicit-identity-registry-v9-20260923.json"
+  ],
+  "accepted_registry": {
+    "version": "v9",
+    "explicit_identity_count": 34,
+    "coverage": {
+      "active_symbols": 734,
+      "resolved": 34,
+      "ambiguous_mapping": 242,
+      "unverified_identity": 291,
+      "missing_asset": 167
+    },
+    "coverage_basis": "baseline_derived_not_full_2026_09_23_live_distribution"
+  },
+  "boundaries": [
+    "no_project_db_write",
+    "no_schema_change",
+    "no_social_heat_or_yaozi_heat_or_rank_inference",
+    "no_trading_core_or_risk_or_supervisor_change",
+    "no_commit_or_push"
+  ]
+}

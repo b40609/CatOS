@@ -175,7 +175,7 @@ def _numeric_identity(value):
 
 
 def _request(binding, write_id, operation, open_event_seq, expected_revision,
-             after, opening, closing, *, v2=False):
+             after, opening, closing, *, v2=False, format_version=None):
     from catos import lot_snapshot_codec
     wire = (lot_snapshot_codec if v2 else ipc_lots).lot_to_wire(after)
     for name in (lot_snapshot_codec.FINANCIAL if v2 else _FINANCIAL):
@@ -190,7 +190,7 @@ def _request(binding, write_id, operation, open_event_seq, expected_revision,
     for name in contract:
         if name != "inst_id":
             contract[name] = _numeric_identity(getattr(binding.contract, name))
-    return _json(dict(format_version=2 if v2 else 1,
+    return _json(dict(format_version=format_version if format_version is not None else (2 if v2 else 1),
                      scope=dict(account_ref=binding.scope.account_ref,
                                 environment=binding.scope.environment),
                      bot_id=binding.bot_id, inst_id=binding.contract.inst_id,
@@ -219,13 +219,13 @@ class LotJournal:
         self.db = journal.connection
         self._failed = False
         from catos import lot_snapshot_codec
-        self.v2 = self.schema_version == 8
+        self.v2 = self.schema_version in (8, 9)
         self.codec = lot_snapshot_codec if self.v2 else ipc_lots
         self.financial = lot_snapshot_codec.FINANCIAL if self.v2 else _FINANCIAL
         self.validator = lots.validate_lot_v2 if self.v2 else lots.validate_lot
 
     def _request(self, *args):
-        return _request(*args, v2=self.v2)
+        return _request(*args, v2=self.v2, format_version=3 if self.schema_version == 9 else None)
 
     @contextmanager
     def _access(self):
@@ -428,7 +428,8 @@ class LotJournal:
 
     def _write(self, scope, bot_id, write_id, operation, open_seq, expected, after, opening, closing,
                *, _in_transaction=False):
-        if not _in_transaction and isinstance(write_id, str) and write_id.startswith(("s3_", "s9_")):
+        prefixes = ("s3_", "s9_", "s10_") if self.schema_version == 9 else ("s3_", "s9_")
+        if not _in_transaction and isinstance(write_id, str) and write_id.startswith(prefixes):
             raise LotStorageError("reserved_write_id")
         with self._write_access(_in_transaction, after):
             binding = self._binding(scope, bot_id)

@@ -65,6 +65,7 @@ class Report:
     side: str | None = None
     trigger: str | None = None
     complete: bool = False
+    algo_id: str | None = None
 
     def wire(self):
         ipc.token(self.request_id, 'protection request')
@@ -73,12 +74,16 @@ class Report:
             raise ipc.ProtocolError('invalid protection status')
         if type(self.complete) is not bool:
             raise ipc.ProtocolError('explicit protection completeness required')
+        if self.algo_id is not None:
+            ipc.token(self.algo_id, 'remote algo id')
+        if self.status in ('LIVE', 'CANCELED', 'TRIGGERED') and self.algo_id is None:
+            raise ipc.ProtocolError('remote algo identity required')
         if self.status == 'LIVE':
             if risk.decimal(self.price, 'confirmed price') <= 0 or self.side not in ('buy', 'sell') or self.trigger not in ('mark', 'last', 'index'):
                 raise ipc.ProtocolError('invalid confirmed protection')
         return dict(request_id=self.request_id, revision=self.revision, status=self.status,
                     price=None if self.price is None else str(self.price), side=self.side,
-                    trigger=self.trigger, complete=self.complete)
+                    trigger=self.trigger, complete=self.complete, algo_id=self.algo_id)
 
 
 class ProtectionJournal:
@@ -230,9 +235,13 @@ class ProtectionJournal:
                 if data == s['report'] and not s['uncertain']:
                     return s
                 raise ipc.ProtocolError('conflicting protection evidence')
+            active_algo_id = None if s['active'] is None else s['active'].get('algo_id')
+            if active_algo_id is not None and data['algo_id'] is not None and data['algo_id'] != active_algo_id:
+                raise ipc.ProtocolError('protection remote identity mismatch')
             s['revision'], s['report'] = report.revision, data
             if report.complete and report.status == 'LIVE' and pending['operation'] != 'algo_cancel':
-                s['active'] = dict(price=data['price'], side=data['side'], trigger=data['trigger'], payload=pending['payload'])
+                s['active'] = dict(price=data['price'], side=data['side'], trigger=data['trigger'],
+                                   algo_id=data['algo_id'], payload=pending['payload'])
                 s['pending'], s['uncertain'], s['failed'], s['alert'] = None, False, False, None
             elif report.complete and report.status == 'CANCELED':
                 s['active'], s['pending'], s['uncertain'], s['failed'] = None, None, False, False
@@ -241,6 +250,8 @@ class ProtectionJournal:
                 s['pending'], s['uncertain'], s['failed'] = None, False, True
                 s['alert'] = 'protection_request_failed'
             elif report.status == 'TRIGGERED':
+                if s['active'] is not None:
+                    s['active']['algo_id'] = data['algo_id']
                 s['triggered'], s['alert'] = True, 'protection_triggered_requires_fill_reconciliation'
             # NOT_FOUND/incomplete/cancel ACK remains UNKNOWN. No blind resend.
             self.save(bot_id, s)

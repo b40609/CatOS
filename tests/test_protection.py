@@ -102,9 +102,10 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         request = (s['pending']['payload']['requestId'] if s['pending'] else
                    s['active']['payload']['requestId'] if s['uncertain'] and s['active'] else
                    digest(f'fake-account:bot:protection:{s["serial"] + 1}')[:32])
+        identity = 'synthetic-algo' if status in ('LIVE', 'CANCELED', 'TRIGGERED') else None
         self.exchange.enqueue(operation, p.Report(request, revision, status,
             D(price) if status == 'LIVE' else None, 'sell' if status == 'LIVE' else None,
-            'mark' if status == 'LIVE' else None, complete))
+            'mark' if status == 'LIVE' else None, complete, identity))
         return await self.s.protection_step(now_ms=3 * STEP)
 
     async def enable(self):
@@ -134,6 +135,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         await self.enable()
         state = await self.state()
         self.assertEqual(D(state['average']), D(100))
+        self.assertEqual(state['active']['algo_id'], 'synthetic-algo')
         self.assertFalse(await self.blocked())
         payload = self.exchange.calls[-1][1]
         self.assertEqual((payload['tag'], payload['closeFraction'], payload['reduceOnly'], payload['slOrdPx']),
@@ -222,12 +224,14 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_restart_retains_responsibility_and_queries_before_increasing(self):
         await self.enable()
+        self.assertEqual((await self.state())['active']['algo_id'], 'synthetic-algo')
         await self.s.close()
         self.s = self.make()
         await self.s.start()
         self.assertTrue(await self.blocked())
         await self.respond('algo_query', revision=2)
         self.assertEqual(self.exchange.calls[-1][0], 'algo_query')
+        self.assertEqual((await self.state())['active']['algo_id'], 'synthetic-algo')
         await self.reconcile(D(2), 1)
         self.assertFalse(await self.blocked())
 

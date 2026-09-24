@@ -1,0 +1,62 @@
+{
+  "version": "catosv1-demo-q1-e0-verification.v1",
+  "recorded_date": "2026-09-24",
+  "decision": "Q1-B",
+  "baseline_source": "demo_quiescent_midnight_equivalence_v1",
+  "event_semantics": "quiescent_interval_equivalent_midnight_equity",
+  "production_evidence_created": false,
+  "implementation": {
+    "risk_authorized_source": true,
+    "orders_history_window": {
+      "event_time_field": "cTime",
+      "cursor_semantics": "after_order_id"
+    },
+    "fills_bills_window": {
+      "event_time_field": "ts",
+      "cursor_semantics": "after_bill_id"
+    },
+    "supervisor_single_writer_commit": true,
+    "reconciled_on_baseline_commit": false,
+    "trade_authorized_on_baseline_commit": false,
+    "balchg_reconstruction": false
+  },
+  "verification": {
+    "demo_quiescent_e0": "10/10 OK",
+    "verified_e0_lifecycle": "22/22 OK",
+    "demo_reconciliation": "33/33 OK",
+    "reconciliation_gate": "17/17 OK",
+    "demo_ledger_bootstrap": "11/11 OK",
+    "supervisor_reconciliation": "15/15 OK",
+    "okx_collection": "13/13 OK",
+    "okx_http": "25/25 OK",
+    "account_report": "42/42 OK",
+    "total": "188/188 OK",
+    "py_compile": "OK",
+    "git_diff_check_scoped": "OK"
+  },
+  "production_status": {
+    "existing_40_get_retrofit_eligible": false,
+    "retrofit_blockers": [
+      "observed_balance_changing_bills",
+      "orders_history_window_provenance_not_recorded_by_old_collection"
+    ],
+    "observed_bill_count": 7,
+    "observed_non_usdt_bill_count": 6,
+    "last_non_usdt_bill_taipei": "2026-09-24T07:07:33+08:00",
+    "bootstrap_ready": false,
+    "reconciled": false,
+    "trade_authorized": false
+  },
+  "scope": {
+    "network_or_private_collection_used": false,
+    "credentials_read": false,
+    "demo_or_live_trading_write_used": false,
+    "existing_workspace_trading_db_modified": false,
+    "schema_modified": false,
+    "production_ledger_or_binding_created": false,
+    "production_database_exists_after_verification": false,
+    "production_binding_exists_after_verification": false,
+    "git_commit_or_push_used": false,
+    "yaozi_lot_market_modified": false
+  }
+}

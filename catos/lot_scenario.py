@@ -60,6 +60,11 @@ class SyntheticScenarioObservationV2:
     observation_version: int = 2
 
 
+@dataclass(frozen=True, slots=True)
+class SyntheticScenarioObservationV3(SyntheticScenarioObservationV2):
+    observation_version: int = 3
+
+
 def _reject(code):
     raise ScenarioInputError(code)
 
@@ -87,10 +92,11 @@ def _lot_view(capture, cut, *, v2=False):
         capture.valid_until_ms, True, bots, bots, capture.lots)
 
 
-def _validate_capture(capture, *, v2=False):
+def _validate_capture(capture, *, v2=False, v3=False):
     # Hashes prove content identity, not provenance or semantic consistency.
     try:
-        if type(capture) is not (snapshot.LocalLotCaptureV2 if v2 else snapshot.LocalLotCapture) or capture.source != "synthetic_ledger":
+        expected = snapshot.LocalLotCaptureV3 if v3 else (snapshot.LocalLotCaptureV2 if v2 else snapshot.LocalLotCapture)
+        if type(capture) is not expected or capture.source != "synthetic_ledger":
             _reject("invalid_capture")
         exposure._scope(capture.scope)
         lots._validate_contract(capture.contract)
@@ -240,9 +246,15 @@ def observe_synthetic_scenario_v2(*, capture: snapshot.LocalLotCaptureV2,
     return _observe_scenario(capture, scenario, now_ms, v2=True)
 
 
-def _observe_scenario(capture, scenario, now_ms, *, v2):
+def observe_synthetic_scenario_v3(*, capture: snapshot.LocalLotCaptureV3,
+                                  scenario: SyntheticScenarioEvidence,
+                                  now_ms: int) -> SyntheticScenarioObservationV3:
+    return _observe_scenario(capture, scenario, now_ms, v2=True, v3=True)
+
+
+def _observe_scenario(capture, scenario, now_ms, *, v2, v3=False):
     with localcontext(exposure._CONTEXT):
-        _validate_capture(capture, v2=v2)
+        _validate_capture(capture, v2=v2, v3=v3)
         _validate_scenario(capture, scenario, now_ms)
         cut = scenario.scenario_cut_id
         pending = exposure.PendingInventory(
@@ -263,5 +275,6 @@ def _observe_scenario(capture, scenario, now_ms, *, v2):
             quality = tuple(LotFeeObservation(s.lot.lot_id, s.lot.bot_id, s.lot.revision,
                 s.lot.fee_quality.coverage, s.lot.fee_quality.known_fee_subtotal,
                 s.lot.fee_quality.fee_unknown_fill_count, s.lot.fee_quality.fee_complete) for s in capture.lots)
-            return SyntheticScenarioObservationV2("SYNTHETIC_SCENARIO", cut, capture.capture_id, report, quality)
+            cls = SyntheticScenarioObservationV3 if v3 else SyntheticScenarioObservationV2
+            return cls("SYNTHETIC_SCENARIO", cut, capture.capture_id, report, quality)
         return SyntheticScenarioObservation("SYNTHETIC_SCENARIO", cut, capture.capture_id, report)

@@ -1,0 +1,68 @@
+{
+  "version": "catosv1-demo-ledger-bootstrap-operation-verification.v1",
+  "recorded_date": "2026-09-24",
+  "implementation": {
+    "operation": "catos.demo_ledger_bootstrap.bootstrap_production_ledger",
+    "planning_gate_rechecked_before_mutation": true,
+    "sqlite_writer": "LocalSupervisor/Journal",
+    "requires_new_database_under_account_lock": true,
+    "database_exclusive_create": true,
+    "binding_exclusive_create": true,
+    "binding_runtime_verified_before_save": true,
+    "persisted_binding_reloaded_and_verified": true,
+    "automatic_cleanup_or_retry": false,
+    "reconciled_on_success": false,
+    "trade_authorized_on_success": false
+  },
+  "verification": {
+    "demo_ledger_bootstrap": "11/11 OK",
+    "demo_ledger_preflight": "9/9 OK",
+    "demo_ledger_binding": "4/4 OK",
+    "supervisor_regression": "14/14 OK",
+    "total": "38/38 OK",
+    "py_compile": "OK",
+    "git_diff_check_scoped": "OK",
+    "independent_acceptance": "PASS",
+    "independent_demo_ledger_bootstrap": "11/11 OK",
+    "independent_demo_ledger_preflight": "9/9 OK",
+    "independent_demo_ledger_binding": "4/4 OK",
+    "independent_supervisor_regression": "14/14 OK",
+    "independent_total": "38/38 OK",
+    "independent_py_compile": "OK",
+    "independent_git_diff_check_scoped": "OK",
+    "independent_adversarial_acceptance": "PASS"
+  },
+  "covered_failure_modes": [
+    "bootstrap_not_ready_creates_nothing",
+    "database_path_race_does_not_overwrite_existing_file",
+    "binding_path_race_does_not_overwrite_existing_file",
+    "binding_failure_preserves_initialized_ledger_and_account_binding",
+    "successful_temporary_bootstrap_is_resume_preflight_readable",
+    "blocked_gate_stops_before_supervisor_construction",
+    "successful_bootstrap_does_not_call_reconcile_or_authorize",
+    "successful_bootstrap_remains_reconciling_with_no_evidence_fence",
+    "default_supervisor_resume_remains_compatible",
+    "new_database_mode_rejects_already_bound_database",
+    "persisted_binding_contains_no_raw_uid"
+  ],
+  "scope": {
+    "temporary_synthetic_test_state_only": true,
+    "production_directory_exists_after_verification": false,
+    "production_database_exists_after_verification": false,
+    "production_binding_exists_after_verification": false,
+    "existing_production_database_modified": false,
+    "schema_migration_of_existing_database": false,
+    "network_or_collection_used": false,
+    "credentials_read": false,
+    "demo_or_live_exchange_write_used": false,
+    "yaozi_lot_market_modified": false,
+    "git_commit_or_push_used": false
+  },
+  "remaining_blockers": [
+    "real_expected_uid_digest_not_supplied",
+    "real_bot_config_fixture_budget_and_risk_limits_not_supplied",
+    "complete_production_balance_fills_bills_and_related_accounting_not_collected",
+    "d1a_exact_midnight_e0_not_available",
+    "production_ledger_and_binding_instance_not_created"
+  ]
+}

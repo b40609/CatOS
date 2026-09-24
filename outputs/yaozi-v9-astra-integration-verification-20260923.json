@@ -1,0 +1,44 @@
+{
+  "contract": "catos-astra-yaozi-social-v9-integration-verification-v1",
+  "observed_date": "2026-09-23",
+  "target_branch": "main",
+  "target_head": "3925759",
+  "source_branch": "yaozi/dev-v0.7",
+  "source_head": "a4fb910",
+  "registry_version": "v9",
+  "explicit_identity_count": 34,
+  "coverage": {
+    "active_symbols": 734,
+    "resolved": 34,
+    "ambiguous_mapping": 242,
+    "unverified_identity": 291,
+    "missing_asset": 167,
+    "basis": "baseline_derived_not_full_2026_09_23_live_distribution"
+  },
+  "verification": {
+    "normalized_source_target_file_match": "5/5",
+    "dedicated_runtime_and_social_tests": "25/25 OK",
+    "social_dashboard_api_regression": "1/1 OK",
+    "py_compile": "OK",
+    "localhost_api": {
+      "status": "materialized_empty",
+      "items": 0,
+      "source_runs": 0,
+      "registry_version": "v9",
+      "explicit_identity_count": 34,
+      "social_heat": null,
+      "yaozi_heat": null
+    },
+    "crawl4ai_rendered_social_page": "OK",
+    "rendered_page_registry": "v9",
+    "rendered_page_metrics": 0,
+    "rendered_page_source_runs": 0,
+    "browser_console_note": "favicon.ico returned 404; Social page and /intel/social returned successfully",
+    "project_db_write": false,
+    "schema_change": false,
+    "external_collection": false,
+    "trading_change": false,
+    "commit": false,
+    "push": false
+  }
+}

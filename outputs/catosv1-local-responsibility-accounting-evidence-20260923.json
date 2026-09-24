@@ -1,0 +1,127 @@
+{
+  "version": "catosv1-local-responsibility-accounting-evidence.v2",
+  "recorded_at_utc": "2026-09-23T08:54:29.8529467Z",
+  "scope": {
+    "environment": "demo",
+    "account_alias": "catOSv1",
+    "expected_uid_output": "pass_fail_only"
+  },
+  "remote_current_responsibility_evidence": {
+    "source": "outputs/demo-subaccount-remote-responsibility-evidence-20260923.json",
+    "expected_uid_pass": true,
+    "dedicated_subaccount_pass": true,
+    "net_mode_pass": true,
+    "account_mode_contract_pass": true,
+    "position_records": 0,
+    "ordinary_pending_order_records": 0,
+    "algo_pending_records_seven_partitions": 0,
+    "private_get_count": 10,
+    "semantics": "bounded sequential current observations only"
+  },
+  "local_trading_ledger_inventory": {
+    "production_demo_ledger_found": false,
+    "catosv1_demo_uid_binding_found": false,
+    "workspace_candidates": [
+      {
+        "path": "outputs/s10-qa-20260921-sol/scenario.sqlite3",
+        "environment": "local-sim",
+        "account_id": "fake-account",
+        "ownership_rows": 0,
+        "unresolved_execution_orders": 0,
+        "eligible_as_catosv1_demo_evidence": false
+      },
+      {
+        "path": "outputs/s10-s9-regression-20260921-sol/scenario.sqlite3",
+        "environment": "local-sim",
+        "account_id": "fake-account",
+        "ownership_rows": 0,
+        "unresolved_execution_orders": 0,
+        "eligible_as_catosv1_demo_evidence": false
+      },
+      {
+        "path": "outputs/s9-qa-20260921-101840/scenario.sqlite3",
+        "environment": "local-sim",
+        "account_id": "fake-account",
+        "ownership_rows": 0,
+        "unresolved_execution_orders": 0,
+        "eligible_as_catosv1_demo_evidence": false
+      },
+      {
+        "path": "reports/s8-qa-20260919-impl/scenario.sqlite3",
+        "environment": "local-sim",
+        "account_id": "s8-example-account",
+        "ownership_rows": 0,
+        "unresolved_execution_orders": 0,
+        "eligible_as_catosv1_demo_evidence": false
+      },
+      {
+        "path": "reports/s9-qa-20260921/scenario.sqlite3",
+        "environment": "local-sim",
+        "account_id": "fake-account",
+        "ownership_rows": 0,
+        "unresolved_execution_orders": 0,
+        "eligible_as_catosv1_demo_evidence": false
+      }
+    ],
+    "runtime_contract": {
+      "account_lock_environment": "local-sim",
+      "demo_environment_supported_by_local_account_lock": false,
+      "journal_metadata_scope_fields": [
+        "account_id",
+        "environment"
+      ],
+      "independent_expected_uid_binding_field": false,
+      "external_demo_ledger_binding_contract_implemented": true,
+      "formal_account_alias": "catOSv1",
+      "binding_fields": [
+        "account_alias",
+        "remote_environment",
+        "storage_environment",
+        "expected_uid_sha256",
+        "canonical_database_path"
+      ],
+      "missing_or_mismatched_binding_fails_before_collection": true,
+      "collected_account_config_uid_digest_must_match_expected_uid": true,
+      "runtime_sqlite_verification": "mode=ro; WAL-visible; explicit close",
+      "raw_uid_persisted_by_binding": false,
+      "schema_change_required": false
+    }
+  },
+  "full_accounting_collection": {
+    "requested_scope": "current balance plus bounded 24h orders/fills/bills responsibility evidence",
+    "executed": false,
+    "network_requests_sent_by_attempt": 0,
+    "reason": "automatic execution safety review blocked the authenticated read-only collection before execution",
+    "live_fallback_attempted": false,
+    "alternate_credential_loader_attempted": false
+  },
+  "classification_policy": {
+    "catalog_coverage_is_informational": true,
+    "observed_unknown_or_forbidden_flow_blocks_entry": true,
+    "observed_flow_status_this_slice": "not_evaluated_no_full_bills_collection"
+  },
+  "blockers": [
+    "production_demo_ledger_and_binding_instance_missing",
+    "local_unknown_and_ownership_not_clearable_without_account_bound_ledger",
+    "full_balance_fills_bills_evidence_not_collected_this_slice",
+    "verified_exact_midnight_e0_missing"
+  ],
+  "reconciled": false,
+  "trade_authorized": false,
+  "tests_rerun": true,
+  "test_results": {
+    "demo_ledger_binding": "4/4 OK",
+    "formal_reconciliation": "33/33 OK",
+    "safe_strategy_loop": "1/1 OK",
+    "verified_e0_lifecycle": "22/22 OK",
+    "account_report": "42/42 OK",
+    "reconciliation_gate": "17/17 OK",
+    "demo_trade_authorization": "17/17 OK",
+    "supervisor_reconciliation": "15/15 OK",
+    "total": "151/151 OK",
+    "py_compile": "OK"
+  },
+  "schema_modified": false,
+  "trading_db_modified": false,
+  "credentials_persisted": false
+}

@@ -1,0 +1,56 @@
+{
+  "date": "2026-09-23",
+  "status": "pass_local_sim",
+  "scope": "unified localhost quant/Yaozi shell and backend lifecycle independence",
+  "routes": {
+    "/": "unified_shell",
+    "/quant": "read_only_backend_status",
+    "/dashboard": "yaozi_v9_dashboard",
+    "/system/strategy-status": "GET_only_read_only_projection"
+  },
+  "strategy_status_contract": {
+    "contract": "catos-strategy-status-v1",
+    "lifecycle_owner": "backend_supervisor",
+    "browser_controls_lifecycle": false,
+    "mutation_routes": []
+  },
+  "lifecycle_test": {
+    "uses_real_local_supervisor": true,
+    "storage": "temporary_synthetic_only",
+    "event_seq_before_web": 1,
+    "web_requests": ["/", "/quant", "/dashboard", "/", "/system/strategy-status"],
+    "revision_changed_by_web": false,
+    "checkpoint_changed_by_web": false,
+    "worker_stopped_by_web": false,
+    "web_client_teardown_stopped_supervisor": false,
+    "event_seq_after_followup_bar": 2
+  },
+  "tests": {
+    "command": "python -m unittest tests.test_app_shell tests.test_yaozi_social_runtime_sync tests.test_market_api",
+    "passed": 44,
+    "failed": 0
+  },
+  "py_compile": "pass",
+  "browser_qa": {
+    "crawl4ai_quant": "success",
+    "crawl4ai_dashboard": "success",
+    "crawl4ai_root": "rendered_text_observed_structural_small_page_heuristic_false",
+    "browser_use": "chrome_cdp_launch_environment_failure"
+  },
+  "boundaries": {
+    "project_db_written": false,
+    "db_schema_changed": false,
+    "real_credentials_read": false,
+    "demo_or_live_network_request": false,
+    "trading_core_semantics_changed": false,
+    "risk_semantics_changed": false,
+    "lot_semantics_changed": false,
+    "yaozi_worktree_modified": false,
+    "commit": false,
+    "push": false
+  },
+  "git": {
+    "branch": "main",
+    "head": "3925759d16771b9cbe8fac709c0b5dc355772865"
+  }
+}

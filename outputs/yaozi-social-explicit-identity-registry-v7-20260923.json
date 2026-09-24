@@ -1,0 +1,79 @@
+{
+  "contract": "catos-social-explicit-identity-registry-v7-delta",
+  "observed_date": "2026-09-23",
+  "base_registry": "outputs/yaozi-social-explicit-identity-registry-v6-20260923.json",
+  "mapping_contract": "catos-coinpaprika-identity-list-v1",
+  "auto_map_from_unique_ticker": false,
+  "registry_delta": [
+    {
+      "symbol": "1INCH-USDT-SWAP",
+      "coinpaprika_id": "1inch-1inch",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x111111111117dc0aa78b770fa6a738034120c302",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/1inch-1inch/",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x111111111117dc0aa78b770fa6a738034120c302",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x111111111117dc0aa78b770fa6a738034120c302",
+        "current_universe": {
+          "binance": "1INCHUSDT",
+          "active_venues": [
+            "binance"
+          ],
+          "catos_symbol_active": true,
+          "okx_perpetual_status": "not_rechecked_this_slice"
+        }
+      }
+    },
+    {
+      "symbol": "SUSHI-USDT-SWAP",
+      "coinpaprika_id": "sushi-sushi",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x6b3595068778dd592e39a122f4f5a5cf09c90fe2",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/sushi-sushi/",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x6b3595068778dd592e39a122f4f5a5cf09c90fe2",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x6b3595068778dd592e39a122f4f5a5cf09c90fe2",
+        "current_universe": {
+          "binance": "SUSHIUSDT",
+          "active_venues": [
+            "binance"
+          ],
+          "catos_symbol_active": true,
+          "okx_perpetual_status": "not_rechecked_this_slice"
+        }
+      }
+    }
+  ],
+  "verification": {
+    "pre_explicit_status": {
+      "1INCH-USDT-SWAP": "unverified_identity:1inch-1inch",
+      "SUSHI-USDT-SWAP": "unverified_identity:sushi-sushi"
+    },
+    "coinpaprika_selected_symbol_probe": {
+      "provider_rows": 61614,
+      "active_provider_rows": 12990,
+      "full_734_symbol_live_mapping_rerun": false
+    },
+    "current_binance_perpetual_page_observed_2026_09_23": true,
+    "social_detail_probe_run": false,
+    "note": "Identity-only slice; no project DB write and no social metric materialization."
+  },
+  "coverage": {
+    "active_symbols": 734,
+    "resolved": 21,
+    "ambiguous_mapping": 247,
+    "unverified_identity": 299,
+    "missing_asset": 167,
+    "derivation": "v1.27 baseline plus two verified unverified_identity-to-resolved transitions; full 734-symbol live mapping was not rerun",
+    "not_current_full_live_distribution": true
+  },
+  "boundaries": [
+    "registry_entries_require_explicit_identity_evidence",
+    "unique_ticker_requires_explicit_cross_provider_evidence",
+    "provider_reported_counts_are_not_heat_or_rank",
+    "no_project_db_write_or_schema_change",
+    "no_social_heat_or_yaozi_heat_inference"
+  ]
+}

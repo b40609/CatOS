@@ -6,6 +6,9 @@ Astra 開發階段只做結構化補丁與靜態閱讀，未執行 Python、單�
 
 ## 正式驗收結果（2026-09-19）
 
+提交結果（依使用者回報）：`e00c2b5`，`feat(lots): add S7 synthetic scenario report`。commit 僅包含 S7 renderer、專屬測試、本交接文件、README 與 WORK_PLAN；market、yaozi、既有 S5／S6 驗收文件修改均維持未提交。本段為提交後補記，Astra 未查 Git 或重跑驗證。
+
+- 靜態核對 40/40 report 欄位、16/16 reason code；`git diff --check`、staged check 通過。
 - `test_lot_scenario_report.py`：21/21 通過。
 - `test_lot_scenario.py`：34/34 通過。
 - 合計 55/55，0 failure／error／skip；未執行全量測試。

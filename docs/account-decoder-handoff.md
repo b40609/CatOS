@@ -18,7 +18,8 @@
 - 驗證來源 evidence 按順序為真正整數 1..N、首請求游標為 null、後頁銜接前頁 next、不得循環或在終頁後續頁；完成來源須非零頁、末 next=null、無 issue，批次／來源完成標誌須一致。`page_chain_invalid`／`manifest_completion_mismatch` 使 collection_complete=false，費用／資金流小計不可用；重複 evidence 不重複解碼。
 - 不強加 HTTP 各來源的單頁或空頁終止契約至通用 CollectionResult。合法不完整前綴可零頁，末 next 可有可無；保留有效資料已觀測小計，不宣稱完整。重試使 requests 大於頁數不視為錯誤。
 - balance 解碼新增 `record_diagnostics`（alias/page/row/field/reason）；field 與 reason 僅固定白名單，不含值、幣別、ID 或例外訊息。缺值不補零，保留 `invalid_record:balance`。此診斷只能處理未來提供的證據，不能還原已丟失的歷史回應。
-- 本次只編寫合成測試，未執行。以下原始驗收數字保留為歷史，不能當目前修補版本驗收。
+- 2026-09-24 production Demo evidence 顯示 `acctLv=2` 的 balance detail 可缺 `liab`，或回 `null`／空字串 sentinel。依 OKX 現行 API guide，currency-level `liab` 僅適用 Spot mode／Multi-currency margin／Portfolio margin，不適用 Futures mode；因此 decoder 現將缺／`null`／空字串 `details[].liab` 保留為 `None`，且只有 `acctLv=2` 可視為 not applicable。`acctLv=3` 的上述 sentinel、任何模式非零 `liab`、多幣 collateral 等仍以 `unsupported_collateral` fail closed；不把缺值補成 0。
+- 2026-09-24 受影響回歸已重跑：`test_account_report + test_okx_collection + test_demo_collection + test_okx_readonly + test_okx_http` 共 116/116 OK；後續新增 Demo balance cleanup operator tool 後，其專屬 6/6 與 `test_demo_subaccount_evidence + test_account_report + test_okx_http` 71/71 亦通過，`py_compile` 與 scoped `git diff --check` OK。修補後已重新完成真實 24h accounting 40 GET：`details[].liab` record diagnostic 為 0，證明缺／`null`／空字串 sentinel 修補在 production Demo 回應上有效。其後依使用者明確 Demo write 授權，使用 fixed Demo-only `demo-adjust-balance reduce` 清除 BTC／ETH／OKB，重新 40 GET 後 `unsupported_collateral` 亦消失；balance 現符合 acctLv=2 單一 USDT contract。以下原始 2026-09-14 驗收數字保留為歷史。
 
 ## 證據與隱私
 

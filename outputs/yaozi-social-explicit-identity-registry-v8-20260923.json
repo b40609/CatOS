@@ -1,0 +1,115 @@
+{
+  "contract": "catos-social-explicit-identity-registry-v8-delta",
+  "observed_date": "2026-09-23",
+  "base_registry": "outputs/yaozi-social-explicit-identity-registry-v7-20260923.json",
+  "mapping_contract": "catos-coinpaprika-identity-list-v1",
+  "auto_map_from_unique_ticker": false,
+  "registry_delta": [
+    {
+      "symbol": "SNX-USDT-SWAP",
+      "coinpaprika_id": "snx-synthetix-network-token",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/snx-synthetix-network-token/",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f",
+        "current_universe": {
+          "okx": "SNX-USDT-SWAP",
+          "binance": "SNXUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "YFI-USDT-SWAP",
+      "coinpaprika_id": "yfi-yearnfinance",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/yfi-yearnfinance/",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
+        "current_universe": {
+          "okx": "YFI-USDT-SWAP",
+          "binance": "YFIUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    },
+    {
+      "symbol": "ZRX-USDT-SWAP",
+      "coinpaprika_id": "zrx-0x",
+      "identity_evidence": {
+        "kind": "cross_provider_contract_address_match",
+        "platform": "eth-ethereum",
+        "contract": "0xe41d2489571d322189246dafa5ebde1f4699f498",
+        "coinpaprika_identity_page": "https://coinpaprika.com/coin/zrx-0x/",
+        "coinpaprika_explorer_url": "https://etherscan.io/token/0xe41d2489571d322189246dafa5ebde1f4699f498",
+        "okx_identity_page": "https://web3.okx.com/token/ethereum/0xe41d2489571d322189246dafa5ebde1f4699f498",
+        "current_universe": {
+          "okx": "ZRX-USDT-SWAP",
+          "binance": "ZRXUSDT",
+          "active_venues": [
+            "okx",
+            "binance"
+          ],
+          "catos_symbol_active": true
+        }
+      }
+    }
+  ],
+  "excluded_candidates": [
+    {
+      "symbol": "MKR-USDT-SWAP",
+      "coinpaprika_id": "mkr-maker",
+      "reason": "not_active_in_current_public_perpetual_universe",
+      "observed_universe": {
+        "binance": "MKRUSDT",
+        "binance_active": false,
+        "okx_active": false
+      }
+    }
+  ],
+  "verification": {
+    "pre_explicit_status": {
+      "SNX-USDT-SWAP": "unverified_identity:snx-synthetix-network-token",
+      "YFI-USDT-SWAP": "unverified_identity:yfi-yearnfinance",
+      "ZRX-USDT-SWAP": "unverified_identity:zrx-0x"
+    },
+    "coinpaprika_selected_symbol_probe": {
+      "provider_rows": 61614,
+      "active_provider_rows": 12999,
+      "full_734_symbol_live_mapping_rerun": false
+    },
+    "current_public_perpetual_selected_symbol_probe": true,
+    "social_detail_probe_run": false,
+    "note": "Identity-only slice; no project DB write and no social metric materialization."
+  },
+  "coverage": {
+    "active_symbols": 734,
+    "resolved": 24,
+    "ambiguous_mapping": 247,
+    "unverified_identity": 296,
+    "missing_asset": 167,
+    "derivation": "v1.28 baseline plus three verified unverified_identity-to-resolved transitions; full 734-symbol live mapping was not rerun",
+    "not_current_full_live_distribution": true
+  },
+  "boundaries": [
+    "registry_entries_require_explicit_identity_evidence",
+    "unique_ticker_requires_explicit_cross_provider_evidence",
+    "provider_reported_counts_are_not_heat_or_rank",
+    "no_project_db_write_or_schema_change",
+    "no_social_heat_or_yaozi_heat_inference"
+  ]
+}

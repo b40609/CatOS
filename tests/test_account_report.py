@@ -6,7 +6,7 @@ import hashlib
 import json
 import unittest
 
-from catos import account_report as r, okx_collection as c
+from catos import account_report as r, okx_collection as c, okx_readonly as o
 
 
 def scope():
@@ -16,8 +16,18 @@ def scope():
 def collect(data):
     class Transport:
         def fetch(self, request):
+            window_evidence = None
+            if request.endpoint.alias in c.WINDOWED_EVENT_ENDPOINTS:
+                if request.endpoint.alias == "orders_history":
+                    window_evidence = c.WindowRequestEvidence(
+                        request.scope.window_start_ms, request.scope.window_end_ms,
+                        "cTime", "after_order_id")
+                else:
+                    window_evidence = c.WindowRequestEvidence(
+                        request.scope.window_start_ms, request.scope.window_end_ms)
             return c.PageResponse("okx-demo", "demo", 200,
-                                  {"code": "0", "data": data[request.endpoint.alias]})
+                                  {"code": "0", "data": data[request.endpoint.alias]},
+                                  window_evidence=window_evidence)
     return c.collect_plan(c.CollectionPlan(scope(), tuple(data)), Transport())
 
 
@@ -78,6 +88,34 @@ class AccountReportTests(unittest.TestCase):
     def report(self, data, **kwargs):
         return r.build_report(collect(data), scope=scope(), **kwargs)
 
+    def test_snapshot_contract_declares_bounded_sequence_without_timestamp_fence(self):
+        report = self.report({
+            "balance": [balance()], "positions": [], "orders_pending": [],
+            "algo_pending": [], "fills": [], "bills": [],
+        })
+        self.assertEqual(report["snapshot_semantics"], {
+            "contract_id": c.SNAPSHOT_SEMANTICS_CONTRACT,
+            "mode": "bounded_sequential_observation",
+            "atomic_snapshot": False,
+            "record_update_time_is_snapshot_fence": False,
+            "transport_time_is_snapshot_fence": False,
+        })
+        by_alias = {source["alias"]: source for source in report["sources"]}
+        self.assertEqual(by_alias["balance"]["record_time_semantics"],
+                         "last_update_or_reference_ms_not_snapshot")
+        self.assertEqual(by_alias["fills"]["record_time_semantics"], "event_ms")
+        self.assertEqual(by_alias["balance"]["source_time_semantics"],
+                         "transport_supplied_not_verified_snapshot")
+        for alias in ("fills", "bills"):
+            self.assertEqual(by_alias[alias]["window_request_evidence"], {
+                "contract_id": c.WINDOW_COVERAGE_CONTRACT,
+                "begin_ms": 100,
+                "end_ms": 200,
+                "event_time_field": "ts",
+                "cursor_semantics": "after_bill_id",
+                "filter_semantics": "exact_inclusive_begin_end",
+            })
+
     def test_decimal_and_missing_fields(self):
         f = r.decode_row("positions", position())
         self.assertEqual(f["avgPx"], Decimal("123.1234567890123456789"))
@@ -128,7 +166,7 @@ class AccountReportTests(unittest.TestCase):
             (balance(details="PRIVATE-DETAILS"), "details", "invalid_structure"),
             (balance(details=["PRIVATE-DETAIL"]), "details[]", "invalid_structure"),
         ))
-        for field in ("ccy", "uTime", "eq", "liab", "availEq", "ordFrozen"):
+        for field in ("ccy", "uTime", "eq", "availEq", "ordFrozen"):
             row = balance()
             del row["details"][0][field]
             cases.append((row, "details[]." + field, "missing"))
@@ -158,6 +196,15 @@ class AccountReportTests(unittest.TestCase):
                 self.assertNotIn("PRIVATE", json.dumps(report))
                 with self.assertRaisesRegex(ValueError, "^invalid balance field$"):
                     r.decode_row("balance", row)
+        missing_liab = balance()
+        del missing_liab["details"][0]["liab"]
+        missing_liab_report = self.report({"balance": [missing_liab]})
+        self.assertNotIn("invalid_record:balance", missing_liab_report["discrepancies"])
+        self.assertIn("unsupported_collateral", missing_liab_report["discrepancies"])
+        self.assertEqual(missing_liab_report["record_diagnostics"], [])
+        self.assertIsNone(next(
+            f for f in missing_liab_report["facts"] if f["kind"] == "balance"
+        )["details"][0]["liab"])
         for field in ("totalEq", "adjEq"):
             with self.subTest(field=field, reason="float_rejected_by_decoder"):
                 with self.assertRaisesRegex(r._BalanceFieldError, "^invalid balance field$") as caught:
@@ -299,8 +346,35 @@ class AccountReportTests(unittest.TestCase):
         self.assertIsNone(self.report({"bills": [bill]})["observed_external_flow_usdt"])
         report = self.report({"bills": [bill, bill]}, classifications={("fixture", "deposit"): "external"})
         self.assertEqual(report["observed_external_flow_usdt"], "10")
+        self.assertIsNone(report["flow_classification_id"])
+        versioned = o.FlowClassification("synthetic-flow-map", (
+            o.FlowClassificationEntry("fixture", "deposit", "external", "synthetic evidence"),
+        ))
+        report = self.report({"bills": [bill, bill]}, classifications=versioned)
+        self.assertEqual(report["observed_external_flow_usdt"], "10")
+        self.assertEqual(report["flow_classification_id"], versioned.classification_id)
+        self.assertFalse(report["flow_classification_complete"])
+        complete = o.FlowClassification("synthetic-flow-map", versioned.entries, True)
+        report = self.report({"bills": [bill, bill]}, classifications=complete)
+        self.assertTrue(report["flow_classification_complete"])
         report = self.report({"bills": [bill, bill | {"balChg": "20"}]})
         self.assertIsNone(report["observed_external_flow_usdt"])
+
+    def test_forbidden_bill_blocks_report_even_zero_or_non_usdt(self):
+        classification = o.FlowClassification("synthetic-forbidden", (
+            o.FlowClassificationEntry("fixture", "blocked", "forbidden", "synthetic evidence"),
+        ), True)
+        for ccy in ("USDT", "BTC"):
+            bill = dict(billId="secret-bill", type="fixture", subType="blocked",
+                        ccy=ccy, balChg="0", ts="150")
+            report = self.report({"bills": [bill, bill]}, classifications=classification)
+            self.assertIn("unsupported_account_activity", report["discrepancies"])
+            self.assertNotIn("unknown_external_flow", report["discrepancies"])
+            self.assertIsNone(report["observed_external_flow_usdt"])
+            self.assertTrue(report["flow_classification_complete"])
+            self.assertFalse(report["trade_authorized"])
+        report = self.report({"bills": []}, classifications=classification)
+        self.assertNotIn("unsupported_account_activity", report["discrepancies"])
 
     def test_p6_effective_does_not_close_and_children_link(self):
         report = self.report({"algo_history": [algo()], "order": [order()]})
@@ -552,6 +626,169 @@ class AccountReportTests(unittest.TestCase):
                                   instType="SWAP", instId="BTC-USDT-SWAP", markPx="120", ts="150")]})
         self.assertNotIn("unsupported_contract", report["discrepancies"])
         self.assertEqual(len(report["facts"]), 4)
+
+    def test_balance_adj_eq_contract_and_acct_lv_modes(self):
+        def config_row(acct_lv):
+            return dict(uid="secret-child", mainUid="secret-parent", acctLv=acct_lv,
+                        posMode="net_mode", roleType="0", perm="read_only,trade")
+
+        # 1. acctLv=2 + adjEq="" + single USDT + liab=0 -> balance fact 合法
+        valid_acct2 = self.report({
+            "account_config": [config_row("2")],
+            "balance": [balance(adjEq="")],
+        })
+        self.assertNotIn("invalid_record:balance", valid_acct2["discrepancies"])
+        self.assertNotIn("unsupported_collateral", valid_acct2["discrepancies"])
+        fact2 = next(f for f in valid_acct2["facts"] if f["kind"] == "balance")
+        self.assertIsNone(fact2["adjEq"])
+        self.assertNotEqual(fact2["adjEq"], "0")
+        self.assertEqual(fact2["details"][0]["eq"], "1000")
+
+        raw_decoded2 = r.decode_row("balance", balance(adjEq=""))
+        self.assertIsNone(raw_decoded2["adjEq"])
+        self.assertNotEqual(raw_decoded2["adjEq"], Decimal("0"))
+        self.assertEqual(raw_decoded2["details"][0]["eq"], Decimal("1000"))
+
+        # 1b. OKX Futures mode may omit details[].liab because the field is
+        # documented as not applicable; acctLv=2 alone may treat omission as N/A.
+        missing_liab_acct2 = balance(adjEq="")
+        del missing_liab_acct2["details"][0]["liab"]
+        missing_liab_report2 = self.report({
+            "account_config": [config_row("2")],
+            "balance": [missing_liab_acct2],
+        })
+        self.assertNotIn("invalid_record:balance", missing_liab_report2["discrepancies"])
+        self.assertNotIn("unsupported_collateral", missing_liab_report2["discrepancies"])
+        missing_liab_fact2 = next(
+            f for f in missing_liab_report2["facts"] if f["kind"] == "balance")
+        self.assertIsNone(missing_liab_fact2["details"][0]["liab"])
+
+        null_liab_acct2 = balance(adjEq="")
+        null_liab_acct2["details"][0]["liab"] = None
+        null_liab_report2 = self.report({
+            "account_config": [config_row("2")],
+            "balance": [null_liab_acct2],
+        })
+        self.assertNotIn("invalid_record:balance", null_liab_report2["discrepancies"])
+        self.assertNotIn("unsupported_collateral", null_liab_report2["discrepancies"])
+
+        empty_liab_acct2 = balance(adjEq="")
+        empty_liab_acct2["details"][0]["liab"] = ""
+        empty_liab_report2 = self.report({
+            "account_config": [config_row("2")],
+            "balance": [empty_liab_acct2],
+        })
+        self.assertNotIn("invalid_record:balance", empty_liab_report2["discrepancies"])
+        self.assertNotIn("unsupported_collateral", empty_liab_report2["discrepancies"])
+
+        # 2. acctLv=2 + adjEq="" + 第二幣別 -> blocker
+        multi_ccy_row = balance(adjEq="")
+        multi_ccy_row["details"].append(dict(
+            ccy="BTC", eq="0.1", liab="0", availEq="0.1", ordFrozen="0", uTime="140"))
+        multi_ccy_report = self.report({
+            "account_config": [config_row("2")],
+            "balance": [multi_ccy_row],
+        })
+        self.assertIn("unsupported_collateral", multi_ccy_report["discrepancies"])
+
+        # 3. acctLv=2 + adjEq="" + USDT liab != 0 -> blocker
+        liab_row = balance(adjEq="")
+        liab_row["details"][0]["liab"] = "10"
+        liab_report = self.report({
+            "account_config": [config_row("2")],
+            "balance": [liab_row],
+        })
+        self.assertIn("unsupported_collateral", liab_report["discrepancies"])
+
+        # 4. acctLv=3 + valid adjEq Decimal -> 合法
+        valid_acct3 = self.report({
+            "account_config": [config_row("3")],
+            "balance": [balance(adjEq="1000")],
+        })
+        self.assertNotIn("invalid_record:balance", valid_acct3["discrepancies"])
+        self.assertNotIn("unsupported_collateral", valid_acct3["discrepancies"])
+        fact3 = next(f for f in valid_acct3["facts"] if f["kind"] == "balance")
+        self.assertEqual(fact3["adjEq"], "1000")
+
+        missing_liab_acct3 = balance(adjEq="1000")
+        del missing_liab_acct3["details"][0]["liab"]
+        missing_liab_report3 = self.report({
+            "account_config": [config_row("3")],
+            "balance": [missing_liab_acct3],
+        })
+        self.assertNotIn("invalid_record:balance", missing_liab_report3["discrepancies"])
+        self.assertIn("unsupported_collateral", missing_liab_report3["discrepancies"])
+
+        null_liab_acct3 = balance(adjEq="1000")
+        null_liab_acct3["details"][0]["liab"] = None
+        null_liab_report3 = self.report({
+            "account_config": [config_row("3")],
+            "balance": [null_liab_acct3],
+        })
+        self.assertNotIn("invalid_record:balance", null_liab_report3["discrepancies"])
+        self.assertIn("unsupported_collateral", null_liab_report3["discrepancies"])
+
+        empty_liab_acct3 = balance(adjEq="1000")
+        empty_liab_acct3["details"][0]["liab"] = ""
+        empty_liab_report3 = self.report({
+            "account_config": [config_row("3")],
+            "balance": [empty_liab_acct3],
+        })
+        self.assertNotIn("invalid_record:balance", empty_liab_report3["discrepancies"])
+        self.assertIn("unsupported_collateral", empty_liab_report3["discrepancies"])
+
+        # 5. acctLv=3 + adjEq="" -> fail closed
+        invalid_acct3 = self.report({
+            "account_config": [config_row("3")],
+            "balance": [balance(adjEq="")],
+        })
+        self.assertIn("unsupported_collateral", invalid_acct3["discrepancies"])
+
+        # 6. adjEq key absent -> fail closed
+        absent_row = balance()
+        del absent_row["adjEq"]
+        report_absent = self.report({"balance": [absent_row]})
+        self.assertIn("invalid_record:balance", report_absent["discrepancies"])
+        self.assertEqual(report_absent["record_diagnostics"], [{
+            "alias": "balance", "page": 1, "row": 0, "field": "adjEq", "reason": "missing"}])
+
+        # 7. adjEq=None -> fail closed
+        none_row = balance(adjEq=None)
+        report_none = self.report({"balance": [none_row]})
+        self.assertIn("invalid_record:balance", report_none["discrepancies"])
+        self.assertEqual(report_none["record_diagnostics"], [{
+            "alias": "balance", "page": 1, "row": 0, "field": "adjEq", "reason": "missing"}])
+
+        # 8. adjEq=float/bool/malformed non-empty string -> fail closed
+        for bad in (True, False, "PRIVATE-BAD-DECIMAL", "NaN", "Infinity"):
+            with self.subTest(bad=bad):
+                bad_row = balance(adjEq=bad)
+                report_bad = self.report({"balance": [bad_row]})
+                self.assertIn("invalid_record:balance", report_bad["discrepancies"])
+                self.assertEqual(report_bad["record_diagnostics"], [{
+                    "alias": "balance", "page": 1, "row": 0, "field": "adjEq", "reason": "invalid_decimal"}])
+                with self.assertRaises(r._BalanceFieldError) as caught:
+                    r.decode_row("balance", bad_row)
+                self.assertEqual(caught.exception.field, "adjEq")
+                self.assertEqual(caught.exception.reason, "invalid_decimal")
+
+        with self.assertRaises(r._BalanceFieldError) as caught:
+            r.decode_row("balance", balance(adjEq=1.5))
+        self.assertEqual(caught.exception.field, "adjEq")
+        self.assertEqual(caught.exception.reason, "invalid_decimal")
+
+        # 9. totalEq 不得作為 USDT equity fallback
+        fallback_check_row = balance(totalEq="999999", adjEq="", details=[dict(
+            ccy="USDT", eq="1000", liab="0", availEq="900", ordFrozen="100", uTime="140")])
+        report_fallback = self.report({
+            "account_config": [config_row("2")],
+            "balance": [fallback_check_row],
+        })
+        fb_fact = next(f for f in report_fallback["facts"] if f["kind"] == "balance")
+        self.assertEqual(fb_fact["totalEq"], "999999")
+        self.assertIsNone(fb_fact["adjEq"])
+        self.assertEqual(fb_fact["details"][0]["eq"], "1000")
+        self.assertNotEqual(fb_fact["details"][0]["eq"], fb_fact["totalEq"])
 
 
 if __name__ == "__main__":

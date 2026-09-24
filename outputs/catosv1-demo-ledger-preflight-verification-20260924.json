@@ -1,0 +1,53 @@
+{
+  "version": "catosv1-demo-ledger-preflight-verification.v1",
+  "recorded_date": "2026-09-24",
+  "implementation": {
+    "module": "catos/demo_ledger_preflight.py",
+    "test": "tests/test_demo_ledger_preflight.py",
+    "intent_modes": ["create", "resume"],
+    "calls_journal_or_supervisor": false,
+    "creates_or_migrates_target_database": false,
+    "reconciled_on_success": false,
+    "trade_authorized_on_success": false
+  },
+  "fail_closed_coverage": [
+    "missing_or_invalid_explicit_settings",
+    "known_qa_database",
+    "existing_database_or_binding_path",
+    "residual_wal_or_shm_on_create",
+    "account_lock_database_conflict",
+    "incomplete_account_lock_binding",
+    "binding_uid_or_scope_mismatch",
+    "schema_version_or_required_table_mismatch",
+    "bot_config_or_ownership_or_protection_mismatch",
+    "fixture_budget_or_risk_limits_mismatch"
+  ],
+  "verification": {
+    "demo_ledger_preflight": "9/9 OK",
+    "demo_ledger_binding_regression": "4/4 OK",
+    "formal_reconciliation_regression": "33/33 OK",
+    "total": "46/46 OK",
+    "py_compile": "OK",
+    "independent_sol_acceptance": "PASS"
+  },
+  "acceptance_fix": {
+    "defect": "mode=ro on a quiescent WAL database created -wal/-shm sidecars during read-only preflight",
+    "resolution": "use mode=ro&immutable=1 when no sidecar pair exists; use mode=ro for an existing complete WAL/SHM pair; verify persisted WAL mode from the SQLite header",
+    "regression_coverage": [
+      "resume_does_not_create_wal_or_shm_sidecars",
+      "non_wal_database_fails_closed"
+    ]
+  },
+  "scope": {
+    "temporary_synthetic_sqlite_only": true,
+    "existing_workspace_trading_db_opened": false,
+    "existing_workspace_trading_db_modified": false,
+    "schema_modified": false,
+    "network_or_collection_used": false,
+    "demo_write_used": false,
+    "git_used": false,
+    "yaozi_lot_market_modified": false,
+    "qa_database_metadata_rechecked_read_only": 5
+  },
+  "previous_151_of_151_rerun": false
+}

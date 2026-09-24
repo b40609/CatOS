@@ -76,6 +76,114 @@ class SocialAssetRef:
         _coin_id(self.coinpaprika_id)
 
 
+EXPLICIT_SOCIAL_ASSETS_V1 = (
+    SocialAssetRef("AAVE-USDT-SWAP", "aave-new"),
+    SocialAssetRef("BTC-USDT-SWAP", "btc-bitcoin"),
+    SocialAssetRef("ETH-USDT-SWAP", "eth-ethereum"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V2 = EXPLICIT_SOCIAL_ASSETS_V1 + (
+    SocialAssetRef("LDO-USDT-SWAP", "ldo-lido-dao"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V3 = EXPLICIT_SOCIAL_ASSETS_V2 + (
+    SocialAssetRef("ENA-USDT-SWAP", "ena-ethena"),
+    SocialAssetRef("MORPHO-USDT-SWAP", "morpho-morpho"),
+    SocialAssetRef("ONDO-USDT-SWAP", "ondo-ondo"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V4 = EXPLICIT_SOCIAL_ASSETS_V3 + (
+    SocialAssetRef("ETHFI-USDT-SWAP", "ethfi-etherfi"),
+    SocialAssetRef("LINK-USDT-SWAP", "link-chainlink"),
+    SocialAssetRef("PAXG-USDT-SWAP", "paxg-pax-gold"),
+    SocialAssetRef("PENDLE-USDT-SWAP", "pendle-pendle"),
+    SocialAssetRef("QNT-USDT-SWAP", "qnt-quant"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V5 = EXPLICIT_SOCIAL_ASSETS_V4 + (
+    SocialAssetRef("AERO-USDT-SWAP", "aero-aerodrome-finance"),
+    SocialAssetRef("CAKE-USDT-SWAP", "cake-pancakeswap"),
+    SocialAssetRef("CRV-USDT-SWAP", "crv-curve-dao-token"),
+    SocialAssetRef("GRT-USDT-SWAP", "grt-the-graph"),
+    SocialAssetRef("VIRTUAL-USDT-SWAP", "virtual-virtual-protocol"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V6 = EXPLICIT_SOCIAL_ASSETS_V5 + (
+    SocialAssetRef("COMP-USDT-SWAP", "comp-compoundd"),
+    SocialAssetRef("UNI-USDT-SWAP", "uni-uniswap"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V7 = EXPLICIT_SOCIAL_ASSETS_V6 + (
+    SocialAssetRef("1INCH-USDT-SWAP", "1inch-1inch"),
+    SocialAssetRef("SUSHI-USDT-SWAP", "sushi-sushi"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V8 = EXPLICIT_SOCIAL_ASSETS_V7 + (
+    SocialAssetRef("SNX-USDT-SWAP", "snx-synthetix-network-token"),
+    SocialAssetRef("YFI-USDT-SWAP", "yfi-yearnfinance"),
+    SocialAssetRef("ZRX-USDT-SWAP", "zrx-0x"),
+)
+
+EXPLICIT_SOCIAL_ASSETS_V9 = EXPLICIT_SOCIAL_ASSETS_V8 + (
+    SocialAssetRef("API3-USDT-SWAP", "api3-api3"),
+    SocialAssetRef("ARB-USDT-SWAP", "arb-arbitrum"),
+    SocialAssetRef("BAT-USDT-SWAP", "bat-basic-attention-token"),
+    SocialAssetRef("CVX-USDT-SWAP", "cvx-convex-finance"),
+    SocialAssetRef("ENS-USDT-SWAP", "ens-ethereum-name-service"),
+    SocialAssetRef("GMX-USDT-SWAP", "gmx-gmx"),
+    SocialAssetRef("LPT-USDT-SWAP", "lpt-livepeer"),
+    SocialAssetRef("OP-USDT-SWAP", "op-optimism"),
+    SocialAssetRef("SPELL-USDT-SWAP", "spell-spell-token"),
+    SocialAssetRef("UMA-USDT-SWAP", "uma-uma"),
+)
+
+EXPLICIT_SOCIAL_ASSETS = EXPLICIT_SOCIAL_ASSETS_V9
+SOCIAL_EXPLICIT_REGISTRY_VERSION = "v9"
+SOCIAL_EXPLICIT_REGISTRY_CONTRACT = "catos-social-explicit-identity-registry-v9-delta"
+SOCIAL_EXPLICIT_REGISTRY_EVIDENCE = (
+    "outputs/yaozi-social-explicit-identity-registry-v9-20260923.json"
+)
+SOCIAL_EXPLICIT_REGISTRY_COVERAGE = {
+    "active_symbols": 734,
+    "resolved": 34,
+    "ambiguous_mapping": 242,
+    "unverified_identity": 291,
+    "missing_asset": 167,
+}
+
+
+def current_explicit_social_assets(symbols=None):
+    """Return the current verified registry, optionally restricted to requested symbols."""
+    if symbols is None:
+        return EXPLICIT_SOCIAL_ASSETS
+    if type(symbols) is not tuple or not symbols:
+        raise ValueError("invalid_social_universe")
+    requested = set()
+    for symbol in symbols:
+        _symbol(symbol)
+        requested.add(symbol)
+    return tuple(asset for asset in EXPLICIT_SOCIAL_ASSETS if asset.symbol in requested)
+
+
+def current_social_identity_registry():
+    """Describe current explicit identity readiness without implying metric materialization."""
+    return {
+        "version": SOCIAL_EXPLICIT_REGISTRY_VERSION,
+        "contract": SOCIAL_EXPLICIT_REGISTRY_CONTRACT,
+        "mapping_contract": SOCIAL_MAPPING_CONTRACT,
+        "evidence_path": SOCIAL_EXPLICIT_REGISTRY_EVIDENCE,
+        "explicit_identity_count": len(EXPLICIT_SOCIAL_ASSETS),
+        "assets": [
+            {"symbol": asset.symbol, "coinpaprika_id": asset.coinpaprika_id}
+            for asset in EXPLICIT_SOCIAL_ASSETS
+        ],
+        "coverage": dict(SOCIAL_EXPLICIT_REGISTRY_COVERAGE),
+        "coverage_basis": "baseline_derived_not_full_2026_09_23_live_distribution",
+        "runtime_mapping_entrypoint": "collect_current_coinpaprika_mapping",
+        "raw_metric_materialization": "separate_materialized_store",
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class SocialMappingIssue:
     symbol: str
@@ -263,6 +371,15 @@ def collect_coinpaprika_mapping(symbols, transport=None, *, explicit_assets=()):
             provider_rows=None,
             active_provider_rows=None,
         )
+
+
+def collect_current_coinpaprika_mapping(symbols, transport=None):
+    """Resolve a requested universe using the current verified explicit registry."""
+    return collect_coinpaprika_mapping(
+        symbols,
+        transport,
+        explicit_assets=current_explicit_social_assets(symbols),
+    )
 
 
 def parse_coinpaprika_social(asset, payload, observed_at_ms):

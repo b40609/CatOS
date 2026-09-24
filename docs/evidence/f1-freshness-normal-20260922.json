@@ -1,0 +1,93 @@
+{
+  "samples": [
+    {
+      "attempts": 41,
+      "batch_span_ms": 20159,
+      "checked_at_ms": 1790043199930,
+      "clock_sample_age_ms": 82,
+      "collection_complete": true,
+      "completed_ms": 1790043199765,
+      "end_public_time": {
+        "half_rtt_ms": 82.0,
+        "midpoint_ms": 1790043199848,
+        "offset_ms": 2848,
+        "recv_ms": 1790043199930,
+        "rtt_ms": 164,
+        "send_ms": 1790043199766,
+        "server_time_ms": 1790043202696
+      },
+      "report_age_ms": 165,
+      "sample": 1,
+      "started_ms": 1790043179606,
+      "trade_authorized": false,
+      "wire_attempts": 41
+    },
+    {
+      "attempts": 41,
+      "batch_span_ms": 20160,
+      "checked_at_ms": 1790043220248,
+      "clock_sample_age_ms": 79,
+      "collection_complete": true,
+      "completed_ms": 1790043220090,
+      "end_public_time": {
+        "half_rtt_ms": 79.0,
+        "midpoint_ms": 1790043220169,
+        "offset_ms": 2847,
+        "recv_ms": 1790043220248,
+        "rtt_ms": 158,
+        "send_ms": 1790043220090,
+        "server_time_ms": 1790043223016
+      },
+      "report_age_ms": 158,
+      "sample": 2,
+      "started_ms": 1790043199930,
+      "trade_authorized": false,
+      "wire_attempts": 41
+    },
+    {
+      "attempts": 41,
+      "batch_span_ms": 20216,
+      "checked_at_ms": 1790043240634,
+      "clock_sample_age_ms": 85,
+      "collection_complete": true,
+      "completed_ms": 1790043240464,
+      "end_public_time": {
+        "half_rtt_ms": 84.5,
+        "midpoint_ms": 1790043240549,
+        "offset_ms": 2846,
+        "recv_ms": 1790043240634,
+        "rtt_ms": 169,
+        "send_ms": 1790043240465,
+        "server_time_ms": 1790043243395
+      },
+      "report_age_ms": 170,
+      "sample": 3,
+      "started_ms": 1790043220248,
+      "trade_authorized": false,
+      "wire_attempts": 41
+    },
+    {
+      "attempts": 41,
+      "batch_span_ms": 20163,
+      "checked_at_ms": 1790043260929,
+      "clock_sample_age_ms": 66,
+      "collection_complete": true,
+      "completed_ms": 1790043260797,
+      "end_public_time": {
+        "half_rtt_ms": 65.5,
+        "midpoint_ms": 1790043260863,
+        "offset_ms": 2837,
+        "recv_ms": 1790043260929,
+        "rtt_ms": 131,
+        "send_ms": 1790043260798,
+        "server_time_ms": 1790043263700
+      },
+      "report_age_ms": 132,
+      "sample": 4,
+      "started_ms": 1790043240634,
+      "trade_authorized": false,
+      "wire_attempts": 41
+    }
+  ],
+  "version": "f1-freshness-normal.v1"
+}

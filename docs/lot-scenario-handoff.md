@@ -1,6 +1,17 @@
 # S6 開發交接：合成情境轉接
 
-狀態：依 [正式規格](../outputs/catos-s6-scenario-spec.md)完成程式與測試編寫，待Sol獨立驗收。Astra只做補丁與靜態閱讀，未執行測試、編譯、Git或資料庫操作。S5使用者回報的180/180與commit `274891981027cf554c590224f68f4ea7c46bb716`為歷史基線，不代表S6通過。
+## 正式驗收結果（2026-09-19 使用者回報）
+
+S6 已由 Sol 驗收並提交：`ecc897e3afc19ab03527a4e1529f060b83f21df7`，`feat(lots): add S6 synthetic scenario adapter`。
+
+- S6 34/34、S4 42/42、S5 39/39，合計 115/115，0 failure／error／skip。
+- Python 3.14.6、SQLite 3.50.4；`py_compile`、`git diff --check`、staged check 通過，未執行全量測試。
+- Schema、Risk、P6、execution／protection／交易路徑未變。
+- 回報時 `main` 相對 `origin/main` ahead 6。`docs/lot-snapshot-handoff.md` 的 S5 驗收紀錄及 market／yaozi 工作仍未提交，全部未納入 S6 commit。yaoI／yaozi 為使用者同步開發的獨立功能，不併入量化平台工作。
+
+本節依使用者回報補記，Astra 未重跑測試、編譯或查 Git；此文件更新發生於上述 commit 之後。下方保留原開發內容與驗收設計，歷史待驗收敘述不覆蓋本節結果。下一片範圍評估見 [S7 本機合成情境報告](../outputs/catos-s7-scenario-report-assessment.md)，尚未開始 S7 程式實作。
+
+原開發狀態：依 [正式規格](../outputs/catos-s6-scenario-spec.md)完成程式與測試編寫，交由 Sol 獨立驗收。Astra 開發階段只做補丁與靜態閱讀，未執行測試、編譯、Git或資料庫操作。
 
 ## 變更與語義
 

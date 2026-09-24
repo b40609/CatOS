@@ -1,0 +1,38 @@
+{
+  "recorded_at_utc": "2026-09-23T08:38:08Z",
+  "environment": "demo",
+  "account_alias": "catOSv1",
+  "credential_selection": "single_explicit_demo_block",
+  "status": "remote_checks_pass_local_unknown_unverified",
+  "started_ms": 1790152669318,
+  "completed_ms": 1790152675575,
+  "checks": {
+    "expected_uid": true,
+    "uid_differs_from_main_uid": true,
+    "net_mode": true,
+    "account_mode_contract_level_2_or_3": true,
+    "permission_contract": true,
+    "known_role": true,
+    "no_remote_position_records": true,
+    "no_remote_ordinary_orders": true,
+    "no_remote_algos_in_seven_queried_partitions": true
+  },
+  "request_counts": {
+    "account_config": 1,
+    "positions": 1,
+    "orders_pending": 1,
+    "algo_pending": 7,
+    "total_private_get": 10
+  },
+  "accepted_row_counts": {
+    "account_config": 1,
+    "positions": 0,
+    "orders_pending": 0,
+    "algo_pending_total": 0
+  },
+  "collection_complete_for_this_evidence_slice": true,
+  "local_unknown": "unverified_local_ledger_not_loaded",
+  "reconciled": false,
+  "trade_authorized": false,
+  "tests_rerun": false
+}

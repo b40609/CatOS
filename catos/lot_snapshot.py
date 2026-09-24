@@ -67,6 +67,12 @@ class LocalLotCaptureV2:
     schema_version: int = 8
 
 
+@dataclass(frozen=True, slots=True)
+class LocalLotCaptureV3(LocalLotCaptureV2):
+    capture_version: int = 3
+    schema_version: int = 9
+
+
 def validate_request(journal, scope, inst_id, observed_at_ms, valid_until_ms):
     try:
         journal.lots._scope(scope)
@@ -85,15 +91,16 @@ def validate_request(journal, scope, inst_id, observed_at_ms, valid_until_ms):
 
 def _fragments(capture):
     from catos import lot_snapshot_codec
-    v2 = type(capture) is LocalLotCaptureV2
+    v3 = type(capture) is LocalLotCaptureV3
+    v2 = type(capture) in (LocalLotCaptureV2, LocalLotCaptureV3)
     contract = {f.name: (capture.contract.inst_id if f.name == "inst_id" else
                          _numeric_identity(getattr(capture.contract, f.name)))
                 for f in fields(ContractSpec)}
-    header = dict(kind="header", format="catos-local-lot-capture-v2" if v2 else _FORMAT,
-                  schema_version=8 if v2 else 7, source=capture.source,
+    header = dict(kind="header", format="catos-local-lot-capture-v3" if v3 else ("catos-local-lot-capture-v2" if v2 else _FORMAT),
+                  schema_version=9 if v3 else (8 if v2 else 7), source=capture.source,
                   scope=ipc_lots._scope_to_wire(capture.scope), contract=contract)
     if v2:
-        header["capture_version"] = 2
+        header["capture_version"] = 3 if v3 else 2
     yield header
     for watermark in capture.bot_watermarks:
         yield dict(kind="bot_watermark", bot_id=watermark.bot_id,
@@ -120,7 +127,12 @@ def _fragments(capture):
 
 
 def _capture_id(capture):
-    if type(capture) is LocalLotCaptureV2:
+    if type(capture) is LocalLotCaptureV3:
+        if (type(capture.capture_version) is not int or capture.capture_version != 3
+                or type(capture.schema_version) is not int or capture.schema_version != 9):
+            raise LotStorageError("unsupported_fee_version")
+        domain = "catos-local-lot-capture-v3"
+    elif type(capture) is LocalLotCaptureV2:
         if (type(capture.capture_version) is not int or capture.capture_version != 2
                 or type(capture.schema_version) is not int or capture.schema_version != 8):
             raise LotStorageError("unsupported_fee_version")
@@ -137,7 +149,7 @@ def _capture_id(capture):
     return digest.hexdigest()
 
 
-def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms, *, v2=False):
+def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms, *, v2=False, v3=False):
     """Internal only: caller pins and owns the read transaction."""
     db = journal.connection
     if not db.in_transaction:
@@ -183,7 +195,7 @@ def _materialize(journal, scope, inst_id, observed_at_ms, valid_until_ms, *, v2=
             key, validated.intent_key, validated.bot_id, validated.lot_id,
             "OPEN" if opening else "CLOSE", side, validated.resolved_quantity, order["total"],
             exact_quantity(validated.resolved_quantity, order["total"].copy_negate()), order["count"]))
-    capture = (LocalLotCaptureV2 if v2 else LocalLotCapture)(
+    capture = (LocalLotCaptureV3 if v3 else (LocalLotCaptureV2 if v2 else LocalLotCapture))(
         "synthetic_ledger", scope, contract, "", observed_at_ms, valid_until_ms,
         tuple(BotWatermark(b.bot_id, b.last_commit_seq) for b in bindings), tuple(stored_lots), tuple(pending),
         tuple(s.lot.lot_id for s in stored_lots if s.lot.lot_id not in managed

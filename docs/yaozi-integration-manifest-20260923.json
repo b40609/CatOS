@@ -1,0 +1,352 @@
+{
+  "version": "catos-yaozi-integration-20260923.v1",
+  "scope": "decision-api-dashboard-social-local-only",
+  "source_root": "C:/Users/user/Desktop/CatOS_Yaozi",
+  "source_git_reference": {
+    "branch": "yaozi/dev-v0.7",
+    "head": "a4fb910",
+    "provenance": "user-relayed Sol audit; not rechecked by Astra; source is working tree including uncommitted content"
+  },
+  "method": "contextual patches; existing common sections preserved; normalize CRLF/LF for comparison",
+  "verification": "file-content comparison only; runtime and browser tests pending Sol",
+  "files": [
+    {
+      "name": "catos/market_decision.py",
+      "groups": [],
+      "source_sha256": "0750d8c84327cade3cd5d98359a2ea679b0aecdb4bb39de419810eb696f062c5",
+      "target_before_sha256": null,
+      "source_unchanged": true,
+      "target_after_sha256": "0750d8c84327cade3cd5d98359a2ea679b0aecdb4bb39de419810eb696f062c5",
+      "normalized_equal": true,
+      "normalized_sha256": "0750d8c84327cade3cd5d98359a2ea679b0aecdb4bb39de419810eb696f062c5"
+    },
+    {
+      "name": "catos/market_api.py",
+      "groups": [
+        [
+          [
+            "replace",
+            2,
+            6,
+            2,
+            7
+          ]
+        ],
+        [
+          [
+            "insert",
+            484,
+            484,
+            485,
+            565
+          ]
+        ],
+        [
+          [
+            "insert",
+            2236,
+            2236,
+            2317,
+            2335
+          ]
+        ]
+      ],
+      "source_sha256": "17a5c9e9940070a88a3fd284c046d8f534da36001efd47b0d9472965a05982b6",
+      "target_before_sha256": "6bf4cd90987dec90c38fb94dd51f57465a7f34f68329dd520aac518ad6ecaaca",
+      "source_unchanged": true,
+      "target_after_sha256": "ee4ccb33e8bd3c5bc4fb4bcd00dfcf047b32461512e6ea325b5f4f4cfc87a9c7",
+      "normalized_equal": true,
+      "normalized_sha256": "ee4ccb33e8bd3c5bc4fb4bcd00dfcf047b32461512e6ea325b5f4f4cfc87a9c7"
+    },
+    {
+      "name": "catos/market_dashboard.py",
+      "groups": [
+        [
+          [
+            "replace",
+            36,
+            37,
+            36,
+            37
+          ],
+          [
+            "replace",
+            42,
+            43,
+            42,
+            54
+          ],
+          [
+            "replace",
+            44,
+            45,
+            55,
+            56
+          ],
+          [
+            "replace",
+            46,
+            47,
+            57,
+            58
+          ],
+          [
+            "insert",
+            50,
+            50,
+            61,
+            75
+          ]
+        ],
+        [
+          [
+            "delete",
+            58,
+            60,
+            83,
+            83
+          ],
+          [
+            "replace",
+            61,
+            63,
+            84,
+            104
+          ],
+          [
+            "delete",
+            65,
+            67,
+            106,
+            106
+          ],
+          [
+            "insert",
+            68,
+            68,
+            107,
+            110
+          ],
+          [
+            "replace",
+            70,
+            71,
+            112,
+            121
+          ],
+          [
+            "insert",
+            74,
+            74,
+            124,
+            125
+          ]
+        ],
+        [
+          [
+            "replace",
+            82,
+            83,
+            133,
+            134
+          ],
+          [
+            "replace",
+            85,
+            89,
+            136,
+            140
+          ],
+          [
+            "replace",
+            92,
+            93,
+            143,
+            146
+          ],
+          [
+            "insert",
+            95,
+            95,
+            148,
+            156
+          ]
+        ],
+        [
+          [
+            "replace",
+            109,
+            110,
+            170,
+            171
+          ]
+        ]
+      ],
+      "source_sha256": "8cd1056db39a4545447e590b0f5c99c7aaa9c8bc19ebbe1b900163df6e00e030",
+      "target_before_sha256": "4d3057faf99831605e4bae900bb0953a93e949dddacf70666aaa63a0c9b96b97",
+      "source_unchanged": true,
+      "target_after_sha256": "94b4dc0ff326ec66d32818a8464f7d4bed040f24955aa163965571308de92bea",
+      "normalized_equal": true,
+      "normalized_sha256": "94b4dc0ff326ec66d32818a8464f7d4bed040f24955aa163965571308de92bea"
+    },
+    {
+      "name": "catos/market_social.py",
+      "groups": [
+        [
+          [
+            "insert",
+            76,
+            76,
+            76,
+            109
+          ]
+        ]
+      ],
+      "source_sha256": "6bedbabf916caaebb16e0b449ff8ce9404dd994d26ff5e8135cf304b4e2ca66e",
+      "target_before_sha256": "c919b2813a3f5abaec32a7bb56e701323c106ed5bab666fa134ee52bf6592c8b",
+      "source_unchanged": true,
+      "target_after_sha256": "b55f942035d4e04206379f3dea7e7671ca44c38ff268990067392aef3056e6d4",
+      "normalized_equal": true,
+      "normalized_sha256": "b55f942035d4e04206379f3dea7e7671ca44c38ff268990067392aef3056e6d4"
+    },
+    {
+      "name": "catos/market_lifecycle.py",
+      "groups": [
+        [
+          [
+            "replace",
+            71,
+            72,
+            71,
+            77
+          ]
+        ]
+      ],
+      "source_sha256": "678284f7df7f7c01017efa0d08132e605f9658f36e01646f6a2ae6bf500aed91",
+      "target_before_sha256": "c21d018eb52356bbff28f7a24c9adcc365dfecb0c6e4ef10ce87383a4c365aa6",
+      "source_unchanged": true,
+      "target_after_sha256": "7f31806c3a70b135fd06fc3dbc836e13f76994a223cf7fb0e400b849d73e2298",
+      "normalized_equal": true,
+      "normalized_sha256": "7e219d800db399ebfcdbe9a93709a8f1b0e6932387655b42b0505fc38587e5a5"
+    },
+    {
+      "name": "tests/test_market_api.py",
+      "groups": [
+        [
+          [
+            "insert",
+            265,
+            265,
+            265,
+            335
+          ]
+        ],
+        [
+          [
+            "insert",
+            432,
+            432,
+            502,
+            767
+          ]
+        ],
+        [
+          [
+            "insert",
+            985,
+            985,
+            1320,
+            1345
+          ]
+        ],
+        [
+          [
+            "insert",
+            1121,
+            1121,
+            1481,
+            1547
+          ],
+          [
+            "insert",
+            1122,
+            1122,
+            1548,
+            1681
+          ]
+        ]
+      ],
+      "source_sha256": "dd23cfc3920900dd2476bb9678491dc1704bf1b237056c632e64dbacf937af54",
+      "target_before_sha256": "e37dc1585739fd07f12fb727e8dc80ce4ec24fc24f560f9139ba377b4efa6233",
+      "source_unchanged": true,
+      "target_after_sha256": "8b9bb563be67dac6ec3d784c71655f7e7a52033105d50d06c490118269e626b1",
+      "normalized_equal": true,
+      "normalized_sha256": "8b9bb563be67dac6ec3d784c71655f7e7a52033105d50d06c490118269e626b1"
+    },
+    {
+      "name": "tests/test_market_social.py",
+      "groups": [
+        [
+          [
+            "insert",
+            9,
+            9,
+            9,
+            14
+          ]
+        ],
+        [
+          [
+            "insert",
+            64,
+            64,
+            69,
+            71
+          ],
+          [
+            "insert",
+            68,
+            68,
+            75,
+            103
+          ]
+        ],
+        [
+          [
+            "insert",
+            98,
+            98,
+            133,
+            320
+          ]
+        ]
+      ],
+      "source_sha256": "4ef55b5e434fb9d3017ee96f5b8f7dba8a5dddf7fad83ad43db44d5519e28e4e",
+      "target_before_sha256": "d878fcb72e471544009bccb5a2afc73ce1999519a9f43b207bf93be4555781df",
+      "source_unchanged": true,
+      "target_after_sha256": "551121e0fd4abd4e68dc589081a46133c9a65f30d87a6db856b8ef8a1e5cabe7",
+      "normalized_equal": true,
+      "normalized_sha256": "551121e0fd4abd4e68dc589081a46133c9a65f30d87a6db856b8ef8a1e5cabe7"
+    },
+    {
+      "name": "tests/test_market_signals.py",
+      "groups": [
+        [
+          [
+            "insert",
+            46,
+            46,
+            46,
+            77
+          ]
+        ]
+      ],
+      "source_sha256": "c91831e783f2ee8b70000d42bf210ce2cb78c20c14ef1e4a6b4e370673efba60",
+      "target_before_sha256": "120f4789f3c409982961434beff99fdf70cdd585427dbd99772b736a9e647837",
+      "source_unchanged": true,
+      "target_after_sha256": "800b7d54246b6242fe6dd4b21191bd3ef75d1fafdbf9aa74253d66ceda7a23d1",
+      "normalized_equal": true,
+      "normalized_sha256": "a99eab890182827c8bed2b537ea464b85969ccfa9510454b84efafb3d2b0acd9"
+    }
+  ]
+}

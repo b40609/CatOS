@@ -1,6 +1,36 @@
 # catOS 階段與分工規劃
 
-## 2026-09-21：S10 帳務缺口評估完成 Sol 獨立契約審查
+## 2026-09-21：主線轉回自動策略，Yaozi 限定收尾
+
+使用者已確認執行：自動策略優先；Yaozi 依 [v0.1 封版契約](docs/yaozi-v0.1-closeout.md)收尾，不再擴來源或追完整私有公式。Astra 已靜態核對實碼並完成[主線阻斷盤點](docs/catos-auto-strategy-readiness.md)；下一步 Sol 固定版本驗收既有離線修補，再推進正式唯讀對帳契約。現行 decoder／runner 固定 false，不以重跑採集代替 reconciliation gate。未執行測試、DB、Python 或 Git。
+
+S10 最新狀態為 Sol 已驗收：34/34 專屬、344/344 必要回歸，詳見 [S10 交接](docs/lot-fee-correction-handoff.md)；下方待驗收段落保留為歷史。Lot 不自動擴片。共用入口／README／本檔由主線整合者維護，Yaozi 僅改專屬文件；尚未建立 worktree，Sol 須先核對未提交來源與保存基線。主情報 DB 不自行升級，不新採集帳戶，不交易，不 push。
+
+## 2026-09-21：S10 已授權實作，Astra 編寫完成待驗收
+
+使用者在Sol規格通過後明確指示「授權 請開始」。Astra完成更正型別／兩步Decimal reducer、schema9固定表與同writer重放、精確前驅／重送／有效費用查詢、LotV2 codec＋S2 request v3、兩階段recovery與受限同subtotal revision特例、V3 capture／scenario／report。新增34個專屬測試方法及3份HTML的可選視覺fixture產生器，詳見 [S10 開發交接](docs/lot-fee-correction-handoff.md)。
+
+本輪依分工僅編寫與靜態閱讀，未執行Python、Decimal探針、編譯、DB、migration、單元／視覺測試或Git，不宣稱任何測試通過。極端subtotal案例分別標為reducer-only與受控replay-state stub，不冒充可達成交軌跡。schema7／8與S8／S9相容仍待Sol必要回歸；下一步Sol獨立驗收，保留所有其他未提交工作。
+
+## 2026-09-21：S10 正式規格通過 Sol 獨立審查
+
+Sol 依 [目前接續入口](docs/current-handoff.md)獨立核對 [S10 正式規格](outputs/catos-s10-fee-correction-spec.md)、S10 assessment、S9 契約與現行 Lot／Journal／capture 實碼，未發現阻斷缺陷。P1A／P2A、correction identity＋精確前驅、重送優先序、current head／active flags、unknown count 不變、schema9 新建隔離與 V3 下游版本均可進後續實作授權階段。
+
+本輪補強三個契約點：schema9 沿用 LotV2 snapshot 時，codec／validator 不得被現行 `schema_version == 8` 條件誤導而回退 v1；S2 僅 revision 變動的 correction 候選必須在 S3 deterministic replay 反向證明後才算完整 recovery 成功；V3 capture header 的 `format` 與 hash domain 都固定 `catos-local-lot-capture-v3`。僅文件審查，未執行 Python、Decimal 探針、DB、migration、單元／視覺測試；未 stage、commit 或 push。下一步等待使用者另行授權實作。
+
+## 2026-09-21：S10 正式規格起草完成，待 Sol 審查
+
+Astra 依使用者已定案 P1A／P2A 起草 [S10 正式規格](outputs/catos-s10-fee-correction-spec.md)。規格選定 schema9、event／S2 request／capture v3，沿用 LotV2 snapshot；包含 correction identity＋精確前驅、有效費用查詢、先重送後狀態驗證、兩步 Decimal 中間值限制、同 writer DDL／原子收據、五表重放及 S5–S7 呈現。不同有效 fee 但 subtotal 因捨入未變仍須建立版本，S2 僅在完整 correction 證據下允許此例外，外部 no-change 契約不放寬。
+
+本輪唯讀核對現行程式與 S9 規格／交接，僅新增規格並同步 assessment、README、current-handoff。沒有執行 Python、Decimal 探針、測試、DB、migration 或 Git；沒有修改程式。版本選擇與驗收矩陣為本次待審設計，不宣稱 Sol 已通過或測試已執行。下一步 Sol 獨立規格審查；實作另需授權，其他未提交工作保持原樣。
+
+## 2026-09-21：S10-P1／P2 使用者定案
+
+使用者明確同意 P1=A、P2=A：新 identity 同有效費用數值拒絕 no-change，不新增事件／revision；既有 identity 同內容重送仍先回原收據。Decimal 採既有 prec=50、ROUND_HALF_EVEN context，先從目前 subtotal 扣舊有效 fee，再加新 fee；接受有限精度往返痕跡，不改採差額先算或全量重加。此決策取代下節審查當時的待決狀態。
+
+Astra 本輪僅同步 assessment、README 與接續入口，未執行 Git、Python、Decimal 探針、測試或 DB 操作；其他未提交工作保留。下一步起草正式規格並交 Sol 獨立審查；尚未起草，未授權實作、既有 DB migration 或交易接線。版本及中間值／例外／rollback 細節留正式規格鎖定。
+
+## 2026-09-21：S10 帳務缺口評估完成 Sol 獨立契約審查（定案前紀錄）
 
 依使用者同意完成 [S10 assessment](outputs/catos-s10-accounting-gap-assessment.md)，比較已知費用更正與 funding 的失敗情境、依賴及驗證成本。Sol 獨立靜態核對確認先評估受管成交費用更正的排序理由成立：每筆更正需穩定 identity＋目前有效費用來源的精確前驅，先查舊 identity 重送再驗證前驅；funding 另需期間涵蓋與結算時歸屬證據。文件結論為「附待決政策可進正式規格」；新 identity 同值如何處理、Decimal 更新順序仍待使用者定案。
 
@@ -49,6 +79,12 @@ Astra 開發階段僅制定文件並靜態核對，未編寫或執行 S8 程式�
 依使用者同意完成 [S8 範圍評估](outputs/catos-s8-scenario-example-assessment.md)。建議採全新輸出目錄中的合成 Journal，經 S3 部分成交→S5 capture→S7 renderer 產生完整／降級 HTML；固定資料與時間，HTML 可重現，拒絕既有目錄及覆寫，保留合成 DB 與失敗產物、不自動清理。範例不引用 tests，不接受使用者 DB 或交易參數。此為評估建議，正式常數、入口及錯誤契約為下一交付，未開始 S8 程式。
 
 本輪僅閱讀與文件補丁，未執行 Python、測試、DB、報告生成或 Git；S7 及其他未提交功能維持獨立。
+
+## 2026-09-19：S7 已提交；下一片建議
+
+依使用者回報，S7 commit `e00c2b5`（`feat(lots): add S7 synthetic scenario report`），55/55 測試及四組 F01 渲染通過；靜態核對 40/40 report 欄位、16/16 reason code，diff／staged check 通過，未執行全量測試。提交僅包含 renderer、專屬測試、S7 handoff、README、WORK_PLAN；market、yaozi、S5／S6 既有紀錄仍未提交。本輪只補記提交資訊，未執行測試或 Git。
+
+下一片建議先評估「固定合成範例入口」：目前一般使用者若要重現報告，需自行組裝 capture／scenario 或借用測試 fixture；最小做法是隔離的本機範例，用明示固定時間與合成資料產生完整／降級報告，輸出不得覆寫既有檔案。驗證限範例可重現、來源語義與輸出路徑行為，既有 renderer 不重寫。是否需要此入口、範例是否使用臨時 Journal 及保存介面留待範圍評估，不先實作 CLI、讀取既有 DB、行情或交易接線；尚未視為核准的新切片。
 
 ## 2026-09-19：S7 renderer 已通過 Sol 驗收
 
