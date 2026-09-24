@@ -69,7 +69,12 @@ def _between(value, lower, upper):
 
 
 def smf_grade(score: Decimal | None) -> str | None:
-    """Validate a supplied SMF score and map it to the published grade bands."""
+    """Map a supplied score using the existing local grade convention.
+
+    Yaozi's rendered guide overlaps B/C at -20 and does not specify decimal
+    rounding. Keeping -20 in B preserves local compatibility; it is not proof
+    of Yaozi boundary equivalence. See docs/yaozi-v1.11-handoff.md.
+    """
     score = _decimal(score, "smf_score")
     if score is None:
         return None

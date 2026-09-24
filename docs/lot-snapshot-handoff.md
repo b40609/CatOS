@@ -1,6 +1,12 @@
 # S5 開發交接：一致 Lot／合成未決責任快照
 
-依 [正式S5規格](../outputs/catos-s5-snapshot-spec.md)完成程式與測試編寫，待Sol獨立質檢。Astra本輪未執行測試、編譯、Git、資料庫操作或外部請求。S4基線`8b16c0b244af611294ec0a98b8add835bb14008b`／76項通過為使用者回報，不是S5驗證結果。
+## 正式驗收結果（使用者回報）
+
+S5已由Sol驗收並提交：`274891981027cf554c590224f68f4ea7c46bb716`，`feat(lots): add S5 consistent snapshot capture`。專屬39/39、必要回歸141/141，合計180/180、0 failure/error/skip；真實雙connection WAL隔離與4096/4097邊界通過。Python3.14.6／SQLite3.50.4，diff/staged檢查通過；未執行全量測試。Schema7及既有Risk／execution／protection／交易路徑未變。
+
+回報時main ahead5；另有未提交且與S5無關的`outputs/yaozi-functional-parity-spec-v0.1.md`，不可稱工作區全乾淨。本次驗收紀錄更新在S5提交之後；Astra未重跑測試或查Git。下方保留原開發交付與驗證設計供追溯，驗證結果以上述回報為準。
+
+依 [正式S5規格](../outputs/catos-s5-snapshot-spec.md)完成程式與測試編寫。開發階段Astra未執行測試、編譯、Git、資料庫操作或外部請求。
 
 ## 變更
 

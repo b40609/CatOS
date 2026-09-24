@@ -57,19 +57,33 @@ class ExecutionJournal:
                 self.db.execute(f"DELETE FROM {table} WHERE intent_key=?", (row["intent_key"],))
         self.db.execute("UPDATE execution_orders SET settled=1,cancel_pending=0 WHERE order_key=?", (key,))
 
-    def _insert(self, key, bot, qty, reduce_only, deadline, epoch, amount, intent=None, state="SUBMITTING"):
+    def _insert(self, key, bot, qty, reduce_only, deadline, epoch, amount, intent=None,
+                state="SUBMITTING", demo_authorization_id=None):
         cl_id = digest(key)[:32]
         collision = self.db.execute("SELECT order_key FROM execution_orders WHERE cl_ord_id=?", (cl_id,)).fetchone()
         if collision is not None:
             raise JournalError("permanent client order id collision")
         contract = self.j._checkpoint(bot).config.contract
         payload = build_payload(contract, cl_id, qty, reduce_only)
+        stored_payload = dict(payload)
+        if demo_authorization_id is not None:
+            stored_payload["_demoAuthorizationId"] = ipc.token(
+                demo_authorization_id, "demo authorization id")
         self.db.execute("""INSERT INTO execution_orders
             (order_key,cl_ord_id,intent_key,bot_id,payload_json,quantity,filled,reservation,state,deadline,epoch)
             VALUES (?,?,?,?,?,?,'0',?,?,?,?)""",
-            (key, cl_id, intent, bot["bot_id"], canonical(payload), str(qty), str(amount), state, deadline, epoch))
+            (key, cl_id, intent, bot["bot_id"], canonical(stored_payload), str(qty), str(amount), state, deadline, epoch))
         return dict(order_key=key, payload=payload, epoch=epoch, risk_seq=self.j.risk_state().seq,
                     risk_time=self.j.risk_state().time_ms)
+
+    def consumed_demo_authorization_ids(self):
+        """Recover one-shot Demo IDs from durable orders without restoring grants."""
+        consumed = set()
+        for row in self.db.execute("SELECT payload_json,state FROM execution_orders"):
+            authorization_id = json.loads(row["payload_json"]).get("_demoAuthorizationId")
+            if authorization_id is not None and row["state"] != "ABORTED":
+                consumed.add(ipc.token(authorization_id, "stored demo authorization id"))
+        return frozenset(consumed)
 
     def _known(self, owner, position, *, allow_unknown_increase=False):
         protection = self.j.protection.state(owner['bot_id'])
@@ -78,7 +92,7 @@ class ExecutionJournal:
                 and (owner["unknown_count"] == 0 or allow_unknown_increase)
                 and owner["conditional_open"] == int(protection['active'] is not None))
 
-    def prepare(self, bot_id, intent_key, now_ms):
+    def prepare(self, bot_id, intent_key, now_ms, demo_authorization_id=None):
         ipc.integer(now_ms, "submit time")
         with self.j._transaction(), localcontext(research._CONTEXT):
             old = self.db.execute("SELECT order_key FROM execution_orders WHERE order_key=?", (intent_key,)).fetchone()
@@ -113,7 +127,7 @@ class ExecutionJournal:
                        and (verdict.reduce_only or not self.unresolved()))
             request = self._insert(intent_key, bot, qty, bool(row["reduce_only"]), deadline,
                                    state.epoch, D(row["amount"]), intent_key,
-                                   "SUBMITTING" if allowed else "ABORTED")
+                                   "SUBMITTING" if allowed else "ABORTED", demo_authorization_id)
             if not allowed:
                 self._release(intent_key)
                 return None

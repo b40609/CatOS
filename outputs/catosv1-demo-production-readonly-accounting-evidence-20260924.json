@@ -1,0 +1,186 @@
+{
+  "account_alias": "catOSv1",
+  "account_mode_verified": true,
+  "bootstrap_ready": false,
+  "collection_evidence_id": "ae428f317a0b33836e1dcb6d487ae8bb752232a26a842bcc2d3c5c36985855ed",
+  "credentials_persisted": false,
+  "current_responsibility_empty": {
+    "algo_orders": true,
+    "ordinary_orders": true,
+    "positions": true
+  },
+  "day_baseline_evidence_id": null,
+  "day_baseline_verified": false,
+  "discrepancies": [
+    "day_baseline_unverified",
+    "freshness_unverified",
+    "unknown_external_flow",
+    "window_coverage_unverified"
+  ],
+  "endpoint_complete": {
+    "account_config": true,
+    "algo_history": true,
+    "algo_pending": true,
+    "balance": true,
+    "bills": true,
+    "fills": true,
+    "orders_history": true,
+    "orders_pending": true,
+    "positions": true
+  },
+  "environment": "demo",
+  "expected_uid_sha256": "de2767e46722ea8f4bc32eb41a959ce801f99624cae253ad42e0ab852c2d51fd",
+  "flow_classification_complete_catalog": false,
+  "flow_classification_id": "okx-demo-subtypes-2026-09-22:f652ed099eace338",
+  "identity_verified": true,
+  "manifest": {
+    "collector_version": "i-b-1.v1",
+    "complete": true,
+    "completed_ms": 1790204902920,
+    "requests": 40,
+    "sources": [
+      {
+        "alias": "account_config",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "public_time",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "account_instruments",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "public_instruments",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "balance",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "positions",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": false
+      },
+      {
+        "alias": "orders_pending",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": false
+      },
+      {
+        "alias": "algo_pending",
+        "complete": true,
+        "pages": 7,
+        "requests": 7,
+        "rows": 0,
+        "window_evidence": false
+      },
+      {
+        "alias": "mark_price",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": false
+      },
+      {
+        "alias": "orders_history",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": false
+      },
+      {
+        "alias": "fills",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": true
+      },
+      {
+        "alias": "bills",
+        "complete": true,
+        "pages": 2,
+        "requests": 2,
+        "rows": 7,
+        "window_evidence": true
+      },
+      {
+        "alias": "algo_history",
+        "complete": true,
+        "pages": 21,
+        "requests": 21,
+        "rows": 0,
+        "window_evidence": false
+      }
+    ],
+    "started_ms": 1790204883242,
+    "window_end_ms": 1790204883242,
+    "window_start_ms": 1790118483242
+  },
+  "monetary_values_persisted": false,
+  "network_read_only_get": true,
+  "observed_flow_counts": {
+    "forbidden": 0,
+    "unknown": 6
+  },
+  "observed_flow_type_counts": [
+    {
+      "classification": "external",
+      "count": 4,
+      "subType": "11",
+      "subTypeDesc": "Transfer in",
+      "type": "1",
+      "typeDesc": "Transfer"
+    },
+    {
+      "classification": "external",
+      "count": 3,
+      "subType": "12",
+      "subTypeDesc": "Transfer out",
+      "type": "1",
+      "typeDesc": "Transfer"
+    }
+  ],
+  "provenance": "production_readonly.v1",
+  "raw_ids_persisted": false,
+  "raw_payload_persisted": false,
+  "reconciled": false,
+  "record_diagnostics": [],
+  "recorded_date": "2026-09-24",
+  "report_content_digest": "b5f21f09ad03b5020019df2acf91096ae0ab18ea0e9d8a25a48035f5e89d4d23",
+  "status": "collected",
+  "trade_authorized": false,
+  "uid_digest_source": "operator_verified_demo_uid.v1",
+  "version": "catosv1-demo-production-readonly-accounting-evidence.v1"
+}

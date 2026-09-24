@@ -132,6 +132,11 @@ def render_synthetic_scenario_report_v2(*, capture, scenario, now_ms):
     return _render(capture, scenario, observation)
 
 
+def render_synthetic_scenario_report_v3(*, capture, scenario, now_ms):
+    observation = lot_scenario.observe_synthetic_scenario_v3(capture=capture, scenario=scenario, now_ms=now_ms)
+    return _render(capture, scenario, observation)
+
+
 def _fee_section(quality):
     rows = []
     for item in quality:
@@ -165,6 +170,9 @@ def _render(capture, scenario, observation):
         _row("source_capture_id", "來源 capture 身份", observation.source_capture_id),
         _row("scenario_cut_id", "明示合成情境截點", observation.scenario_cut_id),
     ]
+    if type(observation) is lot_scenario.SyntheticScenarioObservationV3:
+        identity.append(_row("capture.version", "資料版本",
+                             "capture v3／schema9；費用為此截點的有效小計"))
     for key, label in (("lot_cut_id", "Lot 截點"), ("physical_cut_id", "合成實體截點"),
                        ("pending_cut_id", "未決責任截點"), ("quote_id", "合成 mark 報價身份")):
         identity.append(_row(key, label, getattr(report, key), missing="未提供"))

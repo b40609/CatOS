@@ -1,0 +1,60 @@
+{
+  "version": "catosv1-demo-ledger-bootstrap-plan-verification.v1",
+  "recorded_date": "2026-09-24",
+  "implementation": {
+    "module": "catos/demo_ledger_bootstrap.py",
+    "test": "tests/test_demo_ledger_bootstrap.py",
+    "production_database_relative_path": "data/catosv1-demo/state.sqlite3",
+    "production_binding_relative_path": "data/catosv1-demo/ledger-binding.json",
+    "uid_digest_source": "operator_verified_demo_uid.v1",
+    "historical_evidence_provenance": "production_readonly.v1",
+    "creates_target_database": false,
+    "writes_binding": false,
+    "calls_supervisor": false,
+    "reconciled_on_ready": false,
+    "trade_authorized_on_ready": false
+  },
+  "historical_bridge": {
+    "requires_identity_and_account_mode": true,
+    "requires_complete_accounting_endpoints": true,
+    "requires_current_remote_responsibility_empty": true,
+    "requires_zero_observed_unknown_flow": true,
+    "requires_zero_observed_forbidden_activity": true,
+    "requires_verified_exact_midnight_e0": true,
+    "synthetic_or_qa_provenance_rejected": true,
+    "empty_remote_alone_is_sufficient": false
+  },
+  "verification": {
+    "demo_ledger_bootstrap": "7/7 OK",
+    "demo_ledger_preflight_regression": "9/9 OK",
+    "total": "16/16 OK",
+    "py_compile": "OK",
+    "git_diff_check_scoped": "OK",
+    "independent_sol_acceptance": "PASS",
+    "independent_sol_demo_ledger_bootstrap": "7/7 OK",
+    "independent_sol_demo_ledger_preflight": "9/9 OK",
+    "independent_sol_total": "16/16 OK",
+    "independent_sol_py_compile": "OK",
+    "independent_sol_git_diff_check_scoped": "OK"
+  },
+  "scope": {
+    "temporary_synthetic_test_state_only": true,
+    "production_database_exists_after_verification": false,
+    "production_binding_exists_after_verification": false,
+    "production_directory_exists_after_verification": false,
+    "existing_workspace_trading_db_modified": false,
+    "schema_modified": false,
+    "network_or_collection_used": false,
+    "credentials_read": false,
+    "demo_or_live_write_used": false,
+    "git_commit_or_push_used": false,
+    "yaozi_lot_market_modified": false
+  },
+  "remaining_blockers": [
+    "real_expected_uid_digest_not_supplied_to_bootstrap_plan",
+    "real_bot_config_fixture_budget_and_risk_limits_not_supplied",
+    "complete_production_balance_fills_bills_and_related_accounting_not_collected",
+    "d1a_exact_midnight_e0_not_available",
+    "production_ledger_and_binding_instance_not_created"
+  ]
+}

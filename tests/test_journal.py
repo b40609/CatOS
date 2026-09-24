@@ -16,7 +16,10 @@ D = Decimal
 
 
 def proof(revision, **changes):
-    return replace(Reconciliation(revision, "synthetic-evidence", D("0"), 0, 0, 0, True), **changes)
+    result = replace(Reconciliation(revision, "synthetic-evidence", D("0"), 0, 0, 0, True), **changes)
+    if result.position != 0 and "remote_position_id" not in changes:
+        result = replace(result, remote_position_id="synthetic-position")
+    return result
 
 
 def input_for(index, price="100"):
@@ -169,6 +172,37 @@ class JournalTests(unittest.TestCase):
         for identity in (None, "stranger"):
             with self.assertRaisesRegex(OwnershipError, "taken over"):
                 self.journal.reconcile("bot", proof(0, position=D("1"), attributed_bot_id=identity))
+
+    def test_nonzero_position_identity_is_durable_and_flat_reconciliation_clears_it(self):
+        self.journal.reconcile("bot", proof(0, position=D("1"), attributed_bot_id="bot",
+                                            remote_position_id="remote-position"))
+        snap = self.journal.reconciliation_snapshot("bot")
+        self.assertEqual(snap.owned_remote_position_ids, ((config().contract.inst_id, "remote-position"),))
+        self.reopen()
+        snap = self.journal.reconciliation_snapshot("bot")
+        self.assertEqual(snap.owned_remote_position_ids, ((config().contract.inst_id, "remote-position"),))
+        self.journal.reconcile("bot", proof(snap.bot_revision))
+        self.assertIsNone(self.journal.snapshot("bot")["owner"]["remote_pos_id"])
+
+    def test_core_schema_migrates_legacy_columns_and_rejects_partial_state(self):
+        self.journal.close()
+        self.journal = None
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute("ALTER TABLE ownership DROP COLUMN remote_pos_id")
+            connection.execute("ALTER TABLE metadata DROP COLUMN core_schema_version")
+        self.journal = Journal(self.path, "fake-account", D("100"))
+        metadata = self.journal.connection.execute(
+            "SELECT core_schema_version FROM metadata").fetchone()[0]
+        columns = {row[1] for row in self.journal.connection.execute("PRAGMA table_info(ownership)")}
+        self.assertEqual(metadata, 2)
+        self.assertIn("remote_pos_id", columns)
+        self.assertEqual(self.journal.connection.execute("PRAGMA user_version").fetchone()[0], 7)
+        self.journal.close()
+        self.journal = None
+        with closing(sqlite3.connect(self.path)) as connection, connection:
+            connection.execute("UPDATE metadata SET core_schema_version=1")
+        with self.assertRaisesRegex(JournalError, "partial core schema"):
+            Journal(self.path, "fake-account", D("100"))
 
     def test_invalid_database_identity_budget_and_schema_are_not_rebuilt(self):
         self.journal.close()

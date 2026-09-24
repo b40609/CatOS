@@ -1,0 +1,32 @@
+{
+  "recorded_at_utc": "2026-09-23T08:21:30Z",
+  "environment": "demo",
+  "account_alias": "catOSv1",
+  "credential_source": "C:/Users/user/Desktop/OKX_API.txt",
+  "credential_selection": "single_explicit_demo_block",
+  "status": "config_gate_failed_account_level",
+  "checks": {
+    "expected_uid": true,
+    "uid_differs_from_main_uid": true,
+    "pos_mode_net": true,
+    "account_level_2_or_3": false,
+    "observed_account_level": "1",
+    "permission_contract": true,
+    "known_role": true,
+    "remote_positions": "not_run",
+    "remote_ordinary_orders": "not_run",
+    "remote_algos": "not_run",
+    "local_unknown": "unverified_local_ledger_not_loaded"
+  },
+  "private_get_count": 2,
+  "private_get_endpoints": ["account_config", "account_config"],
+  "collection_complete": false,
+  "reconciled": false,
+  "trade_authorized": false,
+  "tests": {
+    "command": "python -B -m unittest tests.test_demo_subaccount_evidence tests.test_demo_collection -q",
+    "passed": 21,
+    "failed": 0,
+    "synthetic_only": true
+  }
+}

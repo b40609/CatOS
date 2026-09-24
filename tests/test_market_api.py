@@ -263,6 +263,76 @@ class MarketApiTests(unittest.TestCase):
                 ))
         self.store.record_candles(tuple(candles))
 
+    def _seed_multi_symbol_decision_fixture(self):
+        """Create deliberately non-alphabetical decision ranks for contract QA."""
+        j = lambda value: json.dumps(value, separators=(",", ":"), sort_keys=True)
+        c = self.store.connection
+        rows = {
+            "SOL-USDT-SWAP": {
+                "price": "150", "change_1h": "3", "change_24h": "6",
+                "oi_delta": "5", "taker": "0.62", "cvd": "350000",
+                "opportunity": ("active", "95"), "risk": ("watch", "70"),
+            },
+            "ETH-USDT-SWAP": {
+                "price": "3200", "change_1h": "-2", "change_24h": "-4",
+                "oi_delta": "4", "taker": "0.41", "cvd": "-280000",
+                "opportunity": ("active", "55"), "risk": ("high_risk", "88"),
+            },
+            "XRP-USDT-SWAP": {
+                "price": "2", "change_1h": "2", "change_24h": "-3",
+                "oi_delta": "2", "taker": "0.57", "cvd": "-125000",
+                "opportunity": None, "risk": None,
+            },
+            "ADA-USDT-SWAP": {
+                "price": "1", "change_1h": "1", "change_24h": "2",
+                "oi_delta": "3", "taker": "0.58", "cvd": "90000",
+                "opportunity": None, "risk": None,
+            },
+        }
+        for index, (symbol, row) in enumerate(rows.items(), 1):
+            observed_at_ms = 9_000 + index
+            c.execute(
+                "INSERT INTO instrument VALUES (?,?,?,?,?,?,?)",
+                (symbol, symbol, j(["FIXTURE"]), j([]), 1, 1000, observed_at_ms),
+            )
+            c.execute(
+                "INSERT INTO market_snapshot VALUES (?,?,?,?,?,?,?,?,?)",
+                (f"multi-m{index}", symbol, observed_at_ms, row["price"], "1000000",
+                 row["change_1h"], row["change_24h"], None,
+                 j({"primary_market": "FIXTURE", "issues": []})),
+            )
+            c.execute(
+                "INSERT INTO derivative_snapshot VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (symbol, observed_at_ms, "1000", "1", "2", "3", "0",
+                 row["oi_delta"], row["taker"], None, j({"source": "fixture"})),
+            )
+            c.execute(
+                "INSERT INTO flow_snapshot VALUES (?,?,?,?,?,?,?,?,?)",
+                (symbol, observed_at_ms, row["cvd"], row["taker"], 100,
+                 observed_at_ms - 1000, observed_at_ms, 1, j({"source": "fixture"})),
+            )
+            for view_name in ("opportunity", "risk"):
+                state_score = row[view_name]
+                if state_score is None:
+                    continue
+                state, score = state_score
+                c.execute(
+                    "INSERT INTO view_state VALUES (?,?,?,?,?,?,?)",
+                    (symbol, view_name, observed_at_ms, state, score, 0,
+                     j({"evaluation_status": "AVAILABLE", "fixture": "multi-symbol-order"})),
+                )
+
+        # Lifecycle context is intentionally strongest on symbols that do not lead
+        # the actionable arrays. Decision Surface must ignore it for ranking.
+        for cycle_id, symbol, first_price, latest_price, since_return in (
+                ("multi-cycle-eth", "ETH-USDT-SWAP", "3300", "3200", "-30"),
+                ("multi-cycle-ada", "ADA-USDT-SWAP", "0.5", "1", "100")):
+            c.execute(
+                "INSERT INTO cycle VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (cycle_id, symbol, 8000, None, first_price, 9500, 9, latest_price,
+                 first_price, since_return, "-5", None),
+            )
+
     def test_reader_is_sqlite_read_only(self):
         with self.reader._connect() as connection:
             with self.assertRaises(sqlite3.OperationalError):
@@ -430,6 +500,271 @@ class MarketApiTests(unittest.TestCase):
             "HIT",
         )
         self.assertEqual(momentum["items"][0]["funnel"]["status"], "not_materialized")
+
+    def test_decision_surface_requires_multi_domain_direction_and_is_traceable(self):
+        result = self.reader.decision_surface()
+        self.assertEqual(result["contract_version"], "catos-decision-surface-v0.2")
+        self.assertEqual(result["direction"], "bullish")
+        self.assertEqual(result["market_regime"], "selective_bullish")
+        self.assertEqual(result["confidence"]["score_text"], "100")
+        self.assertEqual(result["confidence"]["available_direction_domains"], 3)
+        self.assertEqual(
+            {item["domain"] for item in result["evidence_for"]},
+            {"price", "derivatives", "capital_flow"},
+        )
+        self.assertEqual(result["top_opportunities"][0]["symbol"], SYMBOL)
+        self.assertEqual(result["top_risks"][0]["state"], "watch")
+        self.assertEqual(result["watchlist"]["items"][0]["priority_reasons"],
+                         ["active_opportunity"])
+        price_signal = result["domains"]["price"]["items"][0]["signals"][0]
+        self.assertEqual(price_signal["evidence_refs"][0]["table"], "market_snapshot")
+        self.assertFalse(result["trading_authority"])
+
+    def test_decision_surface_does_not_promote_single_available_domain(self):
+        self.store.connection.execute("DELETE FROM derivative_snapshot")
+        self.store.connection.execute("DELETE FROM flow_snapshot")
+        result = self.reader.decision_surface()
+        self.assertEqual(result["direction"], "unavailable")
+        self.assertEqual(result["confidence"]["available_direction_domains"], 1)
+        self.assertEqual(result["confidence"]["score_text"], "33.33")
+        self.assertIn(
+            {"capability": "direction_domain:derivatives",
+             "reason": "no_materialized_direction_evidence"},
+            result["unavailable"],
+        )
+        self.assertIn(
+            {"capability": "direction_domain:capital_flow",
+             "reason": "no_materialized_direction_evidence"},
+            result["unavailable"],
+        )
+
+    def test_decision_surface_exposes_market_direction_timing_skew_without_policy(self):
+        self.store.connection.execute(
+            "UPDATE derivative_snapshot SET observed_at_ms=5500 WHERE symbol=?",
+            (SYMBOL,),
+        )
+        freshness = self.reader.decision_surface()["freshness"]
+
+        self.assertEqual(freshness["timing_contract"], "catos-decision-timing-diagnostics-v0.5")
+        self.assertEqual(freshness["time_alignment_status"], "not_evaluated_no_skew_policy")
+        self.assertEqual(
+            freshness["by_direction_domain_observed_at_ms"],
+            {"price": 4000, "derivatives": 5500, "capital_flow": 4000},
+        )
+        self.assertEqual(freshness["direction_evidence_domain_count"], 3)
+        self.assertEqual(freshness["oldest_direction_evidence_at_ms"], 4000)
+        self.assertEqual(freshness["latest_direction_evidence_at_ms"], 5500)
+        self.assertEqual(freshness["direction_evidence_span_ms"], 1500)
+
+    def test_decision_surface_preserves_cross_domain_disagreement(self):
+        self.store.connection.execute(
+            "UPDATE derivative_snapshot SET oi_delta_1h_text='0',taker_buy_ratio_text='0.45' "
+            "WHERE symbol=?",
+            (SYMBOL,),
+        )
+        result = self.reader.decision_surface()
+        self.assertEqual(result["direction"], "bullish")
+        self.assertEqual(result["confidence"]["score_text"], "66.67")
+        self.assertEqual(
+            {item["domain"] for item in result["evidence_against"]}, {"derivatives"})
+        self.assertIn(
+            {
+                "type": "cross_domain_disagreement",
+                "bullish_domains": ["price", "capital_flow"],
+                "bearish_domains": ["derivatives"],
+            },
+            result["conflicts"],
+        )
+
+    def test_symbol_decision_reuses_v02_domains_and_actionable_rank(self):
+        result = self.reader.symbol_decision(SYMBOL)
+
+        self.assertEqual(result["contract_version"], "catos-symbol-decision-v0.3")
+        self.assertEqual(result["symbol"], SYMBOL)
+        self.assertEqual(result["direction"], "bullish")
+        self.assertEqual(result["confidence"]["score_text"], "100")
+        self.assertEqual(result["confidence"]["available_direction_domains"], 3)
+        self.assertEqual(
+            {name: item["status"] for name, item in result["domains"].items()},
+            {"price": "bullish", "derivatives": "bullish", "capital_flow": "bullish"},
+        )
+        self.assertEqual(result["actionability"]["top_opportunity"]["rank"], 1)
+        self.assertEqual(result["actionability"]["top_risk"]["rank"], 1)
+        self.assertEqual(
+            result["actionability"]["watchlist"]["priority_reasons"],
+            ["active_opportunity"],
+        )
+        self.assertEqual(result["market_context"]["alignment"], "aligned")
+        self.assertFalse(result["trading_authority"])
+
+    def test_symbol_decision_preserves_domain_conflict_without_browser_formula(self):
+        self._seed_multi_symbol_decision_fixture()
+        result = self.reader.symbol_decision("XRP-USDT-SWAP")
+
+        self.assertEqual(result["direction"], "no_direction")
+        self.assertEqual(result["confidence"]["score_text"], "33.33")
+        self.assertEqual(result["domains"]["price"]["status"], "conflict")
+        self.assertEqual(result["domains"]["derivatives"]["status"], "bullish")
+        self.assertEqual(result["domains"]["capital_flow"]["status"], "bearish")
+        self.assertIn(
+            {
+                "type": "cross_domain_disagreement",
+                "bullish_domains": ["derivatives"],
+                "bearish_domains": ["capital_flow"],
+            },
+            result["conflicts"],
+        )
+        self.assertEqual(result["conflicts"][1]["type"], "within_symbol_domain_conflict")
+        self.assertIsNone(result["actionability"]["top_opportunity"])
+        self.assertIsNone(result["actionability"]["top_risk"])
+        self.assertEqual(result["actionability"]["watchlist"]["priority_reasons"],
+                         ["direction_conflict"])
+        self.assertEqual(result["private_formula_status"], "not_inferred")
+
+    def test_symbol_decision_fails_closed_when_only_one_direction_domain_exists(self):
+        self.store.connection.execute("DELETE FROM derivative_snapshot")
+        self.store.connection.execute("DELETE FROM flow_snapshot")
+        result = self.reader.symbol_decision(SYMBOL)
+
+        self.assertEqual(result["direction"], "unavailable")
+        self.assertEqual(result["confidence"]["available_direction_domains"], 1)
+        self.assertEqual(result["confidence"]["score_text"], "33.33")
+        self.assertEqual(result["domains"]["derivatives"]["status"], "unavailable")
+        self.assertEqual(result["domains"]["capital_flow"]["status"], "unavailable")
+        self.assertEqual(result["market_context"]["alignment"], "not_evaluated")
+
+    def test_symbol_decision_exposes_timing_skew_without_stale_policy(self):
+        self.store.connection.execute(
+            "UPDATE derivative_snapshot SET observed_at_ms=5500 WHERE symbol=?",
+            (SYMBOL,),
+        )
+        result = self.reader.symbol_decision(SYMBOL)
+        freshness = result["freshness"]
+
+        self.assertEqual(freshness["timing_contract"], "catos-decision-timing-diagnostics-v0.5")
+        self.assertEqual(freshness["time_alignment_status"], "not_evaluated_no_skew_policy")
+        self.assertEqual(
+            freshness["by_domain_observed_at_ms"],
+            {"price": 4000, "derivatives": 5500, "capital_flow": 4000},
+        )
+        self.assertEqual(freshness["direction_evidence_domain_count"], 3)
+        self.assertEqual(freshness["oldest_direction_evidence_at_ms"], 4000)
+        self.assertEqual(freshness["latest_direction_evidence_at_ms"], 5500)
+        self.assertEqual(freshness["direction_evidence_span_ms"], 1500)
+        self.assertEqual(self.reader.decision_compare()["items"][0]["direction_evidence_span_ms"], 1500)
+
+    def test_decision_compare_preserves_watchlist_rank_without_new_score(self):
+        self._seed_multi_symbol_decision_fixture()
+        result = self.reader.decision_compare()
+
+        self.assertEqual(result["contract_version"], "catos-decision-compare-v0.4")
+        self.assertEqual(
+            result["ordering_contract"],
+            "risk_then_opportunity_then_conflict_then_multi_domain_v1",
+        )
+        self.assertEqual(result["ordering_source"], "decision_surface.watchlist.items")
+        self.assertIsNone(result["comparison_score"])
+        self.assertEqual(
+            [item["symbol"] for item in result["items"]],
+            [
+                "ETH-USDT-SWAP",
+                "SOL-USDT-SWAP",
+                "BTC-USDT-SWAP",
+                "XRP-USDT-SWAP",
+                "ADA-USDT-SWAP",
+            ],
+        )
+        self.assertEqual([item["watch_rank"] for item in result["items"]], [1, 2, 3, 4, 5])
+        eth, sol, _, xrp, ada = result["items"]
+        self.assertEqual(eth["risk"]["rank"], 1)
+        self.assertEqual(eth["opportunity"]["rank"], 3)
+        self.assertEqual(sol["opportunity"]["rank"], 1)
+        self.assertEqual(sol["risk"]["rank"], 2)
+        self.assertEqual(xrp["direction"], "no_direction")
+        self.assertEqual(xrp["domains"]["price"], "conflict")
+        self.assertEqual(ada["priority_reasons"], ["multi_domain_bullish"])
+        self.assertFalse(result["trading_authority"])
+
+        limited = self.reader.decision_compare(2)
+        self.assertEqual([item["watch_rank"] for item in limited["items"]], [1, 2])
+
+    def test_decision_surface_multi_symbol_contract_preserves_exact_rank_order(self):
+        self._seed_multi_symbol_decision_fixture()
+        result = self.reader.decision_surface()
+
+        self.assertEqual(
+            [item["symbol"] for item in result["top_opportunities"]],
+            ["SOL-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+        )
+        self.assertEqual(
+            [item["rank"] for item in result["top_opportunities"]],
+            [1, 2, 3],
+        )
+        self.assertEqual(
+            [item["symbol"] for item in result["top_risks"]],
+            ["ETH-USDT-SWAP", "SOL-USDT-SWAP", "BTC-USDT-SWAP"],
+        )
+        self.assertEqual(
+            [item["rank"] for item in result["top_risks"]],
+            [1, 2, 3],
+        )
+        watch_items = result["watchlist"]["items"]
+        self.assertEqual(
+            [item["symbol"] for item in watch_items],
+            [
+                "ETH-USDT-SWAP",
+                "SOL-USDT-SWAP",
+                "BTC-USDT-SWAP",
+                "XRP-USDT-SWAP",
+                "ADA-USDT-SWAP",
+            ],
+        )
+        self.assertEqual([item["rank"] for item in watch_items], [1, 2, 3, 4, 5])
+        self.assertEqual(
+            [item["priority_reasons"] for item in watch_items],
+            [
+                ["high_risk"],
+                ["active_opportunity"],
+                ["active_opportunity"],
+                ["direction_conflict"],
+                ["multi_domain_bullish"],
+            ],
+        )
+
+        opportunity_refs = [item["evidence_refs"][0] for item in result["top_opportunities"]]
+        self.assertEqual([ref["table"] for ref in opportunity_refs], ["view_state"] * 3)
+        self.assertEqual(
+            [ref["view_name"] for ref in opportunity_refs],
+            ["opportunity", "opportunity", "opportunity"],
+        )
+        self.assertEqual(result["top_opportunities"][0]["evidence"]["fixture"],
+                         "multi-symbol-order")
+        self.assertEqual(result["top_risks"][0]["evidence_refs"][0]["view_name"], "risk")
+
+        unavailable = {item["capability"] for item in result["unavailable"]}
+        self.assertTrue({
+            "dealer_direction", "options_direction", "onchain_direction",
+            "liquidity_direction", "social_direction", "wall_clock_freshness",
+        }.issubset(unavailable))
+        self.assertNotIn(
+            "neutral",
+            {item["direction"] for item in result["data_quality"]["direction_domains"].values()},
+        )
+
+        # ADA has an active +100 lifecycle cycle but remains watchlist #5 and is
+        # absent from actionable opportunity/risk arrays; lifecycle does not rank.
+        self.assertIn(
+            "ADA-USDT-SWAP",
+            {item["symbol"] for item in self.reader.holdings()["items"]},
+        )
+        self.assertNotIn(
+            "ADA-USDT-SWAP",
+            [item["symbol"] for item in result["top_opportunities"]],
+        )
+        self.assertNotIn(
+            "ADA-USDT-SWAP",
+            [item["symbol"] for item in result["top_risks"]],
+        )
 
     def test_cross_axis_and_status_label_reader_surfaces_are_unranked_and_explicit(self):
         cross_axis = self.reader.cross_axis(symbol=SYMBOL)
@@ -912,7 +1247,7 @@ class MarketApiTests(unittest.TestCase):
             5_000,
         ))
         client = TestClient(create_app(self.path))
-        dashboard = client.get("/")
+        dashboard = client.get("/dashboard")
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn("catOS Market Intel", dashboard.text)
         self.assertIn("Whale / DEX", dashboard.text)
@@ -983,6 +1318,31 @@ class MarketApiTests(unittest.TestCase):
             "2.0408163265306122448979591836734693877551020408163",
         )
         self.assertEqual(today["views"]["momentum"]["items"][0]["l2_state_count"], 14)
+        decision = client.get("/intel/decision-surface").json()
+        self.assertEqual(decision["direction"], "bullish")
+        self.assertEqual(decision["private_formula_status"], "not_inferred")
+        comparison = client.get("/intel/decision-compare").json()
+        self.assertEqual(comparison["contract_version"], "catos-decision-compare-v0.4")
+        self.assertEqual(comparison["items"][0]["symbol"], SYMBOL)
+        self.assertIsNone(comparison["comparison_score"])
+        self.assertEqual(comparison["items"][0]["direction_evidence_span_ms"], 0)
+        self.assertEqual(
+            comparison["freshness"]["timing_contract"],
+            "catos-decision-timing-diagnostics-v0.5",
+        )
+        symbol_decision = client.get(f"/intel/decision-surface/{SYMBOL}").json()
+        self.assertEqual(symbol_decision["contract_version"], "catos-symbol-decision-v0.3")
+        self.assertEqual(symbol_decision["direction"], "bullish")
+        self.assertEqual(symbol_decision["freshness"]["direction_evidence_span_ms"], 0)
+        self.assertFalse(symbol_decision["trading_authority"])
+        market_decision = client.get("/intel/decision-surface").json()
+        self.assertEqual(market_decision["freshness"]["direction_evidence_span_ms"], 0)
+        self.assertEqual(
+            market_decision["freshness"]["by_direction_domain_observed_at_ms"],
+            {"price": 4000, "derivatives": 4000, "capital_flow": 4000},
+        )
+        self.assertEqual(client.get("/intel/decision-surface/BTCUSDT").status_code, 422)
+        self.assertEqual(client.get("/intel/decision-surface/ETH-USDT-SWAP").status_code, 404)
         capital = client.get(f"/intel/capital-flow/{SYMBOL}").json()
         self.assertEqual(capital["status"], "materialized_empty")
         self.assertIsNone(capital["public_evidence"]["whale_threshold"])
@@ -1116,10 +1476,209 @@ class MarketApiTests(unittest.TestCase):
 
     def test_dashboard_labels_persisted_state_as_read_only_not_live(self):
         client = TestClient(create_app(self.path))
-        dashboard = client.get("/").text
+        dashboard = client.get("/dashboard").text
         self.assertIn("READ ONLY", dashboard)
         self.assertIn("FRESHNESS NOT INFERRED", dashboard)
+        self.assertIn("/intel/decision-surface", dashboard)
+        self.assertIn("MARKET REGIME · DETERMINISTIC", dashboard)
+        self.assertIn("RAW EVIDENCE · TRACEABLE DECISION INPUTS", dashboard)
+        self.assertIn("EVIDENCE TRACE · FIRST 18 SIGNALS", dashboard)
+        self.assertIn("LIQUIDITY", dashboard)
+        self.assertIn("ON-CHAIN", dashboard)
+        self.assertIn("SOCIAL", dashboard)
+        self.assertIn("private formula not inferred", dashboard)
+        self.assertIn("const focus=decision?.top_opportunities||[];", dashboard)
+        self.assertIn("const retreat=decision?.top_risks||[];", dashboard)
+        self.assertIn("decision?.watchlist?.items||[]", dashboard)
+        self.assertIn("focus.map(x=>focusCard(x,bySymbol.get(x.symbol),watchBySymbol.get(x.symbol)))", dashboard)
+        self.assertIn("retreat.map(x=>retreatRow(x,bySymbol.get(x.symbol),watchBySymbol.get(x.symbol)))", dashboard)
+        self.assertNotIn("focus.sort(", dashboard)
+        self.assertNotIn("retreat.sort(", dashboard)
+        self.assertNotIn("watchBySymbol.sort(", dashboard)
+        self.assertIn("FOCUS · DECISION TOP OPPORTUNITIES", dashboard)
+        self.assertIn("RETREAT · DECISION TOP RISKS", dashboard)
+        self.assertNotIn("const focus=rows.filter", dashboard)
+        self.assertNotIn("const retreat=rows.filter", dashboard)
+        self.assertNotIn("function advice(", dashboard)
+        self.assertIn("function actionTrace(item,watch)", dashboard)
+        self.assertIn("TRACE · WHY #", dashboard)
+        self.assertIn("first evidence ref", dashboard)
+        self.assertIn("priority reason", dashboard)
+        self.assertIn("unavailable:'資料不足'", dashboard)
+        self.assertIn("function symbolDecisionHtml(d)", dashboard)
+        self.assertIn("catos-symbol-decision-v0.3", dashboard)
+        self.assertIn("/intel/decision-surface/'+q", dashboard)
+        self.assertIn("SYMBOL DECISION · TRACE", dashboard)
+        self.assertIn("function decisionCompareHtml()", dashboard)
+        self.assertIn("catos-decision-compare-v0.4", dashboard)
+        self.assertIn("/intel/decision-compare?limit=20", dashboard)
+        self.assertIn("COMPARE · WATCHLIST PRIORITY", dashboard)
+        self.assertIn("order = existing watchlist rank", dashboard)
+        self.assertNotIn("decisionCompare.items.sort", dashboard)
+        self.assertIn("function decisionCompareMatches(x,filter)", dashboard)
+        self.assertIn("if(filter==='aligned')return x.market_alignment==='aligned'", dashboard)
+        self.assertIn("function setDecisionCompareFilter(filter)", dashboard)
+        self.assertIn("allRows.filter(x=>decisionCompareMatches(x,decisionCompareFilter))", dashboard)
+        self.assertIn("const decisionCompareFilterKeys=new Set(", dashboard)
+        self.assertIn("function decisionCompareFilterFromUrl()", dashboard)
+        self.assertIn(".get('dcfilter')", dashboard)
+        self.assertIn("u.set('dcfilter',decisionCompareFilter)", dashboard)
+        self.assertIn("u.delete('dcfilter')", dashboard)
+        self.assertIn("function todayDetailSymbolFromUrl()", dashboard)
+        self.assertIn(".get('symbol')", dashboard)
+        self.assertIn("function openTodayDetail(symbol)", dashboard)
+        self.assertIn("u.set('symbol',symbol)", dashboard)
+        self.assertIn("if(symbol)await detail(symbol)", dashboard)
+        self.assertIn("onclick=\"openTodayDetail('", dashboard)
+        self.assertIn("function decisionCompareConflictText(x)", dashboard)
+        self.assertIn("<th>CONFLICT</th>", dashboard)
+        self.assertIn("Conflict 只顯示 server 已回傳的 materialized conflict", dashboard)
+        self.assertIn("cross-domain · bull", dashboard)
+        self.assertIn("within-domain ·", dashboard)
+        self.assertIn("Filter 只隱藏不符合條件的列", dashboard)
+        self.assertIn("Market alignment filter 直接使用 server 已回傳的 aligned / opposed", dashboard)
+        self.assertNotIn("rows.sort(", dashboard)
+        self.assertIn("EVIDENCE Δ", dashboard)
+        self.assertIn("time_alignment_status", dashboard)
+        self.assertIn("direction_evidence_span_ms", dashboard)
+        self.assertIn("Market evidence Δ", dashboard)
+        self.assertIn("trading_authority=", dashboard)
+        self.assertIn("資料品質狀態 · 不推方向", dashboard)
+        self.assertIn("browser 不建立混合分數或 ranking", dashboard)
         self.assertNotIn("box-shadow:0 0 8px #2ea961", dashboard)
+
+    def test_dashboard_personal_watchlist_is_browser_local_and_keeps_server_ordering(self):
+        client = TestClient(create_app(self.path))
+        dashboard = client.get("/dashboard").text
+        self.assertIn('data-view="personal"', dashboard)
+        self.assertIn("const personalWatchStorageKey='catos.personalWatchlist.v1'", dashboard)
+        self.assertIn("window.localStorage.getItem(personalWatchStorageKey)", dashboard)
+        self.assertIn("window.localStorage.setItem(personalWatchStorageKey", dashboard)
+        self.assertIn("function canonicalWatchSymbol(symbol)", dashboard)
+        self.assertIn("function normalizePersonalWatchlist(value)", dashboard)
+        self.assertIn("function togglePersonalWatchlist(symbol)", dashboard)
+        self.assertIn("function removePersonalWatchlist(symbol)", dashboard)
+        self.assertIn("function personalWatchlistPage(token)", dashboard)
+        self.assertIn("function personalWatchDetailSymbolFromUrl()", dashboard)
+        self.assertIn("function openPersonalWatchDetail(symbol)", dashboard)
+        self.assertIn('data-watch-toggle="', dashboard)
+        self.assertIn('data-watch-open="', dashboard)
+        self.assertIn('data-watch-remove="', dashboard)
+        self.assertIn("if(selected)await detail(selected)", dashboard)
+        self.assertIn("目前市場資料缺失", dashboard)
+        self.assertIn("localStorage 內容損壞；已忽略且未保存", dashboard)
+        self.assertIn("localStorage 不可用；本次變更未保存", dashboard)
+        self.assertIn("依使用者加入順序顯示", dashboard)
+        self.assertIn("else if(view==='personal')await personalWatchlistPage(token)", dashboard)
+        self.assertNotIn("personalWatchlist.sort(", dashboard)
+        self.assertNotIn("decisionCompare.items.sort", dashboard)
+        self.assertIn("order = existing watchlist rank", dashboard)
+
+    def test_dashboard_push_history_reads_immutable_proof_rows_without_browser_reordering(self):
+        client = TestClient(create_app(self.path))
+        proof = client.get(f"/intel/proof?symbol={SYMBOL}&limit=20").json()
+        self.assertEqual(proof["items"][0]["push_id"], "push1")
+        self.assertEqual(proof["items"][0]["push_type"], "flow_ignition")
+        self.assertEqual(proof["items"][0]["frozen_payload_json"]["price"], "100")
+        self.assertEqual(proof["items"][0]["return_text"], "8")
+
+        dashboard = client.get("/dashboard").text
+        self.assertIn('data-view="pushes"', dashboard)
+        self.assertIn("async function pushHistoryPage(token)", dashboard)
+        self.assertIn("api('/intel/proof?limit=500')", dashboard)
+        self.assertIn("PUSH HISTORY · IMMUTABLE MATERIALIZED SNAPSHOTS", dashboard)
+        self.assertIn("data-push-id=", dashboard)
+        self.assertIn("JSON.stringify(x.frozen_payload_json??{})", dashboard)
+        self.assertIn("不在 browser 重排、不重算報酬", dashboard)
+        self.assertIn("不宣稱已物化通知送達／已讀狀態", dashboard)
+        self.assertIn("else if(view==='pushes')await pushHistoryPage(token)", dashboard)
+        self.assertNotIn("rows.sort(", dashboard)
+
+    def test_dashboard_whistle_history_is_read_only_alert_projection_without_unread_inference(self):
+        client = TestClient(create_app(self.path))
+        alerts = client.get(f"/intel/alerts?symbol={SYMBOL}&limit=100").json()
+        self.assertFalse(alerts["mutation_supported"])
+        self.assertIsNone(alerts["unread_state"])
+        self.assertEqual(alerts["unread_state_status"], "not_materialized")
+        self.assertEqual(alerts["contract"], "read_only_projection_of_materialized_signal_events")
+
+        dashboard = client.get("/dashboard").text
+        self.assertIn('data-view="whistle"', dashboard)
+        self.assertIn("async function whistleHistoryPage(token)", dashboard)
+        self.assertIn("api('/intel/alerts?limit=500')", dashboard)
+        self.assertIn("WHISTLE HISTORY · READ-ONLY ROUTED EVENTS", dashboard)
+        self.assertIn("data-alert-source-id=", dashboard)
+        self.assertIn("unread state 未物化，不提供已讀切換", dashboard)
+        self.assertIn("不宣稱等同 YAOZI 私有 Whistle history／taxonomy", dashboard)
+        self.assertIn("mutation_supported=${esc(d.mutation_supported)}", dashboard)
+        self.assertIn("else if(view==='whistle')await whistleHistoryPage(token)", dashboard)
+        self.assertNotIn("rows.sort(", dashboard)
+
+    def test_dashboard_social_raw_metrics_use_existing_provider_contract_without_heat_inference(self):
+        self.store.record_social_batch(parse_coinpaprika_social(
+            SocialAssetRef(SYMBOL, "btc-bitcoin"),
+            {
+                "id": "btc-bitcoin",
+                "symbol": "BTC",
+                "links_extended": [{
+                    "url": "https://www.reddit.com/r/bitcoin",
+                    "type": "reddit",
+                    "stats": {"subscribers": 5_958_815},
+                }],
+            },
+            5_000,
+        ))
+        client = TestClient(create_app(self.path))
+        social = client.get("/intel/social?limit=1000").json()
+        self.assertEqual(social["contract"], "catos-coinpaprika-social-metric-v1")
+        self.assertEqual(
+            social["mapping_contract"],
+            "caller_supplied_coinpaprika_id_provider_symbol_verified",
+        )
+        self.assertEqual(social["metric_semantics"], "provider_reported_raw_counts_only")
+        self.assertEqual(social["items"][0]["metric_kind"], "reddit_subscribers")
+        self.assertEqual(social["items"][0]["metric_value"], 5_958_815)
+        self.assertIsNone(social["ranking"])
+        self.assertIsNone(social["social_heat"])
+        self.assertIsNone(social["yaozi_heat"])
+
+        dashboard = client.get("/dashboard").text
+        self.assertIn('data-view="social"', dashboard)
+        self.assertIn("async function socialRawPage(token)", dashboard)
+        self.assertIn("api('/intel/social?limit=1000')", dashboard)
+        self.assertIn("SOCIAL · PROVIDER-REPORTED RAW COUNTS", dashboard)
+        self.assertIn("provider-reported raw counts", dashboard)
+        self.assertIn("不以 ticker 猜 asset mapping", dashboard)
+        self.assertIn(
+            "不把 followers/subscribers/members 推成 social heat、YAOZI heat 或 rotation rank",
+            dashboard,
+        )
+        self.assertIn("ranking=${val(d.ranking)}", dashboard)
+        self.assertIn("social_heat=${val(d.social_heat)}", dashboard)
+        self.assertIn("yaozi_heat=${val(d.yaozi_heat)}", dashboard)
+        self.assertIn("else if(view==='social')await socialRawPage(token)", dashboard)
+        self.assertNotIn("rows.sort(", dashboard)
+
+    def test_dashboard_account_local_reflects_member_shell_contract_without_identity_inference(self):
+        client = TestClient(create_app(self.path))
+        dashboard = client.get("/dashboard").text
+        self.assertIn('data-view="account"', dashboard)
+        self.assertIn("async function accountLocalPage(token)", dashboard)
+        self.assertIn("ACCOUNT · LOCAL PRODUCT CONTRACT", dashboard)
+        self.assertIn("catos-local-member-shell-v1", dashboard)
+        self.assertIn("identity=single_local_operator", dashboard)
+        self.assertIn("remote_auth=not_materialized", dashboard)
+        self.assertIn("membership=not_materialized", dashboard)
+        self.assertIn("['Personal watchlist','browser_local','mutable','catos.personalWatchlist.v1']", dashboard)
+        self.assertIn("['Account profile','not_materialized','none','—']", dashboard)
+        self.assertIn("['Chat / online members','not_materialized','none','—']", dashboard)
+        self.assertIn("不從 OKX 帳戶、交易 Journal、OS username 或瀏覽器資料推導身份", dashboard)
+        self.assertIn("else if(view==='account')await accountLocalPage(token)", dashboard)
+        self.assertIn("function openMemberShellView(view)", dashboard)
+        self.assertIn("new Set(['personal','pushes','whistle','social'])", dashboard)
+        self.assertIn("data-member-view=", dashboard)
+        self.assertIn("未物化</button>", dashboard)
+        self.assertIn("未物化能力保持 disabled", dashboard)
 
 
 if __name__ == "__main__":

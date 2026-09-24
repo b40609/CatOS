@@ -294,6 +294,7 @@ class RestrictedTransportTests(unittest.TestCase):
         t, _ = transport(sender)
         first = t.fetch(request("fills", t.scope))
         self.assertIsNotNone(first.next_cursor)  # Short non-empty page must continue.
+        self.assertEqual(first.window_evidence, collection.WindowRequestEvidence(100, 200))
         t.fetch(request("fills", t.scope, page=2, cursor=first.next_cursor))
 
         first_query = dict(parse_qsl(urlsplit(sender.requests[0].target).query))
@@ -302,6 +303,23 @@ class RestrictedTransportTests(unittest.TestCase):
         second_query = dict(parse_qsl(urlsplit(sender.requests[1].target).query))
         self.assertEqual(second_query["after"], "BILL1")
         self.assertNotIn("TRADE9", sender.requests[1].target)
+
+    def test_orders_history_window_evidence_uses_ctime_and_order_cursor(self):
+        sender = ScriptedSender(
+            body([{"instId": "BTC-USDT-SWAP", "ordId": "ORDER1"}]),
+            body([]))
+        t, _ = transport(sender)
+        first = t.fetch(request("orders_history", t.scope))
+        self.assertEqual(
+            first.window_evidence,
+            collection.WindowRequestEvidence(100, 200, "cTime", "after_order_id"),
+        )
+        t.fetch(request("orders_history", t.scope, page=2, cursor=first.next_cursor))
+        first_query = dict(parse_qsl(urlsplit(sender.requests[0].target).query))
+        second_query = dict(parse_qsl(urlsplit(sender.requests[1].target).query))
+        self.assertEqual(first_query["begin"], "100")
+        self.assertEqual(first_query["end"], "200")
+        self.assertEqual(second_query["after"], "ORDER1")
 
     def test_account_level_query_filters_do_not_hide_responsibility(self):
         sender = ScriptedSender(body([]), body([]), body([]))

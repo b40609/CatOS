@@ -1,0 +1,31 @@
+{
+  "version": "dedicated-demo-evidence.v1",
+  "started_ms": 1790149031949,
+  "completed_ms": 1790149032313,
+  "account_alias": "catOSv1",
+  "environment": "demo",
+  "status": "config_gate_failed",
+  "checks": {
+    "expected_uid": false,
+    "dedicated_subaccount": false,
+    "net_mode": true,
+    "account_mode_contract": true,
+    "permission_contract": true,
+    "known_role": true
+  },
+  "requests": [
+    {
+      "endpoint": "account_config",
+      "accepted": true,
+      "row_count": 1,
+      "started_ms": 1790149031949,
+      "completed_ms": 1790149032313
+    }
+  ],
+  "wire_requests": 1,
+  "collection_complete": false,
+  "positions_orders_algos": "not_run_identity_gate_failed",
+  "local_unknown": "unverified_local_ledger_not_loaded",
+  "reconciled": false,
+  "trade_authorized": false
+}

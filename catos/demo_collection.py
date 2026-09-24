@@ -1,6 +1,6 @@
-"""I-b-4 one-shot runner for the specifically authorized Demo collection.
+"""One-shot runners for specifically authorized Demo read-only evidence.
 
-No import-time I/O. Only main(--execute-authorized) reads the designated file and
+No import-time I/O. Only main with an explicit execution flag reads the designated file and
 opens the fixed Demo connection. Verification must use parse_credentials/run_once
 with synthetic input and a fake Sender, never the real credential loader.
 """
@@ -8,6 +8,7 @@ with synthetic input and a fake Sender, never the real credential loader.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from collections import Counter
 from dataclasses import dataclass, field
 import json
@@ -150,7 +151,8 @@ def parse_credentials(text):
 def load_authorized_credentials():
     """Read only the user-designated file, with a size bound and no redirection.
 
-    This is the sole real credential access path authorized for I-b-4. It is not
+    This is the existing designated credential access path. Each real run needs
+    current user authorization. It is not
     an environment loader or permission for any other credential discovery.
     """
     try:
@@ -186,6 +188,50 @@ def authorized_scope(end_ms):
     """Freeze the approved trailing 24h window once, before the first request."""
     return RunScope("okx-demo", "demo", "BTC-USDT-SWAP", end_ms - 86400000,
                     end_ms, 120, 40, 10000, 180000)
+
+
+def read_subtypes_once(credentials, *, sender, clock=None):
+    """One GET via the existing Demo transport; export only official code labels."""
+    active_clock = clock or _Clock()
+    scope = authorized_scope(active_clock.wall_ms())
+    transport = DemoReadTransport(scope, HTTPOptions(host=GLOBAL_DEMO_HOST), credentials,
+        sender=sender, wall_ms=active_clock.wall_ms, monotonic_ms=active_clock.monotonic_ms)
+    response = transport.fetch(PageRequest(ENDPOINTS["account_subtypes"], scope, 1,
+                                          None, scope.request_timeout_ms))
+    catalog = []
+    seen = set()
+    try:
+        data = response.payload["data"]
+        if not data:
+            raise ValueError()
+        for row in data:
+            bill_type, description = row["type"], row["typeDesc"]
+            if (type(bill_type) is not str or not bill_type.isascii()
+                    or not bill_type.isdigit() or bill_type in seen
+                    or type(description) is not str or len(description) > 512):
+                raise ValueError()
+            seen.add(bill_type)
+            details = row["subTypeDetails"]
+            if type(details) is not list:
+                raise ValueError()
+            subtypes = []
+            sub_seen = set()
+            for item in details:
+                code, label = item["subType"], item["subTypeDesc"]
+                if (type(code) is not str or not code.isascii() or not code.isdigit()
+                        or code in sub_seen or type(label) is not str or len(label) > 512):
+                    raise ValueError()
+                sub_seen.add(code)
+                subtypes.append({"subType": code, "subTypeDesc": label})
+            catalog.append({"type": bill_type, "typeDesc": description,
+                            "subTypeDetails": subtypes})
+    except (KeyError, ValueError, TypeError):
+        raise SetupError("subtypes_catalog_invalid") from None
+    digest = hashlib.sha256(json.dumps(catalog, sort_keys=True,
+        separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+    return {"catalog": catalog, "catalog_sha256": digest,
+            "received_ms": response.source_ms, "audit": transport.audit(),
+            "trade_authorized": False}
 
 
 def read_config_mode_once(credentials, *, sender, clock=None, sleep_ms=None):
@@ -294,6 +340,7 @@ def run_once(credentials, *, sender, clock=None, sleep_ms=None):
         gate.passed = False
         gate.issues.add("config_not_verified")
     report = build_report(result, scope=scope)
+    report_built_ms = active_clock.wall_ms()
     # No local trading DB was loaded. Never manufacture ownership or flow classes.
     # Keep this outside the report so the decoder's content_digest stays valid.
     # I-b-4 is explicitly authorized to use the designated Demo main account.
@@ -329,6 +376,17 @@ def run_once(credentials, *, sender, clock=None, sleep_ms=None):
             ).items())
         ],
         "report_content_digest": report["content_digest"],
+        "latency_evidence": {
+            "report_built_ms": report_built_ms,
+            "report_age_ms": report_built_ms - result.manifest.completed_ms,
+            "batch_span_ms": result.manifest.completed_ms - result.manifest.started_ms,
+            "max_runtime_ms": scope.max_runtime_ms,
+            "public_time": [
+                {"server_time_ms": fact["ts"]}
+                for fact in report["facts"] if fact["kind"] == "public_time"
+            ],
+            "attempts": transport.audit()["attempts"],
+        },
     }
     return CollectionOutcome(report, transport.audit(), summary)
 
@@ -340,12 +398,18 @@ def main(argv=None):
                          help="read the specifically authorized credential file and run once")
     actions.add_argument("--read-config-mode-authorized", action="store_true",
                          help="perform one authorized Demo account-config GET and print mode only")
+    actions.add_argument("--read-subtypes-authorized", action="store_true",
+                         help="perform one authorized Demo bill-type catalog GET")
     args = parser.parse_args(argv)
-    if not args.execute_authorized and not args.read_config_mode_authorized:
+    if not args.execute_authorized and not args.read_config_mode_authorized and not args.read_subtypes_authorized:
         parser.print_help()
         return 0
     try:
         credentials = load_authorized_credentials()
+        if args.read_subtypes_authorized:
+            print(json.dumps(read_subtypes_once(credentials, sender=HTTPSGetSender()),
+                             ensure_ascii=True, sort_keys=True))
+            return 0
         if args.read_config_mode_authorized:
             config_mode = read_config_mode_once(credentials, sender=HTTPSGetSender())
             print(json.dumps(config_mode, ensure_ascii=True, sort_keys=True))

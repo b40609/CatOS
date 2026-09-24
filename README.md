@@ -1,10 +1,18 @@
 # catOS：最小 Closed Bar 研究核心
 
-S10 [帳務缺口與下一片評估](outputs/catos-s10-accounting-gap-assessment.md)經 Sol 獨立靜態契約審查，結論為「附待決政策可進正式規格」：先處理受管成交已知費用更正的方向成立，需穩定 correction identity＋精確前驅以防分叉；funding 仍另需結算身份、期間完整性及歸屬政策。新 identity 同金額的處理與 Decimal 更新順序待使用者定案；schema8 固定不改，後續新 schema／payload／capture 版本號尚未定案。本輪未修改程式、Schema 或 DB，也未執行 Python／測試。
+新對話先讀[目前接續入口](docs/current-handoff.md)，確認階段、待決政策、分工與授權；詳細歷史留在各切片文件。
+
+2026-09-23 產品方向已確認：`CatOS_Astra` 與 `CatOS_Yaozi` 保留分工開發，最終整合成同一 catOS 網站內的「量化交易／Yaozi 情報」分頁，不需另開網站。切換頁面不應中斷後端策略；此為交付要求，尚未完成整合驗收。分工、現況與整合順序見[單一介面整合契約](docs/catos-yaozi-integration.md)。
+
+2026-09-21 最新優先序：**catOS 自動跑策略為主線，Yaozi 收斂成可選唯讀情報模組 v0.1**。主線阻斷與最小驗收見[自動策略盤點](docs/catos-auto-strategy-readiness.md)，情報封版見[v0.1 契約](docs/yaozi-v0.1-closeout.md)。S10 已依[專屬交接](docs/lot-fee-correction-handoff.md)通過 Sol 驗收（34/34 專屬、344/344 必要回歸）；下方「待驗收」及各「最新」段落均為切片歷史，不代表目前狀態。本輪未重驗，不啟動新採集或 Demo／Live 交易。
+
+S10 已獲使用者實作授權，Astra 依 [通過審查的正式規格](outputs/catos-s10-fee-correction-spec.md)完成程式及34個專屬測試方法編寫，**待 Sol 執行驗收，尚未宣稱通過**。包含 P1A／P2A、精確前驅及重送、schema9、S2 request／event／capture v3、同 subtotal correction 版本的完整重放證明及 V3 報告。Lot snapshot沿用v2，schema7／8不遷移。詳見 [S10 開發交接](docs/lot-fee-correction-handoff.md)；本輪未執行 Python、測試、DB 或 Git，其他未提交工作保留。
 
 S9 已依[正式規格](outputs/catos-s9-fee-completion-spec.md)完成 Sol 功能／資料完整性驗收：S9 專屬 32/32、必要回歸 312/312，共 344/344 通過，`py_compile` 通過；驗收中修正 schema7 `apply_fill()` raw payload 的既有錯誤語義相容。`Journal(..., lot_schema_version=8)` 只用於新建合成 DB，既有 DB 不遷移、不修改。詳見 [S9 開發交接](docs/lot-fee-completion-handoff.md)。
 
 S9 文件基線：[assessment](outputs/catos-s9-fee-completion-assessment.md) `bb29389`、正式規格 `120dc58`；使用者確認 S8 `b069082` 為穩定基線。本輪以新建 schema8 合成 DB 產生完整／缺費報告，1280／390 px 實際 viewport 均完成像素驗收與 scrollWidth 量測，長 Decimal、費用品質、缺費筆數與 funding 文案可讀，無整頁水平溢位或裁切。
+
+S7 已提交：`e00c2b5`（`feat(lots): add S7 synthetic scenario report`），依使用者回報補記；未執行全量測試，Astra 本輪未重跑驗證或執行 Git。
 
 最新開發：**S8 已實作並通過修正後 Sol 驗收**。入口 `python -B -m examples.lot_scenario_demo --output-dir <new-dir>` 以全新 Journal 走真實 S3→S5→S7，保存合成 DB 與 complete／degraded HTML，拒絕覆寫且失敗保留產物。Astra 獨立審查後將 S8 專屬測試由 16 增至 22 個方法；Sol 重驗 S8 22/22＋S7 21/21，共 43/43，0 failure／error／skip，`py_compile` 通過，生產程式未改。詳見 [S8 開發交接](docs/lot-scenario-demo-handoff.md)。
 

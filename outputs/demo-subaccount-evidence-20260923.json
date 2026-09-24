@@ -1,0 +1,39 @@
+{
+  "recorded_at_utc": "2026-09-23T07:32:01Z",
+  "account_alias": "catOSv1",
+  "environment": "demo",
+  "status": "blocked_credential_source_missing",
+  "credential_content_read": false,
+  "wire_requests": 0,
+  "observed_cli_status": "credential_setup_failed",
+  "designated_path_is_file": false,
+  "designated_path_redirected": false,
+  "checks": {
+    "expected_uid": "not_run",
+    "uid_differs_from_main_uid": "not_run",
+    "net_mode": "not_run",
+    "account_mode_contract": "not_run",
+    "foreign_positions": "not_run",
+    "foreign_ordinary_orders": "not_run",
+    "foreign_algos": "not_run",
+    "local_unknown_responsibility": "unverified_local_ledger_not_loaded"
+  },
+  "classification": {
+    "source": "existing_local_catalog_and_current_mapping_no_remote_refresh",
+    "classified": 166,
+    "total": 185,
+    "external": 10,
+    "internal": 102,
+    "forbidden": 54,
+    "unknown": 19,
+    "complete": false
+  },
+  "tests": {
+    "command": "python -B -m unittest tests.test_demo_subaccount_evidence tests.test_demo_collection -v",
+    "passed": 20,
+    "failed": 0,
+    "synthetic_only": true
+  },
+  "reconciled": false,
+  "trade_authorized": false
+}

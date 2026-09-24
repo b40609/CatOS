@@ -92,8 +92,14 @@ class RiskTests(unittest.TestCase):
         op = state.flatten_id
         state = risk.observe(state, snapshot(2, midnight, basis=None, equity=D("2000")))
         self.assertEqual((state.mode, state.health, state.flatten_id), ("FLAT", "DEGRADED", op))
-        state = risk.observe(state, snapshot(3, midnight + 1, equity=D("2000")))
+        restored = risk.State.from_wire(state.to_wire())
+        self.assertEqual(restored.basis_blocked_day, risk.taipei_day(midnight))
+        with self.assertRaisesRegex(ipc.ProtocolError, "cannot be rebuilt"):
+            risk.observe(restored, snapshot(3, midnight + 1, equity=D("2000")))
+        next_midnight = midnight + risk.DAY_MS
+        state = risk.observe(restored, snapshot(3, next_midnight, equity=D("2000")))
         self.assertEqual((state.mode, state.health, state.flatten_id), ("FLAT", "HEALTHY", op))
+        self.assertIsNone(state.basis_blocked_day)
 
     def test_fixed_basis_cannot_be_rebuilt_on_restart_or_same_day(self):
         state = risk.observe(risk.State(), snapshot())

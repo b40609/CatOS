@@ -12,6 +12,7 @@ from catos import ipc, research, risk
 from catos.account_lock import ENVIRONMENT
 
 SCHEMA_VERSION = 7
+CORE_SCHEMA_VERSION = 2
 HALT_REASONS = frozenset(("manual_kill", "soft_loss", "hard_loss"))
 
 
@@ -67,6 +68,7 @@ class Reconciliation:
     unknown_count: int
     fills_reconciled: bool
     attributed_bot_id: str | None = None
+    remote_position_id: str | None = None
 
     def validate(self, bot_id):
         ipc.integer(self.revision, "reconciliation revision")
@@ -78,9 +80,14 @@ class Reconciliation:
             raise ipc.ProtocolError("fills_reconciled must be bool")
         if self.attributed_bot_id is not None:
             ipc.token(self.attributed_bot_id, "attributed_bot_id")
+        if self.remote_position_id is not None:
+            ipc.token(self.remote_position_id, "remote_position_id")
         if (self.attributed_bot_id not in (None, bot_id)
                 or (self.position != 0 and self.attributed_bot_id != bot_id)):
             raise OwnershipError("unattributed or foreign position cannot be taken over")
+        if ((self.position != 0 and self.remote_position_id is None)
+                or (self.position == 0 and self.remote_position_id is not None)):
+            raise OwnershipError("position identity must match nonzero attributed position")
 
 
 @dataclass(frozen=True)
@@ -97,7 +104,8 @@ class CommitReceipt:
 
 
 _SCHEMA = (
-    "CREATE TABLE metadata (account_id TEXT NOT NULL, environment TEXT NOT NULL, fixture_budget TEXT NOT NULL)",
+    """CREATE TABLE metadata (account_id TEXT NOT NULL, environment TEXT NOT NULL,
+       fixture_budget TEXT NOT NULL, core_schema_version INTEGER NOT NULL)""",
     """CREATE TABLE control (id INTEGER PRIMARY KEY CHECK(id=1), epoch INTEGER NOT NULL,
        halt_reasons TEXT NOT NULL, health TEXT NOT NULL)""",
     """CREATE TABLE bots (bot_id TEXT PRIMARY KEY, inst_id TEXT NOT NULL, config_json TEXT NOT NULL,
@@ -105,7 +113,8 @@ _SCHEMA = (
        isolated INTEGER NOT NULL DEFAULT 0 CHECK(isolated IN (0,1)))""",
     """CREATE TABLE ownership (inst_id TEXT PRIMARY KEY, bot_id TEXT NOT NULL UNIQUE REFERENCES bots(bot_id),
        position TEXT, ordinary_open INTEGER, conditional_open INTEGER, unknown_count INTEGER,
-       fills_reconciled INTEGER NOT NULL DEFAULT 0, evidence_id TEXT, reconciled_revision INTEGER)""",
+       fills_reconciled INTEGER NOT NULL DEFAULT 0, evidence_id TEXT, reconciled_revision INTEGER,
+       remote_pos_id TEXT)""",
     """CREATE TABLE inputs (bot_id TEXT NOT NULL REFERENCES bots(bot_id), seq INTEGER NOT NULL,
        input_json TEXT NOT NULL, input_hash TEXT NOT NULL, before_json TEXT NOT NULL,
        state TEXT NOT NULL CHECK(state IN ('PENDING','COMMITTED')), result_json TEXT,
@@ -128,6 +137,42 @@ _RISK_SCHEMA = (
 )
 
 
+def _columns(connection, table):
+    return {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+
+
+def _migrate_core_schema(connection):
+    """Migrate only catOS core columns; PRAGMA user_version remains the Lot version."""
+    metadata = _columns(connection, "metadata")
+    ownership = _columns(connection, "ownership")
+    if not {"account_id", "environment", "fixture_budget"} <= metadata:
+        raise JournalError("unsupported core schema metadata")
+    if not {"inst_id", "bot_id", "position", "reconciled_revision"} <= ownership:
+        raise JournalError("unsupported core ownership schema")
+    if "core_schema_version" not in metadata:
+        if "remote_pos_id" in ownership:
+            raise JournalError("ambiguous partial core schema migration")
+        connection.execute(
+            "ALTER TABLE metadata ADD COLUMN core_schema_version INTEGER NOT NULL DEFAULT 1")
+        core_version = 1
+    else:
+        rows = connection.execute("SELECT core_schema_version FROM metadata").fetchall()
+        if len(rows) != 1 or type(rows[0][0]) is not int:
+            raise JournalError("invalid core schema version")
+        core_version = rows[0][0]
+    ownership = _columns(connection, "ownership")
+    if core_version == 1:
+        if "remote_pos_id" in ownership:
+            raise JournalError("ambiguous partial core schema migration")
+        connection.execute("ALTER TABLE ownership ADD COLUMN remote_pos_id TEXT")
+        connection.execute("UPDATE metadata SET core_schema_version=?", (CORE_SCHEMA_VERSION,))
+    elif core_version == CORE_SCHEMA_VERSION:
+        if "remote_pos_id" not in ownership:
+            raise JournalError("incomplete core schema migration")
+    else:
+        raise JournalError("unsupported core schema version")
+
+
 class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
     def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False, *, lot_schema_version=7):
@@ -136,13 +181,18 @@ class Journal:
         from catos.lot_journal import LotJournal, install_schema as install_lot_schema
         from catos.lot_fills import LotFillJournal, install_schema as install_fill_schema
         from catos.lot_journal import LotStorageError
-        if type(lot_schema_version) is not int or lot_schema_version not in (7, 8):
+        if type(lot_schema_version) is not int or lot_schema_version not in (7, 8, 9):
             raise LotStorageError("schema_version_mismatch")
         if lot_schema_version == 8:
             if risk_limits is not None or execution_enabled is not False:
                 raise LotStorageError("unsupported_fee_version")
             from catos.lot_schema8 import (LotJournalV2 as LotJournal,
                 LotFillJournalV2 as LotFillJournal, install_lot_schema, install_fill_schema)
+        elif lot_schema_version == 9:
+            if risk_limits is not None or execution_enabled is not False:
+                raise LotStorageError("unsupported_fee_version")
+            from catos.lot_schema9 import (LotJournalV3 as LotJournal,
+                LotFillJournalV3 as LotFillJournal, install_lot_schema, install_fill_schema)
         if sqlite3.sqlite_version_info < (3, 37, 0):
             raise JournalError("SQLite 3.37+ required for Lot STRICT tables")
         if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
@@ -162,11 +212,13 @@ class Journal:
         self.connection.row_factory = sqlite3.Row
         try:
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if ((lot_schema_version == 8 and version not in (0, 8))
-                    or (lot_schema_version == 7 and version == 8)):
+            if ((lot_schema_version in (8, 9) and version not in (0, lot_schema_version))
+                    or (lot_schema_version == 7 and version in (8, 9))):
                 raise LotStorageError("schema_version_mismatch")
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
+                    if lot_schema_version == 9:
+                        raise LotStorageError("schema_version_mismatch")
                     raise JournalError("refusing an unrecognized nonempty database")
             elif version not in (1, 2, 3, 4, 5, 6, lot_schema_version):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
@@ -184,9 +236,11 @@ class Journal:
                 if version == 0:
                     for statement in _SCHEMA:
                         self.connection.execute(statement)
-                    self.connection.execute("INSERT INTO metadata VALUES (?,?,?)",
-                                            (account_id, ENVIRONMENT, str(self.budget)))
+                    self.connection.execute(
+                        "INSERT INTO metadata (account_id,environment,fixture_budget,core_schema_version) VALUES (?,?,?,?)",
+                        (account_id, ENVIRONMENT, str(self.budget), CORE_SCHEMA_VERSION))
                     self.connection.execute("INSERT INTO control VALUES (1,0,'[]','RECONCILING')")
+                _migrate_core_schema(self.connection)
                 if version < 2:
                     for statement in _RISK_SCHEMA:
                         self.connection.execute(statement)
@@ -206,9 +260,13 @@ class Journal:
                     install_fill_schema(self.connection)
                 self.connection.execute(f"PRAGMA user_version={lot_schema_version}")
                 self.lots = LotJournal(self)
-                self.lots._recover_in_transaction()
-                self.lot_fills = LotFillJournal(self)
-                self.lot_fills._recover_in_transaction()
+                if lot_schema_version == 9:
+                    self.lot_fills = LotFillJournal(self)
+                    self.lots._recover_in_transaction()
+                else:
+                    self.lots._recover_in_transaction()
+                    self.lot_fills = LotFillJournal(self)
+                    self.lot_fills._recover_in_transaction()
                 self.protection = ProtectionJournal(self)
                 for row in self.connection.execute('SELECT bot_id FROM protection'):
                     state = self.protection.state(row[0])
@@ -333,11 +391,20 @@ class Journal:
     def capture_lot_snapshot_v2(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
         from catos.lot_journal import LotStorageError
         from catos.lot_snapshot import validate_request, _materialize
-        if not self.lots.v2:
+        if self.lots.schema_version != 8:
             raise LotStorageError("unsupported_fee_version")
         validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
         with self._lot_read_snapshot():
             return _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms, v2=True)
+
+    def capture_lot_snapshot_v3(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
+        from catos.lot_journal import LotStorageError
+        from catos.lot_snapshot import validate_request, _materialize
+        if self.lots.schema_version != 9:
+            raise LotStorageError("unsupported_fee_version")
+        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
+        with self._lot_read_snapshot():
+            return _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms, v2=True, v3=True)
 
     def _bot(self, bot_id):
         row = self.connection.execute("SELECT * FROM bots WHERE bot_id=?", (bot_id,)).fetchone()
@@ -406,6 +473,72 @@ class Journal:
             if state.seq < previous.seq or state.epoch < previous.epoch or not previous.reasons <= state.reasons:
                 raise JournalError("risk state cannot move backwards")
             self._write_risk(state)
+
+    def commit_day_basis(self, basis: risk.DayBasis, day_context: risk.DayContext,
+                         in_flight_reasons: frozenset[str] = frozenset()):
+        if self.risk_limits is None:
+            raise JournalError("risk mode is not enabled")
+        if not isinstance(basis, risk.DayBasis):
+            raise JournalError("valid risk.DayBasis required")
+        if not isinstance(day_context, risk.DayContext) or day_context.day != basis.day:
+            raise JournalError("day basis requires matching trusted day context")
+        with self._transaction():
+            state = self.risk_state()
+            if state is None:
+                raise JournalError("risk state not initialized")
+            if state.basis_blocked_day is not None and basis.day <= state.basis_blocked_day:
+                raise JournalError("missing day basis cannot be rebuilt before next Taipei day")
+            if state.basis is not None and basis.day < state.basis.day:
+                raise JournalError("day basis cannot move backwards")
+            if state.basis is not None and state.basis.day == basis.day:
+                if state.basis == basis:
+                    return state
+                raise JournalError("fixed day basis cannot be replaced")
+            combined_reasons = state.reasons | set(in_flight_reasons)
+            if combined_reasons - state.reasons:
+                state = risk.halt(state, combined_reasons)
+            updated = replace(state, basis=basis, epoch=state.epoch + 1)
+            self._write_risk(updated)
+            return updated
+
+    def block_day_basis(self, day: int, day_context: risk.DayContext,
+                        in_flight_reasons: frozenset[str] = frozenset()):
+        if self.risk_limits is None:
+            raise JournalError("risk mode is not enabled")
+        ipc.integer(day, "basis day")
+        if not isinstance(day_context, risk.DayContext) or day_context.day != day:
+            raise JournalError("basis block requires matching trusted day context")
+        with self._transaction():
+            state = self.risk_state()
+            if state is None:
+                raise JournalError("risk state not initialized")
+            if state.basis_blocked_day == day:
+                return state
+            if state.basis_blocked_day is not None and day < state.basis_blocked_day:
+                raise JournalError("blocked day sequence cannot move backwards")
+            if state.basis is not None and day < state.basis.day:
+                raise JournalError("day sequence cannot move backwards")
+            if state.basis is not None and state.basis.day == day:
+                if risk.is_verified_baseline(state.basis, account_alias=self.account_id,
+                                             environment=ENVIRONMENT, target_day=day):
+                    raise JournalError("cannot block day with existing valid basis")
+                state = replace(state, basis=None)
+            combined_reasons = state.reasons | set(in_flight_reasons)
+            if combined_reasons - state.reasons:
+                state = risk.halt(state, combined_reasons)
+            updated = replace(state, basis_blocked_day=day, epoch=state.epoch + 1)
+            self._write_risk(updated)
+            return updated
+
+    def load_day_basis(self, day: int):
+        if self.risk_limits is None:
+            return None
+        state = self.risk_state()
+        if state is None or state.basis_blocked_day == day:
+            return None
+        if state.basis is not None and state.basis.day == day:
+            return state.basis
+        return None
 
     def _audit_risk(self, kind, actor, evidence_id, before, after, limits):
         self.connection.execute("INSERT INTO risk_actions VALUES (NULL,?,?,?,?,?,?)",
@@ -522,6 +655,121 @@ class Journal:
                     pending=self.connection.execute("SELECT seq FROM inputs WHERE bot_id=? AND state='PENDING'", (bot_id,)).fetchone() is not None,
                     risk_state=self.risk_state())
 
+    def current_revision(self, bot_id):
+        """Small read-only fence used around formal reconciliation consumption."""
+        return self._bot(bot_id)["revision"]
+
+    def reconciliation_snapshot(self, bot_id):
+        """Pin one read-only WAL snapshot of durable local exchange responsibility."""
+        from catos.reconciliation_gate import ownership_snapshot_from_rows
+        if self.connection.in_transaction:
+            raise JournalError("reconciliation snapshot requires an idle writer")
+        self.connection.execute("BEGIN DEFERRED")
+        try:
+            bot, owner = self._require_owner(bot_id)
+            rows = tuple(dict(row) for row in self.connection.execute(
+                "SELECT * FROM execution_orders WHERE bot_id=? ORDER BY rowid", (bot_id,)))
+            protection = self.protection.state(bot_id)
+            position = (None if owner["position"] is None
+                        else ipc.decimal_text(owner["position"], "owned position", derived=True))
+            return ownership_snapshot_from_rows(
+                bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
+                local_position=position, owner_reconciled_revision=owner["reconciled_revision"],
+                fills_reconciled=bool(owner["fills_reconciled"]), isolated=bool(bot["isolated"]),
+                execution_rows=rows, protection=protection,
+                remote_position_id=owner["remote_pos_id"])
+        finally:
+            if self.connection.in_transaction:
+                self.connection.rollback()
+
+    def position_bootstrap_lineage(self, bot_id):
+        """Pin durable local fills that can prove a first remote position identity."""
+        from catos.reconciliation_gate import position_bootstrap_lineage
+        if self.connection.in_transaction:
+            raise JournalError("position bootstrap snapshot requires an idle writer")
+        self.connection.execute("BEGIN DEFERRED")
+        try:
+            bot, owner = self._require_owner(bot_id)
+            if self.execution is None or owner["position"] is None or owner["remote_pos_id"] is not None:
+                return None
+            position = ipc.decimal_text(owner["position"], "owned position", derived=True)
+            if position == 0:
+                return None
+            rows = self.connection.execute("""SELECT o.exchange_id,o.quantity AS order_quantity,
+                f.trade_id,f.quantity AS fill_quantity,f.price
+                FROM execution_fills f JOIN execution_orders o ON o.order_key=f.order_key
+                WHERE o.bot_id=? ORDER BY o.exchange_id,f.trade_id""", (bot_id,)).fetchall()
+            fills = []
+            for row in rows:
+                if row["exchange_id"] is None:
+                    return None
+                order_quantity = ipc.decimal_text(row["order_quantity"], "order quantity", derived=True)
+                fill_quantity = ipc.decimal_text(row["fill_quantity"], "fill quantity", derived=True)
+                price = ipc.decimal_text(row["price"], "fill price", derived=True)
+                signed = fill_quantity if order_quantity > 0 else -fill_quantity
+                fills.append((row["exchange_id"], row["trade_id"], signed, price))
+            try:
+                return position_bootstrap_lineage(
+                    bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
+                    local_position=position, fills=tuple(fills))
+            except ValueError:
+                return None
+        finally:
+            if self.connection.in_transaction:
+                self.connection.rollback()
+
+    def bind_remote_position_identity(self, bot_id, evidence):
+        """Atomically bind first posId only if the evidence still matches durable lineage."""
+        from catos.reconciliation_gate import (PositionIdentityEvidence,
+            ownership_snapshot_from_rows, position_bootstrap_lineage)
+        if not isinstance(evidence, PositionIdentityEvidence) or not evidence.valid():
+            raise OwnershipError("invalid position bootstrap evidence")
+        with self._transaction():
+            bot, owner = self._require_owner(bot_id)
+            if (evidence.bot_id != bot_id or evidence.bot_revision != bot["revision"]
+                    or evidence.inst_id != bot["inst_id"] or owner["position"] is None
+                    or ipc.decimal_text(owner["position"], "owned position", derived=True) != evidence.local_position
+                    or owner["remote_pos_id"] is not None):
+                raise OwnershipError("stale position bootstrap evidence")
+            execution_rows = tuple(dict(row) for row in self.connection.execute(
+                "SELECT * FROM execution_orders WHERE bot_id=? ORDER BY rowid", (bot_id,)))
+            protection = self.protection.state(bot_id)
+            current = ownership_snapshot_from_rows(
+                bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
+                local_position=evidence.local_position,
+                owner_reconciled_revision=owner["reconciled_revision"],
+                fills_reconciled=bool(owner["fills_reconciled"]), isolated=bool(bot["isolated"]),
+                execution_rows=execution_rows, protection=protection,
+                remote_position_id=owner["remote_pos_id"])
+            if current.snapshot_digest != evidence.ownership_snapshot_digest:
+                raise OwnershipError("position bootstrap responsibility changed")
+            fill_rows = self.connection.execute("""SELECT o.exchange_id,o.quantity AS order_quantity,
+                f.trade_id,f.quantity AS fill_quantity,f.price
+                FROM execution_fills f JOIN execution_orders o ON o.order_key=f.order_key
+                WHERE o.bot_id=? ORDER BY o.exchange_id,f.trade_id""", (bot_id,)).fetchall()
+            fills = []
+            for row in fill_rows:
+                if row["exchange_id"] is None:
+                    raise OwnershipError("position bootstrap lineage incomplete")
+                order_quantity = ipc.decimal_text(row["order_quantity"], "order quantity", derived=True)
+                fill_quantity = ipc.decimal_text(row["fill_quantity"], "fill quantity", derived=True)
+                price = ipc.decimal_text(row["price"], "fill price", derived=True)
+                fills.append((row["exchange_id"], row["trade_id"],
+                              fill_quantity if order_quantity > 0 else -fill_quantity, price))
+            try:
+                lineage = position_bootstrap_lineage(
+                    bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
+                    local_position=evidence.local_position, fills=tuple(fills))
+            except ValueError as exc:
+                raise OwnershipError("position bootstrap lineage incomplete") from exc
+            if lineage.lineage_digest != evidence.lineage_digest:
+                raise OwnershipError("position bootstrap lineage changed")
+            self.connection.execute("UPDATE ownership SET remote_pos_id=?,reconciled_revision=NULL,fills_reconciled=0 WHERE bot_id=?",
+                                    (evidence.remote_pos_id, bot_id))
+            self.connection.execute("UPDATE bots SET revision=revision+1 WHERE bot_id=?", (bot_id,))
+            self.connection.execute("UPDATE control SET health='RECONCILING' WHERE id=1")
+        return self.reconciliation_snapshot(bot_id)
+
     def record_halts(self, reasons):
         if not set(reasons) <= HALT_REASONS:
             raise JournalError("unknown halt reason")
@@ -556,9 +804,10 @@ class Journal:
             if evidence.revision != bot["revision"]:
                 raise OwnershipError("stale reconciliation evidence")
             self.connection.execute("""UPDATE ownership SET position=?,ordinary_open=?,conditional_open=?,unknown_count=?,
-                fills_reconciled=?,evidence_id=?,reconciled_revision=? WHERE bot_id=?""",
+                fills_reconciled=?,evidence_id=?,reconciled_revision=?,remote_pos_id=? WHERE bot_id=?""",
                 (str(evidence.position), evidence.ordinary_open, evidence.conditional_open, evidence.unknown_count,
-                 int(evidence.fills_reconciled), evidence.evidence_id, evidence.revision, bot_id))
+                 int(evidence.fills_reconciled), evidence.evidence_id, evidence.revision,
+                 evidence.remote_position_id, bot_id))
             health = "LOCAL_READY" if evidence.unknown_count == 0 and evidence.fills_reconciled else "RECONCILING"
             if self.execution is not None and evidence.conditional_open > int(self.protection.state(bot_id)['active'] is not None):
                 health = "RECONCILING"

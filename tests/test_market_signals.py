@@ -44,6 +44,37 @@ def base_inputs(**changes):
 
 
 class L2SignalTests(unittest.TestCase):
+    def test_public_momentum_absolute_return_boundary_and_missing(self):
+        # Guide s-signals: ordinary momentum is inclusive at 10% in either
+        # direction. These fixtures verify the rule, not live Yaozi agreement.
+        for value, expected in (
+            ("-10.001", signals.HIT), ("-10", signals.HIT),
+            ("-9.999", signals.MISS), ("0", signals.MISS),
+            ("9.999", signals.MISS), ("10", signals.HIT),
+            ("10.001", signals.HIT), (None, signals.MISSING_DATA),
+        ):
+            with self.subTest(value=value):
+                inputs = signals.SignalInputs(
+                    symbol="BTC-USDT-SWAP", observed_at_ms=1_000_000,
+                    return_24h_pct=None if value is None else D(value),
+                )
+                self.assertEqual(signals.evaluate(inputs).signal("MOMENTUM").status,
+                                 expected)
+
+    def test_momentum_uses_24h_not_one_hour_or_fomo(self):
+        inputs = signals.SignalInputs(
+            symbol="BTC-USDT-SWAP", observed_at_ms=1_000_000,
+            return_1h_pct=D("30"), return_24h_pct=D("9.999"),
+            capital_flow_fomo_event=True,
+        )
+        self.assertEqual(signals.evaluate(inputs).signal("MOMENTUM").status,
+                         signals.MISS)
+
+    def test_negative_momentum_is_not_positive_only_pure_momentum(self):
+        bundle = signals.evaluate(base_inputs(return_24h_pct=D("-10")))
+        self.assertEqual(bundle.signal("MOMENTUM").status, signals.HIT)
+        self.assertEqual(bundle.signal("PURE_MOMENTUM").status, signals.MISS)
+
     def test_known_l2_boundaries_hit_and_unknown_thresholds_stay_disabled(self):
         bundle = signals.evaluate(base_inputs(return_24h_pct=D("25")))
         self.assertEqual(bundle.signal("MOMENTUM").status, signals.HIT)

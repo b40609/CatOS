@@ -7,6 +7,15 @@ import unittest
 from catos.market_api import MarketIntelReader
 from catos.market_intel import MarketIntelError, MarketIntelStore
 from catos.market_social import (
+    EXPLICIT_SOCIAL_ASSETS_V1,
+    EXPLICIT_SOCIAL_ASSETS_V2,
+    EXPLICIT_SOCIAL_ASSETS_V3,
+    EXPLICIT_SOCIAL_ASSETS_V4,
+    EXPLICIT_SOCIAL_ASSETS_V5,
+    EXPLICIT_SOCIAL_ASSETS_V6,
+    EXPLICIT_SOCIAL_ASSETS_V7,
+    EXPLICIT_SOCIAL_ASSETS_V8,
+    EXPLICIT_SOCIAL_ASSETS_V9,
     SOCIAL_CONTRACT,
     SOCIAL_MAPPING_CONTRACT,
     SOCIAL_SOURCE,
@@ -62,10 +71,92 @@ class FakeMappingTransport:
 
 
 COIN_LIST = [
+    {"id": "aave-new", "name": "Aave", "symbol": "AAVE", "rank": 46,
+     "is_active": True, "type": "token"},
     {"id": "btc-bitcoin", "name": "Bitcoin", "symbol": "BTC", "rank": 1,
      "is_active": True, "type": "coin"},
     {"id": "eth-ethereum", "name": "Ethereum", "symbol": "ETH", "rank": 2,
      "is_active": True, "type": "coin"},
+    {"id": "ldo-lido-dao", "name": "Lido DAO", "symbol": "LDO", "rank": 142,
+     "is_active": True, "type": "token"},
+    {"id": "ena-ethena", "name": "Ethena", "symbol": "ENA", "rank": 50,
+     "is_active": True, "type": "token"},
+    {"id": "morpho-morpho", "name": "Morpho", "symbol": "MORPHO", "rank": 63,
+     "is_active": True, "type": "token"},
+    {"id": "ondo-ondo", "name": "Ondo", "symbol": "ONDO", "rank": 47,
+     "is_active": True, "type": "token"},
+    {"id": "ethfi-etherfi", "name": "Ether.fi", "symbol": "ETHFI", "rank": 101,
+     "is_active": True, "type": "token"},
+    {"id": "link-chainlink", "name": "Chainlink", "symbol": "LINK", "rank": 17,
+     "is_active": True, "type": "token"},
+    {"id": "paxg-pax-gold", "name": "PAX Gold", "symbol": "PAXG", "rank": 52,
+     "is_active": True, "type": "token"},
+    {"id": "pendle-pendle", "name": "Pendle", "symbol": "PENDLE", "rank": 130,
+     "is_active": True, "type": "token"},
+    {"id": "qnt-quant", "name": "Quant", "symbol": "QNT", "rank": 92,
+     "is_active": True, "type": "token"},
+    {"id": "aero-aerodrome-finance", "name": "Aerodrome Finance", "symbol": "AERO", "rank": 101,
+     "is_active": True, "type": "token"},
+    {"id": "cake-pancakeswap", "name": "PancakeSwap", "symbol": "CAKE", "rank": 94,
+     "is_active": True, "type": "token"},
+    {"id": "crv-curve-dao-token", "name": "Curve DAO Token", "symbol": "CRV", "rank": 113,
+     "is_active": True, "type": "token"},
+    {"id": "grt-the-graph", "name": "The Graph", "symbol": "GRT", "rank": 175,
+     "is_active": True, "type": "token"},
+    {"id": "virtual-virtual-protocol", "name": "Virtuals Protocol", "symbol": "VIRTUAL", "rank": 125,
+     "is_active": True, "type": "token"},
+    {"id": "comp-compoundd", "name": "Compound", "symbol": "COMP", "rank": 176,
+     "is_active": True, "type": "token"},
+    {"id": "comp-compound-coin", "name": "Compound Coin", "symbol": "COMP", "rank": 3886,
+     "is_active": True, "type": "coin"},
+    {"id": "uni-uniswap", "name": "Uniswap", "symbol": "UNI", "rank": 34,
+     "is_active": True, "type": "token"},
+    {"id": "uni-uni", "name": "UNI", "symbol": "UNI", "rank": 2516,
+     "is_active": True, "type": "token"},
+    {"id": "1inch-1inch", "name": "1INCH", "symbol": "1INCH", "rank": 228,
+     "is_active": True, "type": "token"},
+    {"id": "sushi-sushi", "name": "Sushi", "symbol": "SUSHI", "rank": 411,
+     "is_active": True, "type": "token"},
+    {"id": "snx-synthetix-network-token", "name": "Synthetix Network", "symbol": "SNX", "rank": 304,
+     "is_active": True, "type": "token"},
+    {"id": "yfi-yearnfinance", "name": "yearn.finance", "symbol": "YFI", "rank": 290,
+     "is_active": True, "type": "token"},
+    {"id": "zrx-0x", "name": "0x", "symbol": "ZRX", "rank": 299,
+     "is_active": True, "type": "token"},
+    {"id": "api3-api3", "name": "API3", "symbol": "API3", "rank": 500,
+     "is_active": True, "type": "token"},
+    {"id": "arb-arbitrum", "name": "Arbitrum", "symbol": "ARB", "rank": 79,
+     "is_active": True, "type": "token"},
+    {"id": "arb-arb-protocol", "name": "ARB Protocol", "symbol": "ARB", "rank": 3000,
+     "is_active": True, "type": "token"},
+    {"id": "arb-arbitrage-loop", "name": "Arbitrage Loop", "symbol": "ARB", "rank": 4000,
+     "is_active": True, "type": "token"},
+    {"id": "arb6-dotarb", "name": ".arb", "symbol": "ARB", "rank": 5000,
+     "is_active": True, "type": "token"},
+    {"id": "bat-basic-attention-token", "name": "Basic Attention Token", "symbol": "BAT", "rank": 216,
+     "is_active": True, "type": "token"},
+    {"id": "bat2-batic", "name": "Batic", "symbol": "BAT", "rank": 5000,
+     "is_active": True, "type": "token"},
+    {"id": "cvx-convex-finance", "name": "Convex Finance", "symbol": "CVX", "rank": 220,
+     "is_active": True, "type": "token"},
+    {"id": "ens-ethereum-name-service", "name": "Ethereum Name Service", "symbol": "ENS", "rank": 171,
+     "is_active": True, "type": "token"},
+    {"id": "gmx-gmx", "name": "GMX", "symbol": "GMX", "rank": 375,
+     "is_active": True, "type": "token"},
+    {"id": "gmx-gamext", "name": "GameXT", "symbol": "GMX", "rank": 5000,
+     "is_active": True, "type": "token"},
+    {"id": "lpt-livepeer", "name": "Livepeer", "symbol": "LPT", "rank": 400,
+     "is_active": True, "type": "token"},
+    {"id": "op-optimism", "name": "Optimism", "symbol": "OP", "rank": 165,
+     "is_active": True, "type": "token"},
+    {"id": "op-one-path", "name": "One Path", "symbol": "OP", "rank": 5000,
+     "is_active": True, "type": "token"},
+    {"id": "spell-spell-token", "name": "Spell Token", "symbol": "SPELL", "rank": 600,
+     "is_active": True, "type": "token"},
+    {"id": "spell2-the-spellcaster", "name": "The Spellcaster", "symbol": "SPELL", "rank": 5000,
+     "is_active": True, "type": "token"},
+    {"id": "uma-uma", "name": "UMA", "symbol": "UMA", "rank": 500,
+     "is_active": True, "type": "token"},
     {"id": "old-btc", "name": "Old BTC", "symbol": "BTC", "rank": 0,
      "is_active": False, "type": "token"},
 ]
@@ -96,6 +187,348 @@ class MarketSocialTests(unittest.TestCase):
             [("BTC-USDT-SWAP", "btc-bitcoin"), ("ETH-USDT-SWAP", "eth-ethereum")],
         )
         self.assertEqual(first.issues, ())
+
+    def test_evidence_backed_registry_adds_aave_without_ticker_auto_mapping(self):
+        symbols = ("AAVE-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP")
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V1)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        unresolved = resolve_coinpaprika_assets(("AAVE-USDT-SWAP",), COIN_LIST)
+        self.assertEqual(unresolved.assets, ())
+        self.assertEqual(
+            [(item.symbol, item.code, item.candidate_ids) for item in unresolved.issues],
+            [("AAVE-USDT-SWAP", "unverified_identity", ("aave-new",))],
+        )
+
+    def test_v2_registry_adds_ldo_from_explicit_identity_evidence(self):
+        symbols = ("AAVE-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "LDO-USDT-SWAP")
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V2)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+                ("LDO-USDT-SWAP", "ldo-lido-dao"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        unresolved = resolve_coinpaprika_assets(("LDO-USDT-SWAP",), COIN_LIST)
+        self.assertEqual(unresolved.assets, ())
+        self.assertEqual(
+            [(item.symbol, item.code, item.candidate_ids) for item in unresolved.issues],
+            [("LDO-USDT-SWAP", "unverified_identity", ("ldo-lido-dao",))],
+        )
+
+    def test_v3_registry_adds_contract_verified_assets_without_ticker_auto_mapping(self):
+        symbols = (
+            "AAVE-USDT-SWAP", "BTC-USDT-SWAP", "ENA-USDT-SWAP", "ETH-USDT-SWAP",
+            "LDO-USDT-SWAP", "MORPHO-USDT-SWAP", "ONDO-USDT-SWAP",
+        )
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V3)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("ENA-USDT-SWAP", "ena-ethena"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+                ("LDO-USDT-SWAP", "ldo-lido-dao"),
+                ("MORPHO-USDT-SWAP", "morpho-morpho"),
+                ("ONDO-USDT-SWAP", "ondo-ondo"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("ENA-USDT-SWAP", "ena-ethena"),
+            ("MORPHO-USDT-SWAP", "morpho-morpho"),
+            ("ONDO-USDT-SWAP", "ondo-ondo"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(symbol, "unverified_identity", (coinpaprika_id,))],
+                )
+
+    def test_v4_registry_adds_more_contract_verified_assets_without_ticker_auto_mapping(self):
+        symbols = (
+            "AAVE-USDT-SWAP", "BTC-USDT-SWAP", "ENA-USDT-SWAP", "ETH-USDT-SWAP",
+            "ETHFI-USDT-SWAP", "LDO-USDT-SWAP", "LINK-USDT-SWAP", "MORPHO-USDT-SWAP",
+            "ONDO-USDT-SWAP", "PAXG-USDT-SWAP", "PENDLE-USDT-SWAP", "QNT-USDT-SWAP",
+        )
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V4)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("ENA-USDT-SWAP", "ena-ethena"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+                ("ETHFI-USDT-SWAP", "ethfi-etherfi"),
+                ("LDO-USDT-SWAP", "ldo-lido-dao"),
+                ("LINK-USDT-SWAP", "link-chainlink"),
+                ("MORPHO-USDT-SWAP", "morpho-morpho"),
+                ("ONDO-USDT-SWAP", "ondo-ondo"),
+                ("PAXG-USDT-SWAP", "paxg-pax-gold"),
+                ("PENDLE-USDT-SWAP", "pendle-pendle"),
+                ("QNT-USDT-SWAP", "qnt-quant"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("ETHFI-USDT-SWAP", "ethfi-etherfi"),
+            ("LINK-USDT-SWAP", "link-chainlink"),
+            ("PAXG-USDT-SWAP", "paxg-pax-gold"),
+            ("PENDLE-USDT-SWAP", "pendle-pendle"),
+            ("QNT-USDT-SWAP", "qnt-quant"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(symbol, "unverified_identity", (coinpaprika_id,))],
+                )
+
+    def test_v5_registry_adds_chain_matched_assets_without_ticker_auto_mapping(self):
+        symbols = (
+            "AAVE-USDT-SWAP", "AERO-USDT-SWAP", "BTC-USDT-SWAP", "CAKE-USDT-SWAP",
+            "CRV-USDT-SWAP", "ENA-USDT-SWAP", "ETH-USDT-SWAP", "ETHFI-USDT-SWAP",
+            "GRT-USDT-SWAP", "LDO-USDT-SWAP", "LINK-USDT-SWAP", "MORPHO-USDT-SWAP",
+            "ONDO-USDT-SWAP", "PAXG-USDT-SWAP", "PENDLE-USDT-SWAP", "QNT-USDT-SWAP",
+            "VIRTUAL-USDT-SWAP",
+        )
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V5)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("AERO-USDT-SWAP", "aero-aerodrome-finance"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("CAKE-USDT-SWAP", "cake-pancakeswap"),
+                ("CRV-USDT-SWAP", "crv-curve-dao-token"),
+                ("ENA-USDT-SWAP", "ena-ethena"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+                ("ETHFI-USDT-SWAP", "ethfi-etherfi"),
+                ("GRT-USDT-SWAP", "grt-the-graph"),
+                ("LDO-USDT-SWAP", "ldo-lido-dao"),
+                ("LINK-USDT-SWAP", "link-chainlink"),
+                ("MORPHO-USDT-SWAP", "morpho-morpho"),
+                ("ONDO-USDT-SWAP", "ondo-ondo"),
+                ("PAXG-USDT-SWAP", "paxg-pax-gold"),
+                ("PENDLE-USDT-SWAP", "pendle-pendle"),
+                ("QNT-USDT-SWAP", "qnt-quant"),
+                ("VIRTUAL-USDT-SWAP", "virtual-virtual-protocol"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("AERO-USDT-SWAP", "aero-aerodrome-finance"),
+            ("CAKE-USDT-SWAP", "cake-pancakeswap"),
+            ("CRV-USDT-SWAP", "crv-curve-dao-token"),
+            ("GRT-USDT-SWAP", "grt-the-graph"),
+            ("VIRTUAL-USDT-SWAP", "virtual-virtual-protocol"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(symbol, "unverified_identity", (coinpaprika_id,))],
+                )
+
+    def test_v6_registry_resolves_ambiguous_uni_comp_from_chain_contract_evidence(self):
+        symbols = (
+            "AAVE-USDT-SWAP", "AERO-USDT-SWAP", "BTC-USDT-SWAP", "CAKE-USDT-SWAP",
+            "COMP-USDT-SWAP", "CRV-USDT-SWAP", "ENA-USDT-SWAP", "ETH-USDT-SWAP",
+            "ETHFI-USDT-SWAP", "GRT-USDT-SWAP", "LDO-USDT-SWAP", "LINK-USDT-SWAP",
+            "MORPHO-USDT-SWAP", "ONDO-USDT-SWAP", "PAXG-USDT-SWAP",
+            "PENDLE-USDT-SWAP", "QNT-USDT-SWAP", "UNI-USDT-SWAP", "VIRTUAL-USDT-SWAP",
+        )
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V6)
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("AAVE-USDT-SWAP", "aave-new"),
+                ("AERO-USDT-SWAP", "aero-aerodrome-finance"),
+                ("BTC-USDT-SWAP", "btc-bitcoin"),
+                ("CAKE-USDT-SWAP", "cake-pancakeswap"),
+                ("COMP-USDT-SWAP", "comp-compoundd"),
+                ("CRV-USDT-SWAP", "crv-curve-dao-token"),
+                ("ENA-USDT-SWAP", "ena-ethena"),
+                ("ETH-USDT-SWAP", "eth-ethereum"),
+                ("ETHFI-USDT-SWAP", "ethfi-etherfi"),
+                ("GRT-USDT-SWAP", "grt-the-graph"),
+                ("LDO-USDT-SWAP", "ldo-lido-dao"),
+                ("LINK-USDT-SWAP", "link-chainlink"),
+                ("MORPHO-USDT-SWAP", "morpho-morpho"),
+                ("ONDO-USDT-SWAP", "ondo-ondo"),
+                ("PAXG-USDT-SWAP", "paxg-pax-gold"),
+                ("PENDLE-USDT-SWAP", "pendle-pendle"),
+                ("QNT-USDT-SWAP", "qnt-quant"),
+                ("UNI-USDT-SWAP", "uni-uniswap"),
+                ("VIRTUAL-USDT-SWAP", "virtual-virtual-protocol"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("COMP-USDT-SWAP", "comp-compoundd"),
+            ("UNI-USDT-SWAP", "uni-uniswap"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(
+                        symbol,
+                        "ambiguous_mapping",
+                        (("comp-compound-coin", "comp-compoundd")
+                         if symbol == "COMP-USDT-SWAP"
+                         else ("uni-uni", "uni-uniswap")),
+                    )],
+                )
+
+    def test_v7_registry_adds_1inch_sushi_from_exact_contract_evidence(self):
+        self.assertEqual(EXPLICIT_SOCIAL_ASSETS_V7[:-2], EXPLICIT_SOCIAL_ASSETS_V6)
+        symbols = ("1INCH-USDT-SWAP", "SUSHI-USDT-SWAP")
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V7[-2:])
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("1INCH-USDT-SWAP", "1inch-1inch"),
+                ("SUSHI-USDT-SWAP", "sushi-sushi"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("1INCH-USDT-SWAP", "1inch-1inch"),
+            ("SUSHI-USDT-SWAP", "sushi-sushi"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(symbol, "unverified_identity", (coinpaprika_id,))],
+                )
+
+    def test_v8_registry_adds_snx_yfi_zrx_from_exact_contract_evidence(self):
+        self.assertEqual(EXPLICIT_SOCIAL_ASSETS_V8[:-3], EXPLICIT_SOCIAL_ASSETS_V7)
+        symbols = ("SNX-USDT-SWAP", "YFI-USDT-SWAP", "ZRX-USDT-SWAP")
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V8[-3:])
+        self.assertEqual(
+            [(item.symbol, item.coinpaprika_id) for item in coverage.assets],
+            [
+                ("SNX-USDT-SWAP", "snx-synthetix-network-token"),
+                ("YFI-USDT-SWAP", "yfi-yearnfinance"),
+                ("ZRX-USDT-SWAP", "zrx-0x"),
+            ],
+        )
+        self.assertEqual(coverage.issues, ())
+
+        for symbol, coinpaprika_id in (
+            ("SNX-USDT-SWAP", "snx-synthetix-network-token"),
+            ("YFI-USDT-SWAP", "yfi-yearnfinance"),
+            ("ZRX-USDT-SWAP", "zrx-0x"),
+        ):
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                self.assertEqual(
+                    [(item.symbol, item.code, item.candidate_ids)
+                     for item in unresolved.issues],
+                    [(symbol, "unverified_identity", (coinpaprika_id,))],
+                )
+
+    def test_v9_registry_adds_contract_verified_assets_and_resolves_collisions(self):
+        self.assertEqual(EXPLICIT_SOCIAL_ASSETS_V9[:-10], EXPLICIT_SOCIAL_ASSETS_V8)
+        expected = (
+            ("API3-USDT-SWAP", "api3-api3"),
+            ("ARB-USDT-SWAP", "arb-arbitrum"),
+            ("BAT-USDT-SWAP", "bat-basic-attention-token"),
+            ("CVX-USDT-SWAP", "cvx-convex-finance"),
+            ("ENS-USDT-SWAP", "ens-ethereum-name-service"),
+            ("GMX-USDT-SWAP", "gmx-gmx"),
+            ("LPT-USDT-SWAP", "lpt-livepeer"),
+            ("OP-USDT-SWAP", "op-optimism"),
+            ("SPELL-USDT-SWAP", "spell-spell-token"),
+            ("UMA-USDT-SWAP", "uma-uma"),
+        )
+        symbols = tuple(symbol for symbol, _ in expected)
+        coverage = resolve_coinpaprika_assets(
+            symbols, COIN_LIST, explicit_assets=EXPLICIT_SOCIAL_ASSETS_V9[-10:])
+        self.assertEqual(
+            tuple((item.symbol, item.coinpaprika_id) for item in coverage.assets), expected)
+        self.assertEqual(coverage.issues, ())
+
+        ambiguous = {
+            "ARB-USDT-SWAP": ("arb-arb-protocol", "arb-arbitrage-loop", "arb-arbitrum", "arb6-dotarb"),
+            "BAT-USDT-SWAP": ("bat-basic-attention-token", "bat2-batic"),
+            "GMX-USDT-SWAP": ("gmx-gamext", "gmx-gmx"),
+            "OP-USDT-SWAP": ("op-one-path", "op-optimism"),
+            "SPELL-USDT-SWAP": ("spell-spell-token", "spell2-the-spellcaster"),
+        }
+        for symbol, coinpaprika_id in expected:
+            with self.subTest(symbol=symbol):
+                unresolved = resolve_coinpaprika_assets((symbol,), COIN_LIST)
+                self.assertEqual(unresolved.assets, ())
+                issue = unresolved.issues[0]
+                if symbol in ambiguous:
+                    self.assertEqual(
+                        (issue.symbol, issue.code, issue.candidate_ids),
+                        (symbol, "ambiguous_mapping", ambiguous[symbol]),
+                    )
+                else:
+                    self.assertEqual(
+                        (issue.symbol, issue.code, issue.candidate_ids),
+                        (symbol, "unverified_identity", (coinpaprika_id,)),
+                    )
+
+    def test_aave_duplicate_social_link_kind_fails_closed(self):
+        asset = SocialAssetRef("AAVE-USDT-SWAP", "aave-new")
+        payload = {
+            "id": "aave-new",
+            "symbol": "AAVE",
+            "links_extended": [
+                {"url": "https://twitter.com/AaveAave", "type": "twitter",
+                 "stats": {"followers": 531_669}},
+                {"url": "https://twitter.com/ethlend1", "type": "twitter",
+                 "stats": {"followers": 9_751}},
+            ],
+        }
+        batch = collect_coinpaprika_social(asset, 1_000, FakeTransport(payload))
+        self.assertEqual(batch.metrics, ())
+        self.assertEqual(batch.issues, ("ambiguous_metric",))
 
     def test_coin_list_collision_and_missing_asset_stay_unresolved(self):
         payload = COIN_LIST + [

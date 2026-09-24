@@ -1,0 +1,43 @@
+{
+  "date": "2026-09-23",
+  "status": "pass_local_synthetic_integration",
+  "scope": "formal reconciliation + DemoTradeGrant + Worker/Supervisor execution + restart responsibility reconciliation",
+  "acceptance": {
+    "formal_synthetic_reconciliation_passed": true,
+    "formal_gate_trade_authorized": false,
+    "closed_bar_worker_intent_observed": true,
+    "entry_without_grant_blocked_before_transport": true,
+    "entry_without_grant_exchange_calls": 0,
+    "bounded_grant_entry_fill_passed": true,
+    "fixed_tag_preserved": true,
+    "restart_restored_active_grant": false,
+    "restart_restored_consumed_authorization_tombstone": true,
+    "restart_remote_responsibility_reconciliation_passed": true,
+    "consumed_authorization_reuse_blocked": true
+  },
+  "tests": {
+    "dedicated_command": "PYTHONPATH=.;tests python -m unittest tests.test_safe_strategy_loop -v",
+    "dedicated_passed": 1,
+    "dedicated_failed": 0,
+    "regression_command": "PYTHONPATH=.;tests python -m unittest tests.test_safe_strategy_loop tests.test_demo_reconciliation tests.test_demo_trade_authorization tests.test_supervisor_reconciliation",
+    "regression_passed": 63,
+    "regression_failed": 0
+  },
+  "production_blockers": {
+    "flow_classification": "166/185; 19 unknown; complete=false",
+    "exact_midnight_e0": "blocked_no_qualified_production_source_or_producer",
+    "dedicated_demo_identity_and_foreign_responsibility": "blocked_requires_new_explicitly_authorized_real_demo_private_read_only_evidence",
+    "real_demo_write": "not_authorized"
+  },
+  "boundaries": {
+    "production_runtime_code_changed": false,
+    "temporary_synthetic_db_only": true,
+    "project_db_written": false,
+    "db_schema_changed": false,
+    "real_credentials_read": false,
+    "demo_or_live_network_request": false,
+    "catos_yaozi_modified": false,
+    "commit": false,
+    "push": false
+  }
+}

@@ -1,5 +1,18 @@
 # S10：S9 後帳務缺口與下一片評估
 
+2026-09-21 後續：Sol 已通過 [S10 正式規格](catos-s10-fee-correction-spec.md)，使用者其後明確授權實作；Astra 已完成程式與測試編寫，待 Sol 執行驗收。規格採 schema9／event v3／S2 request v3／capture v3，Lot snapshot 沿用 v2；這是正式規格的版本設計，非本 assessment 當時已定案的版本。實作交接見 [S10 handoff](../docs/lot-fee-correction-handoff.md)；本節以下保留政策決策與更早審查沿革，不代表目前仍待實作授權。
+
+## 最新政策決策（2026-09-21）
+
+使用者明確同意 **S10-P1=A、S10-P2=A**，取代下文 assessment／Sol 審查當時「P1／P2 尚待定案」的狀態；下文選項比較保留為歷史依據。
+
+- **P1=A：** 新 correction identity 的新費用若與目前有效費用數值等價，拒絕 no-change，不新增事件或推進 revision。已接受 identity＋相同 canonical payload 的重送仍優先回原收據；不能改判 no-change。
+- **P2=A：** 在既有 `research._CONTEXT`（prec=50、ROUND_HALF_EVEN）中，依序計算目前 subtotal 扣舊有效 fee，再加新 fee。不得改寫為先算 new-old 再加 subtotal，也不重建全部有效費用加總。接受有限精度捨入可能使往返更正無法還原先前 subtotal 最後有效位；相同事件歷史必須依同一契約精確重放。
+- 正式規格仍須鎖定每一步中間值界限、Underflow／DecimalException、整筆 rollback、API／wire／DDL／版本及驗收矩陣。政策定案不等於這些細節已完成或已驗證。
+- 下一步為 Astra 起草正式規格，再交 Sol 獨立審查。本輪只記錄政策，未起草正式規格、未實作、未執行 Decimal 探針或測試；不授權既有 DB migration、交易接線或 Git 操作。
+
+## 評估及審查時狀態（歷史）
+
 狀態：2026-09-21，Astra 完成評估；Sol 獨立契約審查結論為**「附待決政策可進正式規格」**。現行實碼支持先評估「受管成交已知費用更正」的方向，未發現阻斷性的事實錯誤；但新 identity 同金額請求、Decimal 更新順序與後續版本編號仍未定案。使用者定案必要帳務政策後，再由 Astra 制定正式規格。本輪未授權實作、Schema 變更、既有 DB migration 或交易接線。
 
 ## Sol 契約審查（2026-09-21）

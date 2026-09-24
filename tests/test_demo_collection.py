@@ -107,6 +107,31 @@ def config_response(row):
 
 
 class CredentialTests(unittest.TestCase):
+    def test_subtypes_fixed_signed_demo_get_and_safe_catalog(self):
+        clock = FakeClock()
+        sender = mock.Mock()
+        sender.send.return_value = wire_body([{"type": "1", "typeDesc": "Transfer",
+            "subTypeDetails": [{"subType": "11", "subTypeDesc": "Transfer in"}],
+            "private_extra": "must-not-export"}])
+        result = demo.read_subtypes_once(http.MemoryCredentials("key", "secret", "pass"),
+                                        sender=sender, clock=clock)
+        request = sender.send.call_args.args[0]
+        self.assertEqual(request.target, "/api/v5/account/subtypes")
+        self.assertEqual(dict(request.headers)["x-simulated-trading"], "1")
+        self.assertIn("OK-ACCESS-SIGN", dict(request.headers))
+        self.assertNotIn("must-not-export", json.dumps(result))
+        self.assertFalse(result["trade_authorized"])
+        self.assertEqual(result["audit"]["wire_attempts"], 1)
+
+    def test_subtypes_empty_duplicate_and_malformed_fail_closed(self):
+        row = {"type": "1", "typeDesc": "Transfer", "subTypeDetails": []}
+        for data in ([], [row, row], [{"type": "1"}]):
+            sender = mock.Mock()
+            sender.send.return_value = wire_body(data)
+            with self.assertRaisesRegex(demo.SetupError, "subtypes_catalog_invalid"):
+                demo.read_subtypes_once(http.MemoryCredentials("key", "secret", "pass"),
+                                        sender=sender, clock=FakeClock())
+
     def test_parse_supported_formats(self):
         cases = (
             '{"api_key":"key","secret":"secret","passphrase":"pass"}',
@@ -289,6 +314,41 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(outcome.summary["attempts"], len(sender.requests))
         self.assertGreaterEqual(outcome.summary["attempts"], 3)
         self.assertLessEqual(outcome.summary["attempts"], 120)
+
+    def test_latency_summary_and_near_runtime_budget_are_synthetic(self):
+        clock = FakeClock()
+
+        class SlowSender(SyntheticSender):
+            def send(self, request):
+                clock.sleep(4900)
+                return super().send(request)
+
+        outcome = demo.run_once(http.MemoryCredentials("k", "s", "p"),
+            sender=SlowSender(clock), clock=clock, sleep_ms=clock.sleep)
+        evidence = outcome.summary["latency_evidence"]
+        self.assertFalse(outcome.summary["collection_complete"])
+        self.assertFalse(outcome.summary["trade_authorized"])
+        self.assertGreaterEqual(evidence["batch_span_ms"], 180000)
+        self.assertLessEqual(evidence["batch_span_ms"], 184900)
+        self.assertEqual(evidence["report_age_ms"], 0)
+        self.assertEqual(evidence["attempts"][-1]["outcome"], "timeout")
+        self.assertEqual(evidence["public_time"][0]["server_time_ms"],
+                         evidence["attempts"][1]["completed_ms"])
+
+    def test_invalid_public_time_keeps_report_but_provides_no_clock_evidence(self):
+        clock = FakeClock()
+
+        class InvalidTimeSender(SyntheticSender):
+            def send(self, request):
+                if request.target == "/api/v5/public/time":
+                    return wire_body([{"ts": "not-a-timestamp"}])
+                return super().send(request)
+
+        outcome = demo.run_once(http.MemoryCredentials("k", "s", "p"),
+            sender=InvalidTimeSender(clock), clock=clock, sleep_ms=clock.sleep)
+        self.assertEqual(outcome.summary["latency_evidence"]["public_time"], [])
+        self.assertIn("invalid_record:public_time", outcome.summary["discrepancies"])
+        self.assertFalse(outcome.summary["reconciled"])
 
 
 if __name__ == "__main__":

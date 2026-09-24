@@ -11,7 +11,13 @@ import json
 import re
 
 from catos import ipc, okx_readonly as ia
-from catos.okx_collection import ENDPOINTS, CollectionResult, RunScope
+from catos.okx_collection import (
+    ENDPOINTS,
+    SNAPSHOT_SEMANTICS_CONTRACT,
+    WINDOW_COVERAGE_CONTRACT,
+    CollectionResult,
+    RunScope,
+)
 
 
 _TOKEN = re.compile(r"[A-Za-z0-9_,.-]{1,128}\Z")
@@ -89,8 +95,17 @@ def decode_row(alias, row):
         if any(fact[n] <= 0 for n in ("ctVal", "ctMult", "tickSz", "lotSz", "minSz")):
             raise ValueError("invalid instrument quantity")
     elif kind == "balance":
-        for name in ("totalEq", "adjEq"):
-            fact[name] = _balance_value(row, name, ia.number, "invalid_decimal")
+        fact["totalEq"] = _balance_value(row, "totalEq", ia.number, "invalid_decimal")
+        if "adjEq" not in row or row["adjEq"] is None:
+            raise _BalanceFieldError("adjEq", "missing")
+        adj_raw = row["adjEq"]
+        if adj_raw == "":
+            fact["adjEq"] = None
+        else:
+            try:
+                fact["adjEq"] = ia.number(row, "adjEq")
+            except (ValueError, TypeError, AttributeError):
+                raise _BalanceFieldError("adjEq", "invalid_decimal") from None
         fact["uTime"] = _balance_value(row, "uTime", _stamp, "invalid_timestamp")
         fact["aggregate_currency"] = "USD"
         details = row.get("details")
@@ -105,7 +120,15 @@ def decode_row(alias, row):
             item = {"ccy": _balance_value(detail, "ccy", _text, "invalid_text", "details[]."),
                     "uTime": _balance_value(detail, "uTime", _stamp, "invalid_timestamp", "details[].")}
             item.update({n: _balance_value(detail, n, ia.number, "invalid_decimal", "details[].")
-                         for n in ("eq", "liab", "availEq", "ordFrozen")})
+                         for n in ("eq", "availEq", "ordFrozen")})
+            # OKX documents currency-level ``liab`` as not applicable to
+            # Futures mode (acctLv=2). Preserve an omitted field as None here;
+            # account-mode-aware eligibility below accepts it only for acctLv=2.
+            if "liab" not in detail or detail["liab"] in (None, ""):
+                item["liab"] = None
+            else:
+                item["liab"] = _balance_value(
+                    detail, "liab", ia.number, "invalid_decimal", "details[].")
             fact["details"].append(item)
         if len({d["ccy"] for d in fact["details"]}) != len(details):
             raise _BalanceFieldError("details[].ccy", "duplicate_currency")
@@ -134,6 +157,14 @@ def decode_row(alias, row):
         texts("billId", "type", "subType", "ccy")
         nums("balChg")
         stamp("ts")
+        if row.get("timing_verified"):
+            val = _text(row, "timing_verified")
+            if val not in ("prior_to_baseline", "after_baseline"):
+                raise ValueError("invalid timing_verified attribute")
+            fact["timing_verified"] = val
+            ev = row.get("timing_evidence_id") or row.get("baseline_evidence_id")
+            if ev:
+                fact["timing_evidence_id"] = _text(row, "timing_evidence_id") if row.get("timing_evidence_id") else _text(row, "baseline_evidence_id")
     elif kind == "algo":
         texts("instType", "instId", "algoId", "state", "tdMode", "posSide", "side", "ordType")
         stamp("uTime")
@@ -167,7 +198,8 @@ def decode_row(alias, row):
 
 def build_report(result, *, scope, owned_order_ids=frozenset(),
                  owned_algo_ids=frozenset(), owned_positions=None,
-                 unresolved_local_ids=frozenset(), classifications=None):
+                 unresolved_local_ids=frozenset(), classifications=None,
+                 expected_uid_sha256=None):
     """Return JSON-ready private report. Attribution is caller's durable evidence.
 
     owned_positions maps (instId, posId) to the locally verified signed Decimal
@@ -177,10 +209,16 @@ def build_report(result, *, scope, owned_order_ids=frozenset(),
     """
     if not isinstance(result, CollectionResult) or not isinstance(scope, RunScope):
         raise ValueError("invalid report input")
+    if (expected_uid_sha256 is not None
+            and (type(expected_uid_sha256) is not str or len(expected_uid_sha256) != 64
+                 or any(ch not in "0123456789abcdef" for ch in expected_uid_sha256))):
+        raise ValueError("invalid expected UID digest")
     owned_positions = dict(owned_positions or {})
     if any(type(v) is not Decimal or not v.is_finite() for v in owned_positions.values()):
         raise ValueError("local positions require finite Decimal")
-    classifications = dict(classifications or {})
+    classification_id = ia.flow_classification_id(classifications)
+    classification_complete = ia.flow_classification_complete(classifications)
+    classifications = ia.flow_classification_mapping(classifications)
     m = result.manifest
     issues, facts, sources = set(), [], []
     record_diagnostics = []
@@ -211,11 +249,22 @@ def build_report(result, *, scope, owned_order_ids=frozenset(),
     for e in m.endpoint_manifests:
         if e.complete and (not e.pages or e.pages[-1].next_cursor is not None or e.issue != ""):
             issues.add("manifest_completion_mismatch")
+        window_request_evidence = None
+        if e.window_evidence is not None:
+            window_request_evidence = {
+                "contract_id": WINDOW_COVERAGE_CONTRACT,
+                "begin_ms": e.window_evidence.begin_ms,
+                "end_ms": e.window_evidence.end_ms,
+                "event_time_field": e.window_evidence.event_time_field,
+                "cursor_semantics": e.window_evidence.cursor_semantics,
+                "filter_semantics": "exact_inclusive_begin_end",
+            }
         sources.append({"alias": e.alias, "started_ms": e.started_ms,
                         "completed_ms": e.completed_ms, "requests": e.requests,
                         "source_time_semantics": "transport_supplied_not_verified_snapshot",
                         "record_time_semantics": ("event_ms" if _GROUP.get(e.alias) in ("fill", "bill")
                                                   else "last_update_or_reference_ms_not_snapshot"),
+                        "window_request_evidence": window_request_evidence,
                         "complete": e.complete, "issue": "collection_failed" if e.issue else "",
                         "pages": []})
         seen_pages, seen_cursors = set(), set()
@@ -310,6 +359,9 @@ def build_report(result, *, scope, owned_order_ids=frozenset(),
                 issues.add("mode_mismatch")
             if not f["is_subaccount"]:
                 issues.add("not_subaccount")
+            if (expected_uid_sha256 is not None
+                    and hashlib.sha256(f["uid"].encode("ascii")).hexdigest() != expected_uid_sha256):
+                issues.add("scope_mismatch")
         if kind in ("account_instruments", "public_instruments"):
             if (f["ctType"], f["settleCcy"], f["ctValCcy"], f["state"]) != ("linear", "USDT", scope.instrument.split("-")[0], "live"):
                 issues.add("unsupported_contract")
@@ -374,11 +426,67 @@ def build_report(result, *, scope, owned_order_ids=frozenset(),
                       "conflicting_observation:bill", "outside_window:bill", "malformed_page",
                       "page_evidence_gap", "page_evidence_mismatch", "page_chain_invalid",
                       "manifest_completion_mismatch")))
+    day_flows = None
+    day_unknown_count = 0
+    target_time_ms = m.completed_ms if (type(m.completed_ms) is int and m.completed_ms > 0) else scope.window_end_ms
+    target_day = (target_time_ms + 28_800_000) // 86_400_000
+    day_start_ms = target_day * 86_400_000 - 28_800_000
+    day_cutoff_ms = scope.window_end_ms
+
+    if scope.window_start_ms > day_start_ms:
+        issues.add("window_coverage_unverified")
+    if type(m.started_ms) is int and type(m.completed_ms) is int and 0 < m.started_ms <= m.completed_ms:
+        if (m.started_ms + 28_800_000) // 86_400_000 != (m.completed_ms + 28_800_000) // 86_400_000:
+            issues.add("day_baseline_unverified")
+
     if bill_valid:
-        flows, unknown = ia.external_flows([_decimal_strings(f) for f in by_kind.get("bill", [])], classifications)
+        all_bills = by_kind.get("bill", [])
+        flows, unknown, forbidden = ia.classify_bill_flows(
+            [_decimal_strings(f) for f in all_bills], classifications)
+        if forbidden:
+            issues.add("unsupported_account_activity")
+            flows = None
         if unknown:
             issues.add("unknown_external_flow")
             flows = None
+
+        day_bills = []
+        timing_ambiguous = False
+        for f in all_bills:
+            stamp = f.get("ts")
+            if type(stamp) is not int:
+                continue
+            if stamp < day_start_ms:
+                continue
+            if stamp > day_cutoff_ms:
+                continue
+            if stamp == day_start_ms:
+                timing = f.get("timing_verified")
+                timing_ev = f.get("timing_evidence_id")
+                if timing == "prior_to_baseline" and timing_ev:
+                    continue
+                elif timing == "after_baseline" and timing_ev:
+                    day_bills.append(f)
+                else:
+                    timing_ambiguous = True
+            else:
+                day_bills.append(f)
+
+        if timing_ambiguous:
+            issues.add("external_flow_unavailable")
+            day_flows = None
+        else:
+            d_flows, d_unknown, d_forbidden = ia.classify_bill_flows(
+                [_decimal_strings(f) for f in day_bills], classifications)
+            if d_forbidden:
+                issues.add("unsupported_account_activity")
+                day_flows = None
+            elif d_unknown:
+                issues.add("unknown_external_flow")
+                day_flows = None
+            else:
+                day_flows = d_flows
+            day_unknown_count = len(d_unknown)
     for f in by_kind.get("algo", []):
         if f["state"] == "effective":
             issues.add("p6_triggered_not_reconciled")
@@ -392,18 +500,36 @@ def build_report(result, *, scope, owned_order_ids=frozenset(),
         issues.add("external_flow_unavailable")
     # No invented freshness threshold, E_0, collateral conversion or trade gate.
     issues.update(("freshness_unverified", "window_coverage_unverified", "day_baseline_unverified"))
+    configs = by_kind.get("account_config", [])
+    config_acct_lv = configs[0].get("acctLv") if len(configs) == 1 else None
     for f in by_kind.get("balance", []):
         details = f["details"]
-        if len(details) != 1 or details[0]["ccy"] != "USDT" or details[0]["liab"] != 0:
+        liability_ok = (details[0]["liab"] == 0
+                        or (config_acct_lv == "2" and details[0]["liab"] is None)) if len(details) == 1 else False
+        collateral_ok = len(details) == 1 and details[0]["ccy"] == "USDT" and liability_ok
+        if not collateral_ok or (f["adjEq"] is None and config_acct_lv != "2"):
             issues.add("unsupported_collateral")
     report = {"version": "i-b-2.v1", "account_alias": scope.account_alias,
         "environment": scope.environment, "instrument": scope.instrument,
         "window_start_ms": scope.window_start_ms, "window_end_ms": scope.window_end_ms,
         "started_ms": m.started_ms, "completed_ms": m.completed_ms,
         "collection_complete": collection_complete,
+        "snapshot_semantics": {
+            "contract_id": SNAPSHOT_SEMANTICS_CONTRACT,
+            "mode": "bounded_sequential_observation",
+            "atomic_snapshot": False,
+            "record_update_time_is_snapshot_fence": False,
+            "transport_time_is_snapshot_fence": False,
+        },
         "reconciled": False, "trade_authorized": False, "sources": sources,
         "facts": unique, "discrepancies": sorted(issues), "record_diagnostics": record_diagnostics,
-        "observed_signed_fees_by_currency": fees, "observed_external_flow_usdt": flows}
+        "observed_signed_fees_by_currency": fees, "observed_external_flow_usdt": flows,
+        "day_external_flow_usdt": str(day_flows) if day_flows is not None else None,
+        "day_flow_start_ms": day_start_ms,
+        "day_flow_cutoff_ms": day_cutoff_ms,
+        "day_unknown_flow_count": day_unknown_count,
+        "flow_classification_id": classification_id,
+        "flow_classification_complete": classification_complete}
     return _private_output(report)
 
 

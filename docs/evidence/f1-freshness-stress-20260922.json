@@ -1,0 +1,77 @@
+{
+  "aliases": [
+    "account_config",
+    "public_time",
+    "fills_history",
+    "bills_archive",
+    "algo_history"
+  ],
+  "checked_at_ms": 1790043663942,
+  "clock_sample_age_ms": 81,
+  "collection": {
+    "batch_span_ms": 179993,
+    "complete": false,
+    "completed_ms": 1790043663781,
+    "config_gate_passed": true,
+    "endpoint_manifests": [
+      {
+        "alias": "account_config",
+        "complete": true,
+        "issue": "",
+        "pages": 1,
+        "requests": 1
+      },
+      {
+        "alias": "public_time",
+        "complete": true,
+        "issue": "",
+        "pages": 1,
+        "requests": 1
+      },
+      {
+        "alias": "fills_history",
+        "complete": false,
+        "issue": "timeout",
+        "pages": 357,
+        "requests": 358
+      },
+      {
+        "alias": "bills_archive",
+        "complete": false,
+        "issue": "not_started:request_budget_exhausted",
+        "pages": 0,
+        "requests": 0
+      },
+      {
+        "alias": "algo_history",
+        "complete": false,
+        "issue": "not_started:request_budget_exhausted",
+        "pages": 0,
+        "requests": 0
+      }
+    ],
+    "requests": 360,
+    "started_ms": 1790043483788
+  },
+  "end_public_time": {
+    "half_rtt_ms": 80.5,
+    "midpoint_ms": 1790043663861,
+    "offset_ms": 2865,
+    "recv_ms": 1790043663942,
+    "rtt_ms": 161,
+    "send_ms": 1790043663781,
+    "server_time_ms": 1790043666726
+  },
+  "page_size": 1,
+  "purpose": "near-180s real HTTPS pagination stress only; not production snapshot evidence",
+  "report_age_proxy_ms": 161,
+  "scope": {
+    "max_pages_per_endpoint": 360,
+    "max_requests": 360,
+    "max_runtime_ms": 180000,
+    "request_timeout_ms": 10000,
+    "window_days": 30
+  },
+  "trade_authorized": false,
+  "version": "f1-freshness-stress.v2"
+}

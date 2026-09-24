@@ -1,0 +1,214 @@
+{
+  "account_alias": "catOSv1",
+  "bill_type_currency_counts": [
+    {
+      "ccy": "BTC",
+      "count": 1,
+      "subType": "11",
+      "type": "1"
+    },
+    {
+      "ccy": "ETH",
+      "count": 1,
+      "subType": "11",
+      "type": "1"
+    },
+    {
+      "ccy": "OKB",
+      "count": 1,
+      "subType": "11",
+      "type": "1"
+    },
+    {
+      "ccy": "USDT",
+      "count": 1,
+      "subType": "11",
+      "type": "1"
+    },
+    {
+      "ccy": "BTC",
+      "count": 1,
+      "subType": "12",
+      "type": "1"
+    },
+    {
+      "ccy": "ETH",
+      "count": 1,
+      "subType": "12",
+      "type": "1"
+    },
+    {
+      "ccy": "OKB",
+      "count": 1,
+      "subType": "12",
+      "type": "1"
+    }
+  ],
+  "collection_complete": true,
+  "credentials_persisted": false,
+  "discrepancies": [
+    "day_baseline_unverified",
+    "freshness_unverified",
+    "unknown_external_flow",
+    "window_coverage_unverified"
+  ],
+  "environment": "demo",
+  "expected_uid_sha256": "de2767e46722ea8f4bc32eb41a959ce801f99624cae253ad42e0ab852c2d51fd",
+  "fact_counts": {
+    "account_config": 1,
+    "account_instruments": 1,
+    "balance": 1,
+    "bill": 7,
+    "mark_price": 1,
+    "public_instruments": 1,
+    "public_time": 1
+  },
+  "identity_verified": true,
+  "manifest": {
+    "collector_version": "i-b-1.v1",
+    "complete": true,
+    "completed_ms": 1790206981116,
+    "requests": 40,
+    "sources": [
+      {
+        "alias": "account_config",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      },
+      {
+        "alias": "account_instruments",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      },
+      {
+        "alias": "public_instruments",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      },
+      {
+        "alias": "balance",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      },
+      {
+        "alias": "positions",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": null
+      },
+      {
+        "alias": "orders_pending",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": null
+      },
+      {
+        "alias": "algo_pending",
+        "complete": true,
+        "pages": 7,
+        "requests": 7,
+        "rows": 0,
+        "window_evidence": null
+      },
+      {
+        "alias": "mark_price",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      },
+      {
+        "alias": "orders_history",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": {
+          "begin_ms": 1790120563396,
+          "cursor_semantics": "after_order_id",
+          "end_ms": 1790206963396,
+          "event_time_field": "cTime"
+        }
+      },
+      {
+        "alias": "fills",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 0,
+        "window_evidence": {
+          "begin_ms": 1790120563396,
+          "cursor_semantics": "after_bill_id",
+          "end_ms": 1790206963396,
+          "event_time_field": "ts"
+        }
+      },
+      {
+        "alias": "bills",
+        "complete": true,
+        "pages": 2,
+        "requests": 2,
+        "rows": 7,
+        "window_evidence": {
+          "begin_ms": 1790120563396,
+          "cursor_semantics": "after_bill_id",
+          "end_ms": 1790206963396,
+          "event_time_field": "ts"
+        }
+      },
+      {
+        "alias": "algo_history",
+        "complete": true,
+        "pages": 21,
+        "requests": 21,
+        "rows": 0,
+        "window_evidence": null
+      },
+      {
+        "alias": "public_time",
+        "complete": true,
+        "pages": 1,
+        "requests": 1,
+        "rows": 1,
+        "window_evidence": null
+      }
+    ],
+    "started_ms": 1790206959396,
+    "window_end_ms": 1790206963396,
+    "window_start_ms": 1790120563396
+  },
+  "monetary_values_persisted": false,
+  "network_read_only_get": true,
+  "provenance": "production_readonly.v1",
+  "q1_baseline_evidence_id": null,
+  "q1_baseline_verified": false,
+  "q1_blockers": [
+    "balance_changing_bill_present",
+    "report:unknown_external_flow"
+  ],
+  "raw_ids_persisted": false,
+  "raw_payload_persisted": false,
+  "reconciled": false,
+  "record_diagnostics": [],
+  "recorded_date": "2026-09-24",
+  "report_content_digest": "531fbd87be8daade44b87c760c8e5020520ca687caf54a4789634b9d8216c8a4",
+  "trade_authorized": false,
+  "version": "catosv1-demo-production-q1-collection-evidence.v1"
+}
