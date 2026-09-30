@@ -55,7 +55,7 @@ def read_strategy_status(provider=None):
     return {**base, **dict(payload), "mutation_routes": []}
 
 
-def render_app_shell():
+def _render_legacy_app_shell():
     return r'''<!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -80,7 +80,7 @@ const initial=location.hash==='#yaozi'?['/dashboard','yaozi']:['/quant','quant']
 </html>'''
 
 
-def render_quant_surface(status):
+def _render_legacy_quant_surface(status):
     def text(value):
         if value is None:
             return "—"
@@ -107,3 +107,34 @@ def render_quant_surface(status):
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>catOS · 量化交易</title><style>
 :root{{color-scheme:dark;--bg:#080706;--panel:#12100d;--line:#302820;--text:#eee9e1;--muted:#91877c;--gold:#c9a66d}}*{{box-sizing:border-box}}html,body{{margin:0;min-height:100%;background:radial-gradient(circle at 30% -20%,#21170e 0,#090706 45%);color:var(--text);font:14px/1.5 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}}main{{max-width:1180px;margin:0 auto;padding:54px 28px}}.eyebrow{{color:var(--gold);font-size:10px;letter-spacing:.25em}}h1{{font:italic 42px/1.05 Georgia,"Noto Serif TC",serif;margin:7px 0 10px}}p{{color:var(--muted);max-width:760px}}.grid{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:28px}}.card{{border:1px solid var(--line);background:rgba(18,16,13,.9);padding:15px;min-height:84px}}.card span{{display:block;color:var(--muted);font-size:9px;letter-spacing:.14em}}.card strong{{display:block;margin-top:8px;font-size:16px;word-break:break-word}}.contract{{margin-top:20px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:11px;line-height:1.8}}@media(max-width:820px){{.grid{{grid-template-columns:repeat(2,1fr)}}}}
 </style></head><body><main><div class="eyebrow">QUANT · BACKEND-OWNED LIFECYCLE</div><h1>量化交易</h1><p>此頁只投影既有 Supervisor 狀態。瀏覽器切頁、重新整理與關閉頁面不會啟動、停止或重建策略；目前未物化 Web start/stop 控制。</p><section class="grid">{cards}</section><div class="contract">contract={text(status.get('contract'))}<br>lifecycle_owner={text(status.get('lifecycle_owner'))}<br>browser_controls_lifecycle={text(status.get('browser_controls_lifecycle'))}<br>mutation_routes=[]</div></main></body></html>'''
+
+
+def render_app_shell():
+    """Render the current localhost product shell prototype."""
+    return render_workbench_surface("/")
+
+
+def render_workbench_surface(initial_path="/app/dashboard"):
+    """Render the browser-only multi-page workbench prototype."""
+    from catos.workbench_prototype import render_workbench_prototype
+
+    return render_workbench_prototype(initial_path)
+
+
+def render_quant_surface(status):
+    """Render the browser-only quant research prototype.
+
+    ``status`` stays in the signature so the existing read-only lifecycle
+    projection contract remains available through /system/strategy-status.
+    The prototype itself intentionally does not mutate or consume it.
+    """
+    del status
+    from catos.quant_prototype import render_quant_prototype
+
+    return render_quant_prototype()
+
+
+def render_yaozi_placeholder():
+    from catos.quant_prototype import render_yaozi_placeholder as render
+
+    return render()

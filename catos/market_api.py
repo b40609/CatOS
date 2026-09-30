@@ -2292,14 +2292,20 @@ class MarketIntelReader:
         return {"status": "materialized_view", "items": items[:limit], "score": None}
 
 
-def create_app(db_path, *, strategy_status_provider=None):
+def create_app(db_path, *, strategy_status_provider=None, market_reader=None):
     """Create the read-only FastAPI adapter for one market-intelligence DB."""
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.responses import HTMLResponse
-    from catos.app_shell import read_strategy_status, render_app_shell, render_quant_surface
+    from catos.app_shell import (
+        read_strategy_status,
+        render_app_shell,
+        render_quant_surface,
+        render_workbench_surface,
+        render_yaozi_placeholder,
+    )
     from catos.market_dashboard import render_dashboard
 
-    reader = MarketIntelReader(db_path)
+    reader = MarketIntelReader(db_path) if market_reader is None else market_reader
     app = FastAPI(title="catOS Market Intel", version="p1")
 
     def not_materialized(surface, phase):
@@ -2317,6 +2323,46 @@ def create_app(db_path, *, strategy_status_provider=None):
     @app.get("/quant", response_class=HTMLResponse)
     def quant_surface():
         return HTMLResponse(render_quant_surface(read_strategy_status(strategy_status_provider)))
+
+    @app.get("/app/dashboard", response_class=HTMLResponse)
+    def workbench_dashboard():
+        return HTMLResponse(render_workbench_surface("/app/dashboard"))
+
+    @app.get("/app/strategy", response_class=HTMLResponse)
+    def workbench_strategy():
+        return HTMLResponse(render_workbench_surface("/app/strategy"))
+
+    @app.get("/app/strategy/{strategy_id}", response_class=HTMLResponse)
+    def workbench_strategy_detail(strategy_id: str):
+        return HTMLResponse(render_workbench_surface(f"/app/strategy/{strategy_id}"))
+
+    @app.get("/app/bots", response_class=HTMLResponse)
+    def workbench_bots():
+        return HTMLResponse(render_workbench_surface("/app/bots"))
+
+    @app.get("/app/bots/{bot_id}", response_class=HTMLResponse)
+    def workbench_bot_detail(bot_id: str):
+        return HTMLResponse(render_workbench_surface(f"/app/bots/{bot_id}"))
+
+    @app.get("/app/risk", response_class=HTMLResponse)
+    def workbench_risk():
+        return HTMLResponse(render_workbench_surface("/app/risk"))
+
+    @app.get("/app/logs", response_class=HTMLResponse)
+    def workbench_logs():
+        return HTMLResponse(render_workbench_surface("/app/logs"))
+
+    @app.get("/app/yaozi", response_class=HTMLResponse)
+    def workbench_yaozi():
+        return HTMLResponse(render_workbench_surface("/app/yaozi"))
+
+    @app.get("/app/settings", response_class=HTMLResponse)
+    def workbench_settings():
+        return HTMLResponse(render_workbench_surface("/app/settings"))
+
+    @app.get("/yaozi", response_class=HTMLResponse)
+    def yaozi_placeholder():
+        return HTMLResponse(render_yaozi_placeholder())
 
     @app.get("/system/strategy-status")
     def strategy_status():

@@ -76,15 +76,56 @@ class AppShellTests(unittest.IsolatedAsyncioTestCase):
             now_ms=(index + 1) * STEP,
         )
 
-    async def test_root_is_single_product_shell_and_strategy_routes_are_read_only(self):
+    async def test_root_is_multi_page_workbench_and_strategy_routes_are_read_only(self):
         client = TestClient(create_app(self.market_path))
         shell = client.get("/")
         self.assertEqual(shell.status_code, 200)
-        self.assertIn("量化交易", shell.text)
-        self.assertIn("Yaozi 情報", shell.text)
-        self.assertIn('data-route="/quant"', shell.text)
-        self.assertIn('data-route="/dashboard"', shell.text)
-        self.assertIn('src="/quant"', shell.text)
+        self.assertIn("Dashboard", shell.text)
+        self.assertIn("Strategy", shell.text)
+        self.assertIn("Bots", shell.text)
+        self.assertIn("Risk", shell.text)
+        self.assertIn("Logs", shell.text)
+        self.assertIn("Yaozi", shell.text)
+        self.assertIn("設定與連線", shell.text)
+        self.assertIn('href="/app/dashboard"', shell.text)
+        self.assertIn('href="/app/strategy"', shell.text)
+        self.assertIn('href="/app/settings"', shell.text)
+        self.assertNotIn("量化交易</button>", shell.text)
+        self.assertIn("示意資料", shell.text)
+
+        workbench_routes = (
+            "/app/dashboard",
+            "/app/strategy",
+            "/app/strategy/momentum15",
+            "/app/bots",
+            "/app/bots/btc-sim",
+            "/app/risk",
+            "/app/logs",
+            "/app/yaozi",
+            "/app/settings",
+        )
+        for route in workbench_routes:
+            response = client.get(route)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("示意資料", response.text)
+
+        strategy = client.get("/app/strategy/momentum15")
+        self.assertIn("策略</button>", strategy.text)
+        self.assertIn("回測</button>", strategy.text)
+        self.assertIn("參數優化</button>", strategy.text)
+        self.assertIn("設定已變更，尚未重跑", strategy.text)
+        self.assertIn("尚未樣本外驗證", strategy.text)
+        self.assertIn("Antigravity IDE", client.get("/app/settings").text)
+        self.assertIn("DeepSeek Harness", client.get("/app/settings").text)
+
+        # Legacy prototype and existing Yaozi backend stay available.
+        quant = client.get("/quant")
+        self.assertIn("策略研究", quant.text)
+        self.assertIn("A 曲線優先", quant.text)
+        self.assertIn("B 並排", quant.text)
+        self.assertIn("模擬 AI 更新策略", quant.text)
+        self.assertIn("示意資料", quant.text)
+        self.assertEqual(client.get("/yaozi").status_code, 200)
         self.assertEqual(client.get("/dashboard").status_code, 200)
 
         status = client.get("/system/strategy-status").json()
@@ -94,6 +135,8 @@ class AppShellTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status["mutation_routes"], [])
         paths = client.get("/openapi.json").json()["paths"]
         self.assertEqual(set(paths["/system/strategy-status"]), {"get"})
+        for route in workbench_routes[:2] + workbench_routes[3:4] + workbench_routes[5:]:
+            self.assertEqual(set(paths[route]), {"get"})
         self.assertNotIn("/system/strategy-start", paths)
         self.assertNotIn("/system/strategy-stop", paths)
 
@@ -110,7 +153,21 @@ class AppShellTests(unittest.IsolatedAsyncioTestCase):
             self.market_path,
             strategy_status_provider=supervisor_status_provider(supervisor),
         )) as client:
-            for route in ("/", "/quant", "/dashboard", "/", "/system/strategy-status"):
+            for route in (
+                "/",
+                "/app/dashboard",
+                "/app/strategy",
+                "/app/strategy/momentum15",
+                "/app/bots",
+                "/app/bots/btc-sim",
+                "/app/risk",
+                "/app/logs",
+                "/app/yaozi",
+                "/app/settings",
+                "/quant",
+                "/dashboard",
+                "/system/strategy-status",
+            ):
                 self.assertEqual(client.get(route).status_code, 200)
             status = client.get("/system/strategy-status").json()
             self.assertEqual(status["health"], "LOCAL_READY")
