@@ -2,6 +2,8 @@
 
 日期：2026-09-30。工作目錄：`C:/Users/user/Desktop/CatOS_Astra`。R3 MCP 第一片與第二片均已由 5.6 Sol (Web) 獨立驗收通過；本輪未讀真實憑證、未碰交易、未修改既有 DB/schema，R4 未開始。
 
+後續更正：以下驗收針對 build `1ecdac33...878f3`；之後 frontend whitespace/EOF patch 使已提交 `87d60be` 的 build 成為 `72734a4e...ff5e5`，前次重啟又被執行層拒絕，故下文「最終」僅代表原階段。使用者本輪改派 6.1 Sol，已完成目前已提交 build 的補驗，最終依據改為 [R3 6.1 Sol 提交後驗收](frontend-research-r3-sol61-verification-20260930.md)。保留原數據，不將歷史紀錄改寫成新一輪驗證。
+
 ## 第二片驗收結論
 
 固定 `sma-trend / sma-parameters-v1` strategy artifact 的 snapshot loader、immutable reviewed digest、MCP exact binding、最終 runtime restart 與 persisted-runs E2E 均通過。`catos/research_mcp.py` 維持固定 localhost stdio bridge，production 只連 `http://127.0.0.1:8770`；MCP process 不建立第二個 `ResearchService`、writer 或 persistence。
