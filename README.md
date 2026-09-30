@@ -2,6 +2,10 @@
 
 新對話先讀[目前接續入口](docs/current-handoff.md)，確認階段、待決政策、分工與授權；詳細歷史留在各切片文件。
 
+2026-09-30 R1 正式研究入口已實作並通過 Sol 驗收：[R1 交接](docs/frontend-research-r1-handoff-20260930.md)／[驗收證據](docs/frontend-research-r1-sol-verification-20260930.md)。在本目錄執行 `python -B -m catos.research_api --port 8770`，開啟 `http://127.0.0.1:8770/research/`，使用註冊 SMA 與合成資料執行真實 Decimal 回測，結果保存於隔離 JSON／HTML。原型 8088／8089 不是研究驗收入口；畫面底部顯示程式版本，更新後等任務完成再手動重啟。原有 root／Yaozi 保留，其他主頁仍為示意。
+
+2026-09-30 R2 Optuna 已接同一研究入口：註冊 SMA 週期搜尋、明示 trial 預算與 seed、查看保存候選並套用為新回測。僅合成資料樣本內搜尋，未執行樣本外檢驗。5.6 Sol (Web) 專屬與必要回歸 30/30 通過；後續固定 8770 人工重啟、實際瀏覽器畫面及 1-trial 正式 HTTP Optuna 任務均已驗證。詳見 [R2 交接](docs/frontend-research-r2-handoff-20260930.md)。
+
 2026-09-23 產品方向已確認：`CatOS_Astra` 與 `CatOS_Yaozi` 保留分工開發，最終整合成同一 catOS 網站內的「量化交易／Yaozi 情報」分頁，不需另開網站。切換頁面不應中斷後端策略；此為交付要求，尚未完成整合驗收。分工、現況與整合順序見[單一介面整合契約](docs/catos-yaozi-integration.md)。
 
 2026-09-21 最新優先序：**catOS 自動跑策略為主線，Yaozi 收斂成可選唯讀情報模組 v0.1**。主線阻斷與最小驗收見[自動策略盤點](docs/catos-auto-strategy-readiness.md)，情報封版見[v0.1 契約](docs/yaozi-v0.1-closeout.md)。S10 已依[專屬交接](docs/lot-fee-correction-handoff.md)通過 Sol 驗收（34/34 專屬、344/344 必要回歸）；下方「待驗收」及各「最新」段落均為切片歷史，不代表目前狀態。本輪未重驗，不啟動新採集或 Demo／Live 交易。

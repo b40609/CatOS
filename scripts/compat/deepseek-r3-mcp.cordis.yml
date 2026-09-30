@@ -1,0 +1,15 @@
+- insert:
+    - id: mcp-catos-research
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: catos-research
+        transport: stdio
+        command: python
+        args:
+          - -B
+          - -m
+          - catos.research_mcp
+        env: {}
+        cwd: 'C:\Users\user\Desktop\CatOS_Astra'
+        toolCallTimeoutMs: 30000
+        failOnStartupError: true

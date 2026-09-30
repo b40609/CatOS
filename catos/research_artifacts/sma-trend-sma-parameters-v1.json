@@ -1,0 +1,18 @@
+{
+  "schema": "catos.research.strategy-artifact",
+  "schema_version": 1,
+  "artifact_id": "sma-trend",
+  "version": "sma-parameters-v1",
+  "sha256": "3b411bb170572445bc8d4a28c5647387ed08cc3846b03c0c0b36949052f92cf2",
+  "entry": "catos.research_strategy:RegisteredSMA",
+  "source_files": [
+    "examples/closed_bar_demo.py",
+    "catos/research_strategy.py"
+  ],
+  "approval_state": "approved",
+  "provenance": {
+    "origin": "catos-r1-registered-sma",
+    "approval_basis": "inspected-fixed-local-artifact",
+    "scope": "synthetic-research-only"
+  }
+}

@@ -1,2 +1,3 @@
-# Optional optimization dependency; core backtest remains standard-library only.
+# Optional R2/R3 research dependencies; core backtest remains standard-library only.
 optuna==4.9.0
+mcp==1.29.1

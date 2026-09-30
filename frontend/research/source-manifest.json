@@ -1,0 +1,114 @@
+{
+  "source": "C:/Users/user/Desktop/catOS-Frontend-Final",
+  "date": "2026-09-30",
+  "files": [
+    {
+      "path": "css/main.css",
+      "source_sha256": "0e011e030c276ccd5e85e4543156a5b9a5108a6f39b031cde0d8ad73fc629339",
+      "change": "line-ending normalization only",
+      "imported_sha256": "0e011e030c276ccd5e85e4543156a5b9a5108a6f39b031cde0d8ad73fc629339"
+    },
+    {
+      "path": "css/components.css",
+      "source_sha256": "0c723478f03c677be6fcbd3a8008196a184da8ef1c93c949d499e511053bee4b",
+      "change": "line-ending normalization only",
+      "imported_sha256": "0c723478f03c677be6fcbd3a8008196a184da8ef1c93c949d499e511053bee4b"
+    },
+    {
+      "path": "css/views.css",
+      "source_sha256": "0b419d8d15861a9f2b8d601c3dd71b2a9a4f632bd4dd4d8ffc8082835400408e",
+      "change": "line-ending normalization only",
+      "imported_sha256": "0b419d8d15861a9f2b8d601c3dd71b2a9a4f632bd4dd4d8ffc8082835400408e"
+    },
+    {
+      "path": "css/workspace.css",
+      "source_sha256": "54c855c2eab969f00fbd82d9f35f80d0fbdbe7b6956ac5d2acc76d3fee51396a",
+      "change": "line-ending normalization only",
+      "imported_sha256": "54c855c2eab969f00fbd82d9f35f80d0fbdbe7b6956ac5d2acc76d3fee51396a"
+    },
+    {
+      "path": "js/mock-data.js",
+      "source_sha256": "1cb5db8ffef1c70ca9e628268f5c821f46a814d27f1f2443cf861bd901ff9b41",
+      "change": "line-ending normalization only",
+      "imported_sha256": "1cb5db8ffef1c70ca9e628268f5c821f46a814d27f1f2443cf861bd901ff9b41"
+    },
+    {
+      "path": "js/state.js",
+      "source_sha256": "5c9e317d4d1b8d54dcc8f94d0a83c82f34f659fc39c4d4b6a399170484f053aa",
+      "change": "isolated localStorage namespace",
+      "imported_sha256": "c91027de5a7d1f22943969bd3fdcb14cf5d97e8c086b2f73f8941700ae9ccd58"
+    },
+    {
+      "path": "js/workspace.js",
+      "source_sha256": "1abc607e1514c2f949ece2104cab9339b89ee465ea4dab549b0929c8346cbf23",
+      "change": "line-ending normalization only",
+      "imported_sha256": "1abc607e1514c2f949ece2104cab9339b89ee465ea4dab549b0929c8346cbf23"
+    },
+    {
+      "path": "js/charts.js",
+      "source_sha256": "5bac8381dc1a6e838f2157de29ba3abb90c7061691ecd8af7295d78f688242d9",
+      "change": "line-ending normalization only",
+      "imported_sha256": "5bac8381dc1a6e838f2157de29ba3abb90c7061691ecd8af7295d78f688242d9"
+    },
+    {
+      "path": "js/views/dashboard.js",
+      "source_sha256": "4901b39d8686e2d23b7d83f279c83096c9c76d991c07d5efd3b4b1dd99e87b2d",
+      "change": "line-ending normalization only",
+      "imported_sha256": "4901b39d8686e2d23b7d83f279c83096c9c76d991c07d5efd3b4b1dd99e87b2d"
+    },
+    {
+      "path": "js/views/bots.js",
+      "source_sha256": "a17c3968eab4d7fef6cee0cf1a9bba0df583fe5c965d014af337ec054c57b504",
+      "change": "line-ending normalization only",
+      "imported_sha256": "a17c3968eab4d7fef6cee0cf1a9bba0df583fe5c965d014af337ec054c57b504"
+    },
+    {
+      "path": "js/views/risk.js",
+      "source_sha256": "71bad9a63b3e379f44353d4e847c51b3f971441f0d26b7c56441b1e221c0cedc",
+      "change": "line-ending normalization only",
+      "imported_sha256": "71bad9a63b3e379f44353d4e847c51b3f971441f0d26b7c56441b1e221c0cedc"
+    },
+    {
+      "path": "js/views/logs.js",
+      "source_sha256": "c7d3c80a45673c83da9aa757ab8f8d6f0cf0ca1056cd51255f53f8ba78e41a84",
+      "change": "line-ending normalization only",
+      "imported_sha256": "c7d3c80a45673c83da9aa757ab8f8d6f0cf0ca1056cd51255f53f8ba78e41a84"
+    },
+    {
+      "path": "js/views/yaozi.js",
+      "source_sha256": "73216f12d5db2b7fefa1eaa2fdb6a08572a33cf6a4e42b905b929618f526cc1e",
+      "change": "line-ending normalization only",
+      "imported_sha256": "73216f12d5db2b7fefa1eaa2fdb6a08572a33cf6a4e42b905b929618f526cc1e"
+    },
+    {
+      "path": "js/views/settings.js",
+      "source_sha256": "5221e6df3e97d90e50968b5668de506d2f45c21ba86dc10f8dfac4bbad42e0f7",
+      "change": "line-ending normalization only",
+      "imported_sha256": "5221e6df3e97d90e50968b5668de506d2f45c21ba86dc10f8dfac4bbad42e0f7"
+    },
+    {
+      "path": "js/router.js",
+      "source_sha256": "9491fe1aded53719c9dd42118e9b88d59caefcf86b7167d4913993dd5ce3c381",
+      "change": "line-ending normalization only",
+      "imported_sha256": "9491fe1aded53719c9dd42118e9b88d59caefcf86b7167d4913993dd5ce3c381"
+    },
+    {
+      "path": "libs/gridstack.min.css",
+      "source_sha256": "1c232b47b98089dd61dd55d24ebd6e89f5be347d746a5e3d714d3aac385aca1f",
+      "change": "line-ending normalization only",
+      "imported_sha256": "a92b172fec6b8267c4ee1ff12fa75d1cd19d3d1ccc0e2c1bca756f0fa7a98fc3"
+    }
+  ],
+  "excluded": [
+    "js/views/strategy.js (replaced by registered research view)",
+    "js/app.js (research boot)",
+    "libs/gridstack-all.js (no grid-stack DOM in current tiling UI)",
+    "index.html (same-origin research document)"
+  ],
+  "derived_files": [
+    "index.html",
+    "css/research.css",
+    "js/research.js",
+    "js/views/strategy.js"
+  ]
+}

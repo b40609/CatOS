@@ -34,6 +34,9 @@ secrets/
 *.log
 /logs/
 
+# Isolated persisted research jobs (JSON/HTML; no trading DB)
+/outputs/research-web/
+
 # Generated reports; retain the existing visual verification script
 /reports/*
 !/reports/visual-qa/

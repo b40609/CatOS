@@ -1,0 +1,1042 @@
+/* ==========================================================================
+   catOS View Styles
+   Sidebar, Header, Dashboard, Strategy, Bots, Risk, Logs, Yaozi, Settings
+   ========================================================================== */
+
+/* --- Fixed Left Sidebar (Refined Institutional Architecture) --- */
+.app-sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 100;
+  position: relative;
+}
+
+/* Sidebar Brand Header */
+.sidebar-brand {
+  height: var(--header-height);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-sidebar);
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Minimalist Hardware Micro-Monogram */
+.brand-micro-glyph {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  background-color: #0c0e12;
+  border: 1px solid var(--border-gold-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.brand-micro-glyph::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background-color: var(--gold-primary);
+  border-radius: 1px;
+}
+
+.brand-title-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-title-text span.quant-tag {
+  font-size: 11px;
+  color: var(--gold-primary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid var(--border-gold-subtle);
+  background: var(--gold-bg);
+}
+
+.brand-sub-caption {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+/* Navigation List */
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 2px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease;
+  position: relative;
+  border-left: 2px solid transparent;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.025);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background-color: rgba(255, 255, 255, 0.035);
+  color: var(--gold-primary);
+  font-weight: 600;
+  border-left-color: var(--gold-primary);
+}
+
+.nav-item svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
+  flex-shrink: 0;
+  stroke-width: 1.5;
+}
+
+.nav-item:hover svg {
+  opacity: 0.95;
+}
+
+.nav-item.active svg {
+  opacity: 1;
+  color: var(--gold-primary);
+}
+
+/* DevTools Dual-Tier Navigation Typography */
+.nav-dual-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+.nav-dual-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: inherit;
+  letter-spacing: 0.01em;
+}
+.nav-dual-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+/* Bloomberg Terminal Style Navigation Item */
+.nav-bbg-prefix {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  width: 22px;
+}
+.nav-item.active .nav-bbg-prefix {
+  color: var(--gold-primary);
+}
+
+/* Middle Telemetry Card (For Dual-Tier Style) */
+.sidebar-telemetry-chip {
+  margin: 10px 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* Sidebar Footer & Minimal Connection Status */
+.sidebar-footer {
+  padding: 8px 8px 10px 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-color: var(--bg-sidebar);
+}
+
+.sidebar-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  border-radius: 2px;
+}
+
+
+
+/* --- Top Header (Dual-Tier Institutional Style) --- */
+.app-header {
+  height: var(--header-height);
+  background-color: var(--header-bg);
+  backdrop-filter: var(--header-backdrop);
+  -webkit-backdrop-filter: var(--header-backdrop);
+  border-bottom: var(--header-border-bottom, 1px solid var(--border-default));
+  box-shadow: var(--header-box-shadow, none);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, border-bottom 0.2s ease;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 90;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-dual-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.header-dual-title-main {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.header-dual-title-sub {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-top: 1px;
+  font-weight: 500;
+}
+
+.env-pill-dual {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 3px 9px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  line-height: 1.25;
+}
+.env-dual-zh {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gold-primary);
+}
+.env-dual-en {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.service-pill-dual {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  height: 32px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  transition: all 120ms ease;
+}
+.service-pill-dual:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--border-default);
+}
+
+/* Dual-Tier Table Headers */
+.th-dual-zh {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.th-dual-en {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- 1. Dashboard View --- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 小視窗與筆記本解析度下 (<= 1440px)，KPI 採用 2x2 排列，消滅文字截斷 */
+@media (max-width: 1440px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+}
+
+/* 窄螢幕或極端緊湊視窗下 (<= 640px) */
+@media (max-width: 640px) {
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* 窄視窗下 Bot 列表隱藏次要欄位 (持倉與時戳收納至右側 Inspector，避免橫向滾動) */
+@media (max-width: 1280px) {
+  .col-compact-hide {
+    display: none !important;
+  }
+}
+
+.bot-drawer-open .col-compact-hide {
+  display: none !important;
+}
+
+.kpi-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 96px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: transparent;
+}
+
+.kpi-card.gold-accent::after {
+  background-color: var(--gold-primary);
+}
+
+.kpi-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 6px 0 2px 0;
+  line-height: 1.1;
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard-mid-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.time-range-selector {
+  display: flex;
+  background-color: var(--bg-surface);
+  border-radius: var(--border-radius-sm);
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+}
+
+.time-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+}
+
+.time-btn.active {
+  background-color: var(--bg-active);
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.chart-canvas-box {
+  width: 100%;
+  height: 220px;
+  position: relative;
+}
+
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mini-summary-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.mini-summary-card:hover {
+  border-color: var(--border-focus);
+  background-color: var(--bg-surface);
+}
+
+/* Empty state banner inside cards */
+.empty-state-notice {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-muted);
+}
+.empty-state-notice .title {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* --- 2. Strategy View --- */
+.strategy-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.search-box {
+  position: relative;
+  width: 260px;
+}
+
+.search-box input {
+  padding-left: 28px;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+}
+
+.strategy-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 8px;
+}
+
+.strategy-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.strategy-card:hover {
+  border-color: var(--gold-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.strat-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.strat-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.strat-version {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--gold-primary);
+  background-color: var(--gold-bg);
+  padding: 1px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--border-gold-subtle);
+}
+
+.strat-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 14px;
+  flex: 1;
+}
+
+.strat-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+/* Strategy Detail: Collapsible Backtest Config Drawer */
+.backtest-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collapsible-box {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.collapsible-header {
+  padding: 10px 14px;
+  background-color: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.collapsible-header:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.collapsible-content {
+  padding: 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: block;
+}
+
+.collapsible-content.collapsed {
+  display: none;
+}
+
+.backtest-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+/* Backtest Results Split */
+.backtest-split-view {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 8px;
+  min-height: 480px;
+}
+
+.run-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-history-item {
+  padding: 10px 12px;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.run-history-item:hover {
+  border-color: var(--border-focus);
+}
+
+.run-history-item.active {
+  border-color: var(--gold-primary);
+  background-color: var(--bg-surface);
+}
+
+/* Optimization Compare Side-by-Side */
+.compare-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.compare-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  padding: 14px;
+}
+
+.compare-card.highlight {
+  border-color: var(--gold-primary);
+}
+
+/* --- 3. Bots View Refinements (Institutional Workstation) --- */
+.bot-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bot-row-item {
+  transition: background-color 120ms ease;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.bot-row-item:hover {
+  background-color: rgba(255, 255, 255, 0.025) !important;
+}
+.bot-row-item.selected {
+  background-color: rgba(255, 255, 255, 0.035) !important;
+  border-left: 2px solid var(--gold-primary) !important;
+}
+
+/* Warning Bot: Restrained small amber marker only, never full row tint */
+.bot-warning-marker {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--color-amber);
+  margin-right: 5px;
+}
+
+/* Strict No-wrap for Names, Symbols, and Badges */
+.bot-nowrap {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+.bot-subtext {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+/* Inspector Sub-tab navigation (Tight Developer Tooling Style) */
+.drawer-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 12px;
+}
+.drawer-tab-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 100ms ease;
+}
+.drawer-tab-btn:hover {
+  color: var(--text-primary);
+}
+.drawer-tab-btn.active {
+  color: var(--gold-primary);
+  border-bottom-color: var(--gold-primary);
+  font-weight: 600;
+}
+
+/* Compact Key-Value Item */
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.kv-row:last-child {
+  border-bottom: none;
+}
+.kv-label {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.kv-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+
+
+/* --- 4. Risk View --- */
+.risk-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.risk-editor-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+}
+
+/* --- 5. Logs View (Auditing & Diagnostics) --- */
+.logs-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Segmented Pill Group for Severity Filtering */
+.segmented-pill-group {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 2px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.segmented-pill:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-hover);
+}
+
+.segmented-pill.active {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.segmented-pill.active-all {
+  background-color: rgba(230, 184, 64, 0.15);
+  color: var(--gold-primary);
+}
+
+.segmented-pill.active-info {
+  background-color: rgba(56, 189, 248, 0.15);
+  color: var(--color-cyan);
+}
+
+.segmented-pill.active-warn {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--color-amber);
+}
+
+.segmented-pill.active-error {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: var(--color-red);
+}
+
+.pill-count {
+  font-size: 10.5px;
+  opacity: 0.8;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Compact Non-Vacant Log Entry Row */
+.log-entry-row {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.log-entry-row:hover {
+  background-color: var(--bg-surface);
+}
+
+.log-entry-row.expanded {
+  background-color: rgba(230, 184, 64, 0.03);
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.log-col-sev {
+  width: 52px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.log-col-time {
+  width: 135px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.log-col-source {
+  width: 88px;
+  flex-shrink: 0;
+}
+
+.log-col-target {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.log-col-summary {
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-col-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.log-category-tag {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.log-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  transition: all 0.12s ease;
+}
+
+.log-entry-row:hover .log-expand-btn {
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+}
+
+.log-details-box {
+  background-color: #0e1015;
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  padding: 12px 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+
+/* --- 6. Yaozi View --- */
+.yaozi-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 8px;
+  height: calc(100vh - var(--header-height) - 52px);
+}
+
+.yaozi-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.yaozi-card {
+  padding: 12px;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.yaozi-card:hover {
+  border-color: var(--border-focus);
+}
+
+.yaozi-card.active {
+  border-color: var(--gold-primary);
+  background-color: var(--bg-surface);
+}
+
+.yaozi-detail-pane {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* --- 7. Settings View --- */
+.settings-section {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius);
+  padding: 18px;
+  margin-bottom: 8px;
+}
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.client-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.client-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius);
+  padding: 14px;
+}
