@@ -1,6 +1,6 @@
 # R3 MCP 完整交接
 
-日期：2026-09-30。R3 第一片與第二片均已由 5.6 Sol (Web) 獨立驗收通過；本批 R1-R3 由本次 Sol Git 提交收斂。未修改 CatOS_Yaozi、交易、OKX、真實憑證或既有 DB/schema；R4 未開始。Sol 最終證據見 [R3 Sol 獨立驗收](frontend-research-r3-sol-verification-20260930.md)，Astra 第二片證據見 [R3 Astra 實作／驗證](frontend-research-r3-astra-implementation-verification-20260930.md)。
+日期：2026-09-30。R3 原 5.6 Sol (Web) 驗收後的 frontend whitespace/EOF patch 造成 build drift；R1-R3 已提交為 `87d60be`。使用者本輪指定 6.1 Sol 接手補驗與 Git，已完成已提交 build 的獨立審查、36/36 focused tests 與官方 MCP E2E，詳見 [6.1 Sol 最終證據](frontend-research-r3-sol61-verification-20260930.md)。未修改 CatOS_Yaozi、交易、OKX、真實憑證或既有 DB/schema；R4 未開始、未 push。以下 5.6 Sol 證據為歷史階段，不能替代目前 build 驗收；[原 Sol 紀錄](frontend-research-r3-sol-verification-20260930.md)、[Astra 實作／驗證](frontend-research-r3-astra-implementation-verification-20260930.md) 保留。
 
 ## 第二片最終契約
 
@@ -10,7 +10,7 @@ immutable version 另以程式內 reviewed digest 固定，不能靠「改 sourc
 
 MCP 保持七個工具：`research_catalog`、`research_list_runs`、`research_submit_backtest`、`research_submit_optimization`、`research_get_run`、`research_get_result`、`research_get_report`。mutation 綁定 exact `{id, version, sha256}`；每次 mutation 重新查 8770 version/catalog，後端 service/worker 再做共同 manifest/request/provenance gate。MCP process 不建立 `ResearchService`、writer 或 persistence，不碰 DB；production bridge 只允許固定 `127.0.0.1:8770` 並停用 proxy。schema 不接受任意 path、URL、Python source、command、credential、DB handle，也沒有 pickle/marshal 等 executable deserialization。
 
-## 第二片驗收證據
+## 第二片原 5.6 Sol 驗收證據（歷史 build）
 
 - Sol 獨立重跑 `python -B -m unittest tests.test_research_mcp`：6/6 `OK`。
 - Sol 獨立重跑 `python -B -m unittest tests.test_research_mcp tests.test_research_optimization_web tests.test_research_web`：28/28 `OK`；埠占用訊息為既有預期案例。
@@ -34,4 +34,4 @@ DeepSeek Harness：本機 `dsh` 0.1.1-rc.2；新增 `scripts/compat/deepseek-r3-
 
 ## 接續
 
-R3 技術驗收與本批 Git 收斂完成；停在 R3 邊界，不得進 R4。
+R3 已提交 build=`72734a4e3b7d06215a68ea9c5c52af3e898b8fafbee921bc2c87e68deeeff5e5` 的補驗通過。最終 backtest=`81c81c8c76cc44e8b5d8baddc4bd0218`、optimization=`4536469217f84b3f915d285fba425d47`；唯一 listener PID=`40828`，E2E 後 loaded=current、restart_required=false、active_run_id=null。runtime 無新修改，只提交文件收尾；停在 R3，不進 R4、不 push。
