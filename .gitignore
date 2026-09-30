@@ -36,6 +36,7 @@ secrets/
 
 # Isolated persisted research jobs (JSON/HTML; no trading DB)
 /outputs/research-web/
+/outputs/local-sim-r4/
 
 # Generated reports; retain the existing visual verification script
 /reports/*

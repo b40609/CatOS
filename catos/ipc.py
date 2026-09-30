@@ -206,19 +206,27 @@ class WorkerConfig:
     contract: ContractSpec
     timeframe_ms: int
     warmup_bars: int
+    strategy_artifact: str | None = None
 
     def to_wire(self):
         if not isinstance(self.contract, ContractSpec):
             raise ProtocolError("contract must be ContractSpec")
-        return dict(strategy_id=STRATEGY_ID, strategy_version=STRATEGY_VERSION,
+        value = dict(strategy_id=STRATEGY_ID, strategy_version=STRATEGY_VERSION,
                     contract={f.name: (str(getattr(self.contract, f.name))
                               if isinstance(getattr(self.contract, f.name), Decimal)
                               else getattr(self.contract, f.name)) for f in fields(ContractSpec)},
                     timeframe_ms=self.timeframe_ms, warmup_bars=self.warmup_bars)
+        if self.strategy_artifact is not None:
+            value["strategy_artifact"] = self.strategy_artifact
+        return value
 
     @classmethod
     def from_wire(cls, value):
-        exact(value, ("strategy_id", "strategy_version", "contract", "timeframe_ms", "warmup_bars"))
+        keys = ("strategy_id", "strategy_version", "contract", "timeframe_ms", "warmup_bars")
+        exact(value, (*keys, "strategy_artifact") if "strategy_artifact" in value else keys)
+        artifact = value.get("strategy_artifact")
+        if "strategy_artifact" in value and artifact != "sma-parameters-v1":
+            raise ProtocolError("unsupported registered strategy artifact")
         if (value["strategy_id"] != STRATEGY_ID
                 or type(value["strategy_version"]) is not int
                 or value["strategy_version"] != STRATEGY_VERSION):
@@ -229,7 +237,7 @@ class WorkerConfig:
         contract = ContractSpec(spec["inst_id"], **{
             key: decimal_text(spec[key], key, positive=True) for key in spec if key != "inst_id"})
         result = cls(contract, integer(value["timeframe_ms"], "timeframe_ms", 60_000),
-                     integer(value["warmup_bars"], "warmup_bars"))
+                     integer(value["warmup_bars"], "warmup_bars"), artifact)
         price = contract.tick_size
         result.validate_bar(Candle(0, price, price, price, price))
         return result

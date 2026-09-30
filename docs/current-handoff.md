@@ -16,14 +16,14 @@
 
 ## R4 保留與收尾
 
-唯一 run=`347282b9d0d9433db6a0276209936f60`；10:40:11 開始、預計 **18:40:11 UTC+08:00** 結束，32 根正式 15m、900 秒實際間隔、2 根預熱、30 秒心跳。本輪 18:07:25 只讀核對：心跳18:07:19、29/32 正式訊號、11 fills、0 anomalies、running；runner `26720`／Worker `28460` 由 Get-Process 確認存活，未核對本輪 parent／command。未開 R4 DB、重驗 frozen digest、停止／重啟或執行 8h verifier。
+唯一 run=`347282b9d0d9433db6a0276209936f60` 已正式 **PASS**。2026-09-30 20:23 台灣時間執行 `python -B -m catos.local_sim_r4_verify 347282b9d0d9433db6a0276209936f60`，回 profile=`eight-hour`、elapsed=`28800.073241599952` 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、final_equity=`999.67939950`、fees=`0.01320050`、database_mode=`read-only`、runtime_digest_unchanged=`true`。未改 DB、未啟第二 runner。
 
 SMA period=2／quantity=2；固定 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65`，manifest 程式維持凍結。前輪 R4／verifier 9/9、IPC 11/11、Worker 15/15 與 smoke `d8fdd571ef554c8681e2316edd22bbe9` 的 SMOKE_PASS 是歷史證據。詳見 [R4 spec](frontend-research-r4-spec-20260930.md)／[handoff](frontend-research-r4-handoff-20260930.md)。
 
-既有 heartbeat `r4-8-local-sim` 每小時唯讀追蹤、最多 9 次，完成／需人工介入時停用，不啟第二 runner。完成後依原分工執行 `python -B -m catos.local_sim_r4_verify 347282b9d0d9433db6a0276209936f60`，核對 >=28800 秒、32+2 根、成交／費用／tag／Decimal／journal、0 異常、無未決與 Worker 收尾；通過才標 8h PASS。不刪證據、不改 DB、不解除 latch。R4 未提交範圍及輸出規則見原交接，F1 不混入。
+既有 heartbeat `r4-8-local-sim` 原為每小時唯讀追蹤、最多 9 次；R4 已正式 PASS。本輪嘗試以原完整設定改為 `PAUSED`，automation 後端回報該項目已不存在，故目前沒有可再停用的 active heartbeat。驗收器已核對 >=28800 秒、32+2 根、成交／費用／tag／Decimal／journal、0 異常、無未決與 Worker 收尾。不刪證據、不改 DB、不解除 latch。R4 提交範圍及輸出規則見原交接，F1 不混入。
 
 ## R3 基線與下一步
 
 R3 已驗收：固定核可 SMA／合成資料、七 MCP 工具 exact binding、原 8770 唯一服務；36/36 與 MCP E2E 是歷史驗證。詳見 [R3 handoff](frontend-research-r3-handoff-20260930.md)／[6.1 Sol 補驗](frontend-research-r3-sol61-verification-20260930.md)。Antigravity BOM／DSH credential 限制仍保留。
 
-本片收尾可留在現有對話，不需重開或重複驗收。接續指令：「讀入口，核對既有 F1 驗收結果；等唯一 R4 complete 並 verifier PASS 後，只提交 R4 scope、更新入口、停用既有 heartbeat；不 push、不切8770、不啟新 runner。」來源／歷史自驗不得改寫成當前或獨立 PASS；若 F1 驗收另有缺陷，保存原結果再處理，不以 Git 提交取代 PASS。
+R4 收尾完成後，下一片為正式 8770 工作台入口切換；需先確認研究 idle 與單一 writer，再依既有授權進行。R4 不需重跑；F1 亦不需重複驗收。`AGENTS.md`／`.codex` 設定與本片無關，保持未混入；本輪不 push、不切 8770、不啟新 runner。
