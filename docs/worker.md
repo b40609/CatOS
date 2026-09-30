@@ -53,6 +53,8 @@ asyncio.run(main())
 
 目前策略識別固定 `sma-trend`／版本 `1`，不接受任意模組路徑、class hook 或 Worker 自報 Bot 身分。版本 1 是目前已檢查製品的契約標記，尚非來源雜湊驗證或 Live 製品啟用機制；修改策略或其狀態契約時必須重新檢查版本與相容性。
 
+R4 新增可選 `WorkerConfig(..., strategy_artifact="sma-parameters-v1")`，只允許這一固定 reviewed 製品，以 R3 source snapshot loader 在 Worker 載入 RegisteredSMA，固定 period=2／quantity=2，逐根前後核對 provenance。未指定時保持上述舊行為；IPC/state adapter 版本仍為 1，製品版本與 digest 另由 config／R4 manifest 綁定。不得將其他 period 的研究結果直接套入此兩根 checkpoint。8 小時執行與驗收狀態見 [R4 handoff](frontend-research-r4-handoff-20260930.md)。
+
 ## 訊框與資料契約
 
 - 每框為 4-byte unsigned big-endian 長度＋UTF-8 JSON object；長度不含前綴。支援分段讀寫及連續訊框。

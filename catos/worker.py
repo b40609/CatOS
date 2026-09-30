@@ -21,12 +21,19 @@ def run(reader, writer):
     if seq != checkpoint.event_seq:
         raise ipc.ProtocolError("init sequence/checkpoint mismatch")
     strategy = restore_sma(checkpoint)
+    expected_source = None
+    if config.strategy_artifact is not None:
+        from catos.research_catalog import provenance
+
+        expected_source = provenance()
     ipc.write_frame_sync(writer, ipc.envelope("initialized", generation, seq,
                                              {"checkpoint": checkpoint.to_wire()}))
     while True:
         message = ipc.read_frame_sync(reader)
         payload = ipc.check_envelope(message, "bar", generation, checkpoint.event_seq + 1)
         bar, account, warmup = ipc.parse_event(payload, checkpoint)
+        if expected_source is not None and provenance() != expected_source:
+            raise ipc.ProtocolError("source_changed_during_local_sim")
         if research._call(strategy.update_indicators, bar) is not None:
             raise ipc.ProtocolError("indicator update must not produce an intent")
         ready = research._ready(strategy)
@@ -40,6 +47,8 @@ def run(reader, writer):
         result = dict(target=None if target is None else str(target),
                       checkpoint=next_checkpoint.to_wire(), ready=ready)
         ipc.parse_result(result, checkpoint, bar, account, warmup)
+        if expected_source is not None and provenance() != expected_source:
+            raise ipc.ProtocolError("source_changed_during_local_sim")
         ipc.write_frame_sync(writer, ipc.envelope("result", generation,
                                                  next_checkpoint.event_seq, result))
         if require_ack:
