@@ -1,0 +1,942 @@
+/* ==========================================================================
+   catOS Workspace Engine Styles - High Performance & Fluid OS Physics
+   ========================================================================== */
+
+/* --- 1. Workspace Top Toolbar --- */
+.workspace-toolbar-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 8px;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.workspace-toolbar-bar.is-editing {
+  border-color: var(--gold-primary);
+  background-color: rgba(230, 184, 64, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.workspace-presets-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.workspace-preset-pill {
+  font-size: 11.5px;
+  padding: 3px 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.workspace-preset-pill:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.workspace-preset-pill.active {
+  border-color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--gold-primary);
+  font-weight: 600;
+}
+
+.workspace-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Edit Mode Toggle Button */
+.btn-edit-mode {
+  font-size: 11.5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.btn-edit-mode.is-active {
+  background-color: var(--gold-primary) !important;
+  color: #0b0d10 !important;
+  border-color: var(--gold-primary) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+/* Auto-Pack Button */
+.btn-autopack {
+  font-size: 11px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border-gold-subtle);
+  background: rgba(230, 184, 64, 0.08);
+  color: var(--gold-primary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-autopack:hover {
+  background: rgba(230, 184, 64, 0.18);
+  border-color: var(--gold-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* --- 2. 12-Column Grid Container & Hardware Accelerated Physics --- */
+.catos-grid-stack {
+  position: relative;
+  min-height: 680px;
+  transition: background-image 0.2s ease;
+}
+
+/* Blueprint Grid Lines when in Edit Mode */
+/* impeccable-disable-next-line codex-grid-background: workspace layout blueprint grid */
+.catos-grid-stack.is-editing {
+  background-image: 
+    linear-gradient(to right, rgba(230, 184, 64, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(230, 184, 64, 0.06) 1px, transparent 1px);
+  background-size: calc(100% / 12) 76px;
+  border: 1px dashed rgba(230, 184, 64, 0.25);
+  border-radius: var(--border-radius-sm);
+  padding: 4px;
+}
+
+/* Grid Items with Apple Fluid Physics (Cubic-Bezier Snapping) */
+.grid-stack > .grid-stack-item {
+  will-change: transform, width, height;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Disable transitions during active dragging for 0-latency tracking */
+.grid-stack > .grid-stack-item.ui-draggable-dragging,
+.grid-stack > .grid-stack-item.ui-resizable-resizing {
+  transition: none !important;
+  z-index: 1200 !important;
+}
+
+.grid-stack > .grid-stack-item > .grid-stack-item-content {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Floating Card during Drag */
+.grid-stack > .grid-stack-item.ui-draggable-dragging > .grid-stack-item-content {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85) !important;
+  border-color: var(--gold-primary) !important;
+  opacity: 0.94;
+  transform: scale(1.015);
+}
+
+/* Magnetic Ghost Placeholder Box */
+.grid-stack > .grid-stack-placeholder > .placeholder-content {
+  border: 1.5px dashed var(--gold-primary) !important;
+  background-color: rgba(230, 184, 64, 0.08) !important;
+  border-radius: var(--border-radius-sm);
+  margin: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), 
+              width 0.18s cubic-bezier(0.16, 1, 0.3, 1), 
+              height 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Freezing state to eliminate mouse-hover repainting during drag */
+.catos-grid-stack.is-busy-transforming .grid-stack-item-content {
+  pointer-events: none !important;
+}
+.catos-grid-stack.is-busy-transforming .grid-stack-item.ui-draggable-dragging .grid-stack-item-content {
+  pointer-events: auto !important;
+}
+
+/* --- 3. Widget Header & Drag Handle --- */
+.widget-box-header {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.widget-box-header .widget-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.widget-drag-handle {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ==========================================================================
+   Card Header Drag-to-Reorder & Dynamic Drop Animations (Industry Standard)
+   ========================================================================== */
+
+/* 1. Header Drag Surface (Institutional Sleek Grab Region) */
+.tiling-pane:not(#widget-kpi_grid) .widget-box-header {
+  cursor: grab !important;
+  user-select: none !important;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tiling-pane:not(#widget-kpi_grid) .widget-box-header:hover {
+  background-color: rgba(255, 255, 255, 0.025);
+}
+
+.tiling-pane:not(#widget-kpi_grid) .widget-title-wrap {
+  cursor: grab !important;
+  user-select: none !important;
+}
+
+.tiling-pane:not(#widget-kpi_grid) .widget-title-wrap .th-dual-zh {
+  transition: color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+.tiling-pane:not(#widget-kpi_grid) .widget-box-header:hover .th-dual-zh {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+}
+
+.tiling-pane:not(#widget-kpi_grid) .widget-box-header:active,
+.tiling-pane:not(#widget-kpi_grid) .widget-title-wrap:active {
+  cursor: grabbing !important;
+}
+
+/* Ensure action buttons are always isolated from drag initiation */
+.tiling-pane .widget-box-header button,
+.tiling-pane .widget-box-header a,
+.tiling-pane .widget-box-header input,
+.tiling-pane .widget-box-header select,
+.tiling-pane .widget-box-header .time-range-selector,
+.tiling-pane .widget-box-header .time-btn {
+  cursor: pointer !important;
+  user-select: auto;
+}
+
+/* 2. Global Dragging State Cursor & Text Selection Lock */
+body.is-card-dragging-active,
+body.is-card-dragging-active * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* 3. Source Card (Slotted Placeholder) Visual State */
+.tiling-pane.is-dragging-card {
+  opacity: 0.32 !important;
+  border: 1px dashed rgba(212, 175, 55, 0.65) !important;
+  background: rgba(10, 14, 20, 0.55) !important;
+  transform: scale(0.995);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.7) !important;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tiling-pane.is-dragging-card > * {
+  pointer-events: none !important;
+}
+
+/* 4. Laser Insertion Guide Beam (Ultra-precise Vertical Guide) */
+.tile-drop-indicator {
+  position: relative;
+  width: 4px !important;
+  min-width: 4px !important;
+  max-width: 4px !important;
+  height: 100% !important;
+  background: linear-gradient(180deg, rgba(230, 184, 64, 0.15) 0%, #e6b840 20%, #ffd700 50%, #e6b840 80%, rgba(230, 184, 64, 0.15) 100%) !important;
+  box-shadow: 0 0 10px rgba(230, 184, 64, 0.9), 0 0 20px rgba(230, 184, 64, 0.45) !important;
+  border-radius: 2px;
+  z-index: 99;
+  flex-shrink: 0;
+  margin: 0 -2px !important;
+  pointer-events: none;
+  animation: pulseLaserGuide 0.75s infinite alternate ease-in-out;
+}
+
+.tile-drop-indicator::before,
+.tile-drop-indicator::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #ffd700;
+  border: 1.5px solid #0e1218;
+  border-radius: 2px;
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.95);
+}
+
+.tile-drop-indicator::before {
+  top: 4px;
+}
+
+.tile-drop-indicator::after {
+  bottom: 4px;
+}
+
+@keyframes pulseLaserGuide {
+  0% {
+    opacity: 0.75;
+    filter: drop-shadow(0 0 4px rgba(230, 184, 64, 0.6));
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(255, 215, 0, 0.95));
+  }
+}
+
+/* 5. Target Card Edge Highlights */
+.tiling-pane.drop-target-before {
+  box-shadow: inset 3px 0 0 0 var(--gold-primary), inset 12px 0 20px rgba(230, 184, 64, 0.08) !important;
+  transition: box-shadow 0.15s ease;
+}
+
+.tiling-pane.drop-target-after {
+  box-shadow: inset -3px 0 0 0 var(--gold-primary), inset -12px 0 20px rgba(230, 184, 64, 0.08) !important;
+  transition: box-shadow 0.15s ease;
+}
+
+/* 6. Tier Drop Target (Upper / Lower Row Glow) */
+.tiling-row-tier.drop-target-tier {
+  outline: 1.5px dashed rgba(230, 184, 64, 0.55);
+  outline-offset: -2px;
+  background-color: rgba(230, 184, 64, 0.025);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 7. Landing Settle Animation (Tactile Confirmation Pulse) */
+@keyframes cardLandPulse {
+  0% {
+    box-shadow: 0 0 0 2px rgba(230, 184, 64, 0.95), 0 0 24px rgba(230, 184, 64, 0.35) !important;
+    transform: scale(0.995);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px rgba(230, 184, 64, 0.6), 0 0 16px rgba(230, 184, 64, 0.2) !important;
+    transform: scale(1.002);
+  }
+  100% {
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.tiling-pane.just-landed {
+  animation: cardLandPulse 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  z-index: 10;
+}
+
+/* Hide Widget Button */
+.widget-btn-hide {
+  display: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 2px;
+  transition: all var(--transition-fast);
+}
+
+.is-editing .widget-btn-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.widget-btn-hide:hover {
+  color: var(--color-red);
+  background-color: rgba(239, 83, 80, 0.14);
+}
+
+/* Maximize / Restore Button (OKX Window Control) */
+.btn-pane-maximize {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 2px;
+  line-height: 1;
+  transition: all var(--transition-fast);
+}
+
+.btn-pane-maximize:hover {
+  color: var(--gold-primary);
+  border-color: var(--border-gold-subtle);
+  background: rgba(230, 184, 64, 0.08);
+}
+
+/* Widget Content Scrollable Body */
+.widget-box-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom Resize Handle (Micro triangle) */
+.grid-stack-item .ui-resizable-se {
+  display: none;
+  width: 16px;
+  height: 16px;
+  right: 6px;
+  bottom: 6px;
+  cursor: se-resize;
+  background: transparent;
+}
+
+.is-editing .grid-stack-item .ui-resizable-se {
+  display: block;
+}
+
+.is-editing .grid-stack-item .ui-resizable-se::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--gold-primary);
+  border-bottom: 2px solid var(--gold-primary);
+}
+
+/* --- 4. Widget Library Drawer (Modal Slide-over) --- */
+.widget-library-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.55);
+  z-index: 1050;
+  display: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.widget-library-backdrop.is-open {
+  display: block;
+  opacity: 1;
+}
+
+.widget-library-panel {
+  position: fixed;
+  top: 0;
+  right: -380px;
+  width: 380px;
+  height: 100vh;
+  background-color: var(--bg-sidebar);
+  border-left: 1px solid var(--border-default);
+  z-index: 1060;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.widget-library-panel.is-open {
+  right: 0;
+}
+
+.widget-library-header {
+  height: var(--header-height);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-panel);
+}
+
+.widget-library-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.widget-lib-card {
+  padding: 12px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color var(--transition-fast);
+}
+
+.widget-lib-card:hover {
+  border-color: var(--border-default);
+}
+
+.widget-lib-card.is-active {
+  border-left: 2px solid var(--gold-primary);
+}
+
+.widget-lib-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.widget-lib-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.widget-lib-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.widget-lib-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* --- 5. 尺寸快捷選項 (Size Preset Chips - 編輯模式可見) --- */
+.widget-size-shortcuts {
+  display: none;
+  align-items: center;
+  gap: 3px;
+  margin-right: 4px;
+}
+
+.is-editing .widget-size-shortcuts {
+  display: inline-flex;
+}
+
+.btn-size-chip {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.4;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.btn-size-chip:hover {
+  border-color: var(--gold-primary);
+  color: var(--gold-primary);
+  background: rgba(212, 175, 55, 0.1);
+}
+
+/* 小視窗下，若卡片寬度 <= 8 欄，KPI 自動保持 2x2 排列 */
+.grid-stack-item[gs-w="6"] .kpi-grid,
+.grid-stack-item[gs-w="7"] .kpi-grid,
+.grid-stack-item[gs-w="8"] .kpi-grid {
+  grid-template-columns: repeat(2, 1fr) !important;
+}
+
+/* ==========================================================================
+   OKX Institutional Seamless Tiling & Continuous Splitter Architecture
+   ========================================================================== */
+.tiling-workspace-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: calc(100vh - 140px);
+  min-height: 520px;
+  max-height: calc(100vh - 132px);
+  position: relative;
+  overflow: hidden;
+  gap: 0 !important;
+}
+
+/* 頂部 KPI 面板：獨立 Panel，支援任意像素高度拉伸與自適應伸縮 */
+.tiling-top-panel {
+  position: relative !important;
+  width: 100% !important;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.tiling-top-panel > .grid-stack-item-content {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  overflow: hidden !important;
+}
+
+.tiling-top-panel .widget-box-header {
+  height: 34px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.tiling-top-panel .widget-box-body {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.tiling-top-panel .kpi-card {
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+  min-height: 0;
+}
+
+.tiling-top-panel .kpi-card:hover {
+  border-color: var(--border-default);
+  background-color: var(--bg-surface-hover);
+}
+
+/* 中間工作區：純淨透明容器，gap 設為 0 由 8px 分割條主導 */
+.tiling-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  gap: 0 !important;
+}
+
+/* 上排與下排面板水平容器：gap 設為 0 由 8px 垂直分割條主導 */
+.tiling-row-tier {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  min-height: 0;
+  gap: 0 !important;
+  position: relative;
+}
+
+/* 面板單元：獨立卡片！對齊其他分頁 panel-specular 規格 */
+.tiling-pane {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--border-radius) !important;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  overflow: hidden !important;
+  position: relative;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tiling-pane:hover {
+  border-color: var(--border-focus) !important;
+}
+
+/* 面板內部內容結構 */
+.tiling-pane > .tiling-pane-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* 面板標題列：高度 34px，與其他分頁 header 一致 */
+.tiling-pane .widget-box-header {
+  height: 34px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* 面板最大化切換按鈕 (銳利高對比向量按鈕) */
+.btn-pane-maximize {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.btn-pane-maximize:hover {
+  color: var(--gold-primary);
+  border-color: var(--gold-primary);
+  background: rgba(230, 184, 64, 0.1);
+}
+
+.btn-pane-maximize.is-active {
+  color: var(--gold-primary) !important;
+  border-color: var(--gold-primary) !important;
+  background: rgba(230, 184, 64, 0.18) !important;
+  box-shadow: 0 0 8px rgba(230, 184, 64, 0.35) !important;
+}
+
+/* 面板最大化狀態 (鋪滿整個工作區畫布) */
+.tiling-workspace-container.has-maximized-pane {
+  position: relative !important;
+}
+
+.tiling-workspace-container.has-maximized-pane .workspace-splitter {
+  display: none !important;
+}
+
+/* Case A: 頂部 KPI 面板最大化，隱藏下方區域 */
+.tiling-workspace-container.has-max-kpi > .tiling-main-area {
+  display: none !important;
+}
+
+/* Case B: 下方任一卡片最大化，隱藏 KPI 面板並讓最大化卡片覆蓋全畫布 */
+.tiling-workspace-container.has-max-pane > .tiling-top-panel {
+  display: none !important;
+}
+
+.tiling-workspace-container.has-max-pane .tiling-main-area,
+.tiling-workspace-container.has-max-pane .tiling-row-tier {
+  position: static !important;
+  height: 100% !important;
+  flex: 1 1 100% !important;
+}
+
+.tiling-workspace-container.has-max-pane .tiling-pane:not(.is-maximized) {
+  display: none !important;
+}
+
+.tiling-pane.is-maximized,
+.tiling-top-panel.is-maximized {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1000 !important;
+  margin: 0 !important;
+  border: 1px solid var(--gold-primary) !important;
+  border-radius: var(--border-radius) !important;
+  background-color: var(--bg-panel) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* KPI 核心指標面板最大化自適應 */
+.tiling-top-panel.is-maximized > .grid-stack-item-content {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.tiling-top-panel.is-maximized .widget-box-body {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tiling-top-panel.is-maximized .kpi-grid {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 480px;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+}
+
+.tiling-top-panel.is-maximized .kpi-card {
+  padding: 24px 20px !important;
+  justify-content: center !important;
+  gap: 12px !important;
+}
+
+.tiling-top-panel.is-maximized .kpi-value {
+  font-size: 26px !important;
+}
+
+/* 走勢圖最大化高度自適應充滿 */
+.tiling-pane.is-maximized #dashboard-equity-chart {
+  min-height: 380px !important;
+  height: 100% !important;
+}
+
+/* ==========================================================================
+   Continuous Physical Splitters (精確 8px 實體分割條)
+   完全實體 8px 空間無縫接合，全站所有卡片垂直與水平間距 100% 絕對均勻等於 8px
+   ========================================================================== */
+.workspace-splitter {
+  background: transparent;
+  position: relative;
+  z-index: 25;
+  flex-shrink: 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 垂直分割條：實體 8px 寬度，左右卡片淨間距精確等於 8px */
+.workspace-splitter.vertical {
+  width: 8px !important;
+  min-width: 8px !important;
+  max-width: 8px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  cursor: col-resize;
+  border: none !important;
+  position: relative;
+}
+
+/* 中央 2px 科技金指示線 (居中於 8px 之中：left 3px, width 2px, right 3px) */
+.workspace-splitter.vertical::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background-color: transparent;
+  pointer-events: none;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 水平分割條：實體 8px 高度，上下卡片淨間距精確等於 8px */
+.workspace-splitter.horizontal {
+  height: 8px !important;
+  min-height: 8px !important;
+  max-height: 8px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  cursor: row-resize;
+  border: none !important;
+  position: relative;
+}
+
+/* 中央 2px 科技金指示線 (居中於 8px 之中：top 3px, height 2px, bottom 3px) */
+.workspace-splitter.horizontal::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: transparent;
+  pointer-events: none;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 懸停與拖曳時，在 8px 間隙正中央點亮科技金指示線 */
+.workspace-splitter.vertical:hover::after,
+.workspace-splitter.vertical.is-active-dragging::after,
+.workspace-splitter.horizontal:hover::after,
+.workspace-splitter.horizontal.is-active-dragging::after {
+  background-color: var(--gold-primary);
+  box-shadow: 0 0 10px rgba(230, 184, 64, 0.75);
+}
+
+/* 全域拖曳中的游標覆蓋，防止文字選取與滑鼠滑脫 */
+body.is-resizing-h {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+body.is-resizing-v {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.is-resizing-h *,
+body.is-resizing-v * {
+  pointer-events: none !important;
+}
+body.is-resizing-h .workspace-splitter,
+body.is-resizing-v .workspace-splitter {
+  pointer-events: auto !important;
+}

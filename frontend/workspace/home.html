@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>catOS｜首頁比較</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/workspace/assets/home.css">
+  <link rel="stylesheet" href="/workspace/assets/home-layout.css">
+  <script src="/workspace/assets/home-layout.js" defer></script>
+  <script src="/workspace/assets/home.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/workspace/home"><span class="brand-mark">▪</span><span><strong>catOS</strong><small>TRADING WORKSTATION</small></span></a>
+    <div class="header-title"><strong>戰情總覽</strong><small>EXECUTIVE OVERVIEW</small></div>
+    <div class="compare-tabs" role="group" aria-label="首頁比較">
+      <button data-compare="live" class="active" aria-pressed="true">新版首頁</button>
+      <button data-compare="gemini" aria-pressed="false">Gemini 原版</button>
+      <button data-compare="previous" aria-pressed="false">上一版</button>
+    </div>
+    <div class="header-actions"><span class="badge badge-amber">本機合成</span><button id="refresh" class="plain">↻ 更新</button><button data-detail="source" class="plain">資料詳情</button></div>
+  </header>
+  <div id="live-page" class="app-body">
+    <aside class="sidebar" aria-label="主要導航">
+      <nav>
+        <a href="/workspace/home" class="nav-item active" aria-current="page"><span class="nav-icon">▦</span><span>戰情總覽<small>DASHBOARD</small></span></a>
+        <a href="/workspace/research" class="nav-item"><span class="nav-icon">⌁</span><span>策略中心<small>STRATEGY LAB</small></span></a>
+        <a href="/workspace/execution" class="nav-item"><span class="nav-icon">▣</span><span>機器人管理<small>BOTS FLEET</small></span></a>
+        <a href="/workspace/risk" class="nav-item"><span class="nav-icon">⬡</span><span>風險控管<small>RISK LATCH</small></span></a>
+        <a href="/workspace/events" class="nav-item"><span class="nav-icon">≡</span><span>系統日誌<small>AUDIT LOGS</small></span></a>
+        <a href="/workspace/yaozi" class="nav-item"><span class="nav-icon">◎</span><span>市場情報<small>YAOZI INTEL</small></span></a>
+        <a href="/workspace/settings" class="nav-item"><span class="nav-icon">⚙</span><span>系統設定<small>CONFIGURATION</small></span></a>
+      </nav>
+      <button class="sidebar-telemetry" data-detail="source"><span>DATA CONNECTION <b id="connection-label">讀取中</b></span><small>研究服務 <i id="research-connection">—</i> · R4 <i id="runtime-connection">—</i></small></button>
+      <div class="sidebar-footer"><span class="dot"></span> LOCAL SIM <span class="mono">127.0.0.1</span></div>
+    </aside>
+    <main class="main">
+      <div class="workspace-toolbar-bar" id="workspace-toolbar-bar">
+        <div class="workspace-presets-group"><span class="eyebrow">LAYOUT //</span>
+          <button class="workspace-preset-pill active" data-preset="executive"><span class="dot"></span>戰情總覽</button>
+          <button class="workspace-preset-pill" data-preset="research"><span class="dot cyan"></span>研究模式</button>
+          <button class="workspace-preset-pill" data-preset="sentinel"><span class="dot amber"></span>夜間監控</button>
+        </div>
+        <div class="workspace-actions-group">
+          <button class="btn btn-sm btn-ghost" id="btn-workspace-edit-toggle" data-layout="edit" aria-pressed="false">⚙ 調整版面</button>
+          <button class="btn-autopack" id="btn-workspace-autopack" data-layout="pack">ϟ 自動補滿</button>
+          <button class="btn btn-sm btn-ghost" data-layout="undo">↶ 復原</button>
+          <button class="btn btn-sm btn-ghost" data-layout="reset">⟲ 重設</button>
+          <button class="btn btn-sm btn-ghost" data-layout="library">＋ 元件</button>
+        </div>
+      </div>
+      <div class="monitor-line"><span id="monitor-status" role="status">資料讀取中</span><span id="monitor-time" class="mono">—</span><button data-detail="runtime" class="plain">詳情 ↗</button></div>
+      <div class="tiling-workspace-container" id="dashboard-tiling-workspace">
+        <section class="tiling-top-panel" id="widget-kpi_grid" data-widget-id="kpi_grid" aria-label="核心指標">
+          <div class="grid-stack-item-content">
+            <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">核心指標</span><span class="th-dual-en">KPI TELEMETRY</span></div><button class="btn-pane-maximize" data-widget="kpi_grid" aria-label="放大核心指標">↗</button></div>
+            <div class="widget-box-body"><div class="kpi-grid">
+              <button class="kpi-card" data-detail="account"><span class="kpi-label">帳戶權益 <span class="badge badge-ghost">未接入</span></span><strong class="num">— <small>USDT</small></strong><span class="kpi-sub">帳戶快照待接入</span></button>
+              <button class="kpi-card" data-detail="account"><span class="kpi-label">當日損益 <span class="badge badge-ghost">未接入</span></span><strong class="num">— <small>USDT</small></strong><span class="kpi-sub">日損基準待接入</span></button>
+              <button class="kpi-card" data-detail="runtime"><span class="kpi-label">本機執行 <span id="runtime-badge" class="badge badge-ghost">讀取中</span></span><strong class="num" id="runtime-progress">— / — <small>根訊號</small></strong><span class="kpi-sub" id="runtime-summary">合成成交 — · 已記錄異常 —</span></button>
+              <button class="kpi-card" data-detail="account"><span class="kpi-label">帳戶風控 <span class="badge badge-ghost">未接入</span></span><strong class="risk-value">有效槓桿 <span class="num">—</span></strong><span class="kpi-sub">日損／鎖存／責任待接入</span></button>
+            </div></div>
+          </div>
+        </section>
+        <div class="workspace-splitter horizontal" id="splitter-h-top" data-top="widget-kpi_grid" data-bottom="tiling-main-area" title="調整指標高度；雙擊還原"></div>
+        <div class="tiling-main-area" id="tiling-main-area">
+          <div class="tiling-row-tier" id="tiling-upper-tier">
+            <section class="tiling-pane" id="widget-equity_chart" data-widget-id="equity_chart" aria-label="研究權益走勢">
+              <div class="tiling-pane-content panel-specular">
+                <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">研究權益走勢</span><span class="th-dual-en">EQUITY CURVE</span></div><div class="pane-actions"><select id="chart-run" aria-label="選擇已保存回測"><option>讀取中</option></select><button data-detail="research" class="plain">詳情</button><button class="btn-pane-maximize" data-widget="equity_chart" aria-label="放大研究權益走勢">↗</button><button class="widget-btn-hide" data-hide="equity_chart" aria-label="隱藏研究權益走勢">×</button></div></div>
+                <div class="widget-box-body chart-body"><div class="chart-summary" id="chart-summary">已保存回測 · 讀取中</div><div id="research-chart" class="chart-canvas-box"></div><div class="chart-footer"><span>研究回測 · 合成資料</span><span id="chart-footer">讀取中</span><a id="report-link" hidden target="_blank" rel="noopener">查看報告 ↗</a></div></div>
+              </div>
+            </section>
+            <section class="tiling-pane" id="widget-incident_timeline" data-widget-id="incident_timeline" aria-label="執行事件">
+              <div class="tiling-pane-content panel-specular">
+                <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">執行事件</span><span class="th-dual-en">INCIDENT STREAM</span></div><div class="pane-actions"><a href="/workspace/events">日誌 →</a><button class="btn-pane-maximize" data-widget="incident_timeline" aria-label="放大執行事件">↗</button><button class="widget-btn-hide" data-hide="incident_timeline" aria-label="隱藏執行事件">×</button></div></div>
+                <div class="widget-box-body" id="event-stream"><div class="empty">讀取中</div></div>
+              </div>
+            </section>
+          </div>
+          <div class="workspace-splitter horizontal" id="splitter-h-main" data-top="tiling-upper-tier" data-bottom="tiling-lower-tier" title="調整上下高度；雙擊還原"></div>
+          <div class="tiling-row-tier" id="tiling-lower-tier">
+            <section class="tiling-pane" id="widget-active_bots" data-widget-id="active_bots" aria-label="本機執行隊列"><div class="tiling-pane-content panel-specular">
+              <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">本機執行隊列</span><span class="th-dual-en">ACTIVE BOTS</span></div><div class="pane-actions"><button class="btn-pane-maximize" data-widget="active_bots" aria-label="放大本機執行隊列">↗</button><button class="widget-btn-hide" data-hide="active_bots" aria-label="隱藏本機執行隊列">×</button></div></div>
+              <div class="widget-box-body" id="runtime-queue"><div class="empty">讀取中</div></div>
+            </div></section>
+            <section class="tiling-pane" id="widget-research_tasks" data-widget-id="research_tasks" aria-label="近期研究任務"><div class="tiling-pane-content panel-specular">
+              <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">近期研究任務</span><span class="th-dual-en">RESEARCH QUEUE</span></div><div class="pane-actions"><a href="/workspace/research">研究 →</a><button class="btn-pane-maximize" data-widget="research_tasks" aria-label="放大近期研究任務">↗</button><button class="widget-btn-hide" data-hide="research_tasks" aria-label="隱藏近期研究任務">×</button></div></div>
+              <div class="widget-box-body" id="research-queue"><div class="empty">讀取中</div></div>
+            </div></section>
+            <section class="tiling-pane" id="widget-yaozi_brief" data-widget-id="yaozi_brief" aria-label="Yaozi 市場情報"><div class="tiling-pane-content panel-specular">
+              <div class="widget-box-header"><div class="widget-title-wrap"><span class="th-dual-zh">Yaozi 市場情報</span><span class="th-dual-en">YAOZI INTEL</span></div><div class="pane-actions"><button class="btn-pane-maximize" data-widget="yaozi_brief" aria-label="放大 Yaozi 市場情報">↗</button><button class="widget-btn-hide" data-hide="yaozi_brief" aria-label="隱藏 Yaozi 市場情報">×</button></div></div>
+              <div class="widget-box-body"><div class="intel-empty"><span class="intel-symbol">◎</span><strong>情報未接入</strong><span>接入後在此顯示市場摘要</span><a href="/workspace/yaozi">開啟情報工作區 →</a></div></div>
+            </div></section>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <section id="reference-page" hidden aria-label="首頁參考畫面"><div class="reference-caption"><span id="reference-label"></span><a id="reference-open" target="_blank" rel="noopener">開啟互動版本 ↗</a></div><img id="reference-image" alt="首頁對照截圖"></section>
+  <div class="widget-library-backdrop" id="widget-library-backdrop"></div>
+  <aside class="widget-library-panel" id="widget-library-panel" role="dialog" aria-modal="true" aria-label="元件庫" inert><div class="widget-library-header"><strong>元件庫</strong><button data-layout="close-library" class="plain" aria-label="關閉元件庫">×</button></div><div class="widget-library-body" id="widget-library-body"></div></aside>
+  <dialog id="detail-dialog"><header><strong id="detail-title">詳情</strong><button id="detail-close" class="plain" aria-label="關閉詳情">×</button></header><div id="detail-body"></div></dialog>
+</body>
+</html>
