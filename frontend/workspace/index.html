@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>catOS · 專屬工作台</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/workspace/assets/workspace.css">
+<script defer src="/workspace/assets/workspace.js"></script>
+</head>
+<body>
+<aside class="sidebar" aria-label="工作區導覽">
+ <div class="brand"><strong>catOS<span class="alert">.</span></strong><span class="eyebrow">LOCAL QUANT WORKSPACE</span></div>
+ <nav class="nav">
+  <div class="nav-caption">量化交易</div>
+  <button data-page="home" class="active">運行與異常</button>
+  <button data-page="research">策略研究</button>
+  <button data-page="execution">執行工作台</button>
+  <button data-page="risk">帳戶與風控</button>
+  <button data-page="events">事件紀錄</button>
+ </nav>
+ <div class="side-bottom"><button data-page="settings">系統與 Agent</button><p>localhost · F1<br>Closed Bar / Decimal Core</p></div>
+</aside>
+<main>
+ <header class="topbar">
+  <div class="module-tabs"><button id="quant-tab" class="active" data-page="home">量化交易</button><button id="intel-tab" data-page="yaozi">Yaozi 情報</button></div>
+  <div class="top-status"><span class="chip">本機模擬 · 合成資料</span><span class="chip amber" id="connection-state">讀取來源中</span><span class="small muted" id="source-time">心跳尚未讀取</span><button id="refresh">更新資料</button><button data-detail="source">來源詳情</button></div>
+ </header>
+ <div class="page-shell">
+  <div class="page-head"><div><div class="eyebrow" id="page-kicker">OPERATIONS</div><h1 id="page-title">運行與異常</h1><p id="page-description">先看需處理的事件，再看當前執行。</p></div><span class="chip" id="preset-label">監看預設</span></div>
+  <div class="snapshot-note" id="source-note">載入 R4 證據快照。訊號時間、心跳與讀取時間分別呈現。</div>
+  <div class="fixed-status" id="fixed-status" role="status"><strong id="anomaly-status">執行異常尚未讀取</strong><span class="muted small">風控、未決責任與 Worker 即時存活尚不可判定。</span></div>
+  <div class="workspace-tools" id="workspace-tools">
+   <label class="split-control">主欄寬度 <input id="split-range" type="range" min="50" max="70" value="62" aria-label="主欄寬度"><span id="split-value" class="num">62%</span></label>
+   <label><input id="secondary-toggle" type="checkbox" checked> 顯示次要說明</label>
+   <button id="reset-layout">還原此工作區預設</button><span class="small">偏好只影響畫面</span>
+  </div>
+  <section id="view-home" class="view active" aria-label="運行總覽">
+   <div class="work-grid"><div class="stack">
+    <section class="panel accent-line" id="home-runtime"><div class="panel-head"><h2>當前執行</h2><button data-expand="home-runtime">放大面板</button></div><div class="panel-body" id="home-runtime-body">讀取中…</div></section>
+    <section class="panel" id="home-signals"><div class="panel-head"><h2>訊號與模擬成交</h2><button data-expand="home-signals">放大面板</button></div><div class="panel-body" id="home-signals-body">讀取中…</div></section>
+   </div><div class="stack">
+    <section class="panel"><div class="panel-head"><h2>異常與可見性限制</h2></div><div class="panel-body" id="visibility-body">讀取中…</div></section>
+    <section class="panel secondary-panel"><div class="panel-head"><h2>最近研究</h2><span class="muted small">同一研究服務</span></div><div class="panel-body" id="recent-research">讀取中…</div></section>
+   </div></div>
+  </section>
+  <section id="view-research" class="view" aria-label="策略研究">
+   <div class="work-grid"><div class="stack">
+    <section class="panel" id="research-draft"><div class="panel-head"><h2>下一次研究設定</h2><span class="chip amber" id="draft-status">草稿 · 尚未提交</span></div><div class="panel-body">
+     <p id="catalog-label">核可策略與合成資料載入中…</p>
+     <form id="draft-form"><div class="form-grid">
+      <label>核可策略<select id="strategy-select" name="strategy_id" disabled><option>讀取中</option></select></label>
+      <label>研究資料<select id="dataset-select" name="dataset_id" disabled><option>讀取中</option></select></label>
+      <label>SMA 週期<input name="period" id="draft-period" value="2" inputmode="numeric" required></label>
+      <label>目標張數<input name="quantity" value="2" inputmode="numeric" required></label>
+      <label>預熱根數<input name="warmup_bars" value="2" inputmode="numeric" required></label>
+      <label>初始研究權益（USDT）<input name="initial_balance" value="1000" inputmode="decimal" required></label>
+      <label>手續費率（比例）<input name="fee_rate" value="0.0005" inputmode="decimal" required></label>
+      <label>滑價（bps）<input name="slippage_bps" value="2" inputmode="decimal" required></label>
+     </div><div class="cluster"><button type="submit" id="submit-backtest" class="gold-btn" disabled>執行合成回測</button><button type="button" id="reset-draft">還原研究預設</button></div></form>
+     <details><summary>參數搜尋 · Optuna</summary><p class="muted small">只搜尋 SMA 週期；預熱須涵蓋最高週期。樣本內評分不代表投資價值。</p><form id="optimization-form"><div class="form-grid">
+      <label>最低週期<input name="low" value="2" inputmode="numeric"></label><label>最高週期<input name="high" value="8" inputmode="numeric"></label>
+      <label>週期步長<input name="step" value="1" inputmode="numeric"></label><label>試驗次數<input name="n_trials" value="3" inputmode="numeric"></label><label>Seed<input name="seed" value="42" inputmode="numeric"></label>
+     </div><button type="submit" id="submit-optimization" disabled>執行參數搜尋</button></form></details>
+     <p id="submission-message" class="data-state small" role="status">修改草稿不會改寫已保存結果或 R4 參數。</p>
+    </div></section>
+    <section class="panel accent-line" id="research-result"><div class="panel-head"><h2>已保存研究結果</h2><button data-expand="research-result">放大面板</button></div><div class="panel-body" id="research-result-body">選擇已完成的研究紀錄。</div></section>
+   </div><div class="stack">
+    <section class="panel"><div class="panel-head"><h2>研究紀錄</h2><button id="refresh-research">更新紀錄</button></div><div class="panel-body history-list" id="research-history">讀取中…</div></section>
+    <section class="panel secondary-panel"><div class="panel-head"><h2>版本與使用範圍</h2></div><div class="panel-body"><p class="muted small">網頁與 MCP 共用唯一 ResearchService。候選只帶入新草稿，再提交新回測；不套入正在執行的策略。</p><div class="divider"></div><p class="muted small">研究權益與執行帳戶分別呈現。任意策略、CSV 上傳與自動核可尚未交付。</p></div></section>
+   </div></div>
+  </section>
+  <section id="view-execution" class="view" aria-label="執行工作台">
+   <label>選擇執行 run <select id="run-select" class="run-select"><option>讀取中</option></select></label>
+   <div class="work-grid"><div class="stack">
+    <section class="panel accent-line" id="execution-run"><div class="panel-head"><h2>Closed Bar → 目標 → 裁決</h2><button data-expand="execution-run">放大面板</button></div><div class="panel-body" id="execution-run-body">讀取中…</div></section>
+    <section class="panel" id="execution-fills"><div class="panel-head"><h2>已記錄模擬成交</h2><button data-expand="execution-fills">放大面板</button></div><div class="panel-body" id="execution-fills-body">讀取中…</div></section>
+   </div><div class="stack">
+    <section class="panel"><div class="panel-head"><h2>執行資料邊界</h2></div><div class="panel-body"><div class="reason-row"><h3>增倉與鎖存</h3><p>未載入完整有效風控 snapshot，尚不可判定。</p></div><div class="reason-row"><h3>委託責任與 Worker</h3><p>已記錄成交、事件時點部位與即時存活分別核對。未讀當前 Journal，不以 0 補缺漏。</p></div><div class="reason-row"><h3>8 小時驗收</h3><p>此頁不授予 PASS。完成後須經獨立 verifier 核對完整時長、Journal、費用及程序收尾。</p></div><button data-detail="runtime">完整來源與 run 詳情</button></div></section>
+    <section class="panel secondary-panel"><div class="panel-head"><h2>操作與生命週期</h2></div><div class="panel-body"><p class="muted small">監看只讀。切換工作區、放大、收合及關閉瀏覽器不啟停策略。停止計算與平倉、釋放所有權分別處理。</p></div></section>
+   </div></div>
+  </section>
+  <section id="view-risk" class="view" aria-label="帳戶與風控"><section class="panel"><div class="panel-head"><h2>有效帳戶快照尚未載入</h2><span class="chip amber">不可判定</span></div><div class="panel-body"><div class="empty"><strong>日初基準、有效 latch、曝險與未決責任尚不可判定</strong>研究績效、事件時點權益與 anomalies=0 都不能補成即時帳戶風控。</div><dl class="details"><div><dt>已確認預設（非即時設定）</dt><dd>Soft 10% ／ Hard 20%</dd></div><div><dt>單幣上限</dt><dd>槓桿上限 × 風控權益 × 單幣預算占比</dd></div></dl></div></section></section>
+  <section id="view-events" class="view" aria-label="事件紀錄"><section class="panel"><div class="panel-head"><h2>所選 run 的完整事件摘要</h2><span class="small muted">有界讀取</span></div><div class="panel-body" id="events-body">讀取中…</div></section></section>
+  <section id="view-yaozi" class="view" aria-label="Yaozi 情報"><section class="panel"><div class="panel-head"><h2>Yaozi 情報</h2><span class="chip">同站獨立資料品質</span></div><div class="panel-body" id="yaozi-body">讀取服務可用性中…</div></section></section>
+  <section id="view-settings" class="view" aria-label="系統與 Agent"><section class="panel"><div class="panel-head"><h2>服務、來源與 Agent</h2></div><div class="panel-body" id="settings-body">讀取中…</div></section></section>
+  <footer>catOS F1 · 合成研究／只讀執行監看 · 金額保留完整 Decimal 文字 · 研究成果與帳戶風控分別核對。</footer>
+ </div>
+</main>
+<div class="drawer-backdrop" id="drawer-backdrop"><section class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title"><div class="cluster"><h2 id="drawer-title">來源與版本</h2><button id="drawer-close">關閉詳情</button></div><div id="drawer-content"></div></section></div>
+</body>
+</html>
