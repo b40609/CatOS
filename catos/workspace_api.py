@@ -62,6 +62,10 @@ def mount_workspace(app, *, evidence_root=None, preview=False):
     @app.get("/workspace", response_class=HTMLResponse)
     @app.get("/workspace/", response_class=HTMLResponse)
     def workspace_page():
+        return FileResponse(FRONTEND / "home.html", media_type="text/html")
+
+    @app.get("/workspace/legacy", response_class=HTMLResponse)
+    def legacy_workspace_page():
         return FileResponse(FRONTEND / "index.html", media_type="text/html")
 
     @app.get("/workspace/home", response_class=HTMLResponse)

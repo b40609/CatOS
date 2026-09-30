@@ -2,6 +2,8 @@
 
 新對話先讀[目前接續入口](docs/current-handoff.md)，確認階段、待決政策、分工與授權；詳細歷史留在各切片文件。
 
+正式工作台入口：在本目錄執行 `powershell -ExecutionPolicy Bypass -File scripts/start-research.ps1`（或 `python -B -m catos.workspace_api`），開啟 `http://127.0.0.1:8770/`。Gemini 首頁、六頁工作台與研究 API 共用同一 ResearchService／writer，無須 8771 預覽。舊研究頁保留於 `/research/`，舊 F1 工作台保留於 `/workspace/legacy`。更新程式前先等研究任務完成，於啟動終端按 Ctrl+C 再重啟；8770 被占用時直接退出，不自動停其他程序。下列 R1／R2 啟動方式為歷史紀錄，日常使用以上正式入口。
+
 2026-09-30 R1 正式研究入口已實作並通過 Sol 驗收：[R1 交接](docs/frontend-research-r1-handoff-20260930.md)／[驗收證據](docs/frontend-research-r1-sol-verification-20260930.md)。在本目錄執行 `python -B -m catos.research_api --port 8770`，開啟 `http://127.0.0.1:8770/research/`，使用註冊 SMA 與合成資料執行真實 Decimal 回測，結果保存於隔離 JSON／HTML。原型 8088／8089 不是研究驗收入口；畫面底部顯示程式版本，更新後等任務完成再手動重啟。原有 root／Yaozi 保留，其他主頁仍為示意。
 
 2026-09-30 R2 Optuna 已接同一研究入口：註冊 SMA 週期搜尋、明示 trial 預算與 seed、查看保存候選並套用為新回測。僅合成資料樣本內搜尋，未執行樣本外檢驗。5.6 Sol (Web) 專屬與必要回歸 30/30 通過；後續固定 8770 人工重啟、實際瀏覽器畫面及 1-trial 正式 HTTP Optuna 任務均已驗證。詳見 [R2 交接](docs/frontend-research-r2-handoff-20260930.md)。

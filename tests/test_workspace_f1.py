@@ -228,7 +228,8 @@ class WorkspaceAPITests(unittest.TestCase):
             self.assertEqual(page.status_code, 200)
             self.assertIn("script-src 'self'", page.headers["Content-Security-Policy"])
             self.assertIn("no-store", page.headers["Cache-Control"])
-            self.assertIn("運行與異常", page.text)
+            self.assertIn("戰情總覽", page.text)
+            self.assertIn("運行與異常", client.get("/workspace/legacy").text)
             self.assertNotIn("mock-data.js", page.text)
             self.assertEqual(client.get("/workspace/assets/unknown.js").status_code, 404)
             self.assertEqual(client.get("/workspace/assets/workspace.js").status_code, 200)
@@ -240,7 +241,10 @@ class WorkspaceAPITests(unittest.TestCase):
             app = create_app(output_dir=root / "research", market_db=root / "missing.sqlite",
                              evidence_root=root / "evidence")
             with TestClient(app, base_url="http://127.0.0.1") as client:
-                self.assertEqual(client.get("/").status_code, 200)
+                for entry in ("/", "/quant", "/workspace", "/workspace/"):
+                    page = client.get(entry)
+                    self.assertEqual(page.status_code, 200)
+                    self.assertIn("戰情總覽", page.text)
                 version = client.get("/api/research/version").json()
                 self.assertFalse(client.get("/api/workspace/version").json()["preview"])
                 request = client.get("/api/research/catalog").json()["defaults"]

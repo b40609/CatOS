@@ -1,29 +1,27 @@
 # CatOS 目前接續入口
 
-更新：2026-09-30（F1 實作 Git 收尾）。工作目錄 `C:/Users/user/Desktop/CatOS_Astra`。**使用者已授權「F1 Git 收尾 → 等 R4 PASS 並收尾」；F1 以獨立實作提交保存，5.6 Sol (Web) 驗收對話仍在補 #6，尚無正式 PASS。** 本輪不增加瀏覽器測試；R4 八小時長跑仍運行中。Git 基線已核對為 `7c346f2`，F1 與 R4 分開、不 push、不切正式 8770。
+更新：2026-09-30。工作目錄 `C:/Users/user/Desktop/CatOS_Astra`。
 
-## F1 六頁工作台
+## 當前切片：正式 8770 工作台入口
 
-[首頁](http://127.0.0.1:8771/workspace/home)／[策略中心](http://127.0.0.1:8771/workspace/research)。機器人管理、風控、日誌、情報與設定共用 Gemini 黑金、密度、導航與布局操作；來源／版本／驗收進詳情，缺資料短標示。新增 `desk.html/css/js`，更新首頁導航、workspace API 固定路由／資產 hash、tests 與文件；Gemini 原目錄及 CatOS_Yaozi 未修改。舊 F1／design 保留。
+使用者已授權切換正式入口，限定最小驗證、不大量點擊。已將 `scripts/start-research.ps1` 改啟動 `catos.workspace_api`；根入口及 /quant、/workspace 顯示 Gemini 首頁，六頁工作台與研究 API 共用既有單一 ResearchService／writer。舊研究頁 /research/、舊 F1 /workspace/legacy 保留。沒有新增 DB schema、交易功能或第二 writer。
 
-策略中心經原 8770 單一 ResearchService 提交合成回測／搜尋，草稿與結果分離，候選僅帶入新草稿。其餘頁讀既有 R4 證據／缺口／本機偏好；沒有 Bot 啟停、交易、風控 mutation 或第二 writer。固定 R4 狀態與選定歷史記錄分離，避免切 smoke 誤顯示長跑完成。金額維持 Decimal 字串。
+本輪受影響測試 **22/22 PASS**，含正式根入口、同服務暫存合成回測及 Decimal 結果；未做瀏覽器操作，未重驗 R4。占用中的 8770 啟動測試非零退出，未停 owner 或改 port。詳見 [正式入口交接與人工清單](workspace-formal-entry-handoff-20260930.md)。
 
-實際自驗：`test_workspace_f1` **22/22**、desk／home／home-layout 三支 JS 語法通過；真實 UI 合成回測 `6a7956b291bf4205b2d8293ef9963b02`、3 次搜尋 `9076af29fda2417f92015bb946486bc1` 均 complete。已操作候選草稿、R4／smoke 切換、事件篩選／詳情、偏好 reload、隱藏／加回／放大／Escape；不是全站 E2E 或獨立驗收。完整報告連結及剩餘版面互動交由人工驗收；窄視窗只做有限檢查，不宣稱六頁完整響應式驗收。詳見 [交接與人工清單](catos-workspace-f1-handoff-20260930.md)／[規格](catos-workspace-f1-spec-20260930.md)／[設計決策](catos-frontend-design-feedback-20260930.md)。
+**正式服務已於 2026-09-30 23:20（台灣時間）接續啟動。** 對話遺失後核對 8770 已無 listener，未停止任何舊程序；執行 `python -B -m catos.workspace_api`，新 PID `41344`、instance `e126513443884f26810bf437290c66b1`。版本端點確認 preview=false、research_owner=same_app、兩端 restart_required=false、active_run_id=null。首頁含戰情總覽，策略中心／設定頁 HTTP 200；保存研究紀錄 26 筆、queued／running=0。R4 專用快照 `status.state=complete`、32 根／13 fills／0 anomalies、issues=[]。8771 preview PID `5512` 保留。這取代先前「實際服務尚未切換」狀態；先前停止命令遭自動安全政策拒絕仍為歷史紀錄。
 
-8771 preview 前輪 PID `5512`，只有預覽轉交、無 writer；前輪最後載入版本無需重啟。原 8770 未重啟，前輪 GET build=`72734a4e3b7d06215a68ea9c5c52af3e898b8fafbee921bc2c87e68deeeff5e5`，instance=`f2a3c7d3b3544eeaa2aa42eb8a45d71b`；正式啟動器尚未切換。預覽命令 `python -B -m catos.workspace_api --preview`；log／截圖在 `outputs/frontend-design-review-20260930/`。F1 提交僅 workspace API／snapshot、frontend/workspace、專屬 tests、四份 F1 文件與本入口；outputs／研究 runs／DB 不 stage，R4 保留未提交。Gemini 布局引擎的 8 處原有行尾空白保留；本輪未重跑 tests 或修改程式 bytes。
+指定 **5.6 Sol (Web)** 已完成限定範圍獨立驗收：唯一 8770 listener 與 API PID 均為 `41344`，程序命令為 `python -B -m catos.workspace_api`；workspace／research 版本一致且無需重啟，研究紀錄 26 筆且 queued／running=0。真實瀏覽器首頁顯示 R4 已完成、32/32 根訊號、13 成交；側欄實際進入策略中心與系統設定均正常，沒有建立研究任務或修改設定。本輪未重跑單元測試、回測或 R4 verifier。R4 仍讀 `/api/workspace/local-sim/runs/347282b9d0d9433db6a0276209936f60`，不是研究 runs 端點。後續功能切片尚未定案。
 
-獨立驗收對話：[依 F1 清單驗收並保留 R4](codex://threads/01a0f18e-ff90-7751-8624-15b9fde8f4dd)。18:07 核對仍 active，最後處理窄版成交表水平自捲；來源是該對話工具／進度，不能改寫為完整驗收通過。本次提交是實作保存，不是獨立驗收封存。比較圖片／design 樣稿仍屬本機 outputs，乾淨 checkout 缺檔時回 404，不納入 Git。
+## 完成基線與證據
 
-## R4 保留與收尾
+- **F1：提交 `7957447`。** Gemini 六頁工作台保留整體畫面、密度、導航與布局操作；來源／版本／驗收收進詳情，缺資料短標示。指定 5.6 Sol (Web) 已回報 **6/6 PASS**，本輪僅引用。策略中心沿用研究服務；其餘頁讀 R4 證據／缺口／偏好，沒有 Bot 啟停或交易 mutation。[F1 交接](catos-workspace-f1-handoff-20260930.md)／[規格](catos-workspace-f1-spec-20260930.md)／[設計決策](catos-frontend-design-feedback-20260930.md)。
+- **R4：正式 PASS 並提交 `33a4518`。** 唯一 run=`347282b9d0d9433db6a0276209936f60`；eight-hour、28800.073241599952 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、final_equity=`999.67939950`、fees=`0.01320050`。既有 verifier 證據為 read-only、runtime_digest_unchanged=true。本輪未重跑。固定 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65`，manifest 程式保持凍結。[R4 交接](frontend-research-r4-handoff-20260930.md)／[規格](frontend-research-r4-spec-20260930.md)。
+- **R3：既有 36/36 與 MCP E2E 證據。** 固定核可 SMA／合成資料、七 MCP 工具 exact binding；本輪未重驗。[R3 交接](frontend-research-r3-handoff-20260930.md)。
 
-唯一 run=`347282b9d0d9433db6a0276209936f60` 已正式 **PASS**。2026-09-30 20:23 台灣時間執行 `python -B -m catos.local_sim_r4_verify 347282b9d0d9433db6a0276209936f60`，回 profile=`eight-hour`、elapsed=`28800.073241599952` 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、final_equity=`999.67939950`、fees=`0.01320050`、database_mode=`read-only`、runtime_digest_unchanged=`true`。未改 DB、未啟第二 runner。
+## 分工、授權與其他工作
 
-SMA period=2／quantity=2；固定 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65`，manifest 程式維持凍結。前輪 R4／verifier 9/9、IPC 11/11、Worker 15/15 與 smoke `d8fdd571ef554c8681e2316edd22bbe9` 的 SMOKE_PASS 是歷史證據。詳見 [R4 spec](frontend-research-r4-spec-20260930.md)／[handoff](frontend-research-r4-handoff-20260930.md)。
+本輪指定 **5.6 Sol (Web)** 驗收已通過；Git 收尾僅納入 workspace_api、start-research、README、workspace tests、正式 8770 交接與本入口，不 push。`AGENTS.md`、`.codex/`、outputs 與 F1 歷史補記等其他未提交內容繼續留在工作樹，不混入本片。
 
-既有 heartbeat `r4-8-local-sim` 原為每小時唯讀追蹤、最多 9 次；R4 已正式 PASS。本輪嘗試以原完整設定改為 `PAUSED`，automation 後端回報該項目已不存在，故目前沒有可再停用的 active heartbeat。驗收器已核對 >=28800 秒、32+2 根、成交／費用／tag／Decimal／journal、0 異常、無未決與 Worker 收尾。不刪證據、不改 DB、不解除 latch。R4 提交範圍及輸出規則見原交接，F1 不混入。
+不碰 R4 DB、凍結 runtime、其他研究 runs、Gemini 原目錄或 CatOS_Yaozi；不讀真實憑證，不採集、不下單、不解除 latch。outputs 與其他未提交工作不混入。既有 R4 heartbeat 後端已回報不存在，不另建監控。
 
-## R3 基線與下一步
-
-R3 已驗收：固定核可 SMA／合成資料、七 MCP 工具 exact binding、原 8770 唯一服務；36/36 與 MCP E2E 是歷史驗證。詳見 [R3 handoff](frontend-research-r3-handoff-20260930.md)／[6.1 Sol 補驗](frontend-research-r3-sol61-verification-20260930.md)。Antigravity BOM／DSH credential 限制仍保留。
-
-R4 收尾完成後，下一片為正式 8770 工作台入口切換；需先確認研究 idle 與單一 writer，再依既有授權進行。R4 不需重跑；F1 亦不需重複驗收。`AGENTS.md`／`.codex` 設定與本片無關，保持未混入；本輪不 push、不切 8770、不啟新 runner。
+模型設定修正保留：專案 [.codex/config.toml](../.codex/config.toml) 已取消 model／model_reasoning_effort 固定值，6.1／medium 僅為 [AGENTS.md](../AGENTS.md) 建議；全域既有 6.1／low 未修改。新對話選單尚待使用者確認；AGENTS／.codex 設定不納入本片 Git。

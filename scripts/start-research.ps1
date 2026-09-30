@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $researchRoot = Split-Path -Parent $PSScriptRoot
 Push-Location -LiteralPath $researchRoot
 try {
-    python -B -m catos.research_api --port 8770
+    python -B -m catos.workspace_api
     $researchExitCode = $LASTEXITCODE
 } finally {
     Pop-Location
