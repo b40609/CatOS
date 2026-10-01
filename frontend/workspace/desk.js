@@ -88,7 +88,7 @@
       $('page-controls').innerHTML='<div role="group" aria-label="研究分頁">'+[['strategy','策略'],['backtest','回測'],['optimization','參數優化']].map(([key,name])=>button(name,'data-tab="'+key+'" aria-pressed="'+(state.tab===key)+'"','tab-button'+(state.tab===key?' active':''))).join('')+'</div><div class="controls-end"><span id="submit-status" class="row-note"></span>'+button('研究設定','data-action="draft"')+button('執行回測','data-submit="backtest"','gold-button')+button('參數搜尋','data-submit="optimization"','gold-button')+'</div>';
     } else if(page==='execution'||page==='events') {
       $('page-controls').innerHTML='<div class="filter-bar"><label for="runtime-select">執行記錄</label><select id="runtime-select" aria-label="選擇執行記錄"></select>'+
-      (page==='events'?'<select id="event-filter" aria-label="事件類型"><option value="all">全部事件</option><option value="signal">訊號</option><option value="fill">成交</option><option value="anomaly">異常</option><option value="warmup">預熱</option></select><input id="event-query" aria-label="搜尋事件" placeholder="搜尋目標、裁決、原因">':'')+'</div><div class="controls-end">'+badge('本機合成','amber')+button('執行詳情','data-detail="runtime"')+(page==='execution'?badge('啟停未接入'):'')+'</div>';
+      (page==='events'?'<select id="event-filter" aria-label="事件類型"><option value="all">全部事件</option><option value="signal">訊號</option><option value="fill">成交</option><option value="anomaly">異常</option><option value="warmup">預熱</option></select><input id="event-query" aria-label="搜尋事件" placeholder="搜尋目標、裁決、原因">':'')+'</div><div class="controls-end">'+badge('R4 本機合成','amber')+button('執行詳情','data-detail="runtime"')+'</div>';
     } else {
       $('page-controls').innerHTML='<span class="eyebrow">'+esc(config.en)+' //</span><div class="controls-end">'+badge(page==='risk'?'帳戶快照未接入':page==='yaozi'?'情報未接入':'本機偏好')+button('資料詳情','data-detail="source"')+'</div>';
     }
@@ -193,7 +193,7 @@
     $('density').value=document.body.dataset.density;
     body(3,'<p class="row-note">每頁、每種預設獨立保存。使用上方工具拖曳、調整分隔、隱藏或加回面板。</p>'+button('開啟元件庫','data-layout="library"','gold-button')+' '+button('還原本頁版面','data-layout="reset"'));
     body(4,dl([['研究入口','原 8770 ResearchService'],['協定','既有七工具契約'],['Agent 連線','未提供'],['任務歷史','與研究頁共用']])+button('介面詳情','data-detail="agent"'));
-    body(5,dl([['環境','Localhost only'],['模式','合成研究／本機模擬'],['Demo／Live','未接入'],['Bot 啟停','未接入']])+button('執行詳情','data-detail="runtime"'));
+    body(5,dl([['環境','Localhost only'],['模式','合成研究／本機模擬'],['Demo／Live','未接入'],['Bot 啟停','機器人管理頁 · 短程合成案例']])+button('執行詳情','data-detail="runtime"'));
   }
   function render() {
     ({research:renderResearch,execution:renderExecution,risk:renderRisk,events:renderEvents,yaozi:renderYaozi,settings:renderSettings}[page])();
