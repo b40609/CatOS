@@ -239,7 +239,7 @@ class WorkspaceAPITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             app = create_app(output_dir=root / "research", market_db=root / "missing.sqlite",
-                             evidence_root=root / "evidence")
+                             evidence_root=root / "evidence", simulation_root=root / "simulation")
             with TestClient(app, base_url="http://127.0.0.1") as client:
                 for entry in ("/", "/quant", "/workspace", "/workspace/"):
                     page = client.get(entry)
