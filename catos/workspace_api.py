@@ -151,11 +151,14 @@ def relay(method, path, body=b"", build=None):
         connection.close()
 
 
-def create_app(*, output_dir=None, market_db=None, evidence_root=None, preview=False):
+def create_app(*, output_dir=None, market_db=None, evidence_root=None, preview=False,
+               simulation_root=None):
     if not preview:
         from catos.research_api import create_app as create_research_app
-        return mount_workspace(create_research_app(output_dir=output_dir, market_db=market_db),
-                               evidence_root=evidence_root)
+        from catos.local_sim_control_api import mount_simulation
+        app = mount_workspace(create_research_app(output_dir=output_dir, market_db=market_db),
+                              evidence_root=evidence_root)
+        return mount_simulation(app, simulation_root or ROOT / "outputs" / "local-sim-control")
     app = FastAPI(title="catOS F1 temporary localhost preview")
 
     @app.api_route("/api/research/{path:path}", methods=["GET", "POST"])
