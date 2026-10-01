@@ -2,32 +2,27 @@
 
 更新：2026-10-01（台灣時間）。工作目錄 `C:/Users/user/Desktop/CatOS_Astra`。
 
-## 當前切片：W2～W5 三片本機提交收尾
+## 當前切片：W6，A／B 獨驗 PASS 與本機版本保存
 
-使用者已明確例外授權 6.1 Sol 依三片計畫暫存並本機提交（含 W1 規格）；不 push、不重跑案例，排除 AGENTS、.codex、F1 補記與所有 outputs，保留原始證據與服務。起點 main／`46bdba2`、暫存區空。第一片 W1／W2 後端=`5805160`，第二片 W3 UI=`52c981f`；第三片為包含本入口的 `docs(local-sim): record W4 W5 acceptance and closeout`，提交號依最終 git log 辨識。workspace_api 已按 hunk 分配，README 已同步；每片核對精確暫存檔案與空白格式，不宣稱重驗歷史案例或中間版本。詳見 [Git 分片核對與提交紀錄](local-sim-bot-control-w2-w5-git-review-20261001.md)。本輪未改應用程式工作檔、未操作服務或 DB。
+使用者已授權先 B 後 A；後續回覆「同意 請改規則，以後不需要我授權」，已將既有 localhost 服務恢復的固定授權寫入 [AGENTS.md](../AGENTS.md) AUTONOMY。同範圍不再詢問，保留 recovery／交易／Git 等邊界。[W6 提案](local-sim-bot-control-w6-assessment-20261001.md)／[完整交接](local-sim-bot-control-w6-handoff-20261001.md)／[指定 5.6 Sol (Web) 獨驗](local-sim-bot-control-w6-acceptance-20261001.md)。
 
-W5 歷史唯讀獨立驗收依「本次例外，請用 6.1 SOL 直接驗收」授權完成：原始證據 41 項斷言 PASS，GET／owner／來源與輸入 SHA／R4 manifest runtime SHA 核對符合；時間字串正規化後完整清單保持。該驗收輪未另開 run、stop、重啟、開 DB 或執行 Git。詳見 [W5 獨立驗收](local-sim-bot-control-w5-acceptance-20261001.md)。本次提交為後續另授權操作，不變更一般角色分工；下列執行輪描述為歷史證據。
+B 為前輪隔離 stub 歷史證據，本輪未重跑：run=`12575ca8d48c4650bcc618c90c74c798`，首次接受但 UI 503、同 tab 切頁／reload 保留 pending、明示 retry 回同 run。兩次 start＋一次 stop；stopped／cleanup=true，fixture 正常退出。專屬單元 1/1、證據 18/18 PASS，無實際 Worker／帳務驗證。
 
-W5 執行輪依另一次限定驗證授權，在正式 8770 UI 點擊一次 start，run=`c02f745093ae4aaba423cb5a51855219`、request_id=`947445dc87224c8681ae793235a0fd5d`。固定 SMA／真實 Worker／FakeExchange／新合成帳戶及新 DB，1 秒節奏，reload 後自然 completed：2 warmup＋8 bars、4 fills，耗時 9.20579 秒，fees=`0.00404010`、equity=`999.91375990`，cleanup_confirmed=true、worker_closed=true、error=null。Network 唯一 start POST／202、0 stop；控制槽 idle、active_run_id=null。未直接取得即時 sessionStorage 事件，未測切頁／關頁／重送；cleanup 不代表 ownership 釋放或逐列帳務重驗，短程證據不取代八小時 R4。詳見 [W5 交接與證據](local-sim-bot-control-w5-handoff-20261001.md)／[原提案](local-sim-bot-control-w5-assessment-20261001.md)，取代舊入口「W5 尚未執行／驗收」說法。
+A 已依固定授權恢復缺失的 8770 正式／8771 preview，唯讀前置合格後執行原唯一短程。run=`5975e67dffa34594ab78c1fe4bf475b0`，request_id=`fe83d2cb42b44e48b0e0b025de5e15e3`。同 tab 切設定再返回仍 running；17:48:11.124 關頁，獨立 GET 19 次觀測後於 17:48:19.532 自然 completed，新 tab 讀回同 run。終態以保存原命令 API 重送一次，返回同終態、清單及完整紀錄不變。正式 start=2／stop=0／新增 run=1；2 warmup＋8 bars／4 fills，fees=`0.00404010`、equity=`999.91375990`，cleanup／worker_closed=true、error=null、slot=idle。指定 5.6 Sol (Web) 已直接由原始檔離線重算 40 項核心斷言，A／B 整體 PASS；未重跑案例。
 
-W5 歷史前後 owner 相同：8770 PID `39200`（`python -B -m catos.workspace_api`）、8771 PID `5512`；research instance=`9a6c6367ff024b2d9ea4df5be8ecce29`、simulation instance=`db7231f9f987439d9375ccc1778528ad`，不可混用。正式三類 loaded=current／restart_required=false；preview loaded 不變／restart_required=true、simulation GET 404。研究 26/26 complete 與完整清單、W4 snapshot、R4 摘要／凍結 SHA 保持，來源／設定／合成 CSV SHA 相同。原始證據留 `outputs/workspace-w5/`，模擬資料留 `outputs/local-sim-control/`，本提交輪均未操作或重驗。
+## 有效基線、證據與限制
 
-## 已驗收基線（歷史證據，非本輪重驗）
+- 恢復後新 owner：8770 PID5108／8771 PID49164；前後保持。research instance=`f3fa2652523c43f0aab3b4d3a478058e`、simulation instance=`d76e5fa4c1fb4d24b859537afba9ecb3`。不得沿用已不存在的歷史 owner／instance。
+- 正式 workspace／research／simulation 與 preview loaded=current、restart_required=false；研究 26 complete、無 active，完整清單前後相同。R4 摘要／來源及 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65` 保持；未開歷史 DB、未重跑研究／R4。
+- [證據目錄](../outputs/workspace-w6-20261001/)：before／after、A browser／19 次獨立 GET／新 tab／原命令重送／36 項開發核對／PNG／服務日誌；B 原始證據保留。[獨驗文件](local-sim-bot-control-w6-acceptance-20261001.md)另記錄 40 項獨立重算與核心檔案 SHA256。CDP truncated=true，較早閒置 GET 已被截斷；活動命令與導航窗口保留，兩次 start／零 stop 另由服務日誌核對。不宣稱完整前置網路紀錄。
+- 未改正式程式；collector 僅放寬已核對 launcher 可執行檔後空白匹配。本次 Git 收尾已核對 main／`d03e4d6`、空暫存區與八個原始證據 SHA256；僅保存 W6 fixture／test、三份 W6 文件、入口及收尾紀錄共七檔。AGENTS、.codex、F1 補記與所有 outputs 保留未提交。
+- W1 契約及既有金融政策保留，無新政策待決。[W1](local-sim-bot-control-w1-spec-20260930.md)。W2／W3／W4 與 W5 原驗收為歷史證據，非本輪重驗。[W5](local-sim-bot-control-w5-handoff-20261001.md)／[W5 獨驗](local-sim-bot-control-w5-acceptance-20261001.md)／[R4](frontend-research-r4-handoff-20260930.md)。
+- 既有提交沿革見 [W2～W5 Git 紀錄](local-sim-bot-control-w2-w5-git-review-20261001.md)；其後本次另獲明確授權，單一本機提交訊息為 `test(local-sim): save W6 fixture and independent acceptance`，提交號由 git log 辨識。[W6 Git 收尾](local-sim-bot-control-w6-git-closeout-20261001.md)。Yaozi／其他工作目錄未碰，[Yaozi 入口](../../CatOS_Yaozi/docs/current-handoff.md) 由另一目錄接續。
 
-- **W4：指定 5.6 Sol (Web) 限定獨立驗收 PASS**。正式服務載入 W2／W3，API 啟停案例 `89470c8bb7084de89ed701d54b9274fd` 為 stopped、2 warmup＋2 bars／2 fills，cleanup／Worker 關閉確認；正式頁只做 reload 顯示。8771、26 筆研究與 R4 保留。[W4](local-sim-bot-control-w4-handoff-20261001.md)。
-- **W2／W3：指定 5.6 Sol (Web) 獨立驗收 PASS**，分別 50/50、33/33。[W2](local-sim-bot-control-w2-handoff-20261001.md)／[W3](local-sim-bot-control-w3-handoff-20261001.md)／[W1 契約](local-sim-bot-control-w1-spec-20260930.md)。單控制槽、命令先保存、同 ID／本文／build／instance 明示重送；GET／導航／刷新不提交命令；停止不清倉／不釋放 ownership，cleanup 不確定或非終態重啟阻擋 start。
-- **正式入口**：既有 22/22、指定角色服務與瀏覽器驗收 PASS；根入口／quant／workspace 與六頁共用 ResearchService／writer，舊研究頁與 legacy 保留。[交接](workspace-formal-entry-handoff-20260930.md)。先前 PID 41344 為 W4 更新前歷史 owner。
-- **F1**：提交 `7957447`，指定角色 6/6 PASS。[交接](catos-workspace-f1-handoff-20260930.md)。
-- **R4**：正式 PASS、提交 `33a4518`，唯一 run=`347282b9d0d9433db6a0276209936f60`，28800.073241599952 秒、32＋2 根、13 fills、0 anomalies，equity=`999.67939950`、fees=`0.01320050`。凍結 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65`；manifest／來源不可改。[交接](frontend-research-r4-handoff-20260930.md)／[R3](frontend-research-r3-handoff-20260930.md)。
+## 下一步、分工與授權邊界
 
-## 下一步、分工與不可碰範圍
+W6 A／B 已由指定 5.6 Sol (Web) 唯讀獨立驗收 PASS。本次依使用者「同意 請執行」完成 scoped Git 本機保存；核對精確七檔、暫存空白與提交後狀態，不 push、不重跑 B／A、不另開 run、不解除 recovery。此次直接授權不改一般角色分工；歷史獨驗結果與執行時 owner／instance 不冒充本次服務重驗。下一片建議先評估正式 stop 原命令重送的最小缺口，提出 assessment，尚未授權新案例。
 
-W2～W5 本機提交範圍至第三片為止，未授權 push。AGENTS、.codex、F1 補記與 outputs 維持未提交、不混入。第一片成功提交時有 `.git/info/refs` 自動維護警訊，後兩片以單次設定停用自動維護，未改專案設定、未清理；警訊不宣稱已修復，詳見提交紀錄。下一片建議先就尚未涵蓋的切頁／關頁／重送情境提出最小驗證提案，另獲授權才執行；不重跑 W5 或補開案例，沒有新帳務／交易政策待決。
+服務恢復固定授權僅涵蓋既有 localhost launcher／資料根及唯讀建立新基線；先確認埠空缺、不停止不明 owner。遇 unavailable／recovery_required 或其他不合格基線保存原因並停止案例，不解除、不 resume。禁止清理、真實憑證、採集／交易、schema／latch 修改、凍結來源修改、長跑、其他工作目錄或新增案例。
 
-不清理、不改既有 DB schema、不碰 R4 DB／凍結 runtime、其他研究 runs、Gemini 原目錄或 CatOS_Yaozi；不讀真實憑證、不採集、不下單、不解除 latch／recovery、不 resume／長跑。8770 留存正式服務、8771 保留原 owner。既有 R4 heartbeat 已回報不存在，不另建監控。
-
-Yaozi 圖表隔離開發驗證既有 PASS（15 組資料、七類檢查、四次晚到回應），非指定角色獨驗；PC 配對主線、正式圖表接線／精度防護／async lifecycle 仍由另一目錄接續。[Yaozi 入口](../../CatOS_Yaozi/docs/current-handoff.md)／[驗證交接](../../CatOS_Yaozi/docs/yaozi-coin-chart-validation-handoff-20261001.md)。本輪未更動。
-
-模型由使用者介面選擇；專案 .codex/config.toml 已取消固定 model／reasoning，6.1 Sol／medium 僅為建議。帳務／風控難題交 Astra；一般獨立驗收與 Git 指定 5.6 Sol (Web)，本次 W5 唯讀驗收及三片提交各有使用者例外授權，不延伸至後續工作。
-
-三片收尾後建議新對話開始下一片，不自動建立對話。短接續指令：「依 current-handoff.md 接續，先提出切頁／關頁／重送的最小驗證提案；保留原始證據與服務，不執行案例、不 push，後續執行及角色另授權。」
+W6 已完成指定獨驗與本機保存，建議切換對話進下一片，不自動建立。短接續指令：「依 current-handoff 與 W6 Git 收尾接續；先評估正式 stop 原命令重送的最小缺口並提出 assessment，不執行案例、不新增 run、不解除 recovery、不 push；保留未提交內容。」
