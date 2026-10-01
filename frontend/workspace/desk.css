@@ -4,6 +4,10 @@
 .desk-page .widget-box-body{padding:10px 12px}
 .page-controls{display:flex;align-items:center;gap:8px;min-height:39px;flex-shrink:0;margin:0 0 8px;flex-wrap:wrap}
 .page-controls .controls-end{margin-left:auto;display:flex;align-items:center;gap:6px}
+.simulation-control{flex-shrink:0;border:1px solid var(--border-gold-subtle);padding:8px 12px;margin-bottom:8px;font-size:11px;max-height:220px;overflow:auto}
+.simulation-control .simulation-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.simulation-control p{margin:6px 0;color:var(--text-secondary);overflow-wrap:anywhere}
+.simulation-control pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:120px;overflow:auto}
 .tab-button{background:transparent;border-color:transparent;padding:7px 12px;color:var(--text-secondary);font-size:12px}
 .tab-button.active{border-bottom:2px solid var(--gold-primary);color:var(--gold-primary);background:var(--gold-bg)}
 .gold-button{border:1px solid var(--border-gold-subtle);background:var(--gold-bg);color:var(--gold-primary);padding:5px 10px;font-size:11px}

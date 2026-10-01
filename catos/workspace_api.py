@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend" / "workspace"
 ASSETS = {"workspace.css": "text/css", "workspace.js": "text/javascript",
           "home.css": "text/css", "home.js": "text/javascript",
-          "desk.css": "text/css", "desk.js": "text/javascript",
+          "desk.css": "text/css", "desk.js": "text/javascript", "simulation.js": "text/javascript",
           "home-layout.css": "text/css", "home-layout.js": "text/javascript"}
 DESK_PAGES = {"research", "execution", "risk", "events", "yaozi", "settings"}
 RESEARCH_PATH = re.compile(
