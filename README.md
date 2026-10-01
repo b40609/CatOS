@@ -2,6 +2,8 @@
 
 新對話先讀[目前接續入口](docs/current-handoff.md)，確認階段、待決政策、分工與授權；詳細歷史留在各切片文件。
 
+2026-10-01 W2／W3 已由指定 5.6 Sol (Web) 獨立驗收，分別 50/50、33/33 PASS；W4 已將 W2／W3 載入正式 8770，限定啟停驗收 PASS。W5 已完成正式 UI 單次 start、reload 後持續至自然 completed，並依使用者本次例外授權由 6.1 Sol 限定唯讀獨立驗收 PASS（原始證據 41 項斷言）。8771 preview 保留原 owner，不掛 simulation mutation。以上為既有驗收紀錄；本次收尾另獲 6.1 Sol 三片本機提交授權，未重跑案例、測試或 R4，未重啟服務或 push。詳見 [W2](docs/local-sim-bot-control-w2-handoff-20261001.md)／[W3](docs/local-sim-bot-control-w3-handoff-20261001.md)／[W4](docs/local-sim-bot-control-w4-handoff-20261001.md)／[W5 獨立驗收](docs/local-sim-bot-control-w5-acceptance-20261001.md)。
+
 正式工作台入口：在本目錄執行 `powershell -ExecutionPolicy Bypass -File scripts/start-research.ps1`（或 `python -B -m catos.workspace_api`），開啟 `http://127.0.0.1:8770/`。Gemini 首頁、六頁工作台與研究 API 共用同一 ResearchService／writer，無須 8771 預覽。舊研究頁保留於 `/research/`，舊 F1 工作台保留於 `/workspace/legacy`。更新程式前先等研究任務完成，於啟動終端按 Ctrl+C 再重啟；8770 被占用時直接退出，不自動停其他程序。下列 R1／R2 啟動方式為歷史紀錄，日常使用以上正式入口。
 
 2026-09-30 R1 正式研究入口已實作並通過 Sol 驗收：[R1 交接](docs/frontend-research-r1-handoff-20260930.md)／[驗收證據](docs/frontend-research-r1-sol-verification-20260930.md)。在本目錄執行 `python -B -m catos.research_api --port 8770`，開啟 `http://127.0.0.1:8770/research/`，使用註冊 SMA 與合成資料執行真實 Decimal 回測，結果保存於隔離 JSON／HTML。原型 8088／8089 不是研究驗收入口；畫面底部顯示程式版本，更新後等任務完成再手動重啟。原有 root／Yaozi 保留，其他主頁仍為示意。
