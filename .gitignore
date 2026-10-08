@@ -10,6 +10,8 @@ venv/
 htmlcov/
 build/
 dist/
+node_modules/
+.vite/
 *.egg-info/
 
 # Local secrets and credentials (never commit real values)

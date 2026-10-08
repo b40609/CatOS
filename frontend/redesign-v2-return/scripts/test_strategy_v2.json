@@ -1,0 +1,13 @@
+{
+  "contract": "catos.python-strategy.v1",
+  "strategy_id": "test_momentum_v2",
+  "version": "v2_0",
+  "name": "動量突破自測策略 (v2.0)",
+  "description": "用於重驗匯入與分配快照之自測策略",
+  "source": "class Strategy:\n    def __init__(self, p):\n        self.p = p\n",
+  "defaults": {
+    "period": "5",
+    "quantity": "3"
+  },
+  "warmup_bars": 3
+}
