@@ -86,27 +86,7 @@ function handleOpenStrategy(stratId: string) {
     </div>
 
     <!-- 緊湊模式過濾條 (showHeader === false) -->
-    <div v-else class="compact-feed-toolbar">
-      <div class="segmented-control" role="group">
-        <button
-          type="button"
-          class="seg-btn"
-          :class="{ active: eventFilter === 'all' }"
-          @click="eventFilter = 'all'"
-        >
-          全部 ({{ allEvents.length }})
-        </button>
-        <button
-          type="button"
-          class="seg-btn"
-          :class="{ active: eventFilter === 'action' }"
-          @click="eventFilter = 'action'"
-        >
-          待處理
-          <span v-if="pendingEvents.length > 0" class="badge-num">{{ pendingEvents.length }}</span>
-        </button>
-      </div>
-    </div>
+    <!-- 嵌入模式：篩選切換鈕已統一移至外層卡片 Header 右上角 (與標題同一排) -->
 
     <!-- Event List -->
     <div class="feed-body">
@@ -431,10 +411,11 @@ function handleOpenStrategy(stratId: string) {
 }
 
 .compact-feed-toolbar {
-  padding: 4px 10px;
-  background: #181c21;
-  border-bottom: 1px solid #282c31;
+  padding: 3px 8px;
+  background: #13161a;
+  border-bottom: 1px solid #1f2328;
   display: flex;
   align-items: center;
+  min-height: 24px;
 }
 </style>

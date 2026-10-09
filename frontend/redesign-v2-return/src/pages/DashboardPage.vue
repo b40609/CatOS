@@ -7,9 +7,7 @@ const { modeNotice } = useWorkspace();
 
 <template>
   <div class="dashboard-page">
-    <div v-if="modeNotice" class="mode-notice-banner banner banner-warning">
-      <span>{{ modeNotice }}</span>
-    </div>
+
 
     <!-- 定案架構：方案 1 · Bloomberg 平鋪工作台 -->
     <div class="layout-viewport">

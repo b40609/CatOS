@@ -110,21 +110,22 @@ const navSections: NavSection[] = [
     items: [
       { path: '/strategies', name: '策略中心', sub: 'Strategies', icon: 'strategy', shortcut: '2' },
       { path: '/backtest', name: '歷史回測', sub: 'Backtesting', icon: 'backtest', shortcut: '3' },
-      { path: '/optimization', name: '參數優化', sub: 'Optimization', icon: 'optimization', shortcut: '4' }
+      { path: '/optimization', name: '參數優化', sub: 'Optimization', icon: 'optimization', shortcut: '4' },
+      { path: '/review', name: '策略覆盤', sub: 'Strategy Review', icon: 'review', shortcut: '5' }
     ]
   },
   {
     title: 'EXECUTION & RISK',
     items: [
-      { path: '/bots', name: '機器人管理', sub: 'Bot Manager', icon: 'bots', badge: { id: 'bots', text: '1/3', type: 'accent' }, shortcut: '5' },
-      { path: '/risk', name: '風控中心', sub: 'Risk Control', icon: 'risk', badge: { id: 'risk', text: 'SAFE', type: 'neutral' }, shortcut: '6' }
+      { path: '/bots', name: '機器人管理', sub: 'Bot Manager', icon: 'bots', badge: { id: 'bots', text: '1/3', type: 'accent' }, shortcut: '6' },
+      { path: '/risk', name: '風控中心', sub: 'Risk Control', icon: 'risk', badge: { id: 'risk', text: 'SAFE', type: 'neutral' }, shortcut: '7' }
     ]
   },
   {
     title: 'ECOSYSTEM & SYSTEM',
     items: [
-      { path: '/market-intel', name: '市場情報', sub: 'Market Intel', icon: 'market', badge: { id: 'market', text: 'DEV', type: 'info' }, shortcut: '7' },
-      { path: '/logs', name: '系統日誌', sub: 'System Logs', icon: 'logs', shortcut: '8' }
+      { path: '/market-intel', name: '市場情報', sub: 'Market Intel', icon: 'market', badge: { id: 'market', text: 'DEV', type: 'info' }, shortcut: '8' },
+      { path: '/logs', name: '系統日誌', sub: 'System Logs', icon: 'logs', shortcut: '9' }
     ]
   }
 ];
@@ -231,15 +232,6 @@ onUnmounted(() => {
               <span class="brand-tagline">QUANTITATIVE DESK</span>
             </div>
           </div>
-          <!-- Option 3: Dropdown Badge right beside LOGO -->
-          <div v-if="preferences.modeSwitcherPlacement === 'dropdown_badge' && !preferences.sidebarFolded" class="brand-dropdown-wrap">
-            <ModeSelector variant="dropdown" />
-          </div>
-        </div>
-
-        <!-- Option 1: Full-Width Stacked Segmented Control directly beneath LOGO -->
-        <div v-if="preferences.modeSwitcherPlacement === 'sidebar_stack' && !preferences.sidebarFolded" class="sidebar-mode-dock">
-          <ModeSelector variant="full-width" />
         </div>
       </div>
 
@@ -294,6 +286,12 @@ onUnmounted(() => {
                 <line x1="1" y1="14" x2="7" y2="14"/>
                 <line x1="9" y1="8" x2="15" y2="8"/>
                 <line x1="17" y1="16" x2="23" y2="16"/>
+              </svg>
+              <!-- 4.5. Strategy Review: Diagnostic Trend Chart -->
+              <svg v-else-if="item.icon === 'review'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3v18h18"/>
+                <path d="M7 14l4-4 4 4 5-6"/>
+                <circle cx="20" cy="8" r="1.5"/>
               </svg>
               <!-- 5. Bot Manager: Microchip -->
               <svg v-else-if="item.icon === 'bots'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -359,23 +357,8 @@ onUnmounted(() => {
 
       <!-- 4. Sidebar Footer & Telemetry & Toggle -->
       <div class="sidebar-footer">
-        <!-- Option 4: Sidebar Footer Terminal Dock -->
-        <div v-if="preferences.modeSwitcherPlacement === 'sidebar_footer' && !preferences.sidebarFolded && preferences.sidebarStyle !== 'C'" class="footer-mode-dock">
-          <span class="foot-mode-label">環境模式</span>
-          <ModeSelector variant="full-width" />
-        </div>
 
-        <!-- Telemetry Details (Hidden if folded or Dock mode) -->
-        <div v-if="!preferences.sidebarFolded && preferences.sidebarStyle !== 'C'" class="telemetry-box">
-          <div class="footer-row">
-            <span class="foot-label"><span class="dot-indicator"></span> 節點主機：</span>
-            <span class="text-accent font-mono">127.0.0.1</span>
-          </div>
-          <div class="footer-row">
-            <span class="foot-label">固定標籤：</span>
-            <span class="font-mono text-muted text-2xs">41cb53c54d6dABDE</span>
-          </div>
-        </div>
+
 
 
         <!-- User Profile Panel (定案左下角側邊欄底座) -->
@@ -393,11 +376,7 @@ onUnmounted(() => {
 
     <!-- Main Workspace Area -->
     <div class="app-main">
-      <!-- Mode Isolation Alert Banner -->
-      <div v-if="modeNotice" class="mode-isolation-banner" :class="currentMode === 'live' ? 'banner-danger' : 'banner-warning'">
-        <span class="banner-badge">{{ currentMode.toUpperCase() }} 隔離展示</span>
-        <span class="banner-msg">{{ modeNotice }}</span>
-      </div>
+
 
       <header class="app-header">
         <div class="header-left">
@@ -416,10 +395,7 @@ onUnmounted(() => {
           </button>
 
           <span class="header-title">{{ pageTitle }}</span>
-          <span class="header-tag"><span class="header-tag-dot"></span>LOCAL SIM · OKX SWAP</span>
-          <div v-if="preferences.sidebarFolded" class="header-folded-mode">
-            <ModeSelector variant="dropdown" />
-          </div>
+          
         </div>
 
         <div class="header-right">
@@ -430,8 +406,8 @@ onUnmounted(() => {
 
 
 
-          <!-- Option 2: Mode Selector in Top Header Right beside connection status -->
-          <div v-if="preferences.modeSwitcherPlacement === 'top_header'" class="header-mode-wrap">
+          <!-- Finalized Mode Selector in Top Header Right beside connection status (Option 2) -->
+          <div class="header-mode-wrap">
             <ModeSelector variant="segmented" />
           </div>
           <TelemetryPopover />
@@ -463,7 +439,7 @@ onUnmounted(() => {
 .brand-tagline {
   font-size: 8.5px;
   font-family: var(--font-mono);
-  color: #55677d;
+  color: #68707b;
   letter-spacing: 0.12em;
 }
 
@@ -474,7 +450,7 @@ onUnmounted(() => {
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #4a5c72;
+  color: #68707b;
   text-transform: uppercase;
   user-select: none;
 }
@@ -514,7 +490,7 @@ onUnmounted(() => {
 .nav-title-tabler {
   font-size: 13.5px;
   font-weight: 500;
-  color: #d1d8e0;
+  color: #e5e8ec;
   letter-spacing: 0.02em;
   transition: color 0.15s ease;
 }
@@ -552,7 +528,7 @@ onUnmounted(() => {
 .dock-tip-key {
   font-size: 9px;
   font-family: var(--font-mono);
-  color: #6c7d93;
+  color: #727a85;
   margin-left: 4px;
 }
 .nav-item:hover .dock-tooltip {
@@ -573,7 +549,7 @@ onUnmounted(() => {
 }
 .foot-label {
   font-size: 9.5px;
-  color: #6a7c93;
+  color: #727a85;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -599,7 +575,7 @@ onUnmounted(() => {
 }
 .selector-label {
   font-size: 9.5px;
-  color: #7b8eab;
+  color: #727a85;
 }
 .style-btn-group {
   display: flex;
@@ -608,7 +584,7 @@ onUnmounted(() => {
 .style-choice-btn {
   background: none;
   border: none;
-  color: #8b9cb3;
+  color: #727a85;
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 700;
@@ -643,8 +619,8 @@ onUnmounted(() => {
 }
 
 .sidebar-toggle-btn:hover {
-  background: var(--bg-surface-elevated);
-  border-color: var(--border-subtle);
+  background: #161a20;
+  border-color: #24282e;
   color: var(--accent);
 }
 

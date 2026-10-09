@@ -63,7 +63,7 @@ const defaultPreferences: Preferences = {
   offcanvasStyle: 'attached',
   sidebarBehavior: 'expanded',
   containerWidth: 'default',
-  modeSwitcherPlacement: 'sidebar_stack',
+  modeSwitcherPlacement: 'top_header', // ★ 定案方案二：頂部全域狀態列右側
   userProfilePlacement: 'bottom_left',
   showSidebarBadges: true,
   badgeBotsEnabled: true,
@@ -108,9 +108,9 @@ function loadStoredPreferences(): Preferences {
       offcanvasStyle: ['attached', 'floating'].includes(parsed.offcanvasStyle) ? parsed.offcanvasStyle : 'attached',
       sidebarBehavior: ['expanded', 'folded', 'on_hover'].includes(parsed.sidebarBehavior) ? parsed.sidebarBehavior : 'expanded',
       containerWidth: ['default', 'fluid', 'boxed'].includes(parsed.containerWidth) ? parsed.containerWidth : 'default',
-      modeSwitcherPlacement: ['sidebar_stack', 'top_header', 'dropdown_badge', 'sidebar_footer'].includes(parsed.modeSwitcherPlacement)
+      modeSwitcherPlacement: ['top_header', 'dropdown_badge', 'sidebar_footer'].includes(parsed.modeSwitcherPlacement)
         ? parsed.modeSwitcherPlacement
-        : 'sidebar_stack',
+        : 'top_header', // ★ 定案方案二：舊預設 sidebar_stack 或未設定者自動升級為方案二
       userProfilePlacement: 'bottom_left',
       themePreset: 'v0-reference',
 

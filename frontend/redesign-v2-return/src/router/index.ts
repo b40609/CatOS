@@ -3,6 +3,7 @@ import DashboardPage from '@/pages/DashboardPage.vue';
 import StrategiesPage from '@/pages/StrategiesPage.vue';
 import BacktestPage from '@/pages/BacktestPage.vue';
 import OptimizationPage from '@/pages/OptimizationPage.vue';
+import StrategyReviewPage from '@/pages/StrategyReviewPage.vue';
 import BotsPage from '@/pages/BotsPage.vue';
 import RiskPage from '@/pages/RiskPage.vue';
 import MarketIntelPage from '@/pages/MarketIntelPage.vue';
@@ -35,6 +36,12 @@ const router = createRouter({
       name: 'optimization',
       component: OptimizationPage,
       meta: { title: '參數優化' }
+    },
+    {
+      path: '/review',
+      name: 'review',
+      component: StrategyReviewPage,
+      meta: { title: '策略覆盤' }
     },
     {
       path: '/bots',

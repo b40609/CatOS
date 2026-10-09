@@ -158,11 +158,11 @@ const totalNominal = computed(() => {
 }
 
 .positions-table thead th {
-  padding: 8px 10px;
+  padding: 7px 10px;
   color: #90969d;
   font-size: 11px;
   font-weight: 500;
-  border-bottom: 1px solid #282c31;
+  border-bottom: 1px solid #24282e;
   white-space: nowrap;
   background: #0f1216;
   position: sticky;
@@ -171,7 +171,7 @@ const totalNominal = computed(() => {
 }
 
 .pos-row {
-  border-bottom: 1px solid #282c31;
+  border-bottom: 1px solid #24282e;
   transition: background 0.15s ease;
 }
 

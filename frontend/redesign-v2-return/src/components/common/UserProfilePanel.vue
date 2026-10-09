@@ -117,7 +117,7 @@ onUnmounted(() => {
           <span class="user-name">KOL 交易員</span>
           <span class="user-badge-pro">PRO</span>
         </div>
-        <span class="user-subtext">OKX 專用子帳戶</span>
+        <span class="user-subtext">量化專用子帳戶</span>
       </div>
       <div class="trigger-icon-col">
         <svg class="gear-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -161,7 +161,7 @@ onUnmounted(() => {
       </div>
       <div class="header-user-text">
         <span class="header-user-name">KOL 交易員</span>
-        <span class="header-sub-tag">OKX</span>
+        <span class="header-sub-tag">QUANT</span>
       </div>
       <svg class="header-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="6 9 12 15 18 9"></polyline>
@@ -188,7 +188,7 @@ onUnmounted(() => {
                 <span class="name-text">KOL 交易員</span>
                 <span class="account-code">#kol_trader_01</span>
               </div>
-              <span class="account-type-text">OKX 專用子帳戶 · 實名 API 授權</span>
+              <span class="account-type-text">量化專用子帳戶 · 實名 API 授權</span>
             </div>
           </div>
           <button type="button" class="popover-close-btn" @click="closePanel" title="關閉">
@@ -231,21 +231,7 @@ onUnmounted(() => {
             <span class="invariants-title">金融不變量審查 (Financial Invariants)</span>
           </div>
 
-          <div class="invariant-row">
-            <div class="inv-label-group">
-              <span class="inv-label">OKX 強制標籤</span>
-              <span class="inv-sub">Supervisor 自動注入</span>
-            </div>
-            <button
-              type="button"
-              class="inv-tag-btn font-mono"
-              @click="copyFixedTag"
-              :title="'點擊複製固定標籤'"
-            >
-              <span>{{ telemetry.fixed_tag || '41cb53c54d6dABDE' }}</span>
-              <span class="copy-tag-feedback">{{ copiedTag ? '✓ 已複製' : '📋' }}</span>
-            </button>
-          </div>
+
 
           <div class="invariant-row">
             <div class="inv-label-group">
@@ -284,10 +270,10 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 10px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: #111418;
+  border: 1px solid #24282e;
+  border-radius: 4px;
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -295,9 +281,8 @@ onUnmounted(() => {
 }
 
 .profile-trigger-sidebar:hover {
-  background: var(--bg-surface-hover);
-  border-color: var(--accent-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: #161a20;
+  border-color: #2e353f;
 }
 
 .avatar-wrap {
@@ -309,17 +294,16 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #1e2634 0%, #151b24 100%);
-  border: 1px solid var(--accent-border);
+  background: #181d24;
+  border: 1px solid #2e353f;
   color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   position: relative;
-  box-shadow: inset 0 0 8px rgba(245, 158, 11, 0.15);
 }
 
 .avatar-online-dot {

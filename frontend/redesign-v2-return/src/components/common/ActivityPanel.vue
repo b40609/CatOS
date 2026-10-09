@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useV0Engine } from '@/state/v0-engine';
 
 export type ActivityTab = 'positions' | 'orders' | 'fills';
 
@@ -59,7 +60,7 @@ const emit = defineEmits<{
   (e: 'selectBot', botId: string): void;
 }>();
 
-const currentTab = ref<ActivityTab>('positions');
+const { activityTab: currentTab } = useV0Engine();
 
 const positions = ref<PositionItem[]>([
   {
@@ -291,35 +292,7 @@ function openBot(botId: string) {
       </div>
     </div>
 
-    <!-- 嵌入卡片模式：僅保留緊湊三態切換條 -->
-    <div v-else class="compact-tab-bar">
-      <div class="tab-segmented" role="radiogroup">
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: currentTab === 'positions' }"
-          @click="currentTab = 'positions'"
-        >
-          持倉 <span class="badge-num mono">{{ positions.length }}</span>
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: currentTab === 'orders' }"
-          @click="currentTab = 'orders'"
-        >
-          掛單 <span class="badge-num mono">{{ orders.length }}</span>
-        </button>
-        <button
-          type="button"
-          class="tab-btn"
-          :class="{ active: currentTab === 'fills' }"
-          @click="currentTab = 'fills'"
-        >
-          成交 <span class="badge-num mono">{{ fills.length }}</span>
-        </button>
-      </div>
-    </div>
+    <!-- 嵌入卡片模式：分頁切換鈕已統一移至外層卡片 Header 右上角 (與標題同一排) -->
 
     <!-- Body Tables -->
     <div class="panel-body">
@@ -515,9 +488,10 @@ function openBot(botId: string) {
 .compact-tab-bar {
   display: flex;
   align-items: center;
-  padding: 4px 10px;
-  background: #181c21;
-  border-bottom: 1px solid #282c31;
+  padding: 3px 8px;
+  background: #13161a;
+  border-bottom: 1px solid #1f2328;
+  min-height: 24px;
 }
 
 .tab-segmented {
