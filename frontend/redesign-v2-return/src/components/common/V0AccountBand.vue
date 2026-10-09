@@ -57,13 +57,8 @@ onUnmounted(() => {
 const height = 210;
 const axisW = 54;
 const xAxisH = 18;
-const gap = 10;
 const plotW = computed(() => Math.max(1, chartWidth.value - axisW));
-const topH = Math.round((height - xAxisH - gap) * 0.68);
-const ddTop = topH + gap;
-const ddH = height - xAxisH - gap - topH;
-
-const ddLimit = -15; // 帳戶最大回撤上限 -15%
+const plotH = height - xAxisH; // 100% 完整垂直高度全額釋放給資產權益淨值走勢曲線
 
 // 焦點機器人
 const focusBot = computed(() => bots.value.find((b: Bot) => b.id === focusBotId.value));
@@ -110,21 +105,13 @@ const yBounds = computed(() => {
   return { lo, hi, ticks, step };
 });
 
-const minDD = computed(() => Math.min(-0.5, ...periodSum.value.dd.filter((v: number) => !Number.isNaN(v))));
-const limitVisible = computed(() => ddLimit >= minDD.value * 1.8);
-const ddMin = computed(() => (limitVisible.value ? Math.min(minDD.value * 1.25, ddLimit * 1.12) : minDD.value * 1.3));
-
 function getX(k: number) {
   return n.value > 1 ? (k / (n.value - 1)) * plotW.value : 0;
 }
 
 function getY(v: number) {
   const { lo, hi } = yBounds.value;
-  return 4 + ((hi - v) / (hi - lo)) * (topH - 8);
-}
-
-function getYd(v: number) {
-  return ddTop + (v / (ddMin.value || 1)) * ddH;
+  return 8 + ((hi - v) / (hi - lo)) * (plotH - 24);
 }
 
 function generateLine(vals: number[], fy: (v: number) => number) {
@@ -146,15 +133,8 @@ const eqLinePath = computed(() => generateLine(periodSum.value.points, getY));
 const eqAreaPath = computed(() => {
   const firstK = periodSum.value.points.findIndex((v: number) => !Number.isNaN(v));
   if (firstK < 0) return '';
-  return `${eqLinePath.value}L${getX(n.value - 1).toFixed(1)},${getY(0).toFixed(1)}L${getX(firstK).toFixed(1)},${getY(0).toFixed(1)}Z`;
-});
-
-const ddLinePath = computed(() => generateLine(periodSum.value.dd, getYd));
-
-const ddAreaPath = computed(() => {
-  const firstK = periodSum.value.points.findIndex((v: number) => !Number.isNaN(v));
-  if (firstK < 0) return '';
-  return `${ddLinePath.value}L${getX(n.value - 1).toFixed(1)},${ddTop}L${getX(firstK).toFixed(1)},${ddTop}Z`;
+  const zeroY = Math.min(plotH - 8, Math.max(8, getY(0)));
+  return `${eqLinePath.value}L${getX(n.value - 1).toFixed(1)},${zeroY.toFixed(1)}L${getX(firstK).toFixed(1)},${zeroY.toFixed(1)}Z`;
 });
 
 const xTicks = computed(() => [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * (n.value - 1))));
@@ -259,21 +239,7 @@ const hoverData = computed(() => {
             </dd>
           </div>
 
-          <div class="stat-item">
-            <dt class="stat-label">淨曝險</dt>
-            <dd class="stat-val text-white">
-              {{ formatUsd(snap.net, false, 0) }}
-              <span class="stat-sub">{{ ((snap.net / snap.equity) * 100).toFixed(1) }}% 權益</span>
-            </dd>
-          </div>
 
-          <div class="stat-item">
-            <dt class="stat-label">可用現金</dt>
-            <dd class="stat-val text-white">
-              {{ formatUsd(snap.cash, false, 0) }}
-              <span class="stat-sub">槓桿 {{ snap.leverage.toFixed(2) }}x</span>
-            </dd>
-          </div>
         </dl>
       </div>
 
@@ -282,31 +248,16 @@ const hoverData = computed(() => {
         <div class="chart-legend">
           <span class="legend-item">
             <span class="line-swatch bg-white"></span>
-            帳戶權益 · {{ PERIOD_LABEL[period] }}
-          </span>
-          <span class="legend-item text-risk">
-            <span class="block-swatch bg-risk"></span>
-            自高點回撤 · 最大 {{ formatPct(periodSum.maxDD) }} · 上限 {{ ddLimit }}%
+            帳戶淨值走勢 · {{ PERIOD_LABEL[period] }}
           </span>
           <span v-if="hoverData" class="hover-info text-cyan-300">
-            [{{ hoverData.timeStr }}] 報酬率: {{ formatPct(hoverData.val) }} | 回撤: {{ formatPct(hoverData.ddVal) }}
+            [{{ hoverData.timeStr }}] 累計報酬: {{ formatPct(hoverData.val) }}
           </span>
           <span v-else class="text-neutral-500 text-xs">
-            移動滑鼠可查看歷史時刻各節點
+            移動滑鼠可查看各節點累積收益
           </span>
           <!-- 當外層 Header 隱藏時，在圖表右上方保留緊湊期間選擇器 -->
-          <div v-if="!showHeader" class="mini-period-segmented ml-auto flex items-center gap-1" role="group">
-            <button
-              v-for="p in PERIODS"
-              :key="p"
-              type="button"
-              class="seg-btn-mini"
-              :class="{ active: period === p }"
-              @click="setPeriod(p)"
-            >
-              {{ p }}
-            </button>
-          </div>
+          <!-- 週期切換鈕已統一移至外層卡片 Header 右上角 (與標題同一排) -->
         </div>
 
         <div
@@ -327,10 +278,7 @@ const hoverData = computed(() => {
                 <stop offset="0%" stop-color="#e5e8ec" stop-opacity="0.1" />
                 <stop offset="100%" stop-color="#e5e8ec" stop-opacity="0.0" />
               </linearGradient>
-              <linearGradient id="v0DdGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#ed7665" stop-opacity="0.0" />
-                <stop offset="100%" stop-color="#ed7665" stop-opacity="0.25" />
-              </linearGradient>
+
             </defs>
 
             <!-- Y Axis Horizontal Grid Lines -->
@@ -358,32 +306,6 @@ const hoverData = computed(() => {
             <!-- Equity Area & Line -->
             <path :d="eqAreaPath" fill="url(#v0EqGrad)" />
             <path :d="eqLinePath" fill="none" stroke="#e5e8ec" stroke-width="1.6" stroke-linejoin="round" />
-
-            <!-- Drawdown Separator -->
-            <line :x1="0" :x2="plotW" :y1="ddTop" :y2="ddTop" stroke="#282c31" stroke-width="1" />
-
-            <!-- Drawdown Area & Line -->
-            <path :d="ddAreaPath" fill="url(#v0DdGrad)" />
-            <path :d="ddLinePath" fill="none" stroke="#ed7665" stroke-width="1.2" />
-
-            <!-- Max DD Limit Threshold Line -->
-            <g v-if="limitVisible">
-              <line
-                :x1="0"
-                :x2="plotW"
-                :y1="getYd(ddLimit)"
-                :y2="getYd(ddLimit)"
-                stroke="#ed7665"
-                stroke-dasharray="4 3"
-                stroke-width="1"
-              />
-              <text :x="4" :y="getYd(ddLimit) - 4" fill="#ed7665" font-family="monospace" font-size="10">
-                帳戶上限
-              </text>
-              <text :x="plotW + 8" :y="getYd(ddLimit) + 3.5" fill="#ed7665" font-family="monospace" font-size="10">
-                {{ ddLimit }}%
-              </text>
-            </g>
 
             <!-- X Axis Timestamps -->
             <g v-for="(k, idx) in xTicks" :key="k">
@@ -542,26 +464,32 @@ const hoverData = computed(() => {
 }
 
 .band-body {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  display: flex;
   flex: 1;
   min-height: 0;
   background: #13161a;
-}
-
-@media (max-width: 900px) {
-  .band-body {
-    grid-template-columns: 1fr;
-  }
+  overflow: hidden;
 }
 
 .kpi-column {
-  padding: 12px;
-  border-right: 1px solid #282c31;
+  flex: 0 0 clamp(200px, 28%, 250px);
+  max-width: 260px;
+  padding: 10px 12px;
+  border-right: 1px solid #24282e;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   background: #13161a;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.chart-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .equity-hero {

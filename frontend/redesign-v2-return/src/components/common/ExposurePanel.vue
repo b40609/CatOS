@@ -92,6 +92,14 @@ const totalNet = computed(() => {
   return symbols.value.reduce((acc, s) => acc + s.net, 0);
 });
 
+const availableCash = computed(() => {
+  return 26390;
+});
+
+const currentLeverage = computed(() => {
+  return (Math.abs(totalNet.value) / props.equity).toFixed(2);
+});
+
 const totalLong = computed(() => {
   return symbols.value.reduce((acc, s) => acc + s.long, 0);
 });
@@ -251,21 +259,29 @@ function handleBotClick(botId: string) {
         </div>
       </div>
 
-      <!-- 底部彙整清單 -->
+      <!-- 底部彙整清單 (專門完整呈現多空彙整、淨曝險與可用現金) -->
       <div class="exposure-footer">
         <div class="summary-grid mono text-2xs">
           <div class="summary-item">
-            <span class="lbl text-muted">多方總計:</span>
+            <span class="lbl text-muted">多方:</span>
             <span class="val text-green font-medium">+{{ Math.round(totalLong).toLocaleString('en-US') }}</span>
           </div>
           <div class="summary-item">
-            <span class="lbl text-muted">空方總計:</span>
+            <span class="lbl text-muted">空方:</span>
             <span class="val text-red font-medium">-{{ Math.round(totalShort).toLocaleString('en-US') }}</span>
           </div>
           <div class="summary-item">
-            <span class="lbl text-muted">淨額計:</span>
+            <span class="lbl text-muted">淨曝險:</span>
             <span class="val font-medium" :class="totalNet >= 0 ? 'text-green' : 'text-red'">
               {{ totalNet >= 0 ? '+' : '' }}{{ Math.round(totalNet).toLocaleString('en-US') }}
+              <span class="pct-hint text-3xs text-muted">({{ ((totalNet / props.equity) * 100).toFixed(1) }}%)</span>
+            </span>
+          </div>
+          <div class="summary-item">
+            <span class="lbl text-muted">可用現金:</span>
+            <span class="val text-white font-medium">
+              {{ availableCash.toLocaleString('en-US') }}
+              <span class="pct-hint text-3xs text-muted">({{ currentLeverage }}x)</span>
             </span>
           </div>
         </div>
@@ -514,7 +530,7 @@ function handleBotClick(botId: string) {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 

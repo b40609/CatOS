@@ -143,9 +143,9 @@ onUnmounted(() => {
 .mode-switcher {
   display: inline-flex;
   align-items: center;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius-sm);
+  background: #111418;
+  border: 1px solid #24282e;
+  border-radius: 4px;
   padding: 2px;
   gap: 2px;
 }
@@ -166,19 +166,19 @@ onUnmounted(() => {
 .mode-btn {
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: #9da4ad;
   font-size: 10.5px;
   font-weight: 500;
   padding: 2px 8px;
-  border-radius: var(--radius-xs);
+  border-radius: 2px;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
 
 .mode-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-hover);
+  color: #ffffff;
+  background: #161a20;
 }
 
 .mode-btn.active {

@@ -340,19 +340,20 @@ function isSparklineGain(bot: Bot) {
 
 .bot-table thead tr {
   background: #0f1216;
-  border-bottom: 1px solid #282c31;
+  border-bottom: 1px solid #24282e;
   position: sticky;
   top: 0;
   z-index: 2;
 }
 
 .bot-table th {
-  padding: 6px 10px;
-  font-size: 10px;
-  font-family: monospace;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-family: inherit;
   font-weight: 500;
   color: #90969d;
   white-space: nowrap;
+  border-bottom: 1px solid #24282e;
 }
 
 .th-right {
@@ -360,7 +361,7 @@ function isSparklineGain(bot: Bot) {
 }
 
 .bot-row {
-  border-bottom: 1px solid #282c31;
+  border-bottom: 1px solid #24282e;
   transition: background 0.15s;
   cursor: pointer;
 }

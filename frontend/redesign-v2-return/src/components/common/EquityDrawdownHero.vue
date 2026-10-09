@@ -424,16 +424,7 @@ const legacyLastEquityCoord = computed(() => {
             <div class="fin-cell-sub" style="visibility: hidden;">-</div>
           </div>
 
-          <div class="classic-fin-cell">
-            <div class="fin-cell-label">淨曝險</div>
-            <div class="fin-cell-num text-white">16,850</div>
-            <div class="fin-cell-sub">38.9% 權益</div>
-          </div>
-          <div class="classic-fin-cell">
-            <div class="fin-cell-label">可用現金</div>
-            <div class="fin-cell-num text-white">26,390</div>
-            <div class="fin-cell-sub">槓桿 0.42x</div>
-          </div>
+
         </div>
       </div>
 
@@ -736,16 +727,7 @@ const legacyLastEquityCoord = computed(() => {
             <span class="fin-val text-success">+2,309.63 USDT</span>
             <span class="fin-sub">已結清對帳</span>
           </div>
-          <div class="finance-cell">
-            <span class="fin-label">淨曝險額</span>
-            <span class="fin-val text-white">15,936 USDT</span>
-            <span class="fin-sub">37.9% 總權益</span>
-          </div>
-          <div class="finance-cell">
-            <span class="fin-label">可用現金</span>
-            <span class="fin-val text-white">26,158 USDT</span>
-            <span class="fin-sub">實際槓桿 0.53x</span>
-          </div>
+
         </div>
       </div>
 

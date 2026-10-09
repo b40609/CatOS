@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useV0Engine } from '@/state/v0-engine';
 import { useRouter } from 'vue-router';
 import MetricCard from '@/components/common/MetricCard.vue';
 import RiskStatusCard from '@/components/common/RiskStatusCard.vue';
@@ -40,6 +41,36 @@ const {
 const { preferences, setChartRange } = usePreferences();
 
 const botPeriod = ref<'4H' | '1D' | '7D'>('7D');
+
+// V0 Engine Shared State for Unified Header Actions
+const {
+  activityTab,
+  eventFilter,
+  positions: v0Positions,
+  openOrders: v0Orders,
+  fills: v0Fills,
+  events: v0Events,
+  period: v0Period,
+  setPeriod: setV0Period
+} = useV0Engine();
+
+const pendingV0Events = computed(() => v0Events.value.filter((e: any) => !e.acked));
+
+function isActivityCard(cardId: CardId) {
+  return cardId === 'positions' || cardId === 'activity' || cardId === 'v0_activity';
+}
+
+function isEventsCard(cardId: CardId) {
+  return cardId === 'events' || cardId === 'v0_events';
+}
+
+function isBotsCard(cardId: CardId) {
+  return cardId === 'bots' || cardId === 'v0_bots';
+}
+
+function isEquityCard(cardId: CardId) {
+  return cardId === 'v0_equity' || cardId === 'equity';
+}
 
 // 卡片模式
 const botCardMode = ref<'new'>('new'); // 運行中 Bot 隊列全面套用新版態勢
@@ -228,11 +259,11 @@ const linearUpperLeftWidth = ref<number>(64);
 const linearLowerLeftWidth = ref<number>(60);
 
 const bbgPanes = ref<{ leftUpper: CardId; leftLower: CardId; right1: CardId; right2: CardId; right3: CardId }>({
-  leftUpper: 'equity',
-  leftLower: 'positions',
-  right1: 'bots',
-  right2: 'donut',
-  right3: 'events'
+  leftUpper: 'v0_equity',
+  leftLower: 'v0_activity',
+  right1: 'v0_bots',
+  right2: 'v0_exposure',
+  right3: 'v0_events'
 });
 
 const linearPanes = ref<{ upperLeft: CardId; upperRight: CardId; lowerLeft: CardId; lowerRight: CardId }>({
@@ -242,22 +273,22 @@ const linearPanes = ref<{ upperLeft: CardId; upperRight: CardId; lowerLeft: Card
   lowerRight: 'events'
 });
 
-const CARD_META: Record<CardId, { title: string; subtitle: string; isV0: boolean }> = {
-  v0_equity: { title: '模擬帳戶總覽', subtitle: '', isV0: true },
-  v0_bots: { title: '量化策略矩陣', subtitle: '', isV0: true },
-  v0_exposure: { title: '多空標的曝險配置', subtitle: '', isV0: true },
-  v0_activity: { title: '委託與成交活動', subtitle: '', isV0: true },
-  v0_risk: { title: '風控雷達與防護', subtitle: '', isV0: true },
-  v0_events: { title: '事件審計流', subtitle: '', isV0: true },
-  v0_pipeline: { title: '策略研發看板', subtitle: '', isV0: true },
-  equity: { title: '帳戶權益追蹤', subtitle: '', isV0: false },
-  positions: { title: '即時持倉部位', subtitle: '', isV0: false },
-  activity: { title: '委託與成交活動', subtitle: '', isV0: true },
-  bots: { title: '量化BOT動態', subtitle: '', isV0: false },
-  exposure: { title: '資產曝險配置', subtitle: '', isV0: true },
-  risk: { title: '帳戶風控指標', subtitle: '', isV0: false },
-  events: { title: '系統日誌動態', subtitle: '', isV0: false },
-  donut: { title: '資產曝險配置', subtitle: '', isV0: false }
+const CARD_META: Record<CardId, { title: string; subtitle: string; isV0: boolean; tag: string }> = {
+  v0_equity: { title: '帳戶權益 (Equity)', subtitle: '', isV0: true, tag: '緊湊' },
+  equity: { title: '帳戶權益 (Equity)', subtitle: '', isV0: false, tag: '動態' },
+  v0_bots: { title: '量化機器人 (Bots)', subtitle: '', isV0: true, tag: '表格' },
+  bots: { title: '量化機器人 (Bots)', subtitle: '', isV0: false, tag: '動態' },
+  v0_exposure: { title: '多空曝險配置 (Exposure)', subtitle: '', isV0: true, tag: '標尺' },
+  exposure: { title: '多空曝險配置 (Exposure)', subtitle: '', isV0: true, tag: '標尺' },
+  donut: { title: '多空曝險配置 (Exposure)', subtitle: '', isV0: false, tag: '環形' },
+  v0_activity: { title: '部位與活動 (Positions)', subtitle: '', isV0: true, tag: '明細' },
+  activity: { title: '部位與活動 (Positions)', subtitle: '', isV0: true, tag: '明細' },
+  positions: { title: '部位與活動 (Positions)', subtitle: '', isV0: false, tag: '持倉' },
+  v0_risk: { title: '風控防護指標 (Risk Guard)', subtitle: '', isV0: true, tag: '限額' },
+  risk: { title: '風控防護指標 (Risk Guard)', subtitle: '', isV0: false, tag: '儀表' },
+  v0_events: { title: '系統日誌審計 (Audit Stream)', subtitle: '', isV0: true, tag: '串流' },
+  events: { title: '系統日誌審計 (Audit Stream)', subtitle: '', isV0: false, tag: '時間軸' },
+  v0_pipeline: { title: '策略研發看板 (Pipeline)', subtitle: '', isV0: true, tag: '看板' }
 };
 
 // 判斷當前卡片是否為 V0 版本
@@ -416,12 +447,19 @@ const presetLayouts = computed(() => {
 
 // 全域卡片風格狀態判斷
 const isAllV0 = computed(() => {
-  return isCardV0(bbgPanes.value.leftUpper) && isCardV0(bbgPanes.value.leftLower);
+  return (
+    isCardV0(bbgPanes.value.leftLower) &&
+    isCardV0(bbgPanes.value.right1) &&
+    isCardV0(bbgPanes.value.right2) &&
+    isCardV0(bbgPanes.value.right3)
+  );
 });
 
 // 全域一鍵切換卡片風格 (V0 經典 vs Astra 原版)
 function toggleAllCardsVersion(targetVer: 'v0' | 'astra') {
-  const slots: (keyof typeof bbgPanes.value)[] = ['leftUpper', 'leftLower', 'right1', 'right2', 'right3'];
+  // ★ 定案收斂：帳戶權益 (leftUpper) 已定案 V0，不隨全域切換變動！其他 4 個尚未定案槽位隨之切換
+  bbgPanes.value.leftUpper = 'v0_equity';
+  const slots: ('leftLower' | 'right1' | 'right2' | 'right3')[] = ['leftLower', 'right1', 'right2', 'right3'];
   for (const s of slots) {
     const cur = bbgPanes.value[s];
     const curIsV0 = isCardV0(cur);
@@ -432,7 +470,7 @@ function toggleAllCardsVersion(targetVer: 'v0' | 'astra') {
     }
   }
   saveBlueprintLayouts();
-  showToast(`已將全站卡片風格切換為：${targetVer === 'v0' ? '🟢 V0 經典質感' : '💎 Astra 原版風格'}`);
+  showToast(targetVer === 'v0' ? '已將未定案卡片切換為 V0 經典風格' : '已將未定案卡片切換為 Astra 原版風格');
 }
 
 function loadAllProfiles() {
@@ -441,24 +479,33 @@ function loadAllProfiles() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // 保留自訂方案，並將系統預設方案合併更新
         const custom = parsed.filter((p: SavedLayoutProfile) => !p.isSystem);
         savedProfiles.value = [...DEFAULT_PROFILES, ...custom];
       }
     } else {
       savedProfiles.value = [...DEFAULT_PROFILES];
     }
-    const savedCurId = localStorage.getItem(STORAGE_KEY_CURRENT_PROFILE);
-    if (savedCurId && savedProfiles.value.some(p => p.id === savedCurId)) {
-      currentProfileId.value = savedCurId;
-    } else {
-      currentProfileId.value = DEFAULT_PROFILES[0].id;
-    }
+    currentProfileId.value = DEFAULT_PROFILES[0].id;
     applyProfile(currentProfileId.value, false);
+    // 定案收斂保證：全面固化為 V0 典範版插槽
+    bbgPanes.value = {
+      leftUpper: 'v0_equity',
+      leftLower: 'v0_activity',
+      right1: 'v0_bots',
+      right2: 'v0_exposure',
+      right3: 'v0_events'
+    };
   } catch (e) {
     savedProfiles.value = [...DEFAULT_PROFILES];
     currentProfileId.value = DEFAULT_PROFILES[0].id;
     applyProfile(currentProfileId.value, false);
+    bbgPanes.value = {
+      leftUpper: 'v0_equity',
+      leftLower: 'v0_activity',
+      right1: 'v0_bots',
+      right2: 'v0_exposure',
+      right3: 'v0_events'
+    };
   }
 }
 
@@ -1900,7 +1947,7 @@ onUnmounted(() => {
       'is-splitter-active': isSplitterDragging
     }"
   >
-    <!-- Top Executive Ribbon -->
+        <!-- Top Executive Ribbon: 版面快捷切換、卡片風格與排版調整 -->
     <div class="hybrid-ribbon" :class="{ 'ribbon-edit-active': isEditing }">
       <div class="ribbon-left">
         <!-- 四大標準版面方案快捷切換膠囊 -->
@@ -1922,14 +1969,14 @@ onUnmounted(() => {
 
         <div class="ribbon-v-divider"></div>
 
-        <!-- 全域卡片風格一鍵切換 (V0 經典 vs Astra 原版) -->
+        <!-- 全域卡片風格一鍵切換 (V0 經典 vs Astra 原版，排除已定案之帳戶權益) -->
         <div class="quick-theme-switcher" role="group" aria-label="全域卡片風格切換">
           <button
             type="button"
             class="btn-theme-toggle"
             :class="{ active: isAllV0 }"
             @click="toggleAllCardsVersion('v0')"
-            title="將所有卡片統一切換為 V0 經典質感"
+            title="將未定案卡片統一切換為 V0 經典風格"
           >
             🟢 V0 經典
           </button>
@@ -1938,14 +1985,14 @@ onUnmounted(() => {
             class="btn-theme-toggle"
             :class="{ active: !isAllV0 }"
             @click="toggleAllCardsVersion('astra')"
-            title="將所有卡片統一切換為 Astra 原版專業風"
+            title="將未定案卡片統一切換為 Astra 原版風格"
           >
             💎 Astra 原版
           </button>
         </div>
 
         <!-- Live State Indicator Badge (Only in Edit Mode) -->
-        <span v-if="isEditing" class="edit-state-pill" title="編輯微調中：可直接按住標題拖曳換位、滑動分割線比例">
+        <span v-if="isEditing" class="edit-state-pill" title="編輯微調中：可直接按住標題拖曳換位、滑動分割線縮放比例">
           <span class="edit-pulse-dot"></span>
           <span>版面微調中</span>
         </span>
@@ -2015,7 +2062,7 @@ onUnmounted(() => {
             type="button"
             class="btn btn-xs btn-secondary btn-enter-edit"
             @click="isEditing = true"
-            title="解鎖工作台：拖移排序、微調比例、儲存自訂方案"
+            title="解鎖工作台：拖移排序、微調比例、縮放卡片、儲存方案"
           >
             ⚙ 調整版面
           </button>
@@ -2028,26 +2075,13 @@ onUnmounted(() => {
       <div class="guide-left">
         <span class="guide-icon">💡</span>
         <span class="guide-text">
-          <strong>微調小撇步：</strong> 按住標題拖曳換位 · 拖動分割線微調寬高 · 點擊「✓ 完成鎖定」固化
+          <strong>微調小撇步：</strong> 按住標題拖曳換位 · 拖動分割線縮放卡片寬高 · 點擊「✓ 完成鎖定」固化
         </span>
       </div>
       <button type="button" class="btn-guide-close" @click="isEditing = false">鎖定 ✕</button>
     </div>
 
-    <!-- Floating Toast Notification -->
-    <div v-if="toastMessage" class="catos-workspace-toast">
-      <span class="toast-diamond">◆</span>
-      <span>{{ toastMessage }}</span>
-    </div>
-
-    <!-- Offline / Unavailable Error Alert Banner -->
-    <div v-if="isUnavailable || error" class="alert-banner-danger">
-      <div class="alert-icon">⚠️</div>
-      <div class="alert-content">
-        <strong>{{ error || '503 服務不可用：底座連線中斷或離線' }}</strong>
-        <p>安全底線約束：禁止未知狀態轉零或正常。底座未確認連線前，禁止宣告安全並阻擋所有交易下單。</p>
-      </div>
-    </div>
+    
 
     <!-- High-Fidelity Floating REORDER Ghost Card (Follows mouse) -->
     <div
@@ -2188,45 +2222,70 @@ onUnmounted(() => {
                 <span class="bbg-title-text text-white">
                   {{ CARD_META[bbgPanes.leftUpper]?.title || '監控面板' }}
                 </span>
+                
               </div>
               <div class="header-right-actions flex items-center gap-2">
-                <!-- 雙版本快速切換膠囊 (僅在解鎖編輯時顯示) -->
-                <div v-if="isEditing" class="version-switch-pill" role="group">
+                <!-- 1. 部位與活動分頁切換按鈕 (持倉 / 掛單 / 成交) -->
+                <div v-if="isActivityCard(bbgPanes.leftUpper)" class="card-header-segmented" role="group">
                   <button
                     type="button"
-                    class="btn-ver-pill"
-                    :class="{ active: isCardV0(bbgPanes.leftUpper) }"
-                    @click.stop="setSlotCardVersion('leftUpper', 'v0')"
-                    title="切換為 V0 移植版卡片（含 V0 模擬數據）"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'positions' }"
+                    @click.stop="activityTab = 'positions'"
                   >
-                    V0
+                    持倉 <span class="badge-num mono">{{ v0Positions.length }}</span>
                   </button>
                   <button
                     type="button"
-                    class="btn-ver-pill"
-                    :class="{ active: !isCardV0(bbgPanes.leftUpper) }"
-                    @click.stop="setSlotCardVersion('leftUpper', 'astra')"
-                    title="切換為 Astra 原版卡片"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'orders' }"
+                    @click.stop="activityTab = 'orders'"
                   >
-                    原版
+                    掛單 <span class="badge-num mono">{{ v0Orders.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'fills' }"
+                    @click.stop="activityTab = 'fills'"
+                  >
+                    成交 <span class="badge-num mono">{{ v0Fills.length }}</span>
                   </button>
                 </div>
 
-                <!-- 工具列 -->
-                <div v-if="bbgPanes.leftUpper === 'bots' || bbgPanes.leftUpper === 'v0_bots'" class="toolbar-range-picker" role="group">
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '4H' }]" @click.stop="botPeriod = '4H'">4H</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '1D' }]" @click.stop="botPeriod = '1D'">1D</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '7D' }]" @click.stop="botPeriod = '7D'">7D</button>
-                </div>
-                <div v-else-if="bbgPanes.leftUpper === 'events'" class="event-stream-filters" role="group">
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'old' }]" @click.stop="eventFilterMode = 'old'">全部</button>
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'new' }]" @click.stop="eventFilterMode = 'new'">
-                    <span class="filter-dot-container">
-                      <span v-if="hasAnomaly" class="radar-ping" :class="effectiveSeverity === 'critical' ? 'ping-critical' : 'ping-warn'"></span>
-                      <span class="filter-dot" :class="hasAnomaly ? (effectiveSeverity === 'critical' ? 'dot-critical' : 'dot-warn') : 'dot-normal'"></span>
-                    </span>
-                    異常
+                <!-- 2. 事件與審計篩選按鈕 (全部 / 待處理) -->
+                <div v-else-if="isEventsCard(bbgPanes.leftUpper)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'all' }"
+                    @click.stop="eventFilter = 'all'"
+                  >
+                    全部 ({{ v0Events.length }})
                   </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'action' }"
+                    @click.stop="eventFilter = 'action'"
+                  >
+                    待處理
+                    <span v-if="pendingV0Events.length > 0" class="badge-num-risk">{{ pendingV0Events.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 3. 機器人週期選擇器 (4H / 1D / 7D) -->
+                <div v-else-if="isBotsCard(bbgPanes.leftUpper)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '4H' }" @click.stop="botPeriod = '4H'">4H</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '1D' }" @click.stop="botPeriod = '1D'">1D</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '7D' }" @click.stop="botPeriod = '7D'">7D</button>
+                </div>
+
+                <!-- 4. 帳戶權益時間週期選擇 (24H / 7D / 30D) -->
+                <div v-else-if="isEquityCard(bbgPanes.leftUpper)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '24H' }" @click.stop="setV0Period('24H')">24H</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
               </div>
             </div>
@@ -2279,16 +2338,80 @@ onUnmounted(() => {
                 <span class="bbg-title-text text-white">
                   {{ CARD_META[bbgPanes.leftLower]?.title || '監控面板' }}
                 </span>
+                
               </div>
               <div class="header-right-actions flex items-center gap-2">
-                <!-- 雙版本快速切換膠囊 (僅在解鎖編輯時顯示) -->
-                <div v-if="isEditing" class="version-switch-pill" role="group">
+                <!-- 1. 部位與活動分頁切換按鈕 (持倉 / 掛單 / 成交) -->
+                <div v-if="isActivityCard(bbgPanes.leftLower)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'positions' }"
+                    @click.stop="activityTab = 'positions'"
+                  >
+                    持倉 <span class="badge-num mono">{{ v0Positions.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'orders' }"
+                    @click.stop="activityTab = 'orders'"
+                  >
+                    掛單 <span class="badge-num mono">{{ v0Orders.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'fills' }"
+                    @click.stop="activityTab = 'fills'"
+                  >
+                    成交 <span class="badge-num mono">{{ v0Fills.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 2. 事件與審計篩選按鈕 (全部 / 待處理) -->
+                <div v-else-if="isEventsCard(bbgPanes.leftLower)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'all' }"
+                    @click.stop="eventFilter = 'all'"
+                  >
+                    全部 ({{ v0Events.length }})
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'action' }"
+                    @click.stop="eventFilter = 'action'"
+                  >
+                    待處理
+                    <span v-if="pendingV0Events.length > 0" class="badge-num-risk">{{ pendingV0Events.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 3. 機器人週期選擇器 (4H / 1D / 7D) -->
+                <div v-else-if="isBotsCard(bbgPanes.leftLower)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '4H' }" @click.stop="botPeriod = '4H'">4H</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '1D' }" @click.stop="botPeriod = '1D'">1D</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '7D' }" @click.stop="botPeriod = '7D'">7D</button>
+                </div>
+
+                <!-- 4. 帳戶權益時間週期選擇 (24H / 7D / 30D) -->
+                <div v-else-if="isEquityCard(bbgPanes.leftLower)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '24H' }" @click.stop="setV0Period('24H')">24H</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
+                </div>
+              
+                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+                <div class="version-switch-pill" role="group">
                   <button
                     type="button"
                     class="btn-ver-pill"
                     :class="{ active: isCardV0(bbgPanes.leftLower) }"
                     @click.stop="setSlotCardVersion('leftLower', 'v0')"
-                    title="切換為 V0 移植版卡片（含 V0 模擬數據）"
+                    title="切換為 V0 經典移植版"
                   >
                     V0
                   </button>
@@ -2297,26 +2420,9 @@ onUnmounted(() => {
                     class="btn-ver-pill"
                     :class="{ active: !isCardV0(bbgPanes.leftLower) }"
                     @click.stop="setSlotCardVersion('leftLower', 'astra')"
-                    title="切換為 Astra 原版卡片"
+                    title="切換為 Astra 原版"
                   >
                     原版
-                  </button>
-                </div>
-
-                <!-- 工具列 -->
-                <div v-if="bbgPanes.leftLower === 'bots' || bbgPanes.leftLower === 'v0_bots'" class="toolbar-range-picker" role="group">
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '4H' }]" @click.stop="botPeriod = '4H'">4H</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '1D' }]" @click.stop="botPeriod = '1D'">1D</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '7D' }]" @click.stop="botPeriod = '7D'">7D</button>
-                </div>
-                <div v-else-if="bbgPanes.leftLower === 'events'" class="event-stream-filters" role="group">
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'old' }]" @click.stop="eventFilterMode = 'old'">全部</button>
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'new' }]" @click.stop="eventFilterMode = 'new'">
-                    <span class="filter-dot-container">
-                      <span v-if="hasAnomaly" class="radar-ping" :class="effectiveSeverity === 'critical' ? 'ping-critical' : 'ping-warn'"></span>
-                      <span class="filter-dot" :class="hasAnomaly ? (effectiveSeverity === 'critical' ? 'dot-critical' : 'dot-warn') : 'dot-normal'"></span>
-                    </span>
-                    異常
                   </button>
                 </div>
               </div>
@@ -2374,16 +2480,80 @@ onUnmounted(() => {
                 <span class="bbg-title-text text-white">
                   {{ CARD_META[bbgPanes.right1]?.title || '監控面板' }}
                 </span>
+                
               </div>
               <div class="header-right-actions flex items-center gap-2">
-                <!-- 雙版本快速切換膠囊 (僅在解鎖編輯時顯示) -->
-                <div v-if="isEditing" class="version-switch-pill" role="group">
+                <!-- 1. 部位與活動分頁切換按鈕 (持倉 / 掛單 / 成交) -->
+                <div v-if="isActivityCard(bbgPanes.right1)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'positions' }"
+                    @click.stop="activityTab = 'positions'"
+                  >
+                    持倉 <span class="badge-num mono">{{ v0Positions.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'orders' }"
+                    @click.stop="activityTab = 'orders'"
+                  >
+                    掛單 <span class="badge-num mono">{{ v0Orders.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'fills' }"
+                    @click.stop="activityTab = 'fills'"
+                  >
+                    成交 <span class="badge-num mono">{{ v0Fills.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 2. 事件與審計篩選按鈕 (全部 / 待處理) -->
+                <div v-else-if="isEventsCard(bbgPanes.right1)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'all' }"
+                    @click.stop="eventFilter = 'all'"
+                  >
+                    全部 ({{ v0Events.length }})
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'action' }"
+                    @click.stop="eventFilter = 'action'"
+                  >
+                    待處理
+                    <span v-if="pendingV0Events.length > 0" class="badge-num-risk">{{ pendingV0Events.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 3. 機器人週期選擇器 (4H / 1D / 7D) -->
+                <div v-else-if="isBotsCard(bbgPanes.right1)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '4H' }" @click.stop="botPeriod = '4H'">4H</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '1D' }" @click.stop="botPeriod = '1D'">1D</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '7D' }" @click.stop="botPeriod = '7D'">7D</button>
+                </div>
+
+                <!-- 4. 帳戶權益時間週期選擇 (24H / 7D / 30D) -->
+                <div v-else-if="isEquityCard(bbgPanes.right1)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '24H' }" @click.stop="setV0Period('24H')">24H</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
+                </div>
+              
+                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+                <div class="version-switch-pill" role="group">
                   <button
                     type="button"
                     class="btn-ver-pill"
                     :class="{ active: isCardV0(bbgPanes.right1) }"
                     @click.stop="setSlotCardVersion('right1', 'v0')"
-                    title="切換為 V0 移植版卡片（含 V0 模擬數據）"
+                    title="切換為 V0 經典移植版"
                   >
                     V0
                   </button>
@@ -2392,25 +2562,9 @@ onUnmounted(() => {
                     class="btn-ver-pill"
                     :class="{ active: !isCardV0(bbgPanes.right1) }"
                     @click.stop="setSlotCardVersion('right1', 'astra')"
-                    title="切換為 Astra 原版卡片"
+                    title="切換為 Astra 原版"
                   >
                     原版
-                  </button>
-                </div>
-
-                <div v-if="bbgPanes.right1 === 'bots' || bbgPanes.right1 === 'v0_bots'" class="toolbar-range-picker" role="group">
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '4H' }]" @click.stop="botPeriod = '4H'">4H</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '1D' }]" @click.stop="botPeriod = '1D'">1D</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '7D' }]" @click.stop="botPeriod = '7D'">7D</button>
-                </div>
-                <div v-else-if="bbgPanes.right1 === 'events' || bbgPanes.right1 === 'v0_events'" class="event-stream-filters" role="group">
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'old' }]" @click.stop="eventFilterMode = 'old'">全部</button>
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'new' }]" @click.stop="eventFilterMode = 'new'">
-                    <span class="filter-dot-container">
-                      <span v-if="hasAnomaly" class="radar-ping" :class="effectiveSeverity === 'critical' ? 'ping-critical' : 'ping-warn'"></span>
-                      <span class="filter-dot" :class="hasAnomaly ? (effectiveSeverity === 'critical' ? 'dot-critical' : 'dot-warn') : 'dot-normal'"></span>
-                    </span>
-                    異常
                   </button>
                 </div>
               </div>
@@ -2464,16 +2618,80 @@ onUnmounted(() => {
                 <span class="bbg-title-text text-white">
                   {{ CARD_META[bbgPanes.right2]?.title || '監控面板' }}
                 </span>
+                
               </div>
               <div class="header-right-actions flex items-center gap-2">
-                <!-- 雙版本快速切換膠囊 (僅在解鎖編輯時顯示) -->
-                <div v-if="isEditing" class="version-switch-pill" role="group">
+                <!-- 1. 部位與活動分頁切換按鈕 (持倉 / 掛單 / 成交) -->
+                <div v-if="isActivityCard(bbgPanes.right2)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'positions' }"
+                    @click.stop="activityTab = 'positions'"
+                  >
+                    持倉 <span class="badge-num mono">{{ v0Positions.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'orders' }"
+                    @click.stop="activityTab = 'orders'"
+                  >
+                    掛單 <span class="badge-num mono">{{ v0Orders.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'fills' }"
+                    @click.stop="activityTab = 'fills'"
+                  >
+                    成交 <span class="badge-num mono">{{ v0Fills.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 2. 事件與審計篩選按鈕 (全部 / 待處理) -->
+                <div v-else-if="isEventsCard(bbgPanes.right2)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'all' }"
+                    @click.stop="eventFilter = 'all'"
+                  >
+                    全部 ({{ v0Events.length }})
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'action' }"
+                    @click.stop="eventFilter = 'action'"
+                  >
+                    待處理
+                    <span v-if="pendingV0Events.length > 0" class="badge-num-risk">{{ pendingV0Events.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 3. 機器人週期選擇器 (4H / 1D / 7D) -->
+                <div v-else-if="isBotsCard(bbgPanes.right2)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '4H' }" @click.stop="botPeriod = '4H'">4H</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '1D' }" @click.stop="botPeriod = '1D'">1D</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '7D' }" @click.stop="botPeriod = '7D'">7D</button>
+                </div>
+
+                <!-- 4. 帳戶權益時間週期選擇 (24H / 7D / 30D) -->
+                <div v-else-if="isEquityCard(bbgPanes.right2)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '24H' }" @click.stop="setV0Period('24H')">24H</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
+                </div>
+              
+                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+                <div class="version-switch-pill" role="group">
                   <button
                     type="button"
                     class="btn-ver-pill"
                     :class="{ active: isCardV0(bbgPanes.right2) }"
                     @click.stop="setSlotCardVersion('right2', 'v0')"
-                    title="切換為 V0 移植版卡片（含 V0 模擬數據）"
+                    title="切換為 V0 經典移植版"
                   >
                     V0
                   </button>
@@ -2482,25 +2700,9 @@ onUnmounted(() => {
                     class="btn-ver-pill"
                     :class="{ active: !isCardV0(bbgPanes.right2) }"
                     @click.stop="setSlotCardVersion('right2', 'astra')"
-                    title="切換為 Astra 原版卡片"
+                    title="切換為 Astra 原版"
                   >
                     原版
-                  </button>
-                </div>
-
-                <div v-if="bbgPanes.right2 === 'bots' || bbgPanes.right2 === 'v0_bots'" class="toolbar-range-picker" role="group">
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '4H' }]" @click.stop="botPeriod = '4H'">4H</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '1D' }]" @click.stop="botPeriod = '1D'">1D</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '7D' }]" @click.stop="botPeriod = '7D'">7D</button>
-                </div>
-                <div v-else-if="bbgPanes.right2 === 'events' || bbgPanes.right2 === 'v0_events'" class="event-stream-filters" role="group">
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'old' }]" @click.stop="eventFilterMode = 'old'">全部</button>
-                  <button type="button" :class="['filter-btn', { active: eventFilterMode === 'new' }]" @click.stop="eventFilterMode = 'new'">
-                    <span class="filter-dot-container">
-                      <span v-if="hasAnomaly" class="radar-ping" :class="effectiveSeverity === 'critical' ? 'ping-critical' : 'ping-warn'"></span>
-                      <span class="filter-dot" :class="hasAnomaly ? (effectiveSeverity === 'critical' ? 'dot-critical' : 'dot-warn') : 'dot-normal'"></span>
-                    </span>
-                    異常
                   </button>
                 </div>
               </div>
@@ -2556,16 +2758,80 @@ onUnmounted(() => {
                 <span class="bbg-title-text text-white">
                   {{ CARD_META[bbgPanes.right3]?.title || '監控面板' }}
                 </span>
+                
               </div>
               <div class="header-right-actions flex items-center gap-2">
-                <!-- 雙版本快速切換膠囊 (僅在解鎖編輯時顯示) -->
-                <div v-if="isEditing" class="version-switch-pill" role="group">
+                <!-- 1. 部位與活動分頁切換按鈕 (持倉 / 掛單 / 成交) -->
+                <div v-if="isActivityCard(bbgPanes.right3)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'positions' }"
+                    @click.stop="activityTab = 'positions'"
+                  >
+                    持倉 <span class="badge-num mono">{{ v0Positions.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'orders' }"
+                    @click.stop="activityTab = 'orders'"
+                  >
+                    掛單 <span class="badge-num mono">{{ v0Orders.length }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: activityTab === 'fills' }"
+                    @click.stop="activityTab = 'fills'"
+                  >
+                    成交 <span class="badge-num mono">{{ v0Fills.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 2. 事件與審計篩選按鈕 (全部 / 待處理) -->
+                <div v-else-if="isEventsCard(bbgPanes.right3)" class="card-header-segmented" role="group">
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'all' }"
+                    @click.stop="eventFilter = 'all'"
+                  >
+                    全部 ({{ v0Events.length }})
+                  </button>
+                  <button
+                    type="button"
+                    class="seg-btn"
+                    :class="{ active: eventFilter === 'action' }"
+                    @click.stop="eventFilter = 'action'"
+                  >
+                    待處理
+                    <span v-if="pendingV0Events.length > 0" class="badge-num-risk">{{ pendingV0Events.length }}</span>
+                  </button>
+                </div>
+
+                <!-- 3. 機器人週期選擇器 (4H / 1D / 7D) -->
+                <div v-else-if="isBotsCard(bbgPanes.right3)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '4H' }" @click.stop="botPeriod = '4H'">4H</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '1D' }" @click.stop="botPeriod = '1D'">1D</button>
+                  <button type="button" class="seg-btn" :class="{ active: botPeriod === '7D' }" @click.stop="botPeriod = '7D'">7D</button>
+                </div>
+
+                <!-- 4. 帳戶權益時間週期選擇 (24H / 7D / 30D) -->
+                <div v-else-if="isEquityCard(bbgPanes.right3)" class="card-header-segmented" role="group">
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '24H' }" @click.stop="setV0Period('24H')">24H</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
+                  <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
+                </div>
+              
+                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+                <div class="version-switch-pill" role="group">
                   <button
                     type="button"
                     class="btn-ver-pill"
                     :class="{ active: isCardV0(bbgPanes.right3) }"
                     @click.stop="setSlotCardVersion('right3', 'v0')"
-                    title="切換為 V0 移植版卡片（含 V0 模擬數據）"
+                    title="切換為 V0 經典移植版"
                   >
                     V0
                   </button>
@@ -2574,40 +2840,9 @@ onUnmounted(() => {
                     class="btn-ver-pill"
                     :class="{ active: !isCardV0(bbgPanes.right3) }"
                     @click.stop="setSlotCardVersion('right3', 'astra')"
-                    title="切換為 Astra 原版卡片"
+                    title="切換為 Astra 原版"
                   >
                     原版
-                  </button>
-                </div>
-
-                <div v-if="bbgPanes.right3 === 'bots' || bbgPanes.right3 === 'v0_bots'" class="toolbar-range-picker" role="group">
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '4H' }]" @click.stop="botPeriod = '4H'">4H</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '1D' }]" @click.stop="botPeriod = '1D'">1D</button>
-                  <button type="button" :class="['toolbar-range-btn', { active: botPeriod === '7D' }]" @click.stop="botPeriod = '7D'">7D</button>
-                </div>
-                <div v-else-if="bbgPanes.right3 === 'events' || bbgPanes.right3 === 'v0_events'" class="event-stream-filters" role="group" aria-label="事件串流過濾">
-                  <button
-                    type="button"
-                    :class="['filter-btn', { active: eventFilterMode === 'old' }]"
-                    @click.stop="eventFilterMode = 'old'"
-                  >全部</button>
-                  <button
-                    type="button"
-                    :class="['filter-btn', { active: eventFilterMode === 'new' }]"
-                    @click.stop="eventFilterMode = 'new'"
-                  >
-                    <span class="filter-dot-container">
-                      <span
-                        v-if="hasAnomaly"
-                        class="radar-ping"
-                        :class="effectiveSeverity === 'critical' ? 'ping-critical' : 'ping-warn'"
-                      ></span>
-                      <span
-                        class="filter-dot"
-                        :class="hasAnomaly ? (effectiveSeverity === 'critical' ? 'dot-critical' : 'dot-warn') : 'dot-normal'"
-                      ></span>
-                    </span>
-                    異常
                   </button>
                 </div>
               </div>
@@ -2731,14 +2966,16 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
-  background: #181c21;
-  border-bottom: 1px solid #282c31;
+  padding: 3px 10px;
+  height: 32px;
+  min-height: 32px;
+  background: #0d1014;
+  border-bottom: 1px solid #1c2025;
   font-size: 11px;
-  flex-wrap: wrap;
   gap: 8px;
   transition: all 0.2s ease;
   z-index: 10;
+  box-sizing: border-box;
 }
 
 .hybrid-ribbon.ribbon-edit-active {
@@ -2757,10 +2994,10 @@ onUnmounted(() => {
 .quick-layout-pills {
   display: inline-flex;
   align-items: center;
-  background: #11141b;
-  border: 1px solid #282c31;
-  border-radius: 4px;
-  padding: 2px;
+  background: #111418;
+  border: 1px solid #24282e;
+  border-radius: 3px;
+  padding: 1px;
   gap: 2px;
 }
 
@@ -3077,7 +3314,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
-  height: calc(100vh - 46px);
+  height: 100%;
+  min-height: 0;
   background: #0c0f12;
   overflow: hidden;
   gap: 4px;
@@ -3110,9 +3348,35 @@ onUnmounted(() => {
   min-height: 0;
 }
 
+
+.bbg-view-pill {
+  font-size: 10px;
+  font-family: var(--default-font-family, sans-serif);
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+  font-weight: 500;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.bbg-view-pill.is-v0-tag {
+  background: rgba(144, 150, 157, 0.12);
+  color: #9ea4ab;
+  border: 1px solid rgba(144, 150, 157, 0.25);
+}
+
+.bbg-view-pill.is-astra-tag {
+  background: rgba(232, 180, 94, 0.12);
+  color: #e8b45e;
+  border: 1px solid rgba(232, 180, 94, 0.35);
+}
+
 .bbg-card {
   background: #13161a;
-  border: 1px solid #282c31;
+  border: 1px solid #24282e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3122,8 +3386,8 @@ onUnmounted(() => {
 .bbg-card-header {
   height: 28px;
   min-height: 28px;
-  background: #181c21;
-  border-bottom: 1px solid #282c31;
+  background: #16191e;
+  border-bottom: 1px solid #24282e;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5511,4 +5775,63 @@ onUnmounted(() => {
   border-color: rgba(16, 185, 129, 0.6) !important;
   color: #ffffff !important;
 }
+
+/* Card Header Segmented Controls (Unified Top-Right Tab Switchers) */
+.card-header-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: #111418;
+  border: 1px solid #24282e;
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.card-header-segmented .seg-btn {
+  background: transparent;
+  border: none;
+  color: #9da4ad;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.card-header-segmented .seg-btn:hover {
+  color: #ffffff;
+  background: #161a20;
+}
+
+.card-header-segmented .seg-btn.active {
+  background: #1c222b;
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.card-header-segmented .badge-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.card-header-segmented .badge-num-risk {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  background: #ef4444;
+  color: #ffffff;
+  padding: 0 4px;
+  border-radius: 10px;
+  font-weight: 700;
+  line-height: 14px;
+}
+
 </style>
