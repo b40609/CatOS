@@ -3,6 +3,7 @@ import { Pause, Play, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { logSeeds, nextLog, type LogLevel, type LogLine } from "@/lib/mock/data";
+import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/logs")({
@@ -96,7 +97,7 @@ function LogsPage() {
         title="live stream"
         meta={
           <div className="flex items-center gap-2">
-            <span className="pulse-dot size-1.5 rounded-full bg-up" />
+            <PulseBeacon size={5} />
             <span className="label-xs">{visible.length} lines</span>
           </div>
         }

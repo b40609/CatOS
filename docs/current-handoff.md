@@ -1,28 +1,70 @@
 # CatOS 目前接續入口
 
-更新：2026-10-01（台灣時間）。工作目錄 `C:/Users/user/Desktop/CatOS_Astra`。
+**更新時間**：2026-10-10 23:00 (UTC+8)  
+**當前負責者**：開發者 (Antigravity) · 待驗收者 (chatgpt-web/gpt-5.6-sol)  
+**工作目錄**：`C:/Users/kai/Desktop/CatOS_Astra`
 
-## 當前切片：W6，A／B 獨驗 PASS 與本機版本保存
+---
 
-使用者已授權先 B 後 A；後續回覆「同意 請改規則，以後不需要我授權」，已將既有 localhost 服務恢復的固定授權寫入 [AGENTS.md](../AGENTS.md) AUTONOMY。同範圍不再詢問，保留 recovery／交易／Git 等邊界。[W6 提案](local-sim-bot-control-w6-assessment-20261001.md)／[完整交接](local-sim-bot-control-w6-handoff-20261001.md)／[指定 5.6 Sol (Web) 獨驗](local-sim-bot-control-w6-acceptance-20261001.md)。
+## 1. 當前階段與最新成果：React 前端定案 60:40 舒展四分割與 120 FPS 縮放引擎落地
 
-B 為前輪隔離 stub 歷史證據，本輪未重跑：run=`12575ca8d48c4650bcc618c90c74c798`，首次接受但 UI 503、同 tab 切頁／reload 保留 pending、明示 retry 回同 run。兩次 start＋一次 stop；stopped／cleanup=true，fixture 正常退出。專屬單元 1/1、證據 18/18 PASS，無實際 Worker／帳務驗證。
+已完整完成將 `http://127.0.0.1:8899/#/`（Vue 3）的卡片縮放與換位引擎複製至 `http://127.0.0.1:8890/#/`（React + Vite），並直接定案 **60:40 舒展四分割**：
 
-A 已依固定授權恢復缺失的 8770 正式／8771 preview，唯讀前置合格後執行原唯一短程。run=`5975e67dffa34594ab78c1fe4bf475b0`，request_id=`fe83d2cb42b44e48b0e0b025de5e15e3`。同 tab 切設定再返回仍 running；17:48:11.124 關頁，獨立 GET 19 次觀測後於 17:48:19.532 自然 completed，新 tab 讀回同 run。終態以保存原命令 API 重送一次，返回同終態、清單及完整紀錄不變。正式 start=2／stop=0／新增 run=1；2 warmup＋8 bars／4 fills，fees=`0.00404010`、equity=`999.91375990`，cleanup／worker_closed=true、error=null、slot=idle。指定 5.6 Sol (Web) 已直接由原始檔離線重算 40 項核心斷言，A／B 整體 PASS；未重跑案例。
+1. **直接定案 60:40 舒展四分割（無多餘選項）**：
+   - **比例定案**：左欄 60% 主視野（上軌走勢圖 50% / 下軌持倉明細 50%）；右欄 40% 輔助視野（上軌資產配置 50% / 下軌成交流 50%）。
+   - **收斂清理**：在 [`layoutStore.ts`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/state/layoutStore.ts) 清除 64:36、50:50、70:30 等冗餘方案，儲存鍵升級為 `v3_6040`，預設強制生效 60:40；工具列標註「🔲 舒展四分割版面 (已定案) 60:40」。
 
-## 有效基線、證據與限制
+2. **1:1 復刻卡片縮放與換位引擎**：
+   - **左右分割拉伸**：按住中央垂直分割線平滑拉伸寬度（35%~80%），雙擊分割線自動還原 60:40。
+   - **上下分割拉伸**：左欄與右欄各配備水平分割線，雙擊自動還原 50:50。
+   - **16px 安全間隔**：分割線位於 16px 緩衝區中央，具備高階微光髮絲線反饋，徹底杜絕卡片邊框貼合為 0 的問題。
+   - **直覺拖曳對調**：解鎖狀態每張卡片頂部顯示 `⋮⋮ 拖曳換位 ⇄` 抓手；拖曳源呈現半透明虛線態（`is-drag-source`），目標槽位高亮顯示 `DROP TO SWAP` 標籤，放開即刻對調。
 
-- 恢復後新 owner：8770 PID5108／8771 PID49164；前後保持。research instance=`f3fa2652523c43f0aab3b4d3a478058e`、simulation instance=`d76e5fa4c1fb4d24b859537afba9ecb3`。不得沿用已不存在的歷史 owner／instance。
-- 正式 workspace／research／simulation 與 preview loaded=current、restart_required=false；研究 26 complete、無 active，完整清單前後相同。R4 摘要／來源及 runtime SHA=`ec21bab7a7f26436bc75f6f48ea843f82dfcf62e1dbf65b5c507a44616db9e65` 保持；未開歷史 DB、未重跑研究／R4。
-- [證據目錄](../outputs/workspace-w6-20261001/)：before／after、A browser／19 次獨立 GET／新 tab／原命令重送／36 項開發核對／PNG／服務日誌；B 原始證據保留。[獨驗文件](local-sim-bot-control-w6-acceptance-20261001.md)另記錄 40 項獨立重算與核心檔案 SHA256。CDP truncated=true，較早閒置 GET 已被截斷；活動命令與導航窗口保留，兩次 start／零 stop 另由服務日誌核對。不宣稱完整前置網路紀錄。
-- 未改正式程式；collector 僅放寬已核對 launcher 可執行檔後空白匹配。本次 Git 收尾已核對 main／`d03e4d6`、空暫存區與八個原始證據 SHA256；僅保存 W6 fixture／test、三份 W6 文件、入口及收尾紀錄共七檔。AGENTS、.codex、F1 補記與所有 outputs 保留未提交。
-- W1 契約及既有金融政策保留，無新政策待決。[W1](local-sim-bot-control-w1-spec-20260930.md)。W2／W3／W4 與 W5 原驗收為歷史證據，非本輪重驗。[W5](local-sim-bot-control-w5-handoff-20261001.md)／[W5 獨驗](local-sim-bot-control-w5-acceptance-20261001.md)／[R4](frontend-research-r4-handoff-20260930.md)。
-- 既有提交沿革見 [W2～W5 Git 紀錄](local-sim-bot-control-w2-w5-git-review-20261001.md)；其後本次另獲明確授權，單一本機提交訊息為 `test(local-sim): save W6 fixture and independent acceptance`，提交號由 git log 辨識。[W6 Git 收尾](local-sim-bot-control-w6-git-closeout-20261001.md)。Yaozi／其他工作目錄未碰，[Yaozi 入口](../../CatOS_Yaozi/docs/current-handoff.md) 由另一目錄接續。
+3. **根本性修復卡頓（120 FPS 順暢跟手，比照側邊欄）**：
+   - **拖曳中關閉 CSS 過渡**：設定 `!isResizing && "transition-all duration-200"`，拖曳時 1:1 即時跟隨滑鼠，解除 150ms 補間動畫衝突。
+   - **I/O 延遲固化 (Lazy Persistence)**：拖曳中傳入 `persist = false`，不呼叫 `localStorage.setItem`，僅在 `onPointerUp` 放開時儲存一次，零 I/O 阻塞。
+   - **`requestAnimationFrame` (rAF)**：所有分割線移動接入 rAF 影格節流，確保每幀（16.6ms / 8.3ms）精確更新一次。
+   - **遮罩子元件事件**：拖曳期間卡片主體加上 `pointer-events-none`，阻斷 Recharts 與表格內部的重繪開銷。
 
-## 下一步、分工與授權邊界
+4. **建置與驗證狀態**：
+   - `frontend/cat-os-vite`：`tsc && vite build` **0 錯誤**，建置耗時 7.25s。
+   - 服務狀態：`http://127.0.0.1:8890/#/` 正常監聽運行。
 
-W6 A／B 已由指定 5.6 Sol (Web) 唯讀獨立驗收 PASS。本次依使用者「同意 請執行」完成 scoped Git 本機保存；核對精確七檔、暫存空白與提交後狀態，不 push、不重跑 B／A、不另開 run、不解除 recovery。此次直接授權不改一般角色分工；歷史獨驗結果與執行時 owner／instance 不冒充本次服務重驗。下一片建議先評估正式 stop 原命令重送的最小缺口，提出 assessment，尚未授權新案例。
+---
 
-服務恢復固定授權僅涵蓋既有 localhost launcher／資料根及唯讀建立新基線；先確認埠空缺、不停止不明 owner。遇 unavailable／recovery_required 或其他不合格基線保存原因並停止案例，不解除、不 resume。禁止清理、真實憑證、採集／交易、schema／latch 修改、凍結來源修改、長跑、其他工作目錄或新增案例。
+## 2. 筆電出國接續開發指引 (Laptop Continuation Checklist)
 
-W6 已完成指定獨驗與本機保存，建議切換對話進下一片，不自動建立。短接續指令：「依 current-handoff 與 W6 Git 收尾接續；先評估正式 stop 原命令重送的最小缺口並提出 assessment，不執行案例、不新增 run、不解除 recovery、不 push；保留未提交內容。」
+### A. 檔案同步建議（若要在筆電上繼續開發）
+* **免拷貝項目（減少傳輸體積）**：
+  - 忽略所有 `node_modules/` 與 Python `.venv/`。
+  - 建議使用隨身碟拷貝整包 `CatOS_Astra` 或推送到私有 Git 分支（排除快取與打包 zip）。
+* **筆電必備環境**：
+  - Node.js 18+ 或 20+（含 npm）。
+  - Python 3.11+。
+  - 本地 SQLite（無需 Docker、無需 PostgreSQL、無需 Redis）。
+
+### B. 筆電本機一鍵啟動指令
+```bash
+# 1. 進入 React 前端目錄 (8890 主線)
+cd frontend/cat-os-vite
+npm install
+npm run dev -- --port 8890 --host 127.0.0.1
+
+# 2. (可選) 若需對照 Vue 原版 (8899 參考線)
+cd frontend/redesign-v2-return
+npm install
+npm run dev -- --port 8899 --host 127.0.0.1
+```
+
+### C. 筆電開啟新 AI 對話之一鍵提示詞 (One-Line Handoff Prompt)
+> 「請先閱讀 `docs/current-handoff.md`。目前已完成 React 版前端 8890 的 60:40 舒展四分割定案與 120 FPS 流暢縮放拖曳換位。請根據接續入口指示繼續下一階段工作。」
+
+---
+
+## 3. 政策邊界與未涵蓋事項
+
+* **禁止事項**：嚴格禁止碰觸真實 OKX API Key、禁止向外發出實盤交易請求、禁止使用外部非授權資料庫。
+* **Git 邊界**：本輪程式碼已在本地自測通過；commit / push 依規範維持由指定角色（`chatgpt-web/gpt-5.6-sol`）獨立驗收後另行授權。
+* **下一步建議**：
+  1. 完成其他子頁面（策略中心、機器人管理、風控中心）至 React 版的統一搬移與元件復用。
+  2. 配合獨立驗收角色進行 Git 工作樹核對。

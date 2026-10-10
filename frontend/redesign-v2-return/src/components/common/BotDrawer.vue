@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { usePreferences } from '@/state/usePreferences';
+
+const { preferences } = usePreferences();
 
 export interface DrawerBotData {
   id: string;
@@ -57,6 +60,10 @@ function getMeterColor(ratio: number): string {
   if (ratio >= 0.85) return 'var(--risk, #ef4444)';
   if (ratio >= 0.6) return 'var(--accent, #f59e0b)';
   return 'var(--gain, #10b981)';
+}
+
+function formatLegSide(side: '多' | '空'): string {
+  return side === '多' ? '▲ LONG' : '▼ SHORT';
 }
 </script>
 
@@ -201,18 +208,18 @@ function getMeterColor(ratio: number): string {
             <table class="legs-table mono text-2xs">
               <thead>
                 <tr>
-                  <th class="text-left">標的</th>
-                  <th class="text-left">方向</th>
-                  <th class="text-right">數量</th>
-                  <th class="text-right">標記價</th>
-                  <th class="text-right">未實現</th>
+                  <th class="text-left">{{ preferences.proEnglishLabels ? 'SYMBOL' : '標的' }}</th>
+                  <th class="text-left">{{ preferences.proEnglishLabels ? 'SIDE' : '方向' }}</th>
+                  <th class="text-right">{{ preferences.proEnglishLabels ? 'QTY' : '數量' }}</th>
+                  <th class="text-right">{{ preferences.proEnglishLabels ? 'MARK' : '標記價' }}</th>
+                  <th class="text-right">{{ preferences.proEnglishLabels ? 'uPnL' : '未實現' }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(leg, i) in bot.legs" :key="i">
                   <td>{{ leg.symbol }}</td>
                   <td>
-                    <span :class="leg.side === '多' ? 'text-green' : 'text-red'">{{ leg.side }}</span>
+                    <span class="font-bold" :class="leg.side === '多' ? 'text-green' : 'text-red'">{{ formatLegSide(leg.side) }}</span>
                   </td>
                   <td class="text-right">{{ leg.qty }}</td>
                   <td class="text-right">{{ leg.markPrice }}</td>
@@ -221,18 +228,18 @@ function getMeterColor(ratio: number): string {
               </tbody>
             </table>
           </div>
-          <p v-else class="empty-hint mono text-2xs text-muted">無在倉部位</p>
+          <p v-else class="empty-hint mono text-2xs text-muted">{{ preferences.proEnglishLabels ? 'NO ACTIVE POSITIONS' : '無在倉部位' }}</p>
         </section>
 
         <!-- 3. 最近成交紀錄 -->
         <section class="drawer-section">
           <h3 class="section-title">
-            最近成交紀錄 <span class="mono text-2xs text-muted font-normal">({{ bot.recentTrades.length }} 筆)</span>
+            {{ preferences.proEnglishLabels ? 'RECENT FILLS' : '最近成交紀錄' }} <span class="mono text-2xs text-muted font-normal">({{ bot.recentTrades.length }})</span>
           </h3>
           <ul class="trades-list mono text-2xs">
             <li v-for="(t, i) in bot.recentTrades" :key="i" class="trade-row">
               <span class="trade-time text-muted">{{ t.time }}</span>
-              <span class="trade-side" :class="t.side === '多' ? 'text-green' : 'text-red'">{{ t.side }}</span>
+              <span class="trade-side font-bold" :class="t.side === '多' ? 'text-green' : 'text-red'">{{ formatLegSide(t.side) }}</span>
               <span class="trade-price text-right">{{ t.price }}</span>
               <span class="trade-pnl text-right" :class="t.positive ? 'text-green' : 'text-red'">{{ t.pnlPct }}</span>
             </li>

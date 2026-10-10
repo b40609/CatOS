@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const router = useRouter();
-const { preferences } = usePreferences();
+const { preferences, setLanguage } = usePreferences();
 const { telemetry } = useWorkspace();
 
 const isOpen = ref(false);
@@ -208,6 +208,32 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- Quick Language Switcher Row -->
+        <div class="popover-lang-row">
+          <div class="lang-row-label">
+            <span class="lang-icon">🌐</span>
+            <span class="lang-text">{{ preferences.language === 'en' ? 'Language' : '介面語言' }}</span>
+          </div>
+          <div class="lang-pill-group">
+            <button
+              type="button"
+              class="lang-pill-btn"
+              :class="{ active: preferences.language === 'zh-TW' }"
+              @click="setLanguage('zh-TW')"
+            >
+              繁中
+            </button>
+            <button
+              type="button"
+              class="lang-pill-btn"
+              :class="{ active: preferences.language === 'en' }"
+              @click="setLanguage('en')"
+            >
+              EN
+            </button>
+          </div>
+        </div>
+
         <!-- Card 2: Primary Entry — 系統設定 (System Settings) -->
         <router-link to="/settings" class="popover-settings-entry" @click="closePanel">
           <div class="entry-left">
@@ -218,8 +244,8 @@ onUnmounted(() => {
               </svg>
             </div>
             <div class="entry-text-col">
-              <span class="entry-title">前往「系統設定」</span>
-              <span class="entry-subtitle">外觀風格、Tabler參數、切換鈕與日損偏好</span>
+              <span class="entry-title">{{ preferences.language === 'en' ? 'System Settings' : '前往「系統設定」' }}</span>
+              <span class="entry-subtitle">{{ preferences.language === 'en' ? 'Layout, Language, Risk & Preferences' : '外觀風格、語言切換、切換鈕與風控偏好' }}</span>
             </div>
           </div>
           <span class="entry-arrow">→</span>
@@ -622,6 +648,59 @@ onUnmounted(() => {
 .status-v {
   font-size: 11px;
   font-weight: 500;
+}
+
+/* Quick Language Switcher Row */
+.popover-lang-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-xs);
+}
+
+.lang-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.lang-icon {
+  font-size: 12px;
+}
+
+.lang-pill-group {
+  display: flex;
+  gap: 4px;
+}
+
+.lang-pill-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lang-pill-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
+.lang-pill-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b0e14;
+  font-weight: 700;
 }
 
 /* Primary Action: Go to Settings */

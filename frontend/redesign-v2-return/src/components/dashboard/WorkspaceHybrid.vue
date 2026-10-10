@@ -38,7 +38,7 @@ const {
   error
 } = useDashboard();
 
-const { preferences, setChartRange } = usePreferences();
+const { preferences, setChartRange, setKpiDualLayer } = usePreferences();
 
 const botPeriod = ref<'4H' | '1D' | '7D'>('7D');
 
@@ -1988,6 +1988,21 @@ onUnmounted(() => {
             title="將未定案卡片統一切換為 Astra 原版風格"
           >
             💎 Astra 原版
+          </button>
+        </div>
+
+        <div class="ribbon-v-divider"></div>
+
+        <!-- 頂部 KPI 雙層緊湊 vs 原版三段切換開關 (眼見為憑) -->
+        <div class="quick-theme-switcher" role="group" aria-label="KPI 雙層對比切換">
+          <button
+            type="button"
+            class="btn-theme-toggle"
+            :class="{ active: preferences.kpiDualLayer }"
+            @click="setKpiDualLayer(!preferences.kpiDualLayer)"
+            title="切換頂部核心指標雙層極簡高階數值棧"
+          >
+            {{ preferences.kpiDualLayer ? '✦ 雙層緊湊 KPI (58px)' : '標準三段 KPI (85px)' }}
           </button>
         </div>
 

@@ -143,4 +143,4 @@ python -B -m catos.workspace_api --preview
 
 本輪新增兩個 workspace 模組、三個 frontend/workspace 資產、F1 tests、本交接，更新 F1 spec 與 current-handoff。原 R4 未提交內容及 CatOS_Yaozi 不碰；不提交、不 push、不把 F1 混入 R4 scope。預覽 log／截圖、R4 output／DB、研究 runs 不 stage。樣稿目錄原即未提交，保留。
 
-下一步建議由 **5.6 Sol (Web)** 獨立驗收 F1（不能把本輪自驗寫成獨立驗收），再安排 8770 啟動器切換。R4 仍依原 heartbeat／8h verifier 流程收尾；F1 通過不自動使 R4 通過。
+2026-09-30 20:10 狀態補記：F1 實作已提交 `7957447`；指定 [5.6 Sol (Web) 驗收對話](codex://threads/01a0f18e-ff90-7751-8624-15b9fde8f4dd) 已回報 **6/6 PASS**，涵蓋回測草稿／結果分離、參數優化、R4／事件頁、缺資料降級、工作區操作與窄版。窄版成交表以實際 UI 水平捲動確認，視窗與暫存分頁已還原。此為引用既有獨立驗收結果，本輪未重跑瀏覽器測試；取代先前待驗收狀態，不代表 R4 八小時 PASS。R4 已 complete，下一步由指定驗收者執行正式 verifier 與 scoped Git 收尾，再安排 8770 啟動器切換。

@@ -22,6 +22,7 @@ import {
 import { AppShell, PageHead } from "@/components/catos/shell";
 import { bots as SEED, strategies, type Bot } from "@/lib/mock/data";
 import { fmtSigned } from "@/hooks/use-live";
+import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/bots")({
@@ -181,13 +182,11 @@ function BotManagement() {
                 <tr key={b.id} className="border-b border-border/60 hover:bg-secondary/50">
                   <td className="px-4 py-2.5">
                     <span className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          m.dot,
-                          b.status === "running" && "pulse-dot",
-                        )}
-                      />
+                      {b.status === "running" ? (
+                        <PulseBeacon size={5} variant="up" />
+                      ) : (
+                        <span className={cn("size-[5px] rounded-full", m.dot)} />
+                      )}
                       <span className={cn("num text-[0.65rem]", m.text)}>{m.label}</span>
                     </span>
                   </td>

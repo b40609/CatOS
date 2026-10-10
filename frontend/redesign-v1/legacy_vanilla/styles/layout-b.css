@@ -1,0 +1,213 @@
+/**
+ * catOS v1 - Layout B: Trend-First & Attention Hub (趨勢主導與待辦焦點)
+ * 
+ * Hierarchy:
+ * 1. Dominant Upper Section (Two Columns):
+ *    - Left (68%): Integrated Mini-KPI Bar + Large 60D Equity/Exposure Dual-Axis Trend Chart
+ *    - Right (32%): Attention Hub (Urgent Actions: 409 locked state, daily loss safety cushion, pending trust approval)
+ * 2. Lower Section (Three Columns):
+ *    - Left (38%): Fleet Monitoring Matrix & Bot Table
+ *    - Mid (32%): Horizontal Exposure Budget vs 50% Single-Coin Limit
+ *    - Right (30%): Research Tasks & Yaozi Intel Quick Radar
+ */
+
+.layout-b-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+  padding: var(--sp-md) var(--sp-lg);
+  flex: 1;
+}
+
+/* Dominant Upper Section */
+.layout-b-upper-tier {
+  display: grid;
+  grid-template-columns: 68% 32%;
+  gap: var(--sp-md);
+  min-height: 380px;
+}
+
+.trend-main-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Integrated Mini-KPI Strip inside Left Column */
+.trend-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--bg-surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--sp-xs) var(--sp-md);
+  gap: var(--sp-md);
+}
+
+.strip-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.strip-label {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.strip-val-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.strip-val {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+/* Large Trend Canvas */
+.trend-canvas-container {
+  flex: 1;
+  min-height: 280px;
+  position: relative;
+  padding: var(--sp-sm) var(--sp-md);
+}
+
+/* Attention Hub on the Right */
+.attention-hub {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.attention-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm);
+  overflow-y: auto;
+}
+
+.attention-card {
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: var(--sp-sm) var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2xs);
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.attention-card.urgent {
+  border-left: 3px solid var(--color-danger);
+  background: rgba(244, 63, 94, 0.05);
+}
+
+.attention-card.warning {
+  border-left: 3px solid var(--color-warning);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.attention-card.info {
+  border-left: 3px solid var(--color-info);
+  background: rgba(2, 132, 199, 0.05);
+}
+
+.attention-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.attention-title {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.attention-desc {
+  font-size: var(--fs-2xs);
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.attention-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+/* Lower 3-Column Section */
+.layout-b-lower-tier {
+  display: grid;
+  grid-template-columns: 38% 32% 30%;
+  gap: var(--sp-md);
+  min-height: 220px;
+}
+
+/* Horizontal Exposure Bars */
+.exposure-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  padding: var(--sp-xs) 0;
+}
+
+.exposure-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bar-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-2xs);
+}
+
+.bar-track {
+  height: 8px;
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: var(--radius-xs);
+  transition: width 0.3s ease;
+}
+
+.bar-limit-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%; /* 50% single coin budget limit */
+  width: 2px;
+  background: var(--color-danger);
+  z-index: 2;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1280px) {
+  .layout-b-upper-tier {
+    grid-template-columns: 60% 40%;
+  }
+  .layout-b-lower-tier {
+    grid-template-columns: 1fr 1fr;
+  }
+  .layout-b-lower-tier .box-panel:last-child {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .layout-b-upper-tier, .layout-b-lower-tier {
+    grid-template-columns: 1fr;
+  }
+}

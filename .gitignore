@@ -52,3 +52,5 @@ secrets/
 .DS_Store
 Thumbs.db
 Desktop.ini
+*.zip
+CatOS_Astra/

@@ -722,71 +722,66 @@ function formatUsdt(val?: string | number): string {
 .text-accent { color: #e8b45e !important; }
 .text-primary { color: #e5e8ec !important; }
 
-:global([data-theme="v0-reference"]) .mono,
-:global([data-theme="v0-reference"]) .tabular-nums {
+[data-theme="v0-reference"] .mono,
+[data-theme="v0-reference"] .tabular-nums {
   font-family: var(--default-mono-font-family, "IBM Plex Mono", monospace) !important;
 }
 
-:global([data-theme="v0-reference"]) .text-success {
+[data-theme="v0-reference"] .text-success {
   color: var(--gain, #65cba7) !important;
 }
 
-:global([data-theme="v0-reference"]) .text-accent {
+[data-theme="v0-reference"] .text-accent {
   color: var(--primary, #e8b45e) !important;
 }
 
-:global([data-theme="v0-reference"]) .text-primary {
+[data-theme="v0-reference"] .text-primary {
   color: var(--foreground, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .gc-symbol {
+[data-theme="v0-reference"] .gc-symbol {
   font-size: 11px !important;
   font-weight: 500 !important;
   color: var(--foreground, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .gc-pct {
+[data-theme="v0-reference"] .gc-pct {
   font-size: 11px !important;
   font-weight: 400 !important;
 }
 
-:global([data-theme="v0-reference"]) .gc-val {
+[data-theme="v0-reference"] .gc-val {
   font-size: 11px !important;
   font-weight: 400 !important;
   color: var(--foreground, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .gc-unit {
+[data-theme="v0-reference"] .gc-unit {
   font-size: 10px !important;
   color: var(--muted-foreground, #90969d) !important;
   font-weight: 400 !important;
 }
 
-:global([data-theme="v0-reference"]) .tc-val {
+[data-theme="v0-reference"] .tc-val {
   font-size: 12px !important;
   font-weight: 500 !important;
   color: var(--foreground, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .tc-lbl {
+[data-theme="v0-reference"] .tc-lbl {
   font-size: 9px !important;
   font-weight: 400 !important;
   color: var(--muted-foreground, #90969d) !important;
 }
 
-:global([data-theme="v0-reference"]) .cm-lbl {
+[data-theme="v0-reference"] .cm-lbl {
   color: var(--muted-foreground, #90969d) !important;
   font-weight: 400 !important;
   font-size: 10px !important;
 }
 
-:global([data-theme="v0-reference"]) .cm-val {
+[data-theme="v0-reference"] .cm-val {
   font-size: 10px !important;
   font-weight: 400 !important;
-}
-
-:global([data-theme="v0-reference"]) .grid-card {
-  background: var(--card, #13161a) !important;
-  border: 1px solid var(--border, #282c31) !important;
 }
 </style>
