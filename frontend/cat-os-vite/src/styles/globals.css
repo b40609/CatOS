@@ -1,0 +1,257 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * catOS design system — Noir & Gold.
+ * Terminal-grade data UI: near-black surfaces, hairline gold rules,
+ * monospaced numerics.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 1px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 6px);
+  --radius-3xl: calc(var(--radius) + 8px);
+  --radius-4xl: calc(var(--radius) + 10px);
+
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-dim: var(--gold-dim);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+
+  --color-chart-1: var(--gold);
+  --color-chart-2: var(--up);
+  --color-chart-3: var(--info);
+  --color-chart-4: var(--warn);
+  --color-chart-5: var(--down);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.375rem;
+
+  --background: oklch(0.155 0.004 260);
+  --foreground: oklch(0.94 0.004 260);
+  --surface: oklch(0.19 0.004 260);
+  --surface-raised: oklch(0.24 0.006 260);
+
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--foreground);
+
+  --gold: oklch(0.78 0.13 167);
+  --gold-bright: var(--foreground);
+  --gold-dim: oklch(0.56 0.07 167);
+
+  --primary: var(--gold);
+  --primary-foreground: oklch(0.155 0.02 167);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-raised);
+  --muted-foreground: oklch(0.65 0.009 260);
+  --accent: oklch(0.27 0.014 167);
+  --accent-foreground: var(--foreground);
+
+  --up: oklch(0.78 0.15 165);
+  --down: oklch(0.64 0.2 22);
+  --warn: oklch(0.8 0.15 75);
+  --info: oklch(0.72 0.1 235);
+
+  --destructive: oklch(0.64 0.2 22);
+  --destructive-foreground: oklch(0.97 0.005 90);
+
+  --border: oklch(0.42 0.009 260 / 38%);
+  --input: oklch(0.42 0.009 260 / 60%);
+  --ring: oklch(0.78 0.13 167 / 55%);
+
+  --sidebar: oklch(0.18 0.004 260);
+  --sidebar-foreground: oklch(0.86 0.008 260);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --allocation-btc: oklch(0.78 0.13 167);
+  --allocation-eth: oklch(0.66 0.11 290);
+  --allocation-sol: oklch(0.74 0.1 235);
+  --allocation-arb: oklch(0.8 0.13 85);
+  --allocation-cash: oklch(0.48 0.009 260);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    color-scheme: dark;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: 0;
+  }
+}
+
+/* Hairline gold panel with a scanline wash */
+@utility panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  position: relative;
+  border-radius: 6px;
+}
+
+@utility scanlines {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--color-gold) 5%, transparent) 0px,
+      color-mix(in oklab, var(--color-gold) 5%, transparent) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    opacity: 0.35;
+  }
+}
+
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+@utility label-xs {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+@keyframes cat-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+@utility pulse-dot {
+  animation: cat-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cat-flash-up {
+  from {
+    background-color: color-mix(in oklab, var(--color-up) 22%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes cat-flash-down {
+  from {
+    background-color: color-mix(in oklab, var(--color-down) 22%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@utility flash-up {
+  animation: cat-flash-up 0.6s ease-out;
+}
+
+@utility flash-down {
+  animation: cat-flash-down 0.6s ease-out;
+}
+
+@keyframes cat-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility slide-in-row {
+  animation: cat-slide-in 0.35s ease-out;
+}
+
+.terminal-chart .recharts-cartesian-axis-tick text { font-family: var(--font-mono); }
+.allocation-btc { background: var(--allocation-btc); }
+.allocation-eth { background: var(--allocation-eth); }
+.allocation-sol { background: var(--allocation-sol); }
+.allocation-arb { background: var(--allocation-arb); }
+.allocation-cash { background: var(--allocation-cash); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
