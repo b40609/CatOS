@@ -563,61 +563,52 @@ function getItemDescription(evt: AuditLogItem): string {
 /* ========================================================
    v0-reference Typography & Incident Hierarchy Rules
    ======================================================== */
-:global([data-theme="v0-reference"]) .main-title {
+[data-theme="v0-reference"] .main-title {
   font-size: var(--theme-section-title-size, 13px) !important;
   font-weight: var(--theme-section-title-weight, 500) !important;
   color: var(--theme-event-title-color, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .sub-title {
+[data-theme="v0-reference"] .sub-title {
   font-size: var(--theme-meta-size, 10px) !important;
   font-weight: 400 !important;
   color: var(--theme-meta-color, #90969d) !important;
 }
 
-:global([data-theme="v0-reference"]) .btn-all-logs {
+[data-theme="v0-reference"] .btn-all-logs {
   font-size: var(--theme-button-size, 11px) !important;
   font-weight: var(--theme-button-weight, 400) !important;
   color: var(--primary, #e8b45e) !important;
 }
 
-:global([data-theme="v0-reference"]) .stream-timeline::before {
+[data-theme="v0-reference"] .stream-timeline::before {
   background: var(--border, #282c31) !important;
 }
 
-:global([data-theme="v0-reference"]) .incident-dot {
+[data-theme="v0-reference"] .incident-dot {
   box-shadow: none !important;
 }
-:global([data-theme="v0-reference"]) .dot-info,
+[data-theme="v0-reference"] .dot-info,
 .dot-info {
   background: var(--info-accent, #74a4eb) !important;
   box-shadow: none !important;
 }
-:global([data-theme="v0-reference"]) .dot-warn {
+[data-theme="v0-reference"] .dot-warn {
   background: var(--primary, #e8b45e) !important;
   box-shadow: none !important;
 }
-:global([data-theme="v0-reference"]) .dot-error {
+[data-theme="v0-reference"] .dot-error {
   background: var(--risk, #ed7665) !important;
   box-shadow: none !important;
 }
 
-:global([data-theme="v0-reference"]) .entry-time {
+[data-theme="v0-reference"] .entry-time {
   font-size: var(--theme-meta-size, 10px) !important;
   font-weight: 400 !important;
   color: var(--theme-meta-color, #90969d) !important;
 }
 
-:global([data-theme="v0-reference"]) .entry-badge {
-  font-size: 9.5px !important;
-  font-weight: 600 !important;
-  border-radius: 3px !important;
-  letter-spacing: 0.04em !important;
-  padding: 1.5px 5.5px !important;
-  line-height: 1.15 !important;
-}
-
-:global([data-theme="v0-reference"]) .badge-info,
+[data-theme="v0-reference"] .badge-info,
 .badge-info {
   background: var(--info-bg, rgba(116, 164, 235, 0.15)) !important;
   color: var(--info-accent, #74a4eb) !important;
@@ -625,60 +616,40 @@ function getItemDescription(evt: AuditLogItem): string {
   font-weight: 600 !important;
 }
 
-:global([data-theme="v0-reference"]) .badge-warn {
-  background: rgba(232, 180, 94, 0.12) !important;
-  color: var(--primary, #e8b45e) !important;
-  border: 1px solid rgba(232, 180, 94, 0.35) !important;
-  font-weight: 600 !important;
-}
-
-:global([data-theme="v0-reference"]) .badge-error {
-  background: rgba(237, 118, 101, 0.12) !important;
-  color: var(--risk, #ed7665) !important;
-  border: 1px solid rgba(237, 118, 101, 0.35) !important;
-  font-weight: 600 !important;
-}
-
-:global([data-theme="v0-reference"]) .entry-title {
+[data-theme="v0-reference"] .entry-title {
   font-size: var(--theme-event-title-size, 12px) !important;
   font-weight: var(--theme-event-title-weight, 400) !important;
   line-height: var(--theme-event-title-leading, 1.625) !important;
   color: var(--theme-event-title-color, #e5e8ec) !important;
 }
 
-:global([data-theme="v0-reference"]) .entry-drawer {
-  background: var(--card, #13161a) !important;
-  border: 1px solid var(--border, #282c31) !important;
-  border-radius: var(--radius, .375rem) !important;
-}
-
-:global([data-theme="v0-reference"]) .drawer-desc {
+[data-theme="v0-reference"] .drawer-desc {
   font-size: var(--theme-detail-size, 11px) !important;
   font-weight: 400 !important;
   line-height: var(--theme-detail-leading, 1.625) !important;
   color: var(--theme-detail-color, #90969d) !important;
 }
 
-:global([data-theme="v0-reference"]) .source-label {
+[data-theme="v0-reference"] .source-label {
   font-size: var(--theme-meta-size, 10px) !important;
   font-weight: 400 !important;
   color: var(--theme-meta-color, #90969d) !important;
 }
 
-:global([data-theme="v0-reference"]) .source-value,
+[data-theme="v0-reference"] .source-value,
 .source-value {
   font-size: var(--theme-meta-size, 10px) !important;
   font-weight: 500 !important;
   color: var(--info-accent, #74a4eb) !important;
 }
 
-:global([data-theme="v0-reference"]) .link-gold {
+[data-theme="v0-reference"] .link-gold {
   color: var(--primary, #e8b45e) !important;
   font-size: 11px !important;
   font-weight: 400 !important;
 }
 
-:global([data-theme="v0-reference"]) .link-subtle {
+[data-theme="v0-reference"] .link-subtle {
   color: var(--muted-foreground, #90969d) !important;
   font-size: 11px !important;
   font-weight: 400 !important;

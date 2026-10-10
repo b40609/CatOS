@@ -10,8 +10,10 @@ import {
   todayTradeCount,
   lastSignal,
   positionsFor,
+  baseOf,
   type Bot
 } from '@/state/v0-engine';
+import { usePreferences } from '@/state/usePreferences';
 
 const props = withDefaults(
   defineProps<{
@@ -25,6 +27,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'selectBot', botId: string): void;
 }>();
+
+const { preferences, setTableDualLayer, setProEnglishLabels } = usePreferences();
 
 const {
   bots,
@@ -76,8 +80,8 @@ function getSparklinePath(bot: Bot) {
   const lo = Math.min(0, ...pts);
   const hi = Math.max(0, ...pts);
   const span = hi - lo || 1;
-  const w = 84;
-  const h = 20;
+  const w = 72;
+  const h = 18;
   const n = pts.length;
   let d = '';
   pts.forEach((pt, k) => {
@@ -92,26 +96,211 @@ function isSparklineGain(bot: Bot) {
   const v = viewFor(bot, period.value);
   return v.ret >= 0;
 }
+
+function getBotPosSummary(bot: Bot) {
+  const pos = positionsFor([bot]);
+  if (!pos || pos.length === 0) {
+    return {
+      hasPos: false,
+      side: 'idle',
+      qtyText: '0',
+      notionalText: '$0 Notional',
+      upnlVal: 0,
+      upnlPct: 0
+    };
+  }
+  const p = pos[0];
+  const totalUpnl = pos.reduce((s, x) => s + x.upnl, 0);
+  const totalNotional = pos.reduce((s, x) => s + x.notional, 0);
+  const upnlPct = p.upnlPct ?? (totalNotional > 0 ? (totalUpnl / (totalNotional / 3.0)) * 100 : 0);
+  return {
+    hasPos: true,
+    side: p.side,
+    qtyText: `${p.qty} ${baseOf(p.symbol)}`,
+    notionalText: `$${Math.round(totalNotional).toLocaleString()} · 3x Cross`,
+    upnlVal: totalUpnl,
+    upnlPct: upnlPct
+  };
+}
 </script>
 
 <template>
   <div class="v0-bot-table-panel">
-    <!-- Header (獨立展示時才渲染) -->
+    <!-- Header 工具列 (含雙層/單層對比切換開關) -->
     <div v-if="showHeader" class="panel-header">
       <div class="header-left">
         <div class="title-row">
           <span class="v0-chip">V0 移植版</span>
-          <h3 class="panel-title">量化策略矩陣</h3>
+          <h3 class="panel-title">
+            {{ preferences.proEnglishLabels ? 'QUANT BOT MATRIX' : '量化策略矩陣' }}
+          </h3>
         </div>
-        <span class="panel-meta">
-          {{ runningCount }} 運作 · {{ bots.length - runningCount }} 暫停
+        <span class="panel-meta mono">
+          {{ runningCount }} {{ preferences.proEnglishLabels ? 'LIVE' : '運作' }} ·
+          {{ bots.length - runningCount }} {{ preferences.proEnglishLabels ? 'PAUSED' : '暫停' }}
         </span>
+      </div>
+
+      <div class="header-actions">
+        <!-- 核心對比開關: 雙層高階版 vs 原版單層 -->
+        <div class="layout-toggle-group" role="group" aria-label="排版風格對比">
+          <button
+            type="button"
+            class="toggle-btn"
+            :class="{ active: preferences.tableDualLayer }"
+            @click="setTableDualLayer(true)"
+            title="開啟 Zero-Waste 雙層高階版面 (如附圖)"
+          >
+            ✦ 雙層高階版 (Dual-Layer)
+          </button>
+          <button
+            type="button"
+            class="toggle-btn"
+            :class="{ active: !preferences.tableDualLayer }"
+            @click="setTableDualLayer(false)"
+            title="還原原版 10 欄單層平鋪"
+          >
+            原版單層 (Single)
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Table Container -->
     <div class="table-container">
-      <table class="bot-table">
+      <!-- 方案 A：✦ 雙層高階版 (6 欄 Zero-Waste 緊湊量化終端) -->
+      <table v-if="preferences.tableDualLayer" class="bot-table dual-layer-table">
+        <thead>
+          <tr>
+            <th class="th-bot">{{ preferences.proEnglishLabels ? 'BOT / STRATEGY' : '機器人 · 策略' }}</th>
+            <th class="th-pos">{{ preferences.proEnglishLabels ? 'POSITION / NOTIONAL' : '持倉規模 · 名義' }}</th>
+            <th class="th-pnl text-right">{{ preferences.proEnglishLabels ? 'UNREALIZED PnL' : '未實現損益' }}</th>
+            <th class="th-today text-right">{{ preferences.proEnglishLabels ? 'DAILY PnL & RET' : '今日損益 · 報酬' }}</th>
+            <th class="th-guard">{{ preferences.proEnglishLabels ? 'DD / P6 GUARD' : '回撤 / P6 停止線' }}</th>
+            <th class="th-chart text-right">{{ preferences.proEnglishLabels ? 'TREND & ACTION' : '走勢 · 操作' }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="bot in bots"
+            :key="bot.id"
+            class="bot-row dual-row"
+            :class="{
+              'is-paused': bot.status === 'paused',
+              'is-focused': focusBotId === bot.id,
+              'is-selected': selectedBotId === bot.id
+            }"
+            @mouseenter="setFocusBot(bot.id)"
+            @mouseleave="setFocusBot(null)"
+            @click="handleRowClick(bot)"
+          >
+            <!-- 1. 機器人與策略 (雙層) -->
+            <td class="td-bot">
+              <div class="bot-info-cell">
+                <span
+                  class="status-dot"
+                  :class="bot.status === 'running' ? 'dot-running' : 'dot-paused'"
+                ></span>
+                <div class="bot-dual-text">
+                  <div class="bot-name font-bold">{{ bot.name }}</div>
+                  <div class="bot-sub-meta mono text-2xs text-muted">
+                    <span class="symbol-accent">{{ bot.symbol }}</span>
+                    <span class="tf-mini">{{ bot.timeframe }}</span>
+                    <span>· {{ getStrategy(bot)?.file || bot.strategyId }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- 2. 持倉規模與態勢 (雙層 + 定案 TV 幾何箭頭風格切換) -->
+            <td class="td-pos">
+              <div class="pos-dual-cell">
+                <div class="pos-top-row">
+                  <!-- 風格 2: TradingView 幾何箭頭 + 槓桿 (★ 使用者定案) -->
+                  <!-- ★ 使用者定案：TradingView 幾何箭頭 -->
+                  <span
+                    class="badge-tv mono font-bold"
+                    :class="getBotPosSummary(bot).side === 'long' ? 'is-long' : (getBotPosSummary(bot).side === 'short' ? 'is-short' : 'is-idle')"
+                  >
+                    {{ getBotPosSummary(bot).side === 'long' ? '▲ LONG' : (getBotPosSummary(bot).side === 'short' ? '▼ SHORT' : '○ FLAT') }}
+                  </span>
+
+                  <span class="qty-mono mono font-bold">{{ getBotPosSummary(bot).qtyText }}</span>
+                </div>
+                <div class="pos-sub-row mono text-2xs text-muted">
+                  {{ getBotPosSummary(bot).notionalText }}
+                </div>
+              </div>
+            </td>
+
+            <!-- 3. 未實現損益 (雙層數值棧，對齊使用者附圖) -->
+            <td class="td-pnl text-right mono">
+              <div class="pnl-amount font-bold tabular-nums" :class="toneOf(getBotPosSummary(bot).upnlVal)">
+                {{ formatUsd(getBotPosSummary(bot).upnlVal, true) }} USDT
+              </div>
+              <div class="pnl-pct text-2xs tabular-nums" :class="toneOf(getBotPosSummary(bot).upnlVal)">
+                {{ getBotPosSummary(bot).upnlVal === 0 ? '0.00%' : formatPct(getBotPosSummary(bot).upnlPct) }}
+              </div>
+            </td>
+
+            <!-- 4. 今日損益與週期報酬 (雙層合一) -->
+            <td class="td-today text-right mono">
+              <div class="today-pnl font-bold tabular-nums" :class="toneOf(todayChange(equitySeries(bot)).pnl)">
+                {{ formatUsd(todayChange(equitySeries(bot)).pnl, true) }}
+              </div>
+              <div class="today-sub text-2xs" :class="toneOf(todayChange(equitySeries(bot)).pnl)">
+                {{ formatPct(todayChange(equitySeries(bot)).pct) }} · {{ formatPct(viewFor(bot, period).ret) }} {{ period }}
+              </div>
+            </td>
+
+            <!-- 5. 回撤 / P6 停止線 (雙層進度條) -->
+            <td class="td-guard">
+              <div class="guard-cell">
+                <div class="guard-labels font-mono text-2xs flex justify-between">
+                  <span class="text-neutral-400">DD {{ formatPct(viewFor(bot, '30D').ddNow) }}</span>
+                  <span class="text-neutral-500">P6 / {{ bot.guard }}%</span>
+                </div>
+                <div class="meter-bar">
+                  <div
+                    class="meter-fill"
+                    :style="{
+                      width: `${Math.min(100, Math.max(0, (viewFor(bot, '30D').ddNow / bot.guard) * 100))}%`
+                    }"
+                    :class="(viewFor(bot, '30D').ddNow / bot.guard) >= 0.75 ? 'fill-danger' : 'fill-warn'"
+                  ></div>
+                  <div class="warn-line" style="left: 75%"></div>
+                </div>
+              </div>
+            </td>
+
+            <!-- 6. 走勢與操作 -->
+            <td class="td-chart text-right">
+              <div class="chart-action-cell">
+                <svg width="72" height="18" class="sparkline-svg">
+                  <line x1="0" x2="72" y1="9" y2="9" stroke="#282c31" stroke-dasharray="2 2" />
+                  <path
+                    :d="getSparklinePath(bot)"
+                    fill="none"
+                    :stroke="isSparklineGain(bot) ? '#65cba7' : '#ed7665'"
+                    stroke-width="1.3"
+                  />
+                </svg>
+                <button
+                  type="button"
+                  class="btn-pause-compact"
+                  :title="bot.status === 'running' ? '暫停' : '繼續'"
+                  @click="handlePauseClick($event, bot)"
+                >
+                  {{ bot.status === 'running' ? '⏸' : '▶' }}
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 方案 B：原版單層平鋪表格 (10 欄) -->
+      <table v-else class="bot-table original-table">
         <thead>
           <tr>
             <th class="th-bot">機器人 · 策略</th>
@@ -220,7 +409,6 @@ function isSparklineGain(bot: Bot) {
                     }"
                     :class="(viewFor(bot, '30D').ddNow / bot.guard) >= 0.75 ? 'fill-danger' : 'fill-warn'"
                   ></div>
-                  <!-- 75% 警戒標線 -->
                   <div class="warn-line" style="left: 75%"></div>
                 </div>
                 <div class="guard-labels font-mono text-[10px]">
@@ -248,7 +436,7 @@ function isSparklineGain(bot: Bot) {
                 :title="bot.status === 'running' ? '暫停機器人' : '繼續運行'"
                 @click="handlePauseClick($event, bot)"
               >
-                {{ bot.status === 'running' ? '⏸ 暫停' : '▶ 啟動' }}
+                {{ bot.status === 'running' ? '暫停' : '啟動' }}
               </button>
             </td>
           </tr>
@@ -273,28 +461,30 @@ function isSparklineGain(bot: Bot) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: #181c21;
-  border-bottom: 1px solid #282c31;
+  padding: 6px 12px;
+  background: #111418;
+  border-bottom: 1px solid #24282e;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.title-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .v0-chip {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 3px;
+  padding: 1px 5px;
+  border-radius: 2px;
   background: #181c21;
   color: #e8b45e;
   border: 1px solid #282c31;
@@ -303,26 +493,57 @@ function isSparklineGain(bot: Bot) {
 
 .panel-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #e5e8ec;
 }
 
 .panel-meta {
-  font-size: 11px;
+  font-size: 10.5px;
   color: #90969d;
-  font-family: monospace;
 }
 
-.badge-hint {
-  font-size: 10px;
-  color: #90969d;
-  background: #13161a;
-  border: 1px solid #282c31;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: monospace;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+/* 雙層/單層對比開關 */
+.layout-toggle-group {
+  display: flex;
+  background: #181c21;
+  border: 1px solid #282c31;
+  border-radius: 3px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  color: #90969d;
+  font-size: 10px;
+  font-family: var(--default-mono-font-family, monospace);
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover {
+  color: #e5e8ec;
+}
+
+.toggle-btn.active {
+  background: #1f2732;
+  color: #e8b45e;
+  border: 1px solid rgba(232, 180, 94, 0.4);
+}
+
+
 
 .table-container {
   flex: 1;
@@ -334,214 +555,199 @@ function isSparklineGain(bot: Bot) {
 .bot-table {
   width: 100%;
   border-collapse: collapse;
-  text-align: left;
-  min-width: 920px;
+  font-size: 11.5px;
 }
 
-.bot-table thead tr {
-  background: #0f1216;
+.bot-table thead th {
+  padding: 6px 10px;
+  color: #90969d;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   border-bottom: 1px solid #24282e;
+  white-space: nowrap;
+  background: #0f1216;
   position: sticky;
   top: 0;
   z-index: 2;
+  font-family: var(--default-mono-font-family, monospace);
+  text-align: left;
 }
 
-.bot-table th {
-  padding: 7px 10px;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 500;
-  color: #90969d;
-  white-space: nowrap;
-  border-bottom: 1px solid #24282e;
-}
-
-.th-right {
-  text-align: right;
-}
+/* 確保各欄位表頭與資料格精準對齊 */
+.th-bot, .td-bot { text-align: left; }
+.th-pos, .td-pos { text-align: left; }
+.th-guard, .td-guard { text-align: left; }
+.th-pnl, .td-pnl { text-align: right; }
+.th-today, .td-today { text-align: right; }
+.th-chart, .td-chart { text-align: right; }
 
 .bot-row {
-  border-bottom: 1px solid #24282e;
-  transition: background 0.15s;
+  border-bottom: 1px solid #20242a;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .bot-row:hover {
-  background: #1d2126;
+  background: #181c22;
 }
 
-.bot-row.is-focused,
 .bot-row.is-selected {
-  background: rgba(232, 180, 94, 0.12);
+  background: #1c222b;
   border-left: 2px solid #e8b45e;
 }
 
-.bot-row.is-paused {
-  opacity: 0.6;
-}
-
 .bot-table td {
-  padding: 8px 10px;
+  padding: 6px 10px;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
-.td-right {
-  text-align: right;
-}
-
+/* 雙層版面專屬樣式 */
 .bot-info-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
+.dot-running { background: #65cba7; box-shadow: 0 0 5px rgba(101, 203, 167, 0.4); }
+.dot-paused { background: #90969d; }
 
-.dot-running {
-  background: #65cba7;
-  box-shadow: 0 0 6px rgba(101, 203, 167, 0.6);
-}
-
-.dot-paused {
-  background: #90969d;
-}
-
-.bot-names {
+.bot-dual-text {
   display: flex;
   flex-direction: column;
 }
 
-.bot-name {
-  font-size: 12px;
-  font-weight: 600;
+.symbol-accent {
   color: #e5e8ec;
+  font-weight: 700;
 }
 
-.strategy-name {
-  font-size: 10px;
-  font-family: monospace;
+.tf-mini {
+  background: #181c21;
   color: #90969d;
+  padding: 0 3px;
+  border-radius: 2px;
+  border: 1px solid #282c31;
+  margin: 0 2px;
 }
 
-.market-cell {
+.pos-dual-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.pos-top-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-family: monospace;
+  gap: 6px;
 }
 
-.symbol-tag {
-  font-size: 11px;
-  color: #e5e8ec;
-  font-weight: 600;
+.qty-mono {
+  font-size: 11.5px;
 }
 
-.tf-tag {
-  font-size: 10px;
-  color: #90969d;
-}
-
-.legs-badge {
-  font-family: monospace;
-  font-size: 11px;
-  background: #181c21;
-  color: #e8b45e;
-  padding: 1px 6px;
-  border-radius: 3px;
-  border: 1px solid #282c31;
-}
-
-.today-pnl {
+.chart-action-cell {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-.sub-pct {
-  font-size: 10px;
+.btn-pause-compact {
+  background: #181c21;
+  border: 1px solid #282c31;
   color: #90969d;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.btn-pause-compact:hover {
+  color: #e5e8ec;
+  border-color: #3b424b;
 }
 
-.sparkline-svg {
-  display: block;
-}
+/* ★ 使用者定案：TradingView 幾何箭頭 */
+.badge-tv { font-size: 10.5px; }
+.badge-tv.is-long { color: #65cba7; }
+.badge-tv.is-short { color: #ed7665; }
+.badge-tv.is-idle { color: #90969d; }
 
+/* 守護進度條 */
 .guard-cell {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  width: 110px;
+  gap: 2px;
+  min-width: 90px;
 }
-
 .meter-bar {
   position: relative;
-  height: 5px;
-  background: #181c21;
-  border: 1px solid #282c31;
-  border-radius: 3px;
+  height: 4px;
+  background: #20242a;
+  border-radius: 2px;
   overflow: hidden;
 }
-
-.meter-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s;
-}
-
-.fill-warn {
-  background: #e8b45e;
-}
-
-.fill-danger {
-  background: #ed7665;
-}
-
+.meter-fill { height: 100%; border-radius: 2px; }
+.fill-warn { background: #e8b45e; }
+.fill-danger { background: #ed7665; }
 .warn-line {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
-  background: #90969d;
+  background: rgba(255, 255, 255, 0.3);
 }
 
-.guard-labels {
-  display: flex;
-  justify-content: space-between;
+/* 原版單層專用樣式 */
+.symbol-tag {
+  font-weight: 700;
+  font-family: monospace;
+  margin-right: 4px;
 }
-
-.signal-tag {
+.tf-tag {
+  background: #181c21;
   color: #90969d;
-  font-size: 11px;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  border: 1px solid #282c31;
 }
-
+.legs-badge {
+  background: #1f242b;
+  color: #e5e8ec;
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+.signal-tag {
+  background: #181c21;
+  color: #90969d;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid #282c31;
+}
 .btn-pause {
   background: #181c21;
   border: 1px solid #282c31;
   color: #90969d;
   font-size: 10px;
-  font-family: monospace;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 2px 7px;
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.15s;
 }
+.btn-pause:hover { color: #e5e8ec; border-color: #3b424b; }
 
-.btn-pause:hover {
-  background: #1d2126;
-  color: #e5e8ec;
-  border-color: #e8b45e;
-}
-
-.text-gain {
-  color: #65cba7 !important;
-}
-
-.text-risk {
-  color: #ed7665 !important;
-}
+.text-gain { color: #65cba7 !important; }
+.text-risk { color: #ed7665 !important; }
+.text-muted { color: #90969d; }
+.text-2xs { font-size: 10px; }
+.mono { font-family: var(--default-mono-font-family, ui-monospace, monospace); }
+.text-right { text-align: right; }
 </style>

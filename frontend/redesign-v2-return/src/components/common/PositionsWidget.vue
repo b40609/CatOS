@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { usePreferences } from '@/state/usePreferences';
 
 export interface PositionItem {
   id: string;
@@ -18,12 +19,14 @@ export interface PositionItem {
   marginUsdt: string;
 }
 
+const { preferences } = usePreferences();
+
 const positions = ref<PositionItem[]>([
   {
     id: 'pos-btc',
     symbol: 'BTCUSDT',
     timeframe: '15m',
-    botName: 'Tabby',
+    botName: 'Tabby · breakout_v2',
     side: '多',
     amount: '0.12',
     unit: 'BTC',
@@ -39,7 +42,7 @@ const positions = ref<PositionItem[]>([
     id: 'pos-eth',
     symbol: 'ETHUSDT',
     timeframe: '1h',
-    botName: 'Calico',
+    botName: 'Calico · trend_follow',
     side: '多',
     amount: '2.40',
     unit: 'ETH',
@@ -55,7 +58,7 @@ const positions = ref<PositionItem[]>([
     id: 'pos-sol',
     symbol: 'SOLUSDT',
     timeframe: '5m',
-    botName: 'Mochi',
+    botName: 'Mochi · mean_revert',
     side: '多',
     amount: '18.0',
     unit: 'SOL',
@@ -68,56 +71,57 @@ const positions = ref<PositionItem[]>([
     marginUsdt: '137.50'
   }
 ]);
-
-const totalNominal = computed(() => {
-  return '7,452.40';
-});
 </script>
 
 <template>
   <div class="positions-widget">
+    <!-- 即時持倉態勢表格 (已定案：TradingView 幾何箭頭，零浪費直出) -->
     <div class="positions-table-wrap">
       <table class="positions-table">
         <thead>
           <tr>
-            <th class="th-sym">標的 / 策略</th>
-            <th class="th-side">方向</th>
-            <th class="th-qty text-right">持倉量</th>
-            <th class="th-price text-right">開倉 / 標記價</th>
-            <th class="th-pnl text-right">未實現損益</th>
+            <th class="th-sym">{{ preferences.language === 'en' ? 'MARKET / STRATEGY' : '標的 / 策略' }}</th>
+            <th class="th-side">{{ preferences.language === 'en' ? 'SIDE / DIRECTION' : '方向 / 態勢' }}</th>
+            <th class="th-qty text-right">{{ preferences.language === 'en' ? 'QTY / MARGIN' : '持倉量 / 保證金' }}</th>
+            <th class="th-price text-right">{{ preferences.language === 'en' ? 'MARK / ENTRY' : '標記 / 開倉價' }}</th>
+            <th class="th-pnl text-right">{{ preferences.language === 'en' ? 'UNREALIZED PnL' : '未實現損益' }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="p in positions" :key="p.id" class="pos-row">
-            <!-- 標的 / 策略 -->
+            <!-- 標的 / 策略 (雙層) -->
             <td class="td-sym">
               <div class="sym-group">
                 <span class="sym-name mono">{{ p.symbol }}</span>
                 <span class="tf-badge mono">{{ p.timeframe }}</span>
               </div>
-              <div class="bot-owner text-muted">{{ p.botName }}</div>
+              <div class="bot-owner text-muted mono text-2xs">{{ p.botName }}</div>
             </td>
 
-            <!-- 方向 -->
+            <!-- 方向態勢 (★ 使用者定案：TradingView 幾何箭頭) -->
             <td class="td-side">
-              <span class="side-pill" :class="p.side === '多' ? 'is-long' : 'is-short'">
-                {{ p.side }}
+              <span
+                class="badge-tv mono font-bold"
+                :class="p.side === '多' ? 'is-long' : 'is-short'"
+              >
+                {{ p.side === '多' ? '▲ LONG' : '▼ SHORT' }}
+                <span class="tv-lev">{{ p.leverage }}</span>
               </span>
             </td>
 
-            <!-- 持倉量 -->
+            <!-- 持倉量與名義保證金 (雙層) -->
             <td class="td-qty text-right mono">
               <div class="qty-val font-bold">{{ p.amount }} {{ p.unit }}</div>
-              <div class="text-2xs text-muted">{{ p.leverage }} Cross</div>
+              <div class="text-2xs text-muted">{{ p.marginUsdt }} USDT ({{ p.leverage }})</div>
             </td>
 
-            <!-- 開倉 / 標記價 -->
+            <!-- 標記價與開倉價 (雙層) -->
             <td class="td-price text-right mono">
-              <div class="text-xs text-muted">E: {{ p.entryPrice }}</div>
-              <div class="text-xs text-primary font-bold">M: {{ p.markPrice }}</div>
+              <div class="text-xs text-primary font-bold">{{ p.markPrice }}</div>
+              <div class="text-2xs text-muted">{{ p.entryPrice }} entry</div>
             </td>
 
-            <!-- 未實現損益 -->
+            <!-- 未實現損益 (雙層數值棧，對齊使用者附圖) -->
             <td class="td-pnl text-right mono">
               <div class="pnl-amount font-bold" :class="p.isPositive ? 'text-green' : 'text-red'">
                 {{ p.unrealizedPnl }} USDT
@@ -158,29 +162,39 @@ const totalNominal = computed(() => {
 }
 
 .positions-table thead th {
-  padding: 7px 10px;
+  padding: 6px 10px;
   color: #90969d;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   border-bottom: 1px solid #24282e;
   white-space: nowrap;
   background: #0f1216;
   position: sticky;
   top: 0;
   z-index: 2;
+  font-family: var(--default-mono-font-family, monospace);
+  text-align: left;
 }
 
+/* 確保各欄位表頭與資料格精準對齊 */
+.th-sym, .td-sym { text-align: left; }
+.th-side, .td-side { text-align: left; }
+.th-qty, .td-qty { text-align: right; }
+.th-price, .td-price { text-align: right; }
+.th-pnl, .td-pnl { text-align: right; }
+
 .pos-row {
-  border-bottom: 1px solid #24282e;
+  border-bottom: 1px solid #20242a;
   transition: background 0.15s ease;
 }
 
 .pos-row:hover {
-  background: #1d2126;
+  background: #181c22;
 }
 
 .positions-table td {
-  padding: 8px 10px;
+  padding: 6px 10px;
   vertical-align: middle;
   white-space: nowrap;
 }
@@ -202,34 +216,34 @@ const totalNominal = computed(() => {
   background: #181c21;
   color: #90969d;
   border: 1px solid #282c31;
-  padding: 1px 4px;
+  padding: 0px 4px;
   border-radius: 2px;
 }
 
 .bot-owner {
-  font-size: 10.5px;
   margin-top: 1px;
-  color: #90969d;
 }
 
-.side-pill {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  display: inline-block;
+/* ★ 使用者定案：TradingView 幾何箭頭 + 槓桿 */
+.badge-tv {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-
-.side-pill.is-long {
-  background: rgba(101, 203, 167, 0.12);
+.badge-tv.is-long {
   color: #65cba7;
-  border: 1px solid rgba(101, 203, 167, 0.3);
 }
-
-.side-pill.is-short {
-  background: rgba(237, 118, 101, 0.12);
+.badge-tv.is-short {
   color: #ed7665;
-  border: 1px solid rgba(237, 118, 101, 0.3);
+}
+.tv-lev {
+  font-size: 9px;
+  background: #1f242b;
+  color: #90969d;
+  padding: 0 3px;
+  border-radius: 2px;
+  border: 1px solid #282c31;
 }
 
 .pnl-amount {

@@ -41,6 +41,33 @@ test('stop uses active control run and 202 stopping is not a stopped state',asyn
   await f.control.refresh();await f.control.send('stop');assert.equal(posts(f)[0].path,'/api/workspace/simulation/runs/'+RID+'/stop');
   assert.deepEqual(Object.keys(JSON.parse(posts(f)[0].options.body)),['request_id']);assert.equal(f.control.runs[0].control_state,'stopping');assert.equal(f.control.runs[0].still_finishing,true);
 });
+test('uncertain stop is saved before POST, restored at terminal, and explicitly replayed unchanged',async()=>{
+  const f=setup(),key='catos_simulation_pending_v1';
+  Object.assign(f.version,{slot:'running',active_run_id:RID,capabilities:{start:false,stop:true}});
+  await f.control.refresh();
+  let saved;
+  f.post=(path,options)=>{
+    saved=f.memory.get(key);assert.ok(saved);
+    const command=JSON.parse(saved);
+    assert.equal(command.path,path);assert.equal(JSON.stringify(command.body),options.body);
+    assert.equal(command.build,options.headers['X-CatOS-Build']);assert.equal(command.instance,options.headers['X-CatOS-Instance']);
+    assert.equal(path,'/api/workspace/simulation/runs/'+RID+'/stop');
+    assert.deepEqual(Object.keys(command.body),['request_id']);
+    throw Error('HTTP 503 after backend acceptance');
+  };
+  await f.control.send('stop');const first=structuredClone(posts(f)[0]);
+  assert.equal(f.memory.get(key),saved);assert.match(f.control.error,/未確認/);
+  Object.assign(f.version,{slot:'idle',active_run_id:null,capabilities:{start:true,stop:false}});
+  f.items=[{run_id:RID,control_state:'stopped',cleanup_confirmed:true,worker_closed:true,error:null}];
+  await f.control.refresh();assert.equal(f.memory.get(key),saved);
+  const restored=f.newControl();await restored.refresh();await restored.refresh();
+  assert.equal(posts(f).length,1);assert.deepEqual(restored.pending,JSON.parse(saved));assert.equal(f.memory.get(key),saved);
+  assert.ok(restored.reason('start'));assert.ok(restored.reason('stop'));assert.equal(restored.reason('retry'),'');
+  await restored.send('start');await restored.send('stop');assert.equal(posts(f).length,1);
+  f.post=()=>{assert.equal(f.memory.get(key),saved);return structuredClone(f.items[0]);};
+  await restored.send('retry');assert.deepEqual(posts(f)[1],first);assert.equal(posts(f).length,2);
+  assert.equal(restored.pending,null);assert.equal(f.memory.has(key),false);assert.equal(restored.reason('start'),'');
+});
 test('source/workspace drift blocks new start but permits existing stop',async()=>{
   const f=setup();f.workspace.restart_required=true;Object.assign(f.version,{restart_required:true,active_run_id:RID,capabilities:{start:false,stop:true}});
   await f.control.refresh();await f.control.send('start');assert.equal(posts(f).length,0);await f.control.send('stop');assert.equal(posts(f).length,1);

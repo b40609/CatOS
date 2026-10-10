@@ -7,6 +7,7 @@ import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { DerivativesMetrics } from "@/components/catos/derivatives-metrics";
 import { riskAlerts, riskRules as SEED } from "@/lib/mock/data";
 import { useLiveNumber } from "@/hooks/use-live";
+import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/risk")({
@@ -108,7 +109,7 @@ function RiskManagement() {
         desc="永續合約曝險、槓桿熔斷與鏈上風險追蹤 · 模擬數據"
         right={
           <div className="flex items-center gap-2 border border-warn/40 px-3 py-1.5">
-            <span className="size-1.5 rounded-full bg-warn pulse-dot" />
+            <PulseBeacon size={5} variant="warn" />
             <span className="label-xs !text-warn">2 項規則接近門檻</span>
           </div>
         }

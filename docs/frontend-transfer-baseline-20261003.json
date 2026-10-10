@@ -1,0 +1,227 @@
+{
+  "schema": "catos.frontend-transfer-baseline.v1",
+  "date": "2026-10-03",
+  "scope": "Selected local source files only; not remote baseline, runtime build, Git state or acceptance",
+  "files": [
+    {
+      "path": "frontend/workspace/workspace.js",
+      "sha256": "91de9435c939e19e6c6ad711c3fa6636ff7ea010ca901a8f17c534f09afd24d1"
+    },
+    {
+      "path": "frontend/workspace/workspace.css",
+      "sha256": "8561a53ef299b8f9b10abc4670cf7ab0e686cb29c31a2dfda4279db28ff7b8b4"
+    },
+    {
+      "path": "frontend/workspace/verify_interactive_e2e.js",
+      "sha256": "84fdd5be754e7d8ee88e2a891147eb36e158a506da5dab1e0859285842cf85e2"
+    },
+    {
+      "path": "frontend/workspace/v1.js",
+      "sha256": "aa0e279452926aa8cb8822477484cfdc9bca98b4dab9e84f0b1656f7ceaf76c1"
+    },
+    {
+      "path": "frontend/workspace/v1-theme.css",
+      "sha256": "9f89088d237794f6886a13f6603d077d4c6925f8b6fd0334b3f3e08d82f6ff96"
+    },
+    {
+      "path": "frontend/workspace/v1-core.css",
+      "sha256": "68bb15810a44c56c779f70c0014ad2d82e598afc4677406430a3cf5bf3fde045"
+    },
+    {
+      "path": "frontend/workspace/test_workspace_spec.js",
+      "sha256": "1e45236a91b0b07c710819d346c30a4d9f4311d42ff53c4051228d4de744da87"
+    },
+    {
+      "path": "frontend/workspace/test_revert_full.js",
+      "sha256": "2d78d8922aae9251b0693adf5a47fe5e8bc2bb9f0ccd303262e6689925f8ef5a"
+    },
+    {
+      "path": "frontend/workspace/test_directional_drag.js",
+      "sha256": "dba4ed116bbed8198a2e64b499965c531b286a1c0f301847f9223abf8f30b80e"
+    },
+    {
+      "path": "frontend/workspace/test_bots_spec.js",
+      "sha256": "4915a99093550ad3fa606a1e617956d0388515f29464ef07737ccaf4a5890b62"
+    },
+    {
+      "path": "frontend/workspace/test_appearance_spec.js",
+      "sha256": "e820b14e4e882f1302b83eda22df40cd27b5455812a7a69ccccb4bd406505fab"
+    },
+    {
+      "path": "frontend/workspace/simulation.js",
+      "sha256": "34aa34e4084c7695590e9e602b0eaab86c0cf39d290e63097109cf8068f5e641"
+    },
+    {
+      "path": "frontend/workspace/PRODUCT.md",
+      "sha256": "19530007b3b7da0e4ec9644c8cc0b227a6b46af72341b49685df304a86473d52"
+    },
+    {
+      "path": "frontend/workspace/home-layout.js",
+      "sha256": "889ccf151802c6e4024bdc66edfecdb3eb85ad3d3faed64479989e137b1e02f9"
+    },
+    {
+      "path": "frontend/workspace/DESIGN.md",
+      "sha256": "dbafd3431e43e23a483c012578eebee5a8e8d3605ec698ac479625979301d2e4"
+    },
+    {
+      "path": "frontend/workspace/home.js",
+      "sha256": "8d8bf1e24c84ebbddd98e105e8cb67d20584ed6c0fca654f140da15297a072a1"
+    },
+    {
+      "path": "frontend/workspace/desk.js",
+      "sha256": "d15ae916b690cb34c37ef8e0e60a66bd105f374a4ae667be8a7edbdecc222353"
+    },
+    {
+      "path": "frontend/workspace/home-layout.css",
+      "sha256": "ce6a0a1b5cc3552c42d00c4491c786fda9ca74105d8d37a3873478cbd04d0f66"
+    },
+    {
+      "path": "frontend/workspace/home.css",
+      "sha256": "793ca056c27d73aae23101cab8a68668e46c1fa91211c039fb82dcce71936b10"
+    },
+    {
+      "path": "frontend/workspace/HANDOFF.md",
+      "sha256": "eaefaef23611af885f810a76fe252d5c803fa7df32e2606c5732d7516309b891"
+    },
+    {
+      "path": "frontend/workspace/desk.css",
+      "sha256": "b717d4acaa9bb8580fe6bc9e23aa8bd620974101c0d0406ab509e27381690e2f"
+    },
+    {
+      "path": "frontend/workspace/desk.html",
+      "sha256": "98c9da4c684e167b17bd9e2ba337578bef9f151a02563bce4b9a643a57b3bfef"
+    },
+    {
+      "path": "frontend/workspace/home.html",
+      "sha256": "dadf1fc28000b10a57cdbb573269449fd773d02a74f47979876820f48867b585"
+    },
+    {
+      "path": "frontend/workspace/index.html",
+      "sha256": "b5b598315c529c966b1a82cba1f85e68228cc09832c2219aba77e89695960390"
+    },
+    {
+      "path": "frontend/workspace/libs/gridstack.min.css",
+      "sha256": "1c232b47b98089dd61dd55d24ebd6e89f5be347d746a5e3d714d3aac385aca1f"
+    },
+    {
+      "path": "frontend/workspace/libs/gridstack-all.js",
+      "sha256": "52c37cdf838aa8ead6156f0c778cde9af24e87e38dc6a0c3ffef7c6cb7d879cb"
+    },
+    {
+      "path": "frontend/workspace/css/workspace.css",
+      "sha256": "54c855c2eab969f00fbd82d9f35f80d0fbdbe7b6956ac5d2acc76d3fee51396a"
+    },
+    {
+      "path": "frontend/workspace/css/views.css",
+      "sha256": "66107306c0201b51094ee4b91c1fb6cfb585922c7ef7ab89c56eadc137c768ac"
+    },
+    {
+      "path": "frontend/workspace/css/main.css",
+      "sha256": "0e011e030c276ccd5e85e4543156a5b9a5108a6f39b031cde0d8ad73fc629339"
+    },
+    {
+      "path": "frontend/workspace/css/components.css",
+      "sha256": "0c723478f03c677be6fcbd3a8008196a184da8ef1c93c949d499e511053bee4b"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-paw-icon.png",
+      "sha256": "2ccdcdcc3e88cd6cc79300fda5946879c9261ba008c8fa59612cfbd26da76c41"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-catos-paw-horizontal.png",
+      "sha256": "8c53c1205c07cf3d8c9cc02932505a4ed9b0d00db59b231bb415b8e6c2874bb5"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-catos-paw-dark.png",
+      "sha256": "801ec3d8309ccc3e3f895b84bbe5fdbb9151da404e57019bc1005ef9a94e761e"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-cat-icon.png",
+      "sha256": "1c8c22473f92528b714c83ab54c971818c876bf0758e113b0c2503a701e6181c"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-cat-agent-horizontal.png",
+      "sha256": "ee2ec7fd0a23728e30114a9e12ac1116d75226e2b5efd130ac3e3cce3c854c0f"
+    },
+    {
+      "path": "frontend/workspace/assets/logo-cat-agent-dark.png",
+      "sha256": "c6dc4497e7a859580f02b289494300a34796762463cab8f8b667d544bd33965e"
+    },
+    {
+      "path": "frontend/workspace/js/workspace.js",
+      "sha256": "d81c2758d55d214eda878878279d4d90c6f474d2fc3f1d2f11d7267eed64d3e5"
+    },
+    {
+      "path": "frontend/workspace/js/mock-data.js",
+      "sha256": "1cb5db8ffef1c70ca9e628268f5c821f46a814d27f1f2443cf861bd901ff9b41"
+    },
+    {
+      "path": "frontend/workspace/js/router.js",
+      "sha256": "04b37b2929825b29f0a570d3f5e9ba3b614902c0045dd3ba907e0c774c449d6f"
+    },
+    {
+      "path": "frontend/workspace/js/app.js",
+      "sha256": "65ef96a864ef510988f6de0aa4ef1287be2aff0afe9aaba94c959aee86e371d9"
+    },
+    {
+      "path": "frontend/workspace/js/charts.js",
+      "sha256": "5bac8381dc1a6e838f2157de29ba3abb90c7061691ecd8af7295d78f688242d9"
+    },
+    {
+      "path": "frontend/workspace/js/state.js",
+      "sha256": "0cff483a25de4e5319fefc1268c9704c82ff212a52e3b2d83d8a5566211d0a12"
+    },
+    {
+      "path": "frontend/workspace/js/views/yaozi.js",
+      "sha256": "73216f12d5db2b7fefa1eaa2fdb6a08572a33cf6a4e42b905b929618f526cc1e"
+    },
+    {
+      "path": "frontend/workspace/js/views/strategy.js",
+      "sha256": "476926d14c7baec7b60bea6d16abd72d19ac5895deb88f7ba800341e56af1fd7"
+    },
+    {
+      "path": "frontend/workspace/js/views/settings.js",
+      "sha256": "5221e6df3e97d90e50968b5668de506d2f45c21ba86dc10f8dfac4bbad42e0f7"
+    },
+    {
+      "path": "frontend/workspace/js/views/risk.js",
+      "sha256": "71bad9a63b3e379f44353d4e847c51b3f971441f0d26b7c56441b1e221c0cedc"
+    },
+    {
+      "path": "frontend/workspace/js/views/logs.js",
+      "sha256": "c7d3c80a45673c83da9aa757ab8f8d6f0cf0ca1056cd51255f53f8ba78e41a84"
+    },
+    {
+      "path": "frontend/workspace/js/views/dashboard.js",
+      "sha256": "be2fd1049b3d15ae8c1f1777bca8b62b342de71545f32ebd541f98ea34bdc282"
+    },
+    {
+      "path": "frontend/workspace/js/views/bots.js",
+      "sha256": "a17c3968eab4d7fef6cee0cf1a9bba0df583fe5c965d014af337ec054c57b504"
+    },
+    {
+      "path": "catos/workspace_api.py",
+      "sha256": "8c78b93044c19cb3299f74e405c06bf8da4869d48818a8a9eba36d126fd347ae"
+    },
+    {
+      "path": "catos/local_sim_control_api.py",
+      "sha256": "291ed80321b01e62423e21fb8a422374a5709b983e7e83644285871f775d7a5c"
+    },
+    {
+      "path": "catos/strategy_library.py",
+      "sha256": "ac61e23e167b2619bd9ba4d4fe7bde037321498cac14a14164bf21c644b79851"
+    },
+    {
+      "path": "catos/python_strategy.py",
+      "sha256": "5d45e49b9ba74d62fdcee3d3c545e5ab387dbd24c38035e2e945cfd4fc58e5cd"
+    },
+    {
+      "path": "catos/strategy_mcp.py",
+      "sha256": "e1fb0c74287d24dc48bfe58f01c657d47db79c5967193ad0186798e4eaaf85a2"
+    },
+    {
+      "path": "docs/v1-local-core-handoff-20261002.md",
+      "sha256": "afb1f2ee435d406a2e44d034ad9693dc9a5402ad1d21d708329fdc7076627d97"
+    }
+  ]
+}

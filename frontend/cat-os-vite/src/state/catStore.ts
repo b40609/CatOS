@@ -17,11 +17,14 @@ import type {
   BotMode,
 } from '@/contracts';
 
+export type Language = 'zh-TW' | 'en';
+
 export interface CatState {
   // Navigation & Mode
   activeTab: 'dashboard' | 'bots' | 'risk' | 'strategies' | 'logs' | 'settings';
   mode: BotMode;
   activeScenario: ScenarioType;
+  language: Language;
   
   // Authoritative State Projections
   kpis: DashboardKPIs | null;
@@ -43,6 +46,7 @@ export interface CatState {
   setActiveTab: (tab: CatState['activeTab']) => void;
   setMode: (mode: BotMode) => void;
   setScenario: (scenario: ScenarioType) => void;
+  setLanguage: (lang: Language) => void;
   
   // Safe State Updates with Version Guard
   applyAuthoritativeUpdate: (domain: string, version: number, updateFn: (state: CatState) => Partial<CatState>) => boolean;
@@ -67,6 +71,13 @@ export const useCatStore = create<CatState>((set, get) => ({
   activeTab: 'dashboard',
   mode: 'local',
   activeScenario: 'normal',
+  language: (() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('catos_language');
+      if (saved === 'en' || saved === 'zh-TW') return saved;
+    }
+    return 'zh-TW';
+  })(),
   kpis: null,
   bots: [],
   strategies: [],
@@ -83,6 +94,12 @@ export const useCatStore = create<CatState>((set, get) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMode: (mode) => set({ mode }),
   setScenario: (scenario) => set({ activeScenario: scenario }),
+  setLanguage: (lang) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('catos_language', lang);
+    }
+    set({ language: lang });
+  },
 
   applyAuthoritativeUpdate: (domain, version, updateFn) => {
     const currentVersion = get().versionMap[domain] ?? 0;

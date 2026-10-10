@@ -14,8 +14,14 @@ export type WorkspaceMode = 'tiling' | 'freeform' | 'hybrid';
 export type ThemePreset = 'v0-reference';
 
 
+export type PresentationStyle = 'relaxed_pro' | 'dense_bloomberg';
+
+export type SideBadgeStyle = 'tradingview';
+export type Language = 'zh-TW' | 'en';
+
 export interface Preferences {
   themePreset: ThemePreset; // 原主題 (original) vs v0 備份精準主題 (v0-reference)
+  presentationStyle: PresentationStyle; // ✦ 鬆弛專業版 (relaxed_pro) vs 原版高密版 (dense_bloomberg)
 
   dashboardLayout: 'A' | 'B';
   workspaceMode: WorkspaceMode; // 方案 A: tiling (無縫分割) | 方案 B: freeform (自由網格) | 方案 C: hybrid (混合工作台)
@@ -37,15 +43,24 @@ export interface Preferences {
   modeSwitcherPlacement: ModeSwitcherPlacement;
   // User Profile & Settings Placement (bottom_left, top_right, both)
   userProfilePlacement: UserProfilePlacement;
-  // Sidebar notification badges toggles
+  // Sidebar Badges
   showSidebarBadges: boolean;
   badgeBotsEnabled: boolean;
   badgeRiskEnabled: boolean;
   badgeMarketEnabled: boolean;
+  // Side & Posture Indicator Styles (★ 定案：TradingView 幾何箭頭風格)
+  sideBadgeStyle: SideBadgeStyle;
+  // Dual-Layer Zero-Waste Card & Table Layouts
+  kpiDualLayer: boolean;
+  tableDualLayer: boolean;
+  proEnglishLabels: boolean;
+  // Global Language & Localization (★ 全局單一事實來源：繁體中文 vs English)
+  language: Language;
 }
 
 const defaultPreferences: Preferences = {
   themePreset: 'v0-reference', // 預設使用 v0 備份精準主題，可隨時即時切換回原主題
+  presentationStyle: 'relaxed_pro', // 預設使用 ✦ 鬆弛專業版，可隨時即時切換回原版高密版
 
   dashboardLayout: 'A',
   workspaceMode: 'hybrid', // 預設方案 C：混合式旗艦專業工作台
@@ -68,7 +83,12 @@ const defaultPreferences: Preferences = {
   showSidebarBadges: true,
   badgeBotsEnabled: true,
   badgeRiskEnabled: true,
-  badgeMarketEnabled: true
+  badgeMarketEnabled: true,
+  sideBadgeStyle: 'tradingview', // ★ 使用者定案：TradingView 幾何箭頭風格
+  kpiDualLayer: true,
+  tableDualLayer: true,
+  proEnglishLabels: false,
+  language: 'zh-TW' // 預設繁體中文，可於設定或個人選單即時全域切換
 };
 
 function loadStoredPreferences(): Preferences {
@@ -78,6 +98,7 @@ function loadStoredPreferences(): Preferences {
 
     // Check URL parameters (?mode=tiling | freeform | hybrid)
     let initialMode: WorkspaceMode = 'hybrid';
+    let initialStyle: PresentationStyle = 'relaxed_pro';
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const m = params.get('mode');
@@ -86,11 +107,19 @@ function loadStoredPreferences(): Preferences {
       } else if (['tiling', 'freeform', 'hybrid'].includes(parsed.workspaceMode)) {
         initialMode = parsed.workspaceMode;
       }
+
+      const s = params.get('style');
+      if (s && ['relaxed_pro', 'dense_bloomberg'].includes(s)) {
+        initialStyle = s as PresentationStyle;
+      } else if (['relaxed_pro', 'dense_bloomberg'].includes(parsed.presentationStyle)) {
+        initialStyle = parsed.presentationStyle;
+      }
     } else if (['tiling', 'freeform', 'hybrid'].includes(parsed.workspaceMode)) {
       initialMode = parsed.workspaceMode;
     }
 
     return {
+      presentationStyle: initialStyle,
       dashboardLayout: parsed.dashboardLayout === 'B' ? 'B' : 'A',
       workspaceMode: initialMode,
       chartRange: ['1D', '7D', '30D', '90D'].includes(parsed.chartRange) ? parsed.chartRange : '7D',
@@ -117,7 +146,14 @@ function loadStoredPreferences(): Preferences {
       showSidebarBadges: typeof parsed.showSidebarBadges === 'boolean' ? parsed.showSidebarBadges : true,
       badgeBotsEnabled: typeof parsed.badgeBotsEnabled === 'boolean' ? parsed.badgeBotsEnabled : true,
       badgeRiskEnabled: typeof parsed.badgeRiskEnabled === 'boolean' ? parsed.badgeRiskEnabled : true,
-      badgeMarketEnabled: typeof parsed.badgeMarketEnabled === 'boolean' ? parsed.badgeMarketEnabled : true
+      badgeMarketEnabled: typeof parsed.badgeMarketEnabled === 'boolean' ? parsed.badgeMarketEnabled : true,
+      sideBadgeStyle: 'tradingview',
+      kpiDualLayer: typeof parsed.kpiDualLayer === 'boolean' ? parsed.kpiDualLayer : true,
+      tableDualLayer: typeof parsed.tableDualLayer === 'boolean' ? parsed.tableDualLayer : true,
+      proEnglishLabels: typeof parsed.proEnglishLabels === 'boolean' ? parsed.proEnglishLabels : false,
+      language: (parsed.language === 'en' || parsed.language === 'zh-TW')
+        ? parsed.language
+        : (parsed.proEnglishLabels ? 'en' : 'zh-TW')
     };
   } catch (e) {
     return { ...defaultPreferences };
@@ -250,34 +286,71 @@ export function usePreferences() {
 
 
 
-  return {
-    preferences,
+    function setSideBadgeStyle(_style?: SideBadgeStyle) {
+      preferences.value.sideBadgeStyle = 'tradingview';
+    }
 
+    function setKpiDualLayer(enabled: boolean) {
+      preferences.value.kpiDualLayer = enabled;
+    }
 
-    setLayout,
-    setWorkspaceMode,
-    setChartRange,
-    setChartStyle,
-    setBorderContrast,
-    setCardDensity,
-    setSidebarStyle,
-    setSidebarWidth,
-    resetSidebarWidth,
-    toggleSidebarFold,
-    setSidebarFolded,
-    setCornerRadius,
-    setNavPlacement,
-    setNavStyle,
-    setOffcanvasStyle,
-    setSidebarBehavior,
-    setContainerWidth,
-    setModeSwitcherPlacement,
-    setUserProfilePlacement,
-    setShowSidebarBadges,
-    setBadgeBotsEnabled,
-    setBadgeRiskEnabled,
-    setBadgeMarketEnabled,
-    toggleBadge,
-    resetToDefaults
-  };
-}
+    function setTableDualLayer(enabled: boolean) {
+      preferences.value.tableDualLayer = enabled;
+    }
+
+    function setProEnglishLabels(enabled: boolean) {
+      preferences.value.proEnglishLabels = enabled;
+      preferences.value.language = enabled ? 'en' : 'zh-TW';
+    }
+
+    function setLanguage(lang: Language) {
+      preferences.value.language = lang;
+      preferences.value.proEnglishLabels = (lang === 'en');
+    }
+
+    function setPresentationStyle(style: PresentationStyle) {
+      preferences.value.presentationStyle = style;
+    }
+
+    function togglePresentationStyle() {
+      preferences.value.presentationStyle =
+        preferences.value.presentationStyle === 'relaxed_pro' ? 'dense_bloomberg' : 'relaxed_pro';
+    }
+
+    return {
+      preferences,
+
+      setLayout,
+      setWorkspaceMode,
+      setPresentationStyle,
+      togglePresentationStyle,
+      setChartRange,
+      setChartStyle,
+      setBorderContrast,
+      setCardDensity,
+      setSidebarStyle,
+      setSidebarWidth,
+      resetSidebarWidth,
+      toggleSidebarFold,
+      setSidebarFolded,
+      setCornerRadius,
+      setNavPlacement,
+      setNavStyle,
+      setOffcanvasStyle,
+      setSidebarBehavior,
+      setContainerWidth,
+      setModeSwitcherPlacement,
+      setUserProfilePlacement,
+      setShowSidebarBadges,
+      setBadgeBotsEnabled,
+      setBadgeRiskEnabled,
+      setBadgeMarketEnabled,
+      toggleBadge,
+      setSideBadgeStyle,
+      setKpiDualLayer,
+      setTableDualLayer,
+      setProEnglishLabels,
+      setLanguage,
+      resetToDefaults
+    };
+  }

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import RelaxedBotsView from '@/components/relaxed/RelaxedBotsView.vue';
+import { usePreferences } from '@/state/usePreferences';
 import type { Bot, StrategyEntry, SimulationRun, PendingCommand } from '@/contracts';
 import { validateData, validateAllocationPayload, TOKEN_REGEX } from '@/contracts';
 import { activeAdapter } from '@/adapters/mock-adapter';
 import { useWorkspace } from '@/state/useWorkspace';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 
+const { preferences } = usePreferences();
 const { currentMode } = useWorkspace();
+
 const bots = ref<Bot[]>([]);
 const strategies = ref<StrategyEntry[]>([]);
 const runs = ref<SimulationRun[]>([]);
@@ -308,7 +312,8 @@ function handleClearPending() {
 </script>
 
 <template>
-  <div class="bots-page">
+  <RelaxedBotsView v-if="preferences.presentationStyle === 'relaxed_pro'" />
+  <div v-else class="bots-page">
     <!-- Teleport Actions to Unified Header -->
     <Teleport to="#header-page-actions">
       <div class="header-actions-group">

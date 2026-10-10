@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { usePreferences } from '@/state/usePreferences';
+
+const { preferences } = usePreferences();
+
+function cleanDetail(detail?: string): string {
+  if (!detail) return preferences.value.proEnglishLabels ? 'STANDBY' : '等待訊號';
+  return detail.replace(/^(多|空)\s*/, '');
+}
 
 export type TimeframePeriod = '4H' | '1D' | '7D';
 
@@ -277,12 +285,12 @@ function generateSparklineSvg(points: number[]) {
       <table class="bot-table">
         <thead>
           <tr>
-            <th class="th-bot">機器人 · 策略</th>
-            <th v-if="mode === 'new'" class="th-state text-left">當前態勢</th>
-            <th v-else class="th-unrealized text-right">未實現</th>
-            <th class="th-today text-right">今日</th>
-            <th class="th-return text-right">報酬</th>
-            <th class="th-trend text-right">走勢</th>
+            <th class="th-bot">{{ preferences.proEnglishLabels ? 'BOT · STRATEGY' : '機器人 · 策略' }}</th>
+            <th v-if="mode === 'new'" class="th-state text-left">{{ preferences.proEnglishLabels ? 'POSTURE / SIDE' : '當前態勢' }}</th>
+            <th v-else class="th-unrealized text-right">{{ preferences.proEnglishLabels ? 'uPnL' : '未實現' }}</th>
+            <th class="th-today text-right">{{ preferences.proEnglishLabels ? 'DAILY PnL' : '今日' }}</th>
+            <th class="th-return text-right">{{ preferences.proEnglishLabels ? 'RETURN' : '報酬' }}</th>
+            <th class="th-trend text-right">{{ preferences.proEnglishLabels ? 'TREND' : '走勢' }}</th>
           </tr>
         </thead>
         <tbody>
@@ -311,13 +319,16 @@ function generateSparklineSvg(points: number[]) {
               </div>
             </td>
 
-            <!-- 2. 當前態勢 (新版) vs 未實現損益 (舊版) -->
+            <!-- 2. 當前態勢 (★ 定案：TradingView 幾何箭頭) vs 未實現損益 (舊版) -->
             <td v-if="mode === 'new'" class="td-state text-left">
               <div class="live-state-cell">
-                <span class="live-state-badge" :class="`is-${b.liveState?.type || 'idle'}`">
-                  {{ b.liveState?.label || '待機' }}
+                <span
+                  class="badge-tv mono font-bold"
+                  :class="`is-${b.liveState?.type || 'idle'}`"
+                >
+                  {{ b.liveState?.type === 'long' ? '▲ LONG' : (b.liveState?.type === 'short' ? '▼ SHORT' : '○ IDLE') }}
+                  <span class="tv-detail text-muted font-normal">{{ cleanDetail(b.liveState?.detail) }}</span>
                 </span>
-                <span class="live-state-detail mono">{{ b.liveState?.detail || '等待訊號' }}</span>
               </div>
             </td>
             <td v-else class="td-unrealized text-right">
@@ -526,6 +537,17 @@ function generateSparklineSvg(points: number[]) {
   color: #90969d;
   border: 1px solid #282c31;
 }
+
+/* ★ 定案：TradingView 幾何箭頭樣式 */
+.badge-tv {
+  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-tv.is-long { color: #65cba7; }
+.badge-tv.is-short { color: #ed7665; }
+.badge-tv.is-idle { color: #90969d; }
 
 .live-state-detail {
   font-size: 11px;

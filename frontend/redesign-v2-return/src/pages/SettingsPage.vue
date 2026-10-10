@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { usePreferences } from '@/state/usePreferences';
 
 const {
@@ -10,8 +11,11 @@ const {
   setBorderContrast,
   setCardDensity,
   setShowSidebarBadges,
-  toggleBadge
+  toggleBadge,
+  setLanguage
 } = usePreferences();
+
+const isEn = computed(() => preferences.value.language === 'en');
 </script>
 
 <template>
@@ -289,6 +293,70 @@ const {
               >
                 高密度緊湊 (12px)
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Global Language & Localization (English vs 繁體中文) -->
+      <div class="card" id="card-language-settings">
+        <div class="card-header">
+          <div class="card-title">
+            <span style="margin-right: 6px;">🌐</span>
+            {{ isEn ? 'Language & Localization' : '系統語言與國際化 (Language & Localization)' }}
+          </div>
+          <span class="badge badge-accent">
+            {{ preferences.language === 'en' ? 'ENGLISH (US)' : '繁體中文 (ZH-TW)' }}
+          </span>
+        </div>
+        <div class="card-body form-body">
+          <div class="form-group">
+            <label class="form-label">
+              {{ isEn ? 'Interface Display Language' : '全域介面語言 (Global Interface Language)' }}
+            </label>
+            <div class="toggle-btn-row">
+              <button
+                type="button"
+                :class="['btn btn-sm', preferences.language === 'zh-TW' ? 'btn-primary' : 'btn-secondary']"
+                @click="setLanguage('zh-TW')"
+              >
+                繁體中文 (Traditional Chinese)
+              </button>
+              <button
+                type="button"
+                :class="['btn btn-sm', preferences.language === 'en' ? 'btn-primary' : 'btn-secondary']"
+                @click="setLanguage('en')"
+              >
+                English (United States)
+              </button>
+            </div>
+
+            <!-- Detailed Explanation & Quant Invariants Banner -->
+            <div class="lang-mode-description-box" style="margin-top: 12px; padding: 12px; background: var(--bg-surface-elevated); border: 1px solid var(--border-secondary); border-radius: var(--radius-sm); font-size: 12px;">
+              <template v-if="preferences.language === 'zh-TW'">
+                <strong class="text-accent" style="display: block; margin-bottom: 4px;">繁體中文（台灣／香港 KOL 專業交易標準）</strong>
+                <p class="text-secondary" style="margin: 0; line-height: 1.5; font-size: 11.5px;">
+                  全域同步切換側邊欄導航、頂部工具列、面板標題與表格表頭。依據 OKX / TradingView / Bloomberg 專業終端標準，核心態勢標籤（▲ LONG、▼ SHORT）、合約代碼（BTCUSDT）與金融指標縮寫（uPnL、DD、USDT）受保護維持國際緊湊格式，避免字串折行破壞高密度矩陣對齊。
+                </p>
+              </template>
+              <template v-else>
+                <strong class="text-accent" style="display: block; margin-bottom: 4px;">English (US Quantitative Trading Terminal Standard)</strong>
+                <p class="text-secondary" style="margin: 0; line-height: 1.5; font-size: 11.5px;">
+                  Globally applied across navigation sidebar, top status bar, widget titles, and table headers. Posture badges (▲ LONG, ▼ SHORT) and financial metrics (uPnL, DD, USDT) use standardized compact typography for zero-waste visual density.
+                </p>
+              </template>
+            </div>
+
+            <!-- Protected Data Jargon Table/Summary -->
+            <div class="jargon-spec-summary" style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+              <div style="padding: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px;">
+                <span class="text-muted" style="display: block; margin-bottom: 2px;">{{ isEn ? 'UI Chrome & Navigation' : '外層導航與標題 (Chrome)' }}</span>
+                <span class="font-mono text-accent">{{ isEn ? 'Fully Localized' : '100% 依語言切換' }}</span>
+              </div>
+              <div style="padding: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 4px;">
+                <span class="text-muted" style="display: block; margin-bottom: 2px;">{{ isEn ? 'Core Trading Data Matrix' : '核心量化態勢 (Data Matrix)' }}</span>
+                <span class="font-mono text-success">{{ isEn ? 'Protected TV / ISO' : '保留國際標準 ▲ LONG / USDT' }}</span>
+              </div>
             </div>
           </div>
         </div>

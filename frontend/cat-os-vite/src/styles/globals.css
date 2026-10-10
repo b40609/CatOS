@@ -149,12 +149,35 @@
   }
 }
 
-/* Hairline gold panel with a scanline wash */
+/* =========================================================================
+ * 全域字體縮放與數據密度引擎 (解決內容與數字固定小字問題)
+ * ========================================================================= */
+:root {
+  --ui-font-scale: 1;
+  --ui-content-scale: 1;
+}
+
+/* 精準接管 Tailwind 任意像素類別，讓數據內容隨全域縮放等比例放大縮小 */
+.text-\[9px\] { font-size: calc(0.5625rem * var(--ui-content-scale, 1)) !important; }
+.text-\[9\.5px\] { font-size: calc(0.59375rem * var(--ui-content-scale, 1)) !important; }
+.text-\[10px\] { font-size: calc(0.625rem * var(--ui-content-scale, 1)) !important; }
+.text-\[11px\] { font-size: calc(0.6875rem * var(--ui-content-scale, 1)) !important; }
+.text-\[12px\] { font-size: calc(0.75rem * var(--ui-content-scale, 1)) !important; }
+.text-\[13px\] { font-size: calc(0.8125rem * var(--ui-content-scale, 1)) !important; }
+
+/* 現代無界圓角卡片面板，支援即時主題底座色彩 */
 @utility panel {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background-color: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--border);
   position: relative;
-  border-radius: 6px;
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+/* 全域平滑過渡動效，提供 macOS 級別之主題切換沉浸手感 */
+body, aside, nav, header {
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 @utility scanlines {
@@ -189,20 +212,44 @@
   color: var(--color-muted-foreground);
 }
 
-@keyframes cat-pulse {
+@keyframes live-beacon {
   0%,
   100% {
-    opacity: 1;
     transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.65), 0 0 4px rgba(52, 211, 153, 0.85);
+    opacity: 0.95;
   }
   50% {
-    opacity: 0.35;
-    transform: scale(0.82);
+    transform: scale(1.08);
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0), 0 0 7px rgba(52, 211, 153, 1);
+    opacity: 1;
   }
 }
 
+@keyframes live-beacon-warn {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.65), 0 0 4px rgba(245, 158, 11, 0.85);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0), 0 0 7px rgba(245, 158, 11, 1);
+    opacity: 1;
+  }
+}
+
+@utility status-breathe {
+  animation: live-beacon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@utility status-breathe-warn {
+  animation: live-beacon-warn 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 @utility pulse-dot {
-  animation: cat-pulse 1.6s ease-in-out infinite;
+  animation: live-beacon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes cat-flash-up {

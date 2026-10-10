@@ -1,0 +1,16 @@
+{
+  "zipPath": "C:\\Users\\kai\\Desktop\\CatOS_Astra\\frontend\\catos-frontend-return-20261005-v2.zip",
+  "zipFileName": "catos-frontend-return-20261005-v2.zip",
+  "zipSizeBytes": 31928969,
+  "zipSha256": "C14651EEFAB6ABF97E3F81E18416650092EAE8E5E2E409054A947CC381F781A6",
+  "filesCount": 229,
+  "verification": {
+    "excludedNodeModules": true,
+    "excludedGit": true,
+    "hasSrc": true,
+    "hasPackageJson": true,
+    "hasLockfile": true,
+    "hasHandoff": true,
+    "hasEvidence": true
+  }
+}

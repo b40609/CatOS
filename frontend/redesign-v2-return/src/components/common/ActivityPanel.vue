@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useV0Engine } from '@/state/v0-engine';
+import { usePreferences } from '@/state/usePreferences';
 
 export type ActivityTab = 'positions' | 'orders' | 'fills';
 
@@ -61,6 +62,28 @@ const emit = defineEmits<{
 }>();
 
 const { activityTab: currentTab } = useV0Engine();
+const { preferences } = usePreferences();
+
+function formatOrderType(type: '限價' | '停損'): string {
+  if (!preferences.value.proEnglishLabels) return type;
+  return type === '限價' ? 'LIMIT' : 'STOP';
+}
+
+function formatOrderSide(side: 'buy' | 'sell'): string {
+  if (!preferences.value.proEnglishLabels) return side === 'buy' ? '買入' : '賣出';
+  return side === 'buy' ? 'BUY' : 'SELL';
+}
+
+function formatFillAction(action: '平多' | '平空' | '開多' | '開空'): string {
+  if (!preferences.value.proEnglishLabels) return action;
+  switch (action) {
+    case '開多': return 'OPEN LONG';
+    case '平多': return 'CLOSE LONG';
+    case '開空': return 'OPEN SHORT';
+    case '平空': return 'CLOSE SHORT';
+    default: return action;
+  }
+}
 
 const positions = ref<PositionItem[]>([
   {
@@ -301,15 +324,15 @@ function openBot(botId: string) {
         <table class="act-table">
           <thead>
             <tr>
-              <th class="th-bot">機器人</th>
-              <th class="th-sym">標的</th>
-              <th class="th-side">方向</th>
-              <th class="th-qty text-right">數量</th>
-              <th class="th-entry text-right">開倉價</th>
-              <th class="th-mark text-right">標記價</th>
-              <th class="th-notional text-right">名目 USDT</th>
-              <th class="th-upnl text-right">未實現損益</th>
-              <th class="th-time text-right">開倉時間</th>
+              <th class="th-bot">{{ preferences.proEnglishLabels ? 'BOT / STRATEGY' : '機器人' }}</th>
+              <th class="th-sym">{{ preferences.proEnglishLabels ? 'SYMBOL' : '標的' }}</th>
+              <th class="th-side">{{ preferences.proEnglishLabels ? 'SIDE / DIRECTION' : '方向' }}</th>
+              <th class="th-qty text-right">{{ preferences.proEnglishLabels ? 'QTY' : '數量' }}</th>
+              <th class="th-entry text-right">{{ preferences.proEnglishLabels ? 'ENTRY' : '開倉價' }}</th>
+              <th class="th-mark text-right">{{ preferences.proEnglishLabels ? 'MARK' : '標記價' }}</th>
+              <th class="th-notional text-right">{{ preferences.proEnglishLabels ? 'NOTIONAL' : '名目 USDT' }}</th>
+              <th class="th-upnl text-right">{{ preferences.proEnglishLabels ? 'UNREALIZED PnL' : '未實現損益' }}</th>
+              <th class="th-time text-right">{{ preferences.proEnglishLabels ? 'OPENED' : '開倉時間' }}</th>
             </tr>
           </thead>
           <tbody>
@@ -321,23 +344,33 @@ function openBot(botId: string) {
             >
               <td class="td-bot">
                 <span class="bot-link">{{ p.botName }}</span>
-                <span v-if="p.isPaused" class="paused-pill">暫停</span>
+                <span v-if="p.isPaused" class="paused-pill">{{ preferences.proEnglishLabels ? 'PAUSED' : '暫停' }}</span>
               </td>
-              <td class="td-sym mono">{{ p.symbol }}</td>
+              <td class="td-sym mono font-bold">{{ p.symbol }}</td>
+              
+              <!-- 方向態勢 (★ 使用者定案：TradingView 幾何箭頭) -->
               <td class="td-side">
-                <span :class="p.side === 'long' ? 'text-green' : 'text-red'">
-                  {{ p.side === 'long' ? '多' : '空' }}
+                <span
+                  class="badge-tv mono font-bold"
+                  :class="p.side === 'long' ? 'is-long' : 'is-short'"
+                >
+                  {{ p.side === 'long' ? '▲ LONG' : '▼ SHORT' }}
                 </span>
               </td>
+
               <td class="td-qty mono text-right">{{ p.qty }}</td>
               <td class="td-entry mono text-right">{{ p.entry }}</td>
-              <td class="td-mark mono text-right">{{ p.mark }}</td>
+              <td class="td-mark mono text-right text-primary font-bold">{{ p.mark }}</td>
               <td class="td-notional mono text-right">{{ p.notional }}</td>
+
+              <!-- 未實現損益 (雙層數值棧，對齊使用者附圖) -->
               <td class="td-upnl mono text-right">
-                <span :class="p.positive ? 'text-green' : 'text-red'">
-                  {{ p.upnl }}
-                </span>
-                <span class="upnl-pct text-muted">({{ p.upnlPct }})</span>
+                <div class="pnl-amount font-bold" :class="p.positive ? 'text-green' : 'text-red'">
+                  {{ p.upnl }} USDT
+                </div>
+                <div class="pnl-pct text-2xs" :class="p.positive ? 'text-green' : 'text-red'">
+                  {{ p.upnlPct }}
+                </div>
               </td>
               <td class="td-time mono text-muted text-right">{{ p.opened }}</td>
             </tr>
@@ -350,14 +383,14 @@ function openBot(botId: string) {
         <table class="act-table">
           <thead>
             <tr>
-              <th class="th-bot">機器人</th>
-              <th class="th-sym">標的</th>
-              <th class="th-side">方向</th>
-              <th class="th-type">類型</th>
-              <th class="th-price text-right">掛單價格</th>
-              <th class="th-qty text-right">數量</th>
-              <th class="th-dist text-right">距市價</th>
-              <th class="th-time text-right">下單時間</th>
+              <th class="th-bot">{{ preferences.proEnglishLabels ? 'BOT / STRATEGY' : '機器人' }}</th>
+              <th class="th-sym">{{ preferences.proEnglishLabels ? 'SYMBOL' : '標的' }}</th>
+              <th class="th-side">{{ preferences.proEnglishLabels ? 'SIDE' : '方向' }}</th>
+              <th class="th-type">{{ preferences.proEnglishLabels ? 'TYPE' : '類型' }}</th>
+              <th class="th-price text-right">{{ preferences.proEnglishLabels ? 'LIMIT PRICE' : '掛單價格' }}</th>
+              <th class="th-qty text-right">{{ preferences.proEnglishLabels ? 'QTY' : '數量' }}</th>
+              <th class="th-dist text-right">{{ preferences.proEnglishLabels ? 'DISTANCE' : '距市價' }}</th>
+              <th class="th-time text-right">{{ preferences.proEnglishLabels ? 'PLACED' : '下單時間' }}</th>
             </tr>
           </thead>
           <tbody>
@@ -370,15 +403,18 @@ function openBot(botId: string) {
               <td class="td-bot">
                 <span class="bot-link">{{ o.botName }}</span>
               </td>
-              <td class="td-sym mono">{{ o.symbol }}</td>
+              <td class="td-sym mono font-bold">{{ o.symbol }}</td>
               <td class="td-side">
-                <span :class="o.side === 'buy' ? 'text-green' : 'text-red'">
-                  {{ o.side === 'buy' ? '買入' : '賣出' }}
+                <span
+                  class="badge-order-side mono font-bold"
+                  :class="o.side === 'buy' ? 'text-green' : 'text-red'"
+                >
+                  {{ formatOrderSide(o.side) }}
                 </span>
               </td>
               <td class="td-type">
                 <span :class="o.type === '停損' ? 'type-stop' : 'type-limit'">
-                  {{ o.type }}
+                  {{ formatOrderType(o.type) }}
                 </span>
               </td>
               <td class="td-price mono text-right">{{ o.price }}</td>
@@ -395,13 +431,13 @@ function openBot(botId: string) {
         <table class="act-table">
           <thead>
             <tr>
-              <th class="th-bot">機器人</th>
-              <th class="th-sym">標的</th>
-              <th class="th-action">動作</th>
-              <th class="th-qty text-right">數量</th>
-              <th class="th-price text-right">成交價</th>
-              <th class="th-pnl text-right">損益</th>
-              <th class="th-time text-right">時間</th>
+              <th class="th-bot">{{ preferences.proEnglishLabels ? 'BOT / STRATEGY' : '機器人' }}</th>
+              <th class="th-sym">{{ preferences.proEnglishLabels ? 'SYMBOL' : '標的' }}</th>
+              <th class="th-action">{{ preferences.proEnglishLabels ? 'ACTION' : '動作' }}</th>
+              <th class="th-qty text-right">{{ preferences.proEnglishLabels ? 'QTY' : '數量' }}</th>
+              <th class="th-price text-right">{{ preferences.proEnglishLabels ? 'FILL PRICE' : '成交價' }}</th>
+              <th class="th-pnl text-right">{{ preferences.proEnglishLabels ? 'REALIZED PnL' : '損益' }}</th>
+              <th class="th-time text-right">{{ preferences.proEnglishLabels ? 'TIME' : '時間' }}</th>
             </tr>
           </thead>
           <tbody>
@@ -414,17 +450,17 @@ function openBot(botId: string) {
               <td class="td-bot">
                 <span class="bot-link">{{ f.botName }}</span>
               </td>
-              <td class="td-sym mono">{{ f.symbol }}</td>
-              <td class="td-action">
+              <td class="td-sym mono font-bold">{{ f.symbol }}</td>
+              <td class="td-action mono font-bold">
                 <span :class="f.action.includes('多') ? 'text-green' : 'text-red'">
-                  {{ f.action }}
+                  {{ formatFillAction(f.action) }}
                 </span>
               </td>
               <td class="td-qty mono text-right">{{ f.qty }}</td>
               <td class="td-price mono text-right">{{ f.price }}</td>
-              <td class="td-pnl mono text-right">
+              <td class="td-pnl mono text-right font-bold">
                 <span :class="f.positive ? 'text-green' : 'text-red'">
-                  {{ f.pnl }}
+                  {{ f.pnl }} USDT
                 </span>
               </td>
               <td class="td-time mono text-muted text-right">{{ f.time }}</td>
@@ -559,7 +595,38 @@ function openBot(botId: string) {
   position: sticky;
   top: 0;
   z-index: 2;
+  text-align: left;
 }
+
+/* 確保各欄位表頭與資料格精準對齊 (Laser-Aligned Columns) */
+.text-right {
+  text-align: right !important;
+}
+
+.text-left {
+  text-align: left !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+/* 欄位對齊鎖定 */
+.th-bot, .td-bot { text-align: left; }
+.th-sym, .td-sym { text-align: left; }
+.th-side, .td-side { text-align: left; }
+.th-type, .td-type { text-align: left; }
+.th-action, .td-action { text-align: left; }
+
+.th-qty, .td-qty { text-align: right; }
+.th-entry, .td-entry { text-align: right; }
+.th-mark, .td-mark { text-align: right; }
+.th-notional, .td-notional { text-align: right; }
+.th-upnl, .td-upnl { text-align: right; }
+.th-price, .td-price { text-align: right; }
+.th-dist, .td-dist { text-align: right; }
+.th-pnl, .td-pnl { text-align: right; }
+.th-time, .td-time { text-align: right; }
 
 .act-row {
   border-bottom: 1px solid #282c31;
@@ -627,5 +694,38 @@ function openBot(botId: string) {
 
 .mono {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+}
+
+/* ================= 定案：TradingView 幾何箭頭樣式 ================= */
+.badge-tv {
+  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-tv.is-long { color: #65cba7; }
+.badge-tv.is-short { color: #ed7665; }
+
+.pnl-amount {
+  font-size: 11.5px;
+  line-height: 1.15;
+  text-align: right;
+}
+.pnl-pct {
+  font-size: 9.5px;
+  line-height: 1.15;
+  text-align: right;
+}
+
+.badge-order-side {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.text-primary {
+  color: #e8b45e !important;
+}
+.font-bold {
+  font-weight: 700;
 }
 </style>
