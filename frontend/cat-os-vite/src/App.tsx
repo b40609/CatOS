@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { RouterProvider, useRouter } from '@/lib/router';
+import { AuthProvider } from '@/lib/auth';
 import { stateAdapter } from '@/state/stateAdapter';
 
 // Import Page Routes
@@ -43,9 +44,11 @@ function RouterView() {
 
 export function App() {
   return (
-    <RouterProvider>
-      <RouterView />
-    </RouterProvider>
+    <AuthProvider>
+      <RouterProvider>
+        <RouterView />
+      </RouterProvider>
+    </AuthProvider>
   );
 }
 
