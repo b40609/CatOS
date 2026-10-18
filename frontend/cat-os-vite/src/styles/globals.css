@@ -82,17 +82,17 @@
   --popover: var(--surface-raised);
   --popover-foreground: var(--foreground);
 
-  --gold: oklch(0.78 0.13 167);
-  --gold-bright: var(--foreground);
-  --gold-dim: oklch(0.56 0.07 167);
+  --gold: oklch(0.78 0.15 75);
+  --gold-bright: oklch(0.88 0.14 80);
+  --gold-dim: oklch(0.55 0.10 75);
 
   --primary: var(--gold);
-  --primary-foreground: oklch(0.155 0.02 167);
+  --primary-foreground: #000000;
   --secondary: var(--surface-raised);
   --secondary-foreground: var(--foreground);
   --muted: var(--surface-raised);
   --muted-foreground: oklch(0.65 0.009 260);
-  --accent: oklch(0.27 0.014 167);
+  --accent: oklch(0.25 0.03 75);
   --accent-foreground: var(--foreground);
 
   --up: oklch(0.78 0.15 165);
@@ -105,7 +105,7 @@
 
   --border: oklch(0.42 0.009 260 / 38%);
   --input: oklch(0.42 0.009 260 / 60%);
-  --ring: oklch(0.78 0.13 167 / 55%);
+  --ring: oklch(0.78 0.15 75 / 55%);
 
   --sidebar: oklch(0.18 0.004 260);
   --sidebar-foreground: oklch(0.86 0.008 260);
@@ -115,7 +115,7 @@
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
-  --allocation-btc: oklch(0.78 0.13 167);
+  --allocation-btc: oklch(0.78 0.15 75);
   --allocation-eth: oklch(0.66 0.11 290);
   --allocation-sol: oklch(0.74 0.1 235);
   --allocation-arb: oklch(0.8 0.13 85);

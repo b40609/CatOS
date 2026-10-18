@@ -37,7 +37,7 @@ export function PulseBeacon({
       : "bg-gold/60";
 
   const breatheClass =
-    variant === "warn"
+    variant === "warn" || variant === "gold"
       ? "status-breathe-warn"
       : "status-breathe";
 

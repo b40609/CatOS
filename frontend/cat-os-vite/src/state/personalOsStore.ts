@@ -134,8 +134,8 @@ export const ACCENT_PALETTE: Record<
     nameZh: "經典金",
     nameEn: "Champagne Gold",
     hex: "#f59e0b",
-    primary: "oklch(0.78 0.13 167)",
-    ring: "oklch(0.78 0.13 167 / 45%)",
+    primary: "oklch(0.77 0.165 70)",
+    ring: "oklch(0.77 0.165 70 / 45%)",
     foreground: "#000000",
   },
   cyan: {

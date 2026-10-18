@@ -10,26 +10,62 @@ const RouterContext = createContext<RouterContextType>({
   navigate: () => {},
 });
 
+function normalizeRoutePath(raw: string): string {
+  if (!raw) return '/';
+  // Strip query string and fragment hashes
+  const clean = raw.split('?')[0].split('#')[0].trim();
+  if (!clean || clean === '/') return '/';
+  // Ensure starts with /
+  const withLeading = clean.startsWith('/') ? clean : `/${clean}`;
+  // Strip trailing slash except root
+  return withLeading.length > 1 && withLeading.endsWith('/')
+    ? withLeading.slice(0, -1)
+    : withLeading;
+}
+
 export function RouterProvider({ children }: { children: ReactNode }) {
   const getInitialPath = () => {
+    if (typeof window === 'undefined') return '/';
     const hash = window.location.hash.replace(/^#/, '');
-    return hash.startsWith('/') ? hash : '/';
+    if (hash && hash !== '/') {
+      return normalizeRoutePath(hash);
+    }
+    const pathname = window.location.pathname;
+    if (pathname && pathname !== '/') {
+      return normalizeRoutePath(pathname);
+    }
+    return '/';
   };
 
   const [path, setPath] = useState<string>(getInitialPath);
 
   useEffect(() => {
-    const handleHashChange = () => {
+    const handleUrlChange = () => {
       const hash = window.location.hash.replace(/^#/, '');
-      setPath(hash.startsWith('/') ? hash : '/');
+      if (hash && hash !== '/') {
+        setPath(normalizeRoutePath(hash));
+        return;
+      }
+      const pathname = window.location.pathname;
+      if (pathname && pathname !== '/') {
+        setPath(normalizeRoutePath(pathname));
+        return;
+      }
+      setPath('/');
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
   }, []);
 
   const navigate = (to: string) => {
-    window.location.hash = to;
-    setPath(to);
+    const norm = normalizeRoutePath(to);
+    window.location.hash = norm;
+    setPath(norm);
   };
 
   return (

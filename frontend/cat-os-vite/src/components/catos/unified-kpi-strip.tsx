@@ -30,83 +30,83 @@ export function UnifiedKpiStrip() {
   const botsNote = language === "zh-TW" ? "1 暫停 · 1 待關注" : "1 paused · 1 attention";
 
   return (
-    <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {/* 1. Total Equity (macOS Sonoma 浮動圓角卡片) */}
-      <div className="group relative flex min-w-0 flex-col rounded-2xl border border-border/40 bg-surface/60 p-4.5 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-border/70 hover:bg-surface/85 hover:shadow-md">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 1. Total Equity */}
+      <div className="group relative flex min-w-0 flex-col rounded-xl border border-border/70 bg-surface/85 p-3.5 backdrop-blur-md shadow-xs transition-all duration-150 hover:border-primary/50">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-normal text-muted-foreground">{t("total_equity")}</span>
-          <span className="grid size-6 place-items-center rounded-lg bg-secondary/60 text-muted-foreground group-hover:text-primary transition-colors">
-            <Wallet className="size-3.5" strokeWidth={1.5} />
+          <span className="grid size-5.5 place-items-center rounded-md bg-secondary/60 text-muted-foreground group-hover:text-primary transition-colors">
+            <Wallet className="size-3" strokeWidth={1.5} />
           </span>
         </div>
-        <div className="mt-2.5 flex items-baseline gap-1.5">
-          <span className="num text-[25px] font-semibold tracking-tight text-foreground leading-none">
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="num text-xl font-bold tracking-tight text-foreground leading-none">
             {totalEquity}
           </span>
-          <span className="text-xs text-muted-foreground num font-normal">USDT</span>
+          <span className="text-[11px] text-muted-foreground num font-normal">USDT</span>
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
-          <span className="num font-medium text-up">{equityDelta}</span>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px]">
+          <span className="num font-semibold text-up">{equityDelta}</span>
           <span className="text-muted-foreground">{t("vs_yesterday")}</span>
         </div>
       </div>
 
       {/* 2. Today's PnL */}
-      <div className="group relative flex min-w-0 flex-col rounded-2xl border border-border/40 bg-surface/60 p-4.5 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-border/70 hover:bg-surface/85 hover:shadow-md">
+      <div className="group relative flex min-w-0 flex-col rounded-xl border border-border/70 bg-surface/85 p-3.5 backdrop-blur-md shadow-xs transition-all duration-150 hover:border-up/50">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-normal text-muted-foreground">{t("today_pnl")}</span>
-          <span className="grid size-6 place-items-center rounded-lg bg-secondary/60 text-muted-foreground group-hover:text-up transition-colors">
-            <TrendingUp className="size-3.5" strokeWidth={1.5} />
+          <span className="grid size-5.5 place-items-center rounded-md bg-secondary/60 text-muted-foreground group-hover:text-up transition-colors">
+            <TrendingUp className="size-3" strokeWidth={1.5} />
           </span>
         </div>
-        <div className="mt-2.5 flex items-baseline gap-1.5">
-          <span className="num text-[25px] font-semibold tracking-tight text-up leading-none">
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="num text-xl font-bold tracking-tight text-up leading-none">
             {todayPnl}
           </span>
-          <span className="text-xs text-muted-foreground num font-normal">USDT</span>
+          <span className="text-[11px] text-muted-foreground num font-normal">USDT</span>
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
-          <span className="num font-medium text-up">{todayPnlPct}</span>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px]">
+          <span className="num font-semibold text-up">{todayPnlPct}</span>
           <span className="text-muted-foreground">{t("vs_yesterday")}</span>
         </div>
       </div>
 
       {/* 3. Active Bots */}
-      <div className="group relative flex min-w-0 flex-col rounded-2xl border border-border/40 bg-surface/60 p-4.5 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-border/70 hover:bg-surface/85 hover:shadow-md">
+      <div className="group relative flex min-w-0 flex-col rounded-xl border border-border/70 bg-surface/85 p-3.5 backdrop-blur-md shadow-xs transition-all duration-150 hover:border-primary/50">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-normal text-muted-foreground">{t("active_bots")}</span>
-          <span className="grid size-6 place-items-center rounded-lg bg-secondary/60 text-muted-foreground group-hover:text-primary transition-colors">
-            <Bot className="size-3.5" strokeWidth={1.5} />
+          <span className="grid size-5.5 place-items-center rounded-md bg-secondary/60 text-muted-foreground group-hover:text-primary transition-colors">
+            <Bot className="size-3" strokeWidth={1.5} />
           </span>
         </div>
-        <div className="mt-2.5 flex items-baseline gap-1.5">
-          <span className="num text-[25px] font-semibold tracking-tight text-foreground leading-none">
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="num text-xl font-bold tracking-tight text-foreground leading-none">
             {runningBotsCount}
           </span>
-          <span className="text-xs text-muted-foreground num font-normal">/ {totalBotsCount}</span>
+          <span className="text-[11px] text-muted-foreground num font-normal">/ {totalBotsCount}</span>
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
-          <span className="num font-medium text-up">{runningBotsCount} {t("running")}</span>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px]">
+          <span className="num font-semibold text-up">{runningBotsCount} {t("running")}</span>
           <span className="text-muted-foreground truncate">{kpis?.bots_summary_note ?? botsNote}</span>
         </div>
       </div>
 
       {/* 4. Max Drawdown */}
-      <div className="group relative flex min-w-0 flex-col rounded-2xl border border-border/40 bg-surface/60 p-4.5 backdrop-blur-md shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-border/70 hover:bg-surface/85 hover:shadow-md">
+      <div className="group relative flex min-w-0 flex-col rounded-xl border border-border/70 bg-surface/85 p-3.5 backdrop-blur-md shadow-xs transition-all duration-150 hover:border-down/50">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-normal text-muted-foreground">{t("max_drawdown")}</span>
-          <span className="grid size-6 place-items-center rounded-lg bg-secondary/60 text-muted-foreground group-hover:text-down transition-colors">
-            <Activity className="size-3.5" strokeWidth={1.5} />
+          <span className="grid size-5.5 place-items-center rounded-md bg-secondary/60 text-muted-foreground group-hover:text-down transition-colors">
+            <Activity className="size-3" strokeWidth={1.5} />
           </span>
         </div>
-        <div className="mt-2.5 flex items-baseline gap-1.5">
-          <span className="num text-[25px] font-semibold tracking-tight text-foreground leading-none">
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <span className="num text-xl font-bold tracking-tight text-foreground leading-none">
             -8.43
           </span>
-          <span className="text-xs text-muted-foreground num font-normal">%</span>
+          <span className="text-[11px] text-muted-foreground num font-normal">%</span>
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5 text-[10px]">
-          <span className="num font-medium text-down">↘ 1.24%</span>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px]">
+          <span className="num font-semibold text-down">↘ 1.24%</span>
           <span className="text-muted-foreground">{t("ytd")}</span>
         </div>
       </div>

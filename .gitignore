@@ -40,6 +40,9 @@ secrets/
 /outputs/research-web/
 /outputs/local-sim-r4/
 
+# Immutable local public-market snapshots and DCM research evidence
+/artifacts/dcm-*/
+
 # Generated reports; retain the existing visual verification script
 /reports/*
 !/reports/visual-qa/
@@ -48,7 +51,9 @@ secrets/
 
 # Local editor and OS files
 .idea/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
 .DS_Store
 Thumbs.db
 Desktop.ini
