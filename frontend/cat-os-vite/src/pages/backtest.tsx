@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Play, History, CheckCircle2, TrendingUp, ArrowDownRight, Scale, Activity, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { Play, History, CheckCircle2, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-chart";
 
 export const Route = createFileRoute("/backtest")({
   head: () => ({
@@ -104,79 +105,27 @@ function BacktestPage() {
         }
       />
 
-      <div className="space-y-4">
-        {/* ==================== 頂部 4 大核心 KPI 指標卡 ==================== */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {/* 1. 總回報率 */}
-          <div className="rounded-xl border border-border/80 bg-surface/90 p-3.5 shadow-xs backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">累計總回報率</span>
-              <span className="grid size-6 place-items-center rounded bg-up/10 text-up">
-                <TrendingUp className="size-3.5" />
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-bold text-up">{selectedRun.totalReturn}</span>
-              <span className="text-[10px] font-mono text-muted-foreground">年化 34.2%</span>
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground truncate font-mono">
-              測試標的：{selectedRun.symbol}
-            </p>
+      <div className="space-y-3">
+        {/* ==================== 頂部核心指標 (定案方案 B) ==================== */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <span className="text-muted-foreground">總回報: <strong className="text-up font-bold text-sm">{selectedRun.totalReturn}</strong></span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">夏普 (Sharpe): <strong className="text-foreground font-bold">{selectedRun.sharpe}</strong></span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">最大回撤: <strong className="text-down font-bold">{selectedRun.maxDrawdown}</strong></span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">勝率: <strong className="text-foreground">{selectedRun.winRate}</strong> ({selectedRun.tradesCount} 筆)</span>
           </div>
-
-          {/* 2. 夏普比率 */}
-          <div className="rounded-xl border border-border/80 bg-surface/90 p-3.5 shadow-xs backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">夏普比率 (Sharpe)</span>
-              <span className="grid size-6 place-items-center rounded bg-primary/10 text-primary">
-                <Scale className="size-3.5" />
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-bold text-foreground">{selectedRun.sharpe}</span>
-              <span className="text-[10px] font-mono text-primary font-medium">超額收益顯著</span>
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground truncate font-mono">
-              無風險分母：2.0% · 波動率 11.2%
-            </p>
-          </div>
-
-          {/* 3. 最大回撤 */}
-          <div className="rounded-xl border border-border/80 bg-surface/90 p-3.5 shadow-xs backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">最大歷史回撤 (Max DD)</span>
-              <span className="grid size-6 place-items-center rounded bg-down/10 text-down">
-                <ArrowDownRight className="size-3.5" />
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-bold text-down">{selectedRun.maxDrawdown}</span>
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-mono font-medium text-emerald-400">
-                安全可控
-              </span>
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground truncate font-mono">
-              風控警戒臨界：-10.0% · 裕度 5.85%
-            </p>
-          </div>
-
-          {/* 4. 勝率與交易次數 */}
-          <div className="rounded-xl border border-border/80 bg-surface/90 p-3.5 shadow-xs backdrop-blur-md">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">交易勝率 / 總單數</span>
-              <span className="grid size-6 place-items-center rounded bg-secondary text-foreground">
-                <Activity className="size-3.5" />
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-bold text-foreground">{selectedRun.winRate}</span>
-              <span className="text-[11px] font-mono text-muted-foreground">({selectedRun.tradesCount} 筆交易)</span>
-            </div>
-            <p className="mt-1 text-[10px] text-muted-foreground truncate font-mono">
-              盈虧比：1.84 · 平均持倉 3.2h
-            </p>
+          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+            <span>標的: <strong className="text-primary">{selectedRun.symbol}</strong></span>
+            <span className="text-border">|</span>
+            <span>取樣: <strong className="text-foreground">{selectedRun.timeframe}</strong></span>
           </div>
         </div>
+
+        {/* ==================== 定案：水下載回撤圖與月度收益熱力矩陣 ==================== */}
+        <BacktestUnderwaterChart />
 
         {/* ==================== 主體分割：左欄回測歷史與參數，右欄模擬成交流 ==================== */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

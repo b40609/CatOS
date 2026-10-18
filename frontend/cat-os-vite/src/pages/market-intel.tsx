@@ -74,13 +74,14 @@ function MarketIntelPage() {
         }
       />
 
-      <div className="space-y-4">
-        {/* 頂部整合政策提醒橫幅 */}
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-foreground/90 backdrop-blur-md flex items-center gap-2.5">
-          <Zap className="size-4 text-primary shrink-0" />
-          <span>
-            <strong>架構整合約定</strong>：市場情報為獨立情報模組，整合至同一 localhost 分頁交付，切換頁面不控制策略生命週期，不干擾 Supervisor 交易風控。
-          </span>
+      <div className="space-y-3">
+        {/* 頂部整合政策提醒橫幅 (定案 Scheme B 滿版純淨視野) */}
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-1.5 text-xs font-mono shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <Zap className="size-3.5 text-primary shrink-0" />
+            <span className="text-muted-foreground">架構整合: <strong className="text-foreground">獨立情報模組 · 整合至同一 Localhost 分頁交付</strong></span>
+          </div>
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">切換分頁不控制策略生命週期</span>
         </div>
 
         {/* ==================== Yaozi 即時情報卡片清單 ==================== */}

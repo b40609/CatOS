@@ -115,21 +115,20 @@ function RiskManagement() {
         }
       />
 
-      {/* 風控架構條款橫幅 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase font-bold text-primary bg-primary/15 border border-primary/30 rounded px-1.5 py-0.5">
+      {/* 風控架構條款橫幅 (定案 Scheme B 滿版純淨視野) */}
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-1.5 text-xs font-mono shadow-xs backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <span className="font-mono text-[9px] uppercase font-bold text-primary bg-primary/15 border border-primary/30 rounded px-1.5 py-0.2">
             GUARDIAN CORE
           </span>
-          <span className="font-semibold text-foreground">風控鎖存約定：</span>
-          <span className="text-muted-foreground font-mono text-[11px]">
-            Soft 10% 停止增倉 · Hard 20% 市價清倉與 Kill-Switch 鎖存 · 跨日/重啟不自動解除 · 僅限人工恢復
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
-          <span>基準權益: <span className="text-foreground font-bold">$128,450 USDT</span></span>
+          <span className="text-muted-foreground">鎖存: <strong className="text-foreground">Soft 10% / Hard 20%</strong></span>
           <span className="text-border">|</span>
-          <span>E_risk 緩衝: <span className="text-up font-bold">100% (No Buffer)</span></span>
+          <span className="text-muted-foreground">Asia/Taipei 00:00 切日 · 僅人工恢復</span>
+        </div>
+        <div className="flex items-center gap-2 text-[10.5px] text-muted-foreground">
+          <span>基準權益: <strong className="text-foreground">$128,450</strong></span>
+          <span className="text-border">|</span>
+          <span>E_risk 緩衝: <strong className="text-up">100%</strong></span>
         </div>
       </div>
 

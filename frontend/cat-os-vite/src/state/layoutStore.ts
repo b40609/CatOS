@@ -57,7 +57,7 @@ export const DEFAULT_PROFILES: LayoutProfile[] = [
     slots: {
       leftUpper: "equity",
       leftLower: "positions",
-      rightUpper: "exposure",
+      rightUpper: "allocation",
       rightLower: "bots",
     },
     updatedAt: "定案配置",
@@ -112,7 +112,7 @@ export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tact
 const STORAGE_KEY_PROFILES = "catos_layout_profiles_v4_quad";
 const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v4_quad";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v2";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v3";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";

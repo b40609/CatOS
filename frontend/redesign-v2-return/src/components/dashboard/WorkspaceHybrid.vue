@@ -141,7 +141,7 @@ export interface SavedLayoutProfile {
 const DEFAULT_PROFILES: SavedLayoutProfile[] = [
   {
     id: 'layout_b_quad',
-    name: '舒展四分割 (60:40已定案)',
+    name: '舒展四分割 (60:40)',
     shortName: '舒展四分割',
     ratioText: '60:40',
     icon: '🔲',
@@ -164,84 +164,6 @@ const DEFAULT_PROFILES: SavedLayoutProfile[] = [
     linearLowerLeftWidth: 60,
     linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_risk', lowerLeft: 'v0_bots', lowerRight: 'v0_activity' },
     updatedAt: '定案配置'
-  },
-  {
-    id: 'layout_a_bloomberg',
-    name: '方案 A · Bloomberg 經典 (62:38)',
-    shortName: 'Bloomberg 經典',
-    ratioText: '62:38',
-    icon: '📊',
-    desc: '左欄 62% (上走勢 52% / 下持倉 48%) · 右欄 38% (Bot 36% / 曝險 32% / 日誌 32%)',
-    isSystem: true,
-    blueprint: 'bloomberg',
-    allocationMode: 'donut',
-    bbgLeftColWidth: 62,
-    bbgLeftUpperHeight: 52,
-    bbgRightWeights: [36, 32, 32],
-    bbgPanes: {
-      leftUpper: 'v0_equity',
-      leftLower: 'v0_activity',
-      right1: 'v0_bots',
-      right2: 'v0_exposure',
-      right3: 'v0_events'
-    },
-    linearUpperHeight: 50,
-    linearUpperLeftWidth: 64,
-    linearLowerLeftWidth: 60,
-    linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_exposure', lowerLeft: 'v0_bots', lowerRight: 'v0_risk' },
-    updatedAt: '系統內建'
-  },
-  {
-    id: 'layout_c_symmetric',
-    name: '方案 C · 雙主對稱 (50:50)',
-    shortName: '雙主對稱',
-    ratioText: '50:50',
-    icon: '⚖️',
-    desc: '左右 50:50 等寬對稱 · 走勢與持倉並列頂部雙核心',
-    isSystem: true,
-    blueprint: 'bloomberg',
-    allocationMode: 'donut',
-    bbgLeftColWidth: 50,
-    bbgLeftUpperHeight: 54,
-    bbgRightWeights: [54, 46, 0],
-    bbgPanes: {
-      leftUpper: 'v0_equity',
-      leftLower: 'v0_bots',
-      right1: 'v0_activity',
-      right2: 'v0_exposure',
-      right3: 'v0_events'
-    },
-    linearUpperHeight: 50,
-    linearUpperLeftWidth: 64,
-    linearLowerLeftWidth: 60,
-    linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_activity', lowerLeft: 'v0_bots', lowerRight: 'v0_exposure' },
-    updatedAt: '系統內建'
-  },
-  {
-    id: 'layout_d_risk_focus',
-    name: '方案 D · 全景風控審計 (64:36)',
-    shortName: '風控審計',
-    ratioText: '64:36',
-    icon: '🛡️',
-    desc: '左欄 64% 寬大視野 · 右欄 36% 專注 Bot 33% / 風控 33% / 審計日誌 34%',
-    isSystem: true,
-    blueprint: 'bloomberg',
-    allocationMode: 'donut',
-    bbgLeftColWidth: 64,
-    bbgLeftUpperHeight: 52,
-    bbgRightWeights: [33, 33, 34],
-    bbgPanes: {
-      leftUpper: 'v0_equity',
-      leftLower: 'v0_activity',
-      right1: 'v0_bots',
-      right2: 'v0_risk',
-      right3: 'v0_events'
-    },
-    linearUpperHeight: 50,
-    linearUpperLeftWidth: 64,
-    linearLowerLeftWidth: 60,
-    linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_risk', lowerLeft: 'v0_bots', lowerRight: 'v0_events' },
-    updatedAt: '系統內建'
   }
 ];
 
@@ -1965,154 +1887,7 @@ onUnmounted(() => {
       'is-splitter-active': isSplitterDragging
     }"
   >
-        <!-- Top Executive Ribbon: 版面快捷切換、卡片風格與排版調整 -->
-    <div class="hybrid-ribbon" :class="{ 'ribbon-edit-active': isEditing }">
-      <div class="ribbon-left">
-        <!-- 四大標準版面方案快捷切換膠囊 -->
-        <div class="quick-layout-pills" role="tablist" aria-label="版面方案即時切換">
-          <button
-            v-for="p in presetLayouts"
-            :key="p.id"
-            type="button"
-            class="layout-pill-btn"
-            :class="{ active: currentProfileId === p.id }"
-            @click="applyProfile(p.id)"
-            :title="p.desc || p.name"
-          >
-            <span class="pill-icon">{{ p.icon }}</span>
-            <span class="pill-name">{{ p.shortName }}</span>
-            <span class="pill-ratio mono">{{ p.ratioText }}</span>
-          </button>
-        </div>
 
-        <div class="ribbon-v-divider"></div>
-
-        <!-- 全域卡片風格一鍵切換 (V0 經典 vs Astra 原版，排除已定案之帳戶權益) -->
-        <div class="quick-theme-switcher" role="group" aria-label="全域卡片風格切換">
-          <button
-            type="button"
-            class="btn-theme-toggle"
-            :class="{ active: isAllV0 }"
-            @click="toggleAllCardsVersion('v0')"
-            title="將未定案卡片統一切換為 V0 經典風格"
-          >
-            🟢 V0 經典
-          </button>
-          <button
-            type="button"
-            class="btn-theme-toggle"
-            :class="{ active: !isAllV0 }"
-            @click="toggleAllCardsVersion('astra')"
-            title="將未定案卡片統一切換為 Astra 原版風格"
-          >
-            💎 Astra 原版
-          </button>
-        </div>
-
-        <div class="ribbon-v-divider"></div>
-
-        <!-- 頂部 KPI 雙層緊湊 vs 原版三段切換開關 (眼見為憑) -->
-        <div class="quick-theme-switcher" role="group" aria-label="KPI 雙層對比切換">
-          <button
-            type="button"
-            class="btn-theme-toggle"
-            :class="{ active: preferences.kpiDualLayer }"
-            @click="setKpiDualLayer(!preferences.kpiDualLayer)"
-            title="切換頂部核心指標雙層極簡高階數值棧"
-          >
-            {{ preferences.kpiDualLayer ? '✦ 雙層緊湊 KPI (58px)' : '標準三段 KPI (85px)' }}
-          </button>
-        </div>
-
-        <!-- Live State Indicator Badge (Only in Edit Mode) -->
-        <span v-if="isEditing" class="edit-state-pill" title="編輯微調中：可直接按住標題拖曳換位、滑動分割線縮放比例">
-          <span class="edit-pulse-dot"></span>
-          <span>版面微調中</span>
-        </span>
-      </div>
-
-      <div class="ribbon-right">
-        <!-- 版面方案切換器與存檔管理 (Saved Layout Profiles) -->
-        <div class="layout-profile-picker" role="group" aria-label="版面方案管理">
-          <span class="profile-picker-label text-white">版面方案:</span>
-          <select
-            v-model="currentProfileId"
-            class="select-layout-profile"
-            @change="applyProfile(currentProfileId)"
-            title="切換已儲存的版面方案"
-          >
-            <option v-for="p in savedProfiles" :key="p.id" :value="p.id">
-              {{ p.name }}
-            </option>
-          </select>
-
-          <!-- 編輯解鎖模式下顯示的方案管理按鈕組 -->
-          <template v-if="isEditing">
-            <button
-              type="button"
-              class="btn btn-xs btn-outline-gold"
-              @click="openSaveModal"
-              title="將當前排版另存為全新自訂方案"
-            >
-              ＋ 另存新方案
-            </button>
-            <button
-              v-if="!currentProfile?.isSystem"
-              type="button"
-              class="btn btn-xs btn-outline-cyan"
-              @click="updateCurrentProfile"
-              title="儲存變更覆蓋至當前方案"
-            >
-              💾 儲存變更
-            </button>
-            <button
-              v-if="!currentProfile?.isSystem"
-              type="button"
-              class="btn btn-xs btn-danger-outline"
-              @click="deleteProfile(currentProfileId)"
-              title="刪除當前自訂方案"
-            >
-              ✕ 刪除
-            </button>
-          </template>
-        </div>
-
-        <div class="ribbon-v-divider"></div>
-
-        <!-- 編輯解鎖控制按鈕 -->
-        <template v-if="isEditing">
-          <button
-            type="button"
-            class="btn btn-xs btn-primary btn-done-edit"
-            @click="isEditing = false; isDrawerOpen = false; saveProfilesToStorage()"
-            title="完成版面調整並重新鎖定工作台"
-          >
-            ✓ 完成鎖定
-          </button>
-        </template>
-        <template v-else>
-          <button
-            type="button"
-            class="btn btn-xs btn-secondary btn-enter-edit"
-            @click="isEditing = true"
-            title="解鎖工作台：拖移排序、微調比例、縮放卡片、儲存方案"
-          >
-            ⚙ 調整版面
-          </button>
-        </template>
-      </div>
-    </div>
-
-    <!-- Edit Mode Interactive Guide Bar -->
-    <div v-if="isEditing" class="edit-mode-guide-bar">
-      <div class="guide-left">
-        <span class="guide-icon">💡</span>
-        <span class="guide-text">
-          <strong>微調小撇步：</strong> 按住標題拖曳換位 · 拖動分割線縮放卡片寬高 · 點擊「✓ 完成鎖定」固化
-        </span>
-      </div>
-      <button type="button" class="btn-guide-close" @click="isEditing = false">鎖定 ✕</button>
-    </div>
 
     
 
@@ -2320,6 +2095,28 @@ onUnmounted(() => {
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
+
+                <!-- 5. 雙版本快速切換膠囊 (V0 經典移植 vs Astra 原版) -->
+                <div class="version-switch-pill" role="group">
+                  <button
+                    type="button"
+                    class="btn-ver-pill"
+                    :class="{ active: isCardV0(bbgPanes.leftUpper) }"
+                    @click.stop="setSlotCardVersion('leftUpper', 'v0')"
+                    title="切換為 V0 經典移植版"
+                  >
+                    V0
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-ver-pill"
+                    :class="{ active: !isCardV0(bbgPanes.leftUpper) }"
+                    @click.stop="setSlotCardVersion('leftUpper', 'astra')"
+                    title="切換為 Astra 原版"
+                  >
+                    原版
+                  </button>
+                </div>
               </div>
             </div>
             <div class="bbg-card-body">
@@ -2436,8 +2233,8 @@ onUnmounted(() => {
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
-              
-                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+
+                <!-- 5. 雙版本快速切換膠囊 (V0 經典移植 vs Astra 原版) -->
                 <div class="version-switch-pill" role="group">
                   <button
                     type="button"
@@ -2578,8 +2375,8 @@ onUnmounted(() => {
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
-              
-                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+
+                <!-- 5. 雙版本快速切換膠囊 (V0 經典移植 vs Astra 原版) -->
                 <div class="version-switch-pill" role="group">
                   <button
                     type="button"
@@ -2716,8 +2513,8 @@ onUnmounted(() => {
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
-              
-                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+
+                <!-- 5. 雙版本快速切換膠囊 (V0 經典移植 vs Astra 原版) -->
                 <div class="version-switch-pill" role="group">
                   <button
                     type="button"
@@ -2856,8 +2653,8 @@ onUnmounted(() => {
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '7D' }" @click.stop="setV0Period('7D')">7D</button>
                   <button type="button" class="seg-btn" :class="{ active: v0Period === '30D' }" @click.stop="setV0Period('30D')">30D</button>
                 </div>
-              
-                <!-- 5. 雙版本快速切換膠囊 (未定案卡片隨時可切換) -->
+
+                <!-- 5. 雙版本快速切換膠囊 (V0 經典移植 vs Astra 原版) -->
                 <div class="version-switch-pill" role="group">
                   <button
                     type="button"
@@ -3084,39 +2881,35 @@ onUnmounted(() => {
   color: #e8b45e;
 }
 
-/* 全域風格切換按鈕群組 */
-.quick-theme-switcher {
+/* 定案版面狀態標籤樣式 */
+.layout-status-badge {
   display: inline-flex;
   align-items: center;
-  background: #11141b;
-  border: 1px solid #282c31;
+  gap: 6px;
+  background: #111418;
+  border: 1px solid #24282e;
   border-radius: 4px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.btn-theme-toggle {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #8b949e;
   padding: 3px 8px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
+  font-size: 11px;
 }
 
-.btn-theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
+.badge-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.badge-title {
   color: #e5e8ec;
+  font-weight: 600;
 }
 
-.btn-theme-toggle.active {
-  background: #1a221f;
-  color: #65cba7;
-  border-color: rgba(101, 203, 167, 0.4);
+.badge-ratio {
+  font-size: 9px;
+  background: rgba(232, 180, 94, 0.15);
+  color: #e8b45e;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
 }
 
 .ribbon-v-divider {

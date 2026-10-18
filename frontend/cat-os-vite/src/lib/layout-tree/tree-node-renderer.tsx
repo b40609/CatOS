@@ -10,6 +10,7 @@ import type {
   LeafNode,
 } from "./types";
 import { useLayoutStore } from "@/state/layoutStore";
+import { CardSlotContext } from "./card-slot-context";
 
 interface TreeNodeRendererProps {
   node: LayoutNode;
@@ -96,6 +97,7 @@ function LeafCardPane({
 }: LeafCardPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const seamStyle = useLayoutStore((s) => s.seamStyle);
+  const replaceLeafNode = useLayoutStore((s) => s.replaceLeafNode);
   const isDraggingThis = draggingLeafId === leaf.id;
 
   // 1. 如果此節點為「實時流體落位預演槽 (Live Landing Slot)」
@@ -217,7 +219,15 @@ function LeafCardPane({
       )}
     >
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden [&_.panel]:border-0 [&_.panel]:rounded-none [&_.panel]:bg-transparent [&_.panel]:backdrop-blur-none [&_.panel]:shadow-none">
-        {renderCard(leaf.cardId)}
+        <CardSlotContext.Provider
+          value={{
+            leafId: leaf.id,
+            cardId: leaf.cardId,
+            replaceCard: (newCardId) => replaceLeafNode(leaf.id, newCardId),
+          }}
+        >
+          {renderCard(leaf.cardId)}
+        </CardSlotContext.Provider>
       </div>
     </div>
   );

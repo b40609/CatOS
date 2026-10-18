@@ -8,7 +8,7 @@ import { usePreferences } from '@/state/usePreferences';
 import { useWorkspace } from '@/state/useWorkspace';
 
 const route = useRoute();
-const { preferences, setSidebarStyle, setSidebarWidth, resetSidebarWidth, toggleSidebarFold, togglePresentationStyle } = usePreferences();
+const { preferences, setSidebarStyle, setSidebarWidth, resetSidebarWidth, toggleSidebarFold } = usePreferences();
 const { telemetry, currentMode, modeNotice } = useWorkspace();
 
 // Resizable Sidebar Splitter State (VS Code / Bloomberg / TradingView Pro)
@@ -107,40 +107,6 @@ function updateClock() {
 let clockTimer: any = null;
 
 const navSections = computed<NavSection[]>(() => {
-  if (preferences.value.presentationStyle === 'relaxed_pro') {
-    return [
-      {
-        title: 'OVERVIEW',
-        items: [
-          { path: '/', name: 'Dashboard', sub: '戰情總覽', icon: 'dashboard', shortcut: '1' }
-        ]
-      },
-      {
-        title: 'RESEARCH',
-        items: [
-          { path: '/strategies', name: 'Strategies', sub: '策略中心', icon: 'strategy', shortcut: '2' },
-          { path: '/backtest', name: 'Backtest', sub: '歷史回測', icon: 'backtest', shortcut: '3' },
-          { path: '/optimization', name: 'Optimization', sub: '參數優化', icon: 'optimization', shortcut: '4' },
-          { path: '/review', name: 'Review', sub: '策略覆盤', icon: 'review', shortcut: '5' }
-        ]
-      },
-      {
-        title: 'EXECUTION & RISK',
-        items: [
-          { path: '/bots', name: 'Bots', sub: '機器人管理', icon: 'bots', shortcut: '6' },
-          { path: '/risk', name: 'Risk Control', sub: '風控中心', icon: 'risk', shortcut: '7' }
-        ]
-      },
-      {
-        title: 'ECOSYSTEM & SYSTEM',
-        items: [
-          { path: '/market-intel', name: 'Market Intel', sub: '市場情報', icon: 'market', shortcut: '8' },
-          { path: '/logs', name: 'Logs', sub: '系統日誌', icon: 'logs', shortcut: '9' }
-        ]
-      }
-    ];
-  }
-
   const isEn = preferences.value.language === 'en';
   return [
     {
@@ -184,21 +150,6 @@ function isBadgeVisible(badgeId?: 'bots' | 'risk' | 'market'): boolean {
 }
 
 const pageTitle = computed(() => {
-  if (preferences.value.presentationStyle === 'relaxed_pro') {
-    const p = route.path;
-    if (p === '/') return 'Dashboard';
-    if (p === '/strategies') return 'Strategies';
-    if (p === '/backtest') return 'Backtest';
-    if (p === '/optimization') return 'Optimization';
-    if (p === '/review') return 'Review';
-    if (p === '/bots') return 'Bots';
-    if (p === '/risk') return 'Risk Control';
-    if (p === '/market-intel') return 'Market Intel';
-    if (p === '/logs') return 'Logs';
-    if (p === '/settings') return 'Settings';
-    return 'Dashboard';
-  }
-
   const isEn = preferences.value.language === 'en';
   const path = route.path;
   if (path === '/') return isEn ? 'Dashboard Overview' : '系統總覽';
@@ -254,14 +205,13 @@ onUnmounted(() => {
       `sidebar-${preferences.sidebarStyle.toLowerCase()}`,
       {
         'sidebar-is-folded': preferences.sidebarFolded || preferences.sidebarBehavior === 'folded',
-        'is-resizing-sidebar': isResizingSidebar,
-        'is-relaxed-shell': preferences.presentationStyle === 'relaxed_pro'
+        'is-resizing-sidebar': isResizingSidebar
       }
     ]"
     :style="{
       '--sidebar-width': (preferences.sidebarFolded || preferences.sidebarBehavior === 'folded')
         ? '64px'
-        : (preferences.presentationStyle === 'relaxed_pro' ? '228px' : `${preferences.sidebarWidth || 245}px`)
+        : `${preferences.sidebarWidth || 245}px`
     }"
   >
     <!-- Left Attached Sidebar (Default: Tabler Attached + Expanded + 0.5 Radius) -->
@@ -296,44 +246,19 @@ onUnmounted(() => {
       </div>
 
       <!-- 1. Sidebar Brand Header -->
-      <div class="sidebar-header" :class="{ 'is-relaxed-header': preferences.presentationStyle === 'relaxed_pro' }">
-        <template v-if="preferences.presentationStyle === 'relaxed_pro'">
-          <div class="brand-top-row-relaxed">
-            <span class="relaxed-cat-badge">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 4-.42 4 .57 1.07 1 2.24 1 3.44C21 16 17 21 12 21S3 16 3 10.44c0-1.2.43-2.37 1-3.44 0 0-1.82-3.42-.42-4 1.39-.58 4.64.26 6.42 2.26.65-.17 1.33-.26 2-.26z"/>
-                <circle cx="9" cy="12" r="1"/>
-                <circle cx="15" cy="12" r="1"/>
-              </svg>
-            </span>
-            <span v-if="!preferences.sidebarFolded" class="relaxed-brand-text">
-              catOS<span class="relaxed-dot-green">.</span>
-            </span>
-          </div>
-
-          <!-- Quant Workspace Card Inset -->
-          <div v-if="!preferences.sidebarFolded" class="relaxed-workspace-card">
-            <span class="relaxed-ws-badge">M</span>
-            <span class="relaxed-ws-text">Quant Workspace</span>
-            <svg class="relaxed-ws-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
-        </template>
-        <template v-else>
-          <div class="brand-top-row">
-            <div class="brand-left-group">
-              <div class="brand-badge">C</div>
-              <div v-if="!preferences.sidebarFolded" class="brand-text-col">
-                <div class="brand-row">
-                  <span class="brand-name">catOS</span>
-                  <span class="brand-ver">v1.2</span>
-                </div>
-                <span class="brand-tagline">QUANTITATIVE DESK</span>
+      <div class="sidebar-header">
+        <div class="brand-top-row">
+          <div class="brand-left-group">
+            <div class="brand-badge">C</div>
+            <div v-if="!preferences.sidebarFolded" class="brand-text-col">
+              <div class="brand-row">
+                <span class="brand-name">catOS</span>
+                <span class="brand-ver">v1.2</span>
               </div>
+              <span class="brand-tagline">QUANTITATIVE DESK</span>
             </div>
           </div>
-        </template>
+        </div>
       </div>
 
 
@@ -498,85 +423,30 @@ onUnmounted(() => {
             :aria-label="preferences.sidebarFolded ? '展開側邊欄' : '收合側邊欄'"
           >
             <!-- Lovable [|<] collapse icon when in relaxed mode (Lucide PanelLeftClose) -->
-            <svg v-if="preferences.presentationStyle === 'relaxed_pro'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="2"/>
-              <path d="M9 3v18"/>
-              <path d="m16 15-3-3 3-3"/>
-            </svg>
-            <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <line x1="9" y1="3" x2="9" y2="21"/>
             </svg>
           </button>
 
-          <!-- Lovable Breadcrumb Trail Workspace / {{ pageTitle }} -->
-          <div v-if="preferences.presentationStyle === 'relaxed_pro'" class="breadcrumb-trail">
-            <span class="crumb-dim">Workspace</span>
-            <span class="crumb-slash">/</span>
-            <span class="crumb-active">{{ pageTitle }}</span>
-          </div>
-          <span v-else class="header-title">{{ pageTitle }}</span>
+          <span class="header-title">{{ pageTitle }}</span>
         </div>
 
         <div class="header-right">
-          <!-- ✦ 鬆弛專業版 vs 原版高密版 即時切換比對膠囊 -->
-          <div class="presentation-switch-wrap">
-            <button
-              type="button"
-              class="style-toggle-pill"
-              :class="{ 'is-relaxed': preferences.presentationStyle === 'relaxed_pro' }"
-              @click="togglePresentationStyle"
-              :title="preferences.presentationStyle === 'relaxed_pro' ? '點擊切換為原版高密平鋪模式 (Bloomberg)' : '點擊切換為 ✦ 鬆弛專業模式 (Lovable)'"
-            >
-              <span class="pill-dot" :class="preferences.presentationStyle === 'relaxed_pro' ? 'dot-relaxed' : 'dot-bloomberg'"></span>
-              <span class="pill-text">
-                {{ preferences.presentationStyle === 'relaxed_pro' ? '✦ 鬆弛專業版' : '原版高密版' }}
-              </span>
-            </button>
+          <!-- Page Actions Teleport Target for Unified Header Mode -->
+          <div id="header-page-actions" class="header-page-actions"></div>
+
+          <!-- Finalized Mode Selector in Top Header Right beside connection status (Option 2) -->
+          <div class="header-mode-wrap">
+            <ModeSelector variant="segmented" />
           </div>
-
-          <template v-if="preferences.presentationStyle === 'relaxed_pro'">
-            <span class="trading-pill-gold num">PAPER TRADING</span>
-            <span class="engine-status-text">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="pulse-radio-icon">
-                <circle cx="12" cy="12" r="2"/>
-                <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"/>
-              </svg>
-              Engine online
-            </span>
-            <span class="clock-utc-text num">{{ liveClock }} UTC+8</span>
-          </template>
-
-          <template v-else>
-            <!-- Page Actions Teleport Target for Unified Header Mode -->
-            <div id="header-page-actions" class="header-page-actions"></div>
-
-            <!-- Finalized Mode Selector in Top Header Right beside connection status (Option 2) -->
-            <div class="header-mode-wrap">
-              <ModeSelector variant="segmented" />
-            </div>
-            <TelemetryPopover />
-          </template>
+          <TelemetryPopover />
         </div>
       </header>
-
 
       <main class="app-body">
         <router-view />
       </main>
-
-      <!-- Lovable Style Grounded Terminal Footer -->
-      <footer v-if="preferences.presentationStyle === 'relaxed_pro'" class="relaxed-footer">
-        <div class="footer-left">
-          <span class="footer-latency-dot"></span>
-          <span>Binance <span class="num">18ms</span></span>
-          <span class="footer-bar">|</span>
-          <span>OKX <span class="num">24ms</span></span>
-        </div>
-        <div class="footer-right">
-          <span>catOS Terminal · Simulated market data</span>
-        </div>
-      </footer>
     </div>
 
   </div>
@@ -974,8 +844,9 @@ onUnmounted(() => {
   box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
 }
 
-.pill-bloomberg {
-  background: var(--os-warn);
+.dot-quad {
+  background: var(--os-warn, #e8b45e);
+  box-shadow: 0 0 6px rgba(232, 180, 94, 0.6);
 }
 
 /* Relaxed Pro Specific Styles */

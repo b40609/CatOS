@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { INITIAL_BOTS, equitySeries, summarize, formatPct, formatUsd, toneOf, type Bot } from "@/lib/v0-engine";
 import { CardHeaderTitle } from "./card-header-title";
@@ -21,6 +21,27 @@ interface V0BotTableProps {
 export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
   const [bots, setBots] = useState<Bot[]>(INITIAL_BOTS);
   const [focusedBotId, setFocusedBotId] = useState<string | null>(null);
+  const [flashBotId, setFlashBotId] = useState<Record<string, "up" | "down">>({});
+
+  // 模擬 Tick 波動微光跳動 (已定案固化)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const targetIdx = Math.floor(Math.random() * INITIAL_BOTS.length);
+      const isUp = Math.random() > 0.45;
+      const targetBot = INITIAL_BOTS[targetIdx];
+      if (!targetBot) return;
+
+      setFlashBotId((prev) => ({ ...prev, [targetBot.id]: isUp ? "up" : "down" }));
+      setTimeout(() => {
+        setFlashBotId((prev) => {
+          const next = { ...prev };
+          delete next[targetBot.id];
+          return next;
+        });
+      }, 700);
+    }, 3200);
+    return () => clearInterval(timer);
+  }, []);
 
   const runningCount = bots.filter((b) => b.status === "running").length;
 
@@ -130,7 +151,7 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
               <th className="px-1.5 font-medium">POSITION / NOTIONAL</th>
               <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
               <th className="px-1.5 text-right font-medium hidden sm:table-cell">DAILY / 7D</th>
-              <th className="px-1.5 font-medium hidden md:table-cell">DD / P6 GUARD</th>
+              <th className="px-1.5 font-medium hidden md:table-cell">回撤 / 交易所停損</th>
               <th className="py-2 pr-3 pl-1.5 text-right font-medium">TREND & ACT</th>
             </tr>
           </thead>
@@ -146,7 +167,9 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
                   className={cn(
                     "hover:bg-secondary/40 transition-colors group cursor-pointer",
                     focusedBotId === bot.id && "bg-secondary/50",
-                    isPaused && "opacity-60 bg-background/20"
+                    isPaused && "opacity-60 bg-background/20",
+                    flashBotId[bot.id] === "up" && "flash-up",
+                    flashBotId[bot.id] === "down" && "flash-down"
                   )}
                   onMouseEnter={() => setFocusedBotId(bot.id)}
                   onMouseLeave={() => setFocusedBotId(null)}
@@ -221,8 +244,8 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
                       <span className="text-[9.5px] text-muted-foreground leading-tight">
                         DD: <span className="text-rose-400 font-semibold">{pos.dd.toFixed(2)}%</span>
                       </span>
-                      <span className="text-[8.5px] text-amber-400/80 leading-tight">
-                        P6: {pos.p6Guard.toFixed(1)}% OKX-SL
+                      <span className="text-[8.5px] text-primary/90 leading-tight">
+                        停損: {pos.p6Guard.toFixed(1)}% (OKX)
                       </span>
                     </div>
                   </td>

@@ -4,6 +4,7 @@ import { SlidersHorizontal, Award, Sparkles, Download } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ParetoScatterChart, type TrialPoint } from "@/components/catos/pareto-scatter-chart";
 
 export const Route = createFileRoute("/optimization")({
   head: () => ({
@@ -39,6 +40,24 @@ function OptimizationPage() {
   const [selectedTrial, setSelectedTrial] = useState<OptTrial>(TRIALS[0]);
   const [exported, setExported] = useState(false);
 
+  const handleSelectParetoTrial = (point: TrialPoint) => {
+    const found = TRIALS.find((t) => t.trialNumber === point.trialNumber);
+    if (found) {
+      setSelectedTrial(found);
+    } else {
+      setSelectedTrial({
+        trialNumber: point.trialNumber,
+        fastPeriod: point.fastPeriod,
+        slowPeriod: point.slowPeriod,
+        atrMultiplier: point.atrMultiplier,
+        sharpe: point.sharpe.toFixed(2),
+        totalReturn: `+${point.totalReturn}%`,
+        maxDrawdown: `-${point.maxDrawdown}%`,
+        isBest: point.isBest || false,
+      });
+    }
+  };
+
   return (
     <AppShell>
       <PageHead
@@ -57,43 +76,28 @@ function OptimizationPage() {
         }
       />
 
-      <div className="space-y-4">
-        {/* ==================== 頂部優化任務全景狀態卡 ==================== */}
-        <div className="rounded-xl border border-border/80 bg-surface/90 p-4 shadow-xs backdrop-blur-md">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">目標策略</span>
-              <p className="mt-1 text-sm font-semibold text-primary">EMA-ATR-Breakout</p>
-              <span className="text-[10px] text-muted-foreground">單合約 BTC-USDT 15m</span>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">搜尋演算法</span>
-              <p className="mt-1 font-mono text-sm font-semibold text-foreground">TPE (Tree-structured Parzen)</p>
-              <span className="text-[10px] text-muted-foreground">Optuna 貝氏採樣</span>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">試驗進度 (Trials)</span>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="font-mono text-sm font-bold text-foreground">100 / 100</span>
-                <span className="rounded bg-primary/10 border border-primary/20 px-1.5 py-0.2 text-[9px] font-mono font-medium text-primary">
-                  COMPLETED
-                </span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">並行 4 Workers 耗時 42s</span>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">最佳評分 (Sharpe)</span>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className="font-mono text-xl font-bold text-up">2.45</span>
-                <span className="font-mono text-xs text-primary font-medium">(Trial #42)</span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">年化收益 +26.8% · 回撤 -3.8%</span>
-            </div>
+      <div className="space-y-3">
+        {/* ==================== 頂部任務狀態 (定案 Scheme B 滿版純淨視野) ==================== */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <span className="text-muted-foreground">目標: <strong className="text-primary font-semibold">EMA-ATR-Breakout (15m)</strong></span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">演算法: <strong className="text-foreground">TPE (Optuna)</strong></span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">進度: <strong className="text-foreground font-bold">100 / 100</strong> (4 Workers)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">最佳評分:</span>
+            <span className="text-up font-bold text-sm">Sharpe 2.45</span>
+            <span className="text-primary font-medium text-[11px]">(Trial #42)</span>
           </div>
         </div>
+
+        {/* ==================== 定案：帕累托前沿二維散佈圖 ==================== */}
+        <ParetoScatterChart
+          selectedTrialNumber={selectedTrial.trialNumber}
+          onSelectTrial={handleSelectParetoTrial}
+        />
 
         {/* ==================== 下半部：左欄搜尋空間，右欄試驗排行榜 ==================== */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

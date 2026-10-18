@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import RelaxedRiskView from '@/components/relaxed/RelaxedRiskView.vue';
 import { usePreferences } from '@/state/usePreferences';
 import type { RiskState } from '@/contracts';
 import { activeAdapter } from '@/adapters/mock-adapter';
@@ -39,8 +38,7 @@ onUnmounted(() => { ++loadToken; });
 </script>
 
 <template>
-  <RelaxedRiskView v-if="preferences.presentationStyle === 'relaxed_pro'" />
-  <div v-else class="risk-page">
+  <div class="risk-page">
     <!-- Teleport Actions to Unified Header -->
     <Teleport to="#header-page-actions">
       <div class="header-actions-group">

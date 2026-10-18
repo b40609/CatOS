@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
+import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { cn } from "@/lib/utils";
 
@@ -302,9 +303,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           !isResizing && "transition-all duration-200"
         )}
       >
-        {/* Breathing Room Top Navigation Header */}
-        <header className="sticky top-0 z-20 flex h-11 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:px-6">
-          <div className="flex items-center gap-3">
+        {/* Breathing Room Top Navigation Header (z-40 確保頂部彈窗高於工作區分割條 z-20) */}
+        <header className="sticky top-0 z-40 flex h-11 items-center justify-between border-b border-border bg-background/95 px-3 backdrop-blur lg:px-5 gap-2">
+          <div className="flex items-center gap-2.5 shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -324,18 +325,22 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          {/* 右側：工作台主畫面卡片庫與自定義入口 */}
-          <div className="flex items-center gap-2">
-            <CardManagerDropdown />
+          {/* 右側：工作台卡片庫與核心交易模式切換 */}
+          <div className="flex items-center gap-2 shrink-0">
+            {current?.to === "/" && <CardManagerDropdown />}
+            <ModeSelector />
+            <span className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground hidden sm:flex">
+              <PulseBeacon size={4} variant="up" /> Engine online
+            </span>
           </div>
         </header>
 
         <main className="w-full p-3 lg:p-4">{children}</main>
 
         {/* 頁面底座 Grounded Footer */}
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-[10px] text-muted-foreground lg:px-6">
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-[10px] text-muted-foreground lg:px-6">
           <div className="flex items-center gap-2">
-            <PulseBeacon size={5} />
+            <PulseBeacon size={4.5} />
             <span>Binance <span className="num font-medium text-foreground/80">18ms</span></span>
             <span className="mx-1 text-border">|</span>
             <span>OKX <span className="num font-medium text-foreground/80">24ms</span></span>
@@ -351,9 +356,6 @@ export function PageHead({
   title,
   code,
   desc,
-  dateText = "Oct 10, 2026",
-  onExport,
-  isExported = false,
   right,
 }: {
   title: string;
@@ -365,40 +367,21 @@ export function PageHead({
   right?: ReactNode;
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/70 bg-secondary/30 px-3 py-1.5 backdrop-blur-sm">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 shrink-0">
+    <div className="mb-2 flex items-center justify-between gap-2 rounded border border-border/60 bg-secondary/20 px-2.5 py-1 backdrop-blur-xs text-xs">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.2 shrink-0">
           {code}
         </span>
-        <span className="text-xs font-semibold text-foreground tracking-tight truncate">
+        <span className="font-semibold text-foreground tracking-tight text-xs truncate">
           {title}
         </span>
         {desc && (
-          <span className="text-[11px] text-muted-foreground/80 hidden sm:inline truncate">
+          <span className="text-[10px] text-muted-foreground/75 hidden md:inline truncate">
             · {desc}
           </span>
         )}
       </div>
-      {right ?? (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="hidden text-[10px] font-mono text-muted-foreground md:block">{dateText}</span>
-          {onExport && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExport}
-              className="h-6 gap-1.5 border-border bg-surface px-2 text-[10px] text-foreground hover:bg-surface-raised transition-colors"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>{isExported ? "Exported" : "Export"}</span>
-            </Button>
-          )}
-        </div>
-      )}
+      {right && <div className="flex items-center gap-1.5 shrink-0">{right}</div>}
     </div>
   );
 }

@@ -59,8 +59,8 @@ export interface Preferences {
 }
 
 const defaultPreferences: Preferences = {
-  themePreset: 'v0-reference', // 預設使用 v0 備份精準主題，可隨時即時切換回原主題
-  presentationStyle: 'relaxed_pro', // 預設使用 ✦ 鬆弛專業版，可隨時即時切換回原版高密版
+  themePreset: 'v0-reference', // 預設使用 v0 備份精準主題
+  presentationStyle: 'dense_bloomberg', // 定案方案一：舒展四分割 (60:40) 定案純淨視圖
 
   dashboardLayout: 'A',
   workspaceMode: 'hybrid', // 預設方案 C：混合式旗艦專業工作台
@@ -98,7 +98,7 @@ function loadStoredPreferences(): Preferences {
 
     // Check URL parameters (?mode=tiling | freeform | hybrid)
     let initialMode: WorkspaceMode = 'hybrid';
-    let initialStyle: PresentationStyle = 'relaxed_pro';
+    let initialStyle: PresentationStyle = 'dense_bloomberg';
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const m = params.get('mode');
@@ -109,10 +109,10 @@ function loadStoredPreferences(): Preferences {
       }
 
       const s = params.get('style');
-      if (s && ['relaxed_pro', 'dense_bloomberg'].includes(s)) {
-        initialStyle = s as PresentationStyle;
-      } else if (['relaxed_pro', 'dense_bloomberg'].includes(parsed.presentationStyle)) {
-        initialStyle = parsed.presentationStyle;
+      if (s === 'relaxed_pro') {
+        initialStyle = 'relaxed_pro';
+      } else {
+        initialStyle = 'dense_bloomberg';
       }
     } else if (['tiling', 'freeform', 'hybrid'].includes(parsed.workspaceMode)) {
       initialMode = parsed.workspaceMode;
@@ -148,7 +148,7 @@ function loadStoredPreferences(): Preferences {
       badgeRiskEnabled: typeof parsed.badgeRiskEnabled === 'boolean' ? parsed.badgeRiskEnabled : true,
       badgeMarketEnabled: typeof parsed.badgeMarketEnabled === 'boolean' ? parsed.badgeMarketEnabled : true,
       sideBadgeStyle: 'tradingview',
-      kpiDualLayer: typeof parsed.kpiDualLayer === 'boolean' ? parsed.kpiDualLayer : true,
+      kpiDualLayer: true,
       tableDualLayer: typeof parsed.tableDualLayer === 'boolean' ? parsed.tableDualLayer : true,
       proEnglishLabels: typeof parsed.proEnglishLabels === 'boolean' ? parsed.proEnglishLabels : false,
       language: (parsed.language === 'en' || parsed.language === 'zh-TW')

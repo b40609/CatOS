@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Pause, Play, Plus, RotateCw, ShieldAlert, Cpu, Network, CheckCircle2, Server } from "lucide-react";
+import { Pause, Play, Plus, RotateCw, Cpu, Network, CheckCircle2, Server } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AppShell, PageHead } from "@/components/catos/shell";
+import { AppShell } from "@/components/catos/shell";
 import { bots as SEED, strategies, type Bot } from "@/lib/mock/data";
 import { fmtSigned } from "@/hooks/use-live";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
@@ -168,62 +168,27 @@ function BotManagement() {
 
   return (
     <AppShell>
-      <PageHead
-        code="engine // bot-fleet"
-        title="機器人管理集群"
-        desc="OKX 專用子帳戶 · 1 Bot : 1 SWAP 獨佔合約 · 毫秒級 IPC 監控"
-        right={<NewBotDialog />}
-      />
-
-      {/* 頂部架構規範與狀態摘要條 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="size-4 text-primary shrink-0" />
-          <span className="font-semibold text-foreground">OKX 執行架構約定：</span>
-          <span className="text-muted-foreground font-mono text-[11px]">
-            1 Bot : 1 SWAP 獨佔 · Supervisor 強制注入 tag: 41cb53c54d6dABDE · cross + net_mode
+      {/* 頂部架構規範與狀態摘要條 (定案 Scheme B 滿版純淨視野) */}
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded border border-border/80 bg-surface/90 px-3 py-1.5 text-xs font-mono shadow-xs backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 uppercase tracking-wider">
+            FLEET
           </span>
-        </div>
-        <div className="flex items-center gap-3 text-[11px] font-mono">
-          <span className="text-muted-foreground">子帳戶隔離: <span className="text-up font-bold">VERIFIED</span></span>
+          <span className="text-muted-foreground">總數: <strong className="text-foreground">{totalBots}</strong></span>
           <span className="text-border">|</span>
-          <span className="text-muted-foreground">平均延遲: <span className="text-primary font-bold">{avgLatency}ms</span></span>
+          <span className="text-up font-bold flex items-center gap-1"><PulseBeacon size={3.5} variant="up" /> 在線: {runningBots}</span>
           <span className="text-border">|</span>
-          <span className="text-muted-foreground">集群今日損益: <span className={cn("font-bold", totalPnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(totalPnl)}</span></span>
+          <span className="text-muted-foreground">暫停: <strong className="text-foreground">{pausedBots}</strong></span>
+          <span className="text-border">|</span>
+          <span className={cn("font-bold", errorBots > 0 ? "text-down" : "text-muted-foreground")}>異常: {errorBots}</span>
+          <span className="text-border">|</span>
+          <span className="text-muted-foreground">延遲: <strong className="text-primary font-bold">{avgLatency}ms</strong></span>
+          <span className="text-border">|</span>
+          <span className="text-muted-foreground">今日損益: <strong className={cn("font-bold", totalPnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(totalPnl)}</strong></span>
         </div>
-      </div>
-
-      {/* 4 大核心 KPI 指標卡 */}
-      <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <div className="rounded-lg border border-border/80 bg-surface/90 p-2.5">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">集群總節點</span>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="font-mono text-lg font-bold text-foreground">{totalBots}</span>
-            <span className="text-[10px] text-muted-foreground font-mono">Workers</span>
-          </div>
-        </div>
-        <div className="rounded-lg border border-up/30 bg-up/5 p-2.5">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-up">在線運行中</span>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="font-mono text-lg font-bold text-up">{runningBots}</span>
-            <span className="flex items-center gap-1 text-[10px] text-up font-mono">
-              <PulseBeacon size={4} variant="up" /> ACTIVE
-            </span>
-          </div>
-        </div>
-        <div className="rounded-lg border border-border/80 bg-surface/90 p-2.5">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">暫停維護</span>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="font-mono text-lg font-bold text-muted-foreground">{pausedBots}</span>
-            <span className="text-[10px] text-muted-foreground font-mono">PAUSED</span>
-          </div>
-        </div>
-        <div className="rounded-lg border border-down/30 bg-down/5 p-2.5">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-down">異常警告</span>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="font-mono text-lg font-bold text-down">{errorBots}</span>
-            <span className="text-[10px] text-down font-mono">{errorBots > 0 ? "ATTENTION" : "CLEAR"}</span>
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP · tag: 41cb53c5</span>
+          <NewBotDialog />
         </div>
       </div>
 
@@ -375,7 +340,7 @@ function BotManagement() {
                   <span className="text-foreground">cross + net_mode</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>P6 災難停損:</span>
+                  <span>交易所停損:</span>
                   <span className="text-foreground">15.0% (Mark Tick Floor)</span>
                 </div>
                 <div className="flex justify-between">
