@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
+import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { cn } from "@/lib/utils";
 
 
@@ -69,35 +70,31 @@ const GROUPS: NavigationGroup[] = [
   },
 ];
 
-const MIN_SIDEBAR_WIDTH = 190;
-const MAX_SIDEBAR_WIDTH = 420;
-const DEFAULT_SIDEBAR_WIDTH = 245;
-const COLLAPSE_THRESHOLD = 135;
-const EXPAND_THRESHOLD = 145;
+import {
+  useSidebarStore,
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  COLLAPSE_THRESHOLD,
+  EXPAND_THRESHOLD,
+} from "@/state/sidebarStore";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const {
+    collapsed,
+    sidebarWidth,
+    setCollapsed,
+    setSidebarWidth,
+    resetSidebarWidth,
+    toggleCollapsed,
+  } = useSidebarStore();
+
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const current = GROUPS.flatMap((g) => g.items).find((n) => n.to === pathname);
   const { t, language } = useI18n();
 
-
-  // 可調整側邊欄寬度狀態（持久化至 localStorage，預設 245px）
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("catos_sidebar_width");
-      if (saved) {
-        const n = parseInt(saved, 10);
-        if (!isNaN(n) && n >= MIN_SIDEBAR_WIDTH && n <= MAX_SIDEBAR_WIDTH) {
-          return n;
-        }
-      }
-    }
-    return DEFAULT_SIDEBAR_WIDTH;
-  });
   const [isResizing, setIsResizing] = useState(false);
 
-  // 使用 Refs 杜絕 React 閉包陳舊問題，確保拖曳過程中有精確的段落感吸附與切換
+  // 使用 Refs 杜絕閉包陳舊問題，確保拖曳過程中有精確的段落感吸附與切換
   const collapsedRef = useRef(collapsed);
   collapsedRef.current = collapsed;
   const sidebarWidthRef = useRef(sidebarWidth);
@@ -121,7 +118,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           setCollapsed(false);
           const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, rawTarget));
           setSidebarWidth(clamped);
-          localStorage.setItem("catos_sidebar_width", clamped.toString());
         }
         return;
       }
@@ -138,7 +134,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       setCollapsed(false);
       const clamped = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, rawTarget));
       setSidebarWidth(clamped);
-      localStorage.setItem("catos_sidebar_width", clamped.toString());
     };
 
     const onPointerUp = () => {
@@ -155,9 +150,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const handleResizerDblClick = () => {
     collapsedRef.current = false;
-    setCollapsed(false);
-    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
-    localStorage.setItem("catos_sidebar_width", DEFAULT_SIDEBAR_WIDTH.toString());
+    resetSidebarWidth();
   };
 
   // 拖曳調整期間鎖定全域光標與反白，杜絕閃爍
@@ -184,15 +177,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           return;
         }
         e.preventDefault();
-        setCollapsed((v) => {
-          collapsedRef.current = !v;
-          return !v;
-        });
+        toggleCollapsed();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [toggleCollapsed]);
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
@@ -218,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className={cn(
               "resizer-line absolute inset-y-0 left-[4px] w-[2px] transition-colors pointer-events-none",
-              isResizing ? "bg-primary shadow-[0_0_8px_rgba(52,211,153,0.6)]" : "bg-transparent group-hover:bg-primary/70"
+              isResizing ? "bg-primary shadow-[0_0_8px_var(--color-primary)]/60" : "bg-transparent group-hover:bg-primary/70"
             )}
           />
         </div>
@@ -232,7 +222,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
           title="CatOS Dashboard"
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_12px_rgba(52,211,153,0.3)]">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_12px_var(--color-primary)]/40">
             <Cat className="size-5" strokeWidth={2} />
           </span>
           {!collapsed && (
@@ -313,30 +303,37 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         {/* Breathing Room Top Navigation Header */}
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur lg:px-7">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? "展開側邊欄 (Ctrl+B)" : "收合側邊欄 (Ctrl+B)"}
-            aria-label={collapsed ? "展開側邊欄" : "收合側邊欄"}
-            className="size-7 text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-          </Button>
+        <header className="sticky top-0 z-20 flex h-11 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur lg:px-6">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCollapsed}
+              title={collapsed ? "展開側邊欄 (Ctrl+B)" : "收合側邊欄 (Ctrl+B)"}
+              aria-label={collapsed ? "展開側邊欄" : "收合側邊欄"}
+              className="size-7 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            </Button>
 
-          {/* Breadcrumbs: Dim Workspace / Bright Active Page */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="hidden text-muted-foreground/75 sm:inline">{t("workspace_trail")}</span>
-            <span className="hidden text-muted-foreground/40 sm:inline">/</span>
-            <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
+            {/* Breadcrumbs: Dim Workspace / Bright Active Page */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="hidden text-muted-foreground/75 sm:inline">{t("workspace_trail")}</span>
+              <span className="hidden text-muted-foreground/40 sm:inline">/</span>
+              <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
+            </div>
+          </div>
+
+          {/* 右側：工作台主畫面卡片庫與自定義入口 */}
+          <div className="flex items-center gap-2">
+            <CardManagerDropdown />
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1700px] p-4 lg:px-7 lg:py-6">{children}</main>
+        <main className="w-full p-3 lg:p-4">{children}</main>
 
         {/* 頁面底座 Grounded Footer */}
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-[10px] text-muted-foreground lg:px-7">
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2.5 text-[10px] text-muted-foreground lg:px-6">
           <div className="flex items-center gap-2">
             <PulseBeacon size={5} />
             <span>Binance <span className="num font-medium text-foreground/80">18ms</span></span>
@@ -368,28 +365,36 @@ export function PageHead({
   right?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <p className="mb-1 text-[10px] font-mono font-medium uppercase tracking-wider text-muted-foreground">{code}</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
-        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{desc}</p>
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/70 bg-secondary/30 px-3 py-1.5 backdrop-blur-sm">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 shrink-0">
+          {code}
+        </span>
+        <span className="text-xs font-semibold text-foreground tracking-tight truncate">
+          {title}
+        </span>
+        {desc && (
+          <span className="text-[11px] text-muted-foreground/80 hidden sm:inline truncate">
+            · {desc}
+          </span>
+        )}
       </div>
       {right ?? (
-        <div className="flex items-center gap-3">
-          <span className="hidden text-[11px] text-muted-foreground md:block">{dateText}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="hidden text-[10px] font-mono text-muted-foreground md:block">{dateText}</span>
           {onExport && (
             <Button
               variant="outline"
               size="sm"
               onClick={onExport}
-              className="gap-2 border-border bg-surface text-[11px] text-foreground hover:bg-surface-raised transition-colors"
+              className="h-6 gap-1.5 border-border bg-surface px-2 text-[10px] text-foreground hover:bg-surface-raised transition-colors"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span>{isExported ? "Exported" : "Export snapshot"}</span>
+              <span>{isExported ? "Exported" : "Export"}</span>
             </Button>
           )}
         </div>
@@ -400,12 +405,14 @@ export function PageHead({
 
 export function Panel({ title, meta, className, children }: { title: ReactNode; meta?: ReactNode; className?: string; children: ReactNode }) {
   return (
-    <section className={cn("panel flex min-w-0 flex-col", className)}>
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-        <h2 className="text-xs font-medium text-foreground">{title}</h2>
+    <section className={cn("panel flex min-w-0 flex-col overflow-hidden", className)}>
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3.5 py-2 shrink-0 bg-secondary/50">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-semibold text-foreground tracking-tight">{title}</h2>
+        </div>
         {meta}
       </header>
-      <div className="min-w-0 flex-1 p-4">{children}</div>
+      <div className="min-w-0 flex-1 p-3 flex flex-col overflow-hidden">{children}</div>
     </section>
   );
 }

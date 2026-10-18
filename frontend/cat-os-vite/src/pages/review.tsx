@@ -316,7 +316,7 @@ function StrategyReviewPage() {
                 {/* 左軸：策略淨值累積收益率 */}
                 <YAxis
                   yAxisId="equity"
-                  domain={['dataMin - 1', 'dataMax + 2']}
+                  domain={[(min: number) => Math.floor(min - 1), (max: number) => Math.ceil(max + 2)]}
                   tick={{ fill: "var(--muted-foreground)", fontSize: 10, fontFamily: "var(--font-mono)" }}
                   tickFormatter={(v) => `+${Number(v).toFixed(0)}%`}
                   axisLine={false}

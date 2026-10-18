@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Check,
   KeyRound,
@@ -77,6 +77,14 @@ export function PersonalOsModal({
   const [nameInput, setNameInput] = useState(displayName);
   const [aliasInput, setAliasInput] = useState(subAccountAlias);
   const [savedToast, setSavedToast] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+      setNameInput(displayName);
+      setAliasInput(subAccountAlias);
+    }
+  }, [isOpen, initialTab, displayName, subAccountAlias]);
 
   if (!isOpen) return null;
 

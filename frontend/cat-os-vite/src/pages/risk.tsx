@@ -104,22 +104,40 @@ function RiskManagement() {
   return (
     <AppShell>
       <PageHead
-        code="module / risk-management"
-        title="風險控管"
-        desc="永續合約曝險、槓桿熔斷與鏈上風險追蹤 · 模擬數據"
+        code="guardian // risk-engine"
+        title="風險控管中心"
+        desc="E_risk = E_verified · Asia/Taipei 00:00 日損鎖存 · Soft 10% / Hard 20% · 槓桿上限 3.0x"
         right={
-          <div className="flex items-center gap-2 border border-warn/40 px-3 py-1.5">
-            <PulseBeacon size={5} variant="warn" />
-            <span className="label-xs !text-warn">2 項規則接近門檻</span>
+          <div className="flex items-center gap-2 border border-warn/40 bg-warn/10 rounded px-2.5 py-1">
+            <PulseBeacon size={4} variant="warn" />
+            <span className="font-mono text-[11px] font-semibold text-warn">2 項風控指標接近警戒線</span>
           </div>
         }
       />
 
+      {/* 風控架構條款橫幅 */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase font-bold text-primary bg-primary/15 border border-primary/30 rounded px-1.5 py-0.5">
+            GUARDIAN CORE
+          </span>
+          <span className="font-semibold text-foreground">風控鎖存約定：</span>
+          <span className="text-muted-foreground font-mono text-[11px]">
+            Soft 10% 停止增倉 · Hard 20% 市價清倉與 Kill-Switch 鎖存 · 跨日/重啟不自動解除 · 僅限人工恢復
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
+          <span>基準權益: <span className="text-foreground font-bold">$128,450 USDT</span></span>
+          <span className="text-border">|</span>
+          <span>E_risk 緩衝: <span className="text-up font-bold">100% (No Buffer)</span></span>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Gauge label="total exposure" seed={18.42} vol={0.004} max={30} suffix="M" danger={26} />
-        <Gauge label="leverage" seed={2.81} vol={0.006} max={3} suffix="x" danger={2.9} />
-        <Gauge label="var 95% (1d)" seed={412} vol={0.005} max={800} suffix="k" danger={700} />
-        <Gauge label="concentration" seed={23.4} vol={0.005} max={25} suffix="%" danger={24} />
+        <Gauge label="總曝險名目價值 (Total Exposure)" seed={18.42} vol={0.004} max={30} suffix="M" danger={26} />
+        <Gauge label="帳戶有效槓桿 (Effective Leverage)" seed={2.81} vol={0.006} max={3.0} suffix="x" danger={2.85} />
+        <Gauge label="單幣預算占比 (Single-Asset Cap)" seed={42.8} vol={0.005} max={50.0} suffix="%" danger={45.0} />
+        <Gauge label="當日累計虧損 (Daily Drawdown)" seed={3.42} vol={0.005} max={10.0} suffix="%" danger={8.0} />
       </div>
 
       <div className="mt-3"><DerivativesMetrics /></div>

@@ -140,6 +140,32 @@ export interface SavedLayoutProfile {
 
 const DEFAULT_PROFILES: SavedLayoutProfile[] = [
   {
+    id: 'layout_b_quad',
+    name: '舒展四分割 (60:40已定案)',
+    shortName: '舒展四分割',
+    ratioText: '60:40',
+    icon: '🔲',
+    desc: '左欄 60% 主視野 · 右欄 40% 輔助視野 (四角平衡 50:50) · 已定案佈局',
+    isSystem: true,
+    blueprint: 'bloomberg',
+    allocationMode: 'donut',
+    bbgLeftColWidth: 60,
+    bbgLeftUpperHeight: 50,
+    bbgRightWeights: [50, 50, 0],
+    bbgPanes: {
+      leftUpper: 'v0_equity',
+      leftLower: 'v0_activity',
+      right1: 'v0_bots',
+      right2: 'v0_exposure',
+      right3: 'v0_events'
+    },
+    linearUpperHeight: 50,
+    linearUpperLeftWidth: 60,
+    linearLowerLeftWidth: 60,
+    linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_risk', lowerLeft: 'v0_bots', lowerRight: 'v0_activity' },
+    updatedAt: '定案配置'
+  },
+  {
     id: 'layout_a_bloomberg',
     name: '方案 A · Bloomberg 經典 (62:38)',
     shortName: 'Bloomberg 經典',
@@ -163,32 +189,6 @@ const DEFAULT_PROFILES: SavedLayoutProfile[] = [
     linearUpperLeftWidth: 64,
     linearLowerLeftWidth: 60,
     linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_exposure', lowerLeft: 'v0_bots', lowerRight: 'v0_risk' },
-    updatedAt: '系統內建'
-  },
-  {
-    id: 'layout_b_quad',
-    name: '方案 B · 舒展四分割 (60:40)',
-    shortName: '舒展四分割',
-    ratioText: '60:40',
-    icon: '🔲',
-    desc: '左欄 60% 主視野 · 右欄 40% (Bot 50% / 風控雷達 50%) · 高度充裕',
-    isSystem: true,
-    blueprint: 'bloomberg',
-    allocationMode: 'donut',
-    bbgLeftColWidth: 60,
-    bbgLeftUpperHeight: 52,
-    bbgRightWeights: [50, 50, 0],
-    bbgPanes: {
-      leftUpper: 'v0_equity',
-      leftLower: 'v0_activity',
-      right1: 'v0_bots',
-      right2: 'v0_risk',
-      right3: 'v0_events'
-    },
-    linearUpperHeight: 50,
-    linearUpperLeftWidth: 64,
-    linearLowerLeftWidth: 60,
-    linearPanes: { upperLeft: 'v0_equity', upperRight: 'v0_risk', lowerLeft: 'v0_bots', lowerRight: 'v0_activity' },
     updatedAt: '系統內建'
   },
   {
@@ -248,10 +248,10 @@ const DEFAULT_PROFILES: SavedLayoutProfile[] = [
 const STORAGE_KEY_PROFILES = 'catos_saved_layout_profiles_v12';
 const STORAGE_KEY_CURRENT_PROFILE = 'catos_current_profile_id_v12';
 
-// 方案 A (Bloomberg) 比例狀態
-const bbgLeftColWidth = ref<number>(62);
-const bbgLeftUpperHeight = ref<number>(52);
-const bbgRightWeights = ref<number[]>([36, 32, 32]);
+// 方案 A (Bloomberg) 比例狀態 (預設 60:40 舒展四分割定案)
+const bbgLeftColWidth = ref<number>(60);
+const bbgLeftUpperHeight = ref<number>(50);
+const bbgRightWeights = ref<number[]>([50, 50, 0]);
 
 // 方案 B (Linear) 比例狀態
 const linearUpperHeight = ref<number>(50);
@@ -331,7 +331,7 @@ function setSlotCardVersion(slot: 'leftUpper' | 'leftLower' | 'right1' | 'right2
 }
 
 const savedProfiles = ref<SavedLayoutProfile[]>([...DEFAULT_PROFILES]);
-const currentProfileId = ref<string>('layout_a_bloomberg');
+const currentProfileId = ref<string>('layout_b_quad');
 
 // V0 抽屜交互狀態
 const selectedDrawerBot = ref<DrawerBotData | null>(null);
@@ -637,14 +637,20 @@ function startBbgMainColSplitDrag(e: PointerEvent) {
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
 
+  let rafId: number | null = null;
+
   const onPointerMove = (moveEvt: PointerEvent) => {
     if (!isSplitterDragging.value) return;
-    const deltaX = moveEvt.clientX - startX;
-    const deltaPct = (deltaX / containerWidth) * 100;
-    bbgLeftColWidth.value = Math.min(82, Math.max(38, Math.round(startPct + deltaPct)));
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      const deltaX = moveEvt.clientX - startX;
+      const deltaPct = (deltaX / containerWidth) * 100;
+      bbgLeftColWidth.value = Math.min(82, Math.max(35, Math.round(startPct + deltaPct)));
+    });
   };
 
   const onPointerUp = () => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
     isSplitterDragging.value = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
@@ -659,7 +665,7 @@ function startBbgMainColSplitDrag(e: PointerEvent) {
   window.addEventListener('pointercancel', onPointerUp);
 }
 
-// 2. 方案 A 左欄水平分割線滑動 (走勢圖 vs 持倉部位 上下拉伸高度，需先解鎖)
+// 2. 方案 A 左欄水平分割線滑動 (走勢圖 vs 持倉部位 上下拉伸高度，需先解鎖 · 120 FPS rAF 節流)
 function startBbgLeftSplitDrag(e: PointerEvent) {
   if (!isEditing.value) {
     showToast('請先點擊頂部「⚙ 調整版面」解鎖後，再微調比例');
@@ -676,14 +682,20 @@ function startBbgLeftSplitDrag(e: PointerEvent) {
   document.body.style.cursor = 'row-resize';
   document.body.style.userSelect = 'none';
 
+  let rafId: number | null = null;
+
   const onPointerMove = (moveEvt: PointerEvent) => {
     if (!isSplitterDragging.value) return;
-    const deltaY = moveEvt.clientY - startY;
-    const deltaPct = (deltaY / containerHeight) * 100;
-    bbgLeftUpperHeight.value = Math.min(70, Math.max(30, Math.round(startPct + deltaPct)));
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      const deltaY = moveEvt.clientY - startY;
+      const deltaPct = (deltaY / containerHeight) * 100;
+      bbgLeftUpperHeight.value = Math.min(75, Math.max(25, Math.round(startPct + deltaPct)));
+    });
   };
 
   const onPointerUp = () => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
     isSplitterDragging.value = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
@@ -698,7 +710,7 @@ function startBbgLeftSplitDrag(e: PointerEvent) {
   window.addEventListener('pointercancel', onPointerUp);
 }
 
-// 3. 方案 A 右欄 3 張卡片水平分割線滑動 (Bot / Donut / Events，需先解鎖)
+// 3. 方案 A 右欄水平分割線滑動 (Bot / Donut / Events，需先解鎖 · 120 FPS rAF 節流)
 function startBbgRightSplitDrag(index: number, e: PointerEvent) {
   if (!isEditing.value) {
     showToast('請先點擊頂部「⚙ 調整版面」解鎖後，再微調比例');
@@ -715,24 +727,30 @@ function startBbgRightSplitDrag(index: number, e: PointerEvent) {
   document.body.style.cursor = 'row-resize';
   document.body.style.userSelect = 'none';
 
+  let rafId: number | null = null;
+
   const onPointerMove = (moveEvt: PointerEvent) => {
     if (!isSplitterDragging.value) return;
-    const deltaY = moveEvt.clientY - startY;
-    const deltaPct = (deltaY / containerHeight) * 100;
-    const topIdx = index;
-    const btmIdx = index + 1;
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      const deltaY = moveEvt.clientY - startY;
+      const deltaPct = (deltaY / containerHeight) * 100;
+      const topIdx = index;
+      const btmIdx = index + 1;
 
-    const current = [...initWeights];
-    const maxDelta = current[btmIdx] - 20;
-    const minDelta = -(current[topIdx] - 20);
-    const clampedDelta = Math.min(maxDelta, Math.max(minDelta, deltaPct));
+      const current = [...initWeights];
+      const maxDelta = current[btmIdx] - 20;
+      const minDelta = -(current[topIdx] - 20);
+      const clampedDelta = Math.min(maxDelta, Math.max(minDelta, deltaPct));
 
-    current[topIdx] += clampedDelta;
-    current[btmIdx] -= clampedDelta;
-    bbgRightWeights.value = current.map(w => Math.round(w));
+      current[topIdx] += clampedDelta;
+      current[btmIdx] -= clampedDelta;
+      bbgRightWeights.value = current.map(w => Math.round(w));
+    });
   };
 
   const onPointerUp = () => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
     isSplitterDragging.value = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
@@ -864,13 +882,13 @@ function startLinearLowerColSplitDrag(e: PointerEvent) {
   window.addEventListener('pointercancel', onPointerUp);
 }
 
-// 快速雙擊還原預設黃金比例
+// 快速雙擊還原預設黃金比例 (60:40 舒展四分割定案)
 function resetBbgSplits() {
-  bbgLeftColWidth.value = 64;
-  bbgLeftUpperHeight.value = 54;
-  bbgRightWeights.value = [38, 28, 34];
+  bbgLeftColWidth.value = 60;
+  bbgLeftUpperHeight.value = 50;
+  bbgRightWeights.value = [50, 50, 0];
   saveBlueprintLayouts();
-  showToast('已還原 Bloomberg 平鋪黃金比例 (左 64% / 右 36%)');
+  showToast('已還原 60:40 舒展四分割定案比例 (左 60% / 右 40%)');
 }
 
 function resetLinearSplits() {
@@ -3436,6 +3454,16 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background: #13161a;
+}
+
+/* 拖曳分割線或卡片時，停用內部圖表/表格指針事件與文字選取，確保 120 FPS 流暢度不掉幀 */
+.workspace-hybrid.is-splitter-active .bbg-card-body,
+.workspace-hybrid.is-dragging-active .bbg-card-body,
+.workspace-hybrid.is-splitter-active iframe,
+.workspace-hybrid.is-splitter-active svg,
+.workspace-hybrid.is-splitter-active canvas {
+  pointer-events: none !important;
+  user-select: none !important;
 }
 
 .bbg-card-equity { flex: 54 1 0px; }

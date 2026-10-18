@@ -17,18 +17,18 @@
   --card-foreground: oklch(0.94 0.004 260);
   --popover: oklch(0.24 0.006 260);
   --popover-foreground: oklch(0.94 0.004 260);
-  --primary: oklch(0.78 0.13 167);
-  --primary-foreground: oklch(0.155 0.02 167);
+  --primary: oklch(0.80 0.12 78);
+  --primary-foreground: #000000;
   --secondary: oklch(0.24 0.006 260);
   --secondary-foreground: oklch(0.94 0.004 260);
   --muted: oklch(0.24 0.006 260);
   --muted-foreground: oklch(0.65 0.009 260);
-  --accent-v0: oklch(0.27 0.014 167);
+  --accent-v0: oklch(0.25 0.03 78);
   --accent-foreground: oklch(0.94 0.004 260);
   --destructive: oklch(0.64 0.2 22);
   --border: oklch(0.42 0.009 260 / 38%);
   --input: oklch(0.42 0.009 260 / 60%);
-  --ring: oklch(0.78 0.13 167 / 55%);
+  --ring: oklch(0.80 0.12 78 / 55%);
   --radius: .375rem;
   --gain: #65cba7;
   --gain-bright: #64d6af;
@@ -181,9 +181,9 @@
   --os-warn: oklch(0.8 0.15 75);
   --os-warn-bg: oklch(0.8 0.15 75 / 10%);
   --os-info: oklch(0.72 0.1 235);
-  --os-accent: oklch(0.78 0.13 167);
+  --os-accent: oklch(0.80 0.12 78);
 
-  --os-alloc-btc: oklch(0.78 0.13 167);
+  --os-alloc-btc: oklch(0.80 0.12 78);
   --os-alloc-eth: oklch(0.66 0.11 290);
   --os-alloc-sol: oklch(0.74 0.1 235);
   --os-alloc-arb: oklch(0.8 0.13 85);

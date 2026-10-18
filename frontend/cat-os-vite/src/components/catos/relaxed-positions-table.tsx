@@ -93,9 +93,9 @@ export function RelaxedPositionsTable({ className }: { className?: string } = {}
   return (
     <section className={cn("panel min-w-0 flex flex-col overflow-hidden", className)}>
       {/* Header bar with counter badge and filter tabs */}
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3.5 py-2 bg-secondary/50">
         <div className="flex items-center gap-2">
-          <h2 className="text-xs font-medium text-foreground">{t("open_positions")}</h2>
+          <h2 className="text-xs font-semibold text-foreground tracking-tight">{t("open_positions")}</h2>
           <span className="grid size-4 place-items-center rounded bg-secondary num text-[9px] text-muted-foreground font-medium">
             {DEFAULT_POSITIONS.length}
           </span>
@@ -121,7 +121,7 @@ export function RelaxedPositionsTable({ className }: { className?: string } = {}
       </header>
 
       {/* Laser-aligned positions table */}
-      <div className="overflow-x-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full min-w-[620px] text-left border-collapse">
           <thead className="border-b border-border bg-background/25 text-[9px] text-muted-foreground">
             <tr>
