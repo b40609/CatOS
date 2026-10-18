@@ -155,9 +155,13 @@ export function CardManagerDropdown() {
         </span>
       </button>
 
-      {/* 下拉卡片庫面板 */}
+      {/* 下拉卡片庫面板 (完全實心不透明背景，杜絕底層文字透光與事件穿透) */}
       {isOpen && (
-        <div className="absolute right-0 top-9 z-50 w-[360px] rounded-xl bg-surface/95 border border-primary/50 shadow-[0_12px_40px_rgba(0,0,0,0.7),0_0_24px_rgba(232,180,94,0.15)] backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 p-3 select-none flex flex-col gap-2.5">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="absolute right-0 top-9 z-50 w-[360px] rounded-xl bg-surface border border-primary/50 shadow-[0_16px_48px_rgba(0,0,0,0.85),0_0_24px_rgba(232,180,94,0.15)] animate-in fade-in zoom-in-95 duration-150 p-3 select-none flex flex-col gap-2.5"
+        >
           {/* 1. 面板標題列 */}
           <div className="flex items-center justify-between pb-2 border-b border-border/70">
             <div className="flex items-center gap-1.5">

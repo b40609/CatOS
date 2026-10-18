@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatUsd, formatPct, toneOf } from "@/lib/v0-engine";
 import { CardHeaderTitle } from "./card-header-title";
@@ -20,6 +20,10 @@ export interface PositionRow {
   upnlPct: number;
   leverage: string;
   opened: string;
+  liqPrice: string;
+  distLiqPct: string;
+  mmr: string;
+  p6Guard: string;
 }
 
 export interface OrderRow {
@@ -70,6 +74,10 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     upnlPct: 1.06,
     leverage: "3x 全倉 (cross)",
     opened: "04:30",
+    liqPrice: "54,210.00",
+    distLiqPct: "+12.7%",
+    mmr: "0.40%",
+    p6Guard: "OKX 59,500",
   },
   {
     id: "p2",
@@ -86,6 +94,10 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     upnlPct: 1.66,
     leverage: "3x 全倉 (cross)",
     opened: "10/5 06:00",
+    liqPrice: "2,980.00",
+    distLiqPct: "+11.7%",
+    mmr: "0.40%",
+    p6Guard: "OKX 3,210",
   },
   {
     id: "p3",
@@ -102,6 +114,10 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     upnlPct: 3.1,
     leverage: "3x 全倉 (cross)",
     opened: "08:15",
+    liqPrice: "131.50",
+    distLiqPct: "+13.9%",
+    mmr: "0.50%",
+    p6Guard: "OKX 142.0",
   },
   {
     id: "p4",
@@ -118,6 +134,10 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     upnlPct: 3.57,
     leverage: "3x 全倉 (cross)",
     opened: "09:00",
+    liqPrice: "0.1420",
+    distLiqPct: "+18.4%",
+    mmr: "0.80%",
+    p6Guard: "OKX 0.160",
   },
 ];
 
@@ -137,6 +157,27 @@ const DEFAULT_FILLS: FillRow[] = [
 
 export function ActivityPanel({ className, showHeader = true }: ActivityPanelProps) {
   const [tab, setTab] = useState<ActivityTab>("positions");
+  const [flashRows, setFlashRows] = useState<Record<string, "up" | "down">>({});
+
+  // 模擬 Tick 波動微光跳動 (已定案固化)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const targetIdx = Math.floor(Math.random() * DEFAULT_POSITIONS.length);
+      const isUp = Math.random() > 0.45;
+      const targetPos = DEFAULT_POSITIONS[targetIdx];
+      if (!targetPos) return;
+
+      setFlashRows((prev) => ({ ...prev, [targetPos.id]: isUp ? "up" : "down" }));
+      setTimeout(() => {
+        setFlashRows((prev) => {
+          const next = { ...prev };
+          delete next[targetPos.id];
+          return next;
+        });
+      }, 700);
+    }, 2400);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
@@ -204,67 +245,102 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                 <th className="px-1.5 text-right font-medium">SIZE / NOTIONAL</th>
                 <th className="px-1.5 text-right font-medium">ENTRY / MARK</th>
                 <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
-                <th className="py-2 pr-3 pl-1.5 text-right font-medium hidden md:table-cell">LEVERAGE</th>
+                    <th className="px-1.5 text-right font-medium hidden sm:table-cell">預估強平 / 距爆倉</th>
+                    <th className="px-1.5 text-right font-medium hidden md:table-cell">停損價 / 保證金率</th>
+                <th className="py-2 pr-3 pl-1.5 text-right font-medium hidden lg:table-cell">LEVERAGE</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 text-xs font-mono">
-              {DEFAULT_POSITIONS.map((p) => (
-                <tr key={p.id} className="hover:bg-secondary/40 transition-colors">
-                  <td className="py-2 pl-3 pr-1.5">
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-bold text-foreground leading-tight">{p.symbol}</span>
-                      <span className="text-[9px] text-muted-foreground leading-tight">
-                        {p.botName} · OKX
+              {DEFAULT_POSITIONS.map((p) => {
+                const flash = flashRows[p.id];
+                return (
+                  <tr
+                    key={p.id}
+                    className={cn(
+                      "hover:bg-secondary/40 transition-colors",
+                      flash === "up" && "flash-up",
+                      flash === "down" && "flash-down"
+                    )}
+                  >
+                    <td className="py-2 pl-3 pr-1.5">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-foreground leading-tight">{p.symbol}</span>
+                        <span className="text-[9px] text-muted-foreground leading-tight">
+                          {p.botName} · OKX
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-1.5 py-2">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-0.5 rounded-[3px] border px-1 py-0.2 text-[8.5px] font-bold tracking-tight",
+                          p.side === "long"
+                            ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
+                            : "border-rose-400/30 bg-rose-400/10 text-rose-400"
+                        )}
+                      >
+                        {p.side === "long" ? "▲多" : "▼空"}
                       </span>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-1.5 py-2">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-0.5 rounded-[3px] border px-1 py-0.2 text-[8.5px] font-bold tracking-tight",
-                        p.side === "long"
-                          ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
-                          : "border-rose-400/30 bg-rose-400/10 text-rose-400"
-                      )}
-                    >
-                      {p.side === "long" ? "▲多" : "▼空"}
-                    </span>
-                  </td>
+                    <td className="px-1.5 py-2 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10.5px] font-bold text-foreground leading-tight">{p.qty} {p.base}</span>
+                        <span className="text-[9px] text-muted-foreground leading-tight">${p.notional}</span>
+                      </div>
+                    </td>
 
-                  <td className="px-1.5 py-2 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10.5px] font-bold text-foreground leading-tight">{p.qty} {p.base}</span>
-                      <span className="text-[9px] text-muted-foreground leading-tight">${p.notional}</span>
-                    </div>
-                  </td>
+                    <td className="px-1.5 py-2 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10.5px] text-foreground leading-tight">{p.entry}</span>
+                        <span className="text-[9px] text-muted-foreground leading-tight">{p.mark}</span>
+                      </div>
+                    </td>
 
-                  <td className="px-1.5 py-2 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10.5px] text-foreground leading-tight">{p.entry}</span>
-                      <span className="text-[9px] text-muted-foreground leading-tight">{p.mark}</span>
-                    </div>
-                  </td>
+                    <td className="px-1.5 py-2 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className={cn("text-[10.5px] font-bold leading-tight", toneOf(p.upnl))}>
+                          {formatUsd(p.upnl, true)}
+                        </span>
+                        <span className={cn("text-[9px] leading-tight", toneOf(p.upnl))}>
+                          {formatPct(p.upnlPct)}
+                        </span>
+                      </div>
+                    </td>
 
-                  <td className="px-1.5 py-2 text-right">
-                    <div className="flex flex-col items-end">
-                      <span className={cn("text-[10.5px] font-bold leading-tight", toneOf(p.upnl))}>
-                        {formatUsd(p.upnl, true)}
-                      </span>
-                      <span className={cn("text-[9px] leading-tight", toneOf(p.upnl))}>
-                        {formatPct(p.upnlPct)}
-                      </span>
-                    </div>
-                  </td>
+                    <td className="px-1.5 py-2 text-right hidden sm:table-cell">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-foreground font-mono leading-tight font-medium">${p.liqPrice}</span>
+                        <span className="text-[8.5px] text-emerald-400 font-semibold leading-tight flex items-center gap-0.5">
+                          距爆倉 {p.distLiqPct}
+                        </span>
+                      </div>
+                    </td>
 
-                  <td className="py-2 pr-3 pl-1.5 text-right hidden md:table-cell">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9.5px] text-foreground font-semibold leading-tight">{p.leverage}</span>
-                      <span className="text-[8.5px] text-emerald-400 leading-tight">P6 停損防護</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-1.5 py-2 text-right hidden md:table-cell">
+                      <div className="flex flex-col items-end">
+                        <span
+                          className="text-[10px] text-primary font-mono leading-tight font-medium"
+                          title="OKX 官方伺服器託管的市價停損觸發價"
+                        >
+                          停損 ${p.p6Guard.replace("OKX ", "")}
+                        </span>
+                        <span className="text-[8.5px] text-muted-foreground font-mono leading-tight">
+                          維持率 {p.mmr}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="py-2 pr-3 pl-1.5 text-right hidden lg:table-cell">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9.5px] text-foreground font-semibold leading-tight">{p.leverage}</span>
+                        <span className="text-[8.5px] text-emerald-400 leading-tight">Net Mode</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

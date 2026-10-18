@@ -217,9 +217,7 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
 
   return (
     <div className={cn("relative flex flex-col w-full min-w-0", draggingInfo ? "select-none" : "select-text")}>
-
-
-      {/* 3. Layout Tree 容器主體 (維持穩定樹渲染，支援 120 FPS 自由縮放與流暢拖曳) */}
+      {/* 3. Layout Tree 容器主體 (維持穩定樹渲染，支援 120 FPS 自由縮放與卡片原地模組替換) */}
       <div
         ref={containerRef}
         className={cn(

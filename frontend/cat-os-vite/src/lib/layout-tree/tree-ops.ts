@@ -37,7 +37,7 @@ export function createDefaultTree(): LayoutNode {
       id: "split-right",
       direction: "col", // 上下分列
       ratio: 0.5,
-      first: { type: "leaf", id: "leaf-exposure", cardId: "exposure" },
+      first: { type: "leaf", id: "leaf-exposure", cardId: "allocation" },
       second: { type: "leaf", id: "leaf-bots", cardId: "bots" },
     },
   };

@@ -1,13 +1,30 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-11 (UTC+8；首份 DCM 研究製品交驗，保留並行前端最新交接)  
-**當前負責者**：DCM 研究開發與自測 (Codex)；前端視覺與互動開發者 (Antigravity) · 待獨立驗收者 (chatgpt-web/gpt-5.6-sol)  
+**更新時間**：2026-10-18 21:55 (UTC+8；前端資產配置環圖全響應式流體化定案與版面收斂完成，準備跨機交接)  
+**當前負責者**：前端視覺與互動開發者 (Antigravity / 6.1 Sol) · 待獨立驗收者 (chatgpt-web/gpt-5.6-sol)  
 **工作目錄**：`C:/Users/kai/Desktop/CatOS_Astra`  
-**Git 分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`；沿用前端交接資訊，研究本輪未執行 Git 核對）
+**Git 分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）  
+**明日目標**：接續至公司電腦開發環境，啟動 Vite 驗證，並依序推進 Stage 2 佈局快捷板或策略回測聯調。
 
 ---
 
-## 本輪研究接續：DCM 六家族／三週期，已交開發自測證據
+## 1. 今日核心成果交付：資產曝險配置環圖 (Allocation Donut) 完美收斂定案 (2026-10-18)
+
+針對使用者指示「顯示比例問題」與「卡片縮放未跟隨、太大了頂天立地、字體跑版切邊」等問題，已徹底完成全方位幾何重構與收斂固化：
+
+1. **中心純淨留空（方案 1 定案）**：中央維持沉穩留空，資訊全面移至外部標註，杜絕中央擁擠雜亂。
+2. **外置微折短鉤（方案 A 定案）**：徹底廢除長水平托盤底線，採用 8~14px 雅緻 45° 肘點 + 微折短鉤，引線絕不穿透切割文字。
+3. **全響應式流體幾何架構 (Fluid ResizeObserver)**：
+   - 根除寫死 `max-h-[260px]` 與固定 `viewBox`；由容器 `ResizeObserver` 60 FPS 即時捕捉卡片寬高 `(W, H)`，拖曳卡片邊界時圓環與線條平滑等比縮放。
+   - **黃金比例收斂（解決「太大了」）**：圓環半徑嚴格限縮至最大 75px（外直徑約 170px，維持容器高度約 50%~55% 黃金佔比），環身厚度收斂在 12~24px，兼顧厚實份量與深黑呼吸留白。
+   - **垂直防溢出安全夾持（解決「真實本金字體切邊跑版」）**：針對 12 點鐘（`佔用 0.1%`）與 6 點鐘（`可用 99.9%`）等垂直切片，肘點強制向外側展 16px，文字 Y 軸座標嚴格鎖定在 `[18px, H - 24px]` 安全區間內，絕不切字或跌入底部麵板。
+   - **底部量化指標徹底防折行**：全面鎖定單行等寬微標（`whitespace-nowrap`），各尺寸視窗下嚴格防擠壓疊字。
+4. **收斂固化 SOP**：徹底移除所有臨時開關、對照開關與過渡狀態，還原為高質感單一正式組件，頂部配備 `即時同步` 微光指示。
+5. **編譯自測**：`npm run build` (tsc + vite build) **0 錯誤** 通過（7.39s），全視圖截圖已存證。
+
+---
+
+## 2. 既有研究與前端架構基線 (維持完整保留)
 
 - 目標：理解 Pine → 多候選與反例 → 多週期成本後比較 → 按證據討論。允許隔夜，策略可演化；使用者看過證據後已確認保留 D 雙向反轉研究，不需重問。前端不作本次評估依據。
 - 已校準：由 AI 解釋、選例、畫圖與提出疑點，用戶判斷合理性；不要求用戶先準備交易情境。新增 [三張可切換圖例](../artifacts/dcm-20261011-casebook-final/index.html)，復用已使用資料，新增下載／回測 0。當時／後續切換與六圖載入已用隔離 Edge 實際驗證，證據與命令見研究紀錄；未改 Antigravity 前端。
@@ -81,15 +98,95 @@
 
 ---
 
-## 2. 分工約定與後續接續 (Handoff & Next Steps)
+## 2. 前端全面收斂固化與開發 SOP 定案 (2026-10-18 交付)
 
-- **前端開發者 (Antigravity)**：本輪前端視覺極致化、四分割佈局、120 FPS 縮放跟手、視覺瑕疵根除與子頁面補齊已全數交付。
-- **後端與資料對接者 (GPT-6.1)**：接手後端 Supervisor 核心、IPC 通訊契約與狀態轉接層（`stateAdapter`）對接。
-- **獨立驗收者 (`chatgpt-web/gpt-5.6-sol`)**：進行 Git 差異核對與獨立驗收。未獲授權不得自行提交或推送至遠端。
+本輪前端優化實驗與版面評選經使用者逐項審閱後，已依使用者指示全面執行**收斂固化（Solidification）**與代碼清理：
+
+1. **8899 工作台 (Vue 3, `redesign-v2-return`) 固化**：
+   - 永久定案為「方案一：舒展四分割 (60:40) 定案純淨視圖」。
+   - 徹底刪除方案 A/C/D、頂部切換膠囊按鈕（`style-toggle-pill`）、次級工具條（`hybrid-ribbon`，含「⚙ 調整版面」與「🔲 舒展四分割」狀態牌）、四卡片標題列上的版本膠囊（`V0 | 原版`），四張核心卡片 100% 垂直頂滿視野，實現極致零浪費純淨四分割。
+
+2. **8890 主終端 (React 19, `cat-os-vite`) 固化**：
+   - **開關 1 (頂部態勢帶)**：徹底拔除，全域 Header 保持純淨純寬裕，資產回歸【系統總覽】首頁。
+   - **開關 2 (子頁面佈局)**：全面固化「方案 B（零浪費頂滿首屏）」，子頁面（Bots、Risk、Market Intel、Backtest、Optimization）統一採用精簡工具列，釋放 200px 垂直高度。
+   - **開關 3 (盤口 Tick 閃爍)**：正式固化，微光漸層呼吸跳動直接常態啟用。
+   - **開關 4 (部位深度指標)**：正式固化，採用 OKX 官方標準「預估強平價」、「距爆倉」與純粹白話「停損價」，徹底拋棄 P6 等工程晦澀詞。
+   - **開關 5 (回測水下載回撤與熱力圖)**：正式固化為默認圖表組件。
+   - **開關 6 (超參數優化帕累托散佈圖)**：正式固化為默認圖表組件。
+   - **開關 7 (全域命令面板)**：不採用，徹底刪除。
+   - **過渡元件徹底刪除**：已刪除 `optimization-labs.tsx`（實驗室彈窗）、`optimizationStore.ts`、`global-telemetry-bar.tsx`、`command-palette.tsx`，並拔除所有卡片標題列上的 `X` 關閉按鈕（`從主畫面關閉此卡片`）與「新增卡片 (4/6)」下拉選單，四分割版面鎖定。
+
+3. **視覺決策定案 SOP 正式寫入 `AGENTS.md`**：
+   - **定案固化 SOP（Solidify & Purge on Decision）**：使用者一旦對 UI/UX 方案拍板定案，下一階段開發即刻執行收斂固化——直接寫死為正式代碼，第一時間徹底清除所有臨時對照開關、實驗室彈窗、過渡期分支代碼與冗餘自訂按鈕，嚴禁在交付環境中繼續殘留已決策之過渡調試選項。
+   - 型別驗證：`npx tsc --noEmit` 0 錯誤通過；全域實機截圖已完成存證。
 
 ---
 
-## 3. 政策邊界與不可碰事項
+## 3. 交易帳戶模式恢復與 TradingView / 台灣 XQ 工作台多階段落地 (2026-10-18 Stage 1 交付)
+
+針對使用者指示「切換 (本機 Demo Live) 交易帳戶模式是 CatOS 開發文件內的最基礎需求」以及「參考台灣 XQ 或 TradingView 的靈活多階段套用」，已完成 **Stage 1 (第一階段)** 實作與實機截圖存證：
+
+1. **核心交易帳戶切換器 (`[本機] [Demo] [Live]`) 正式恢復並連動**：
+   - 新增 [`mode-selector.tsx`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/mode-selector.tsx)，直接嵌入全域 Header 右側。
+   - 雙向連動 `useCatStore` 與 `stateAdapter.setMode`，提供三色專屬狀態：
+     - **本機 (Local Sim)**：琥珀金呼吸微光 (`bg-amber-500/15 text-amber-400 border-amber-500/40`)，可自由啟動/停止策略進行本機模擬。
+     - **Demo (模擬盤)**：青空藍標示 (`bg-cyan-500/15 text-cyan-400 border-cyan-500/40`)，唯讀隔離展示，禁止增倉與下單。
+     - **Live (實盤)**：警示紅標示 (`bg-rose-500/15 text-rose-400 border-rose-500/40`)，依 INVARIANTS 嚴格鎖定防護，禁止真實金鑰。
+
+2. **Stage 1：台灣 XQ / TradingView 風格卡片原地模組切換 (In-Place Module Swap)**：
+   - 解決痛點：不需破壞已調校好的 60:40 或自訂分割線，任何視窗皆可原地秒切為交易員當前最想看的量化視窗。
+   - 在 [`card-header-title.tsx`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/card-header-title.tsx) 引入微型下拉標記 `▾`，點擊即展開快速切換選單：
+     - 📈 帳戶權益 (Equity & Drawdown)
+     - 📊 部位與活動 (Positions & Activity)
+     - 📐 多空曝險配置 (Exposure & Margin)
+     - 🤖 量化機器人 (Bots Matrix)
+     - 🪙 資產配置比例 (Asset Allocation Donut)
+     - ⚡ 即時成交流 (Recent Fills)
+   - 呼叫 `layoutStore.replaceLeafNode(leafId, newCardId)` 原地替換，即時生效並持久化。
+
+3. **動態自由增刪卡片功能正式啟用 (Add & Remove Card Controls)**：
+   - 使用者明確指示「要的是原本可以新增或刪減單張卡片的選項」，讓用戶有打造屬於自己 OS 的高度自由：
+   - **新增卡片 (Add Card)**：在 [`shell.tsx`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/shell.tsx) 頂部 Header 正式掛載 [`card-manager-dropdown.tsx`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/card-manager-dropdown.tsx)，呈現 `[+ 新增卡片 4/6]` 即時狀態指示。點擊展開「主畫面卡片庫」，可一鍵將未在畫面上的卡片加入排版，或快速點擊「四分割／三分割／雙分欄」佈局預設。
+   - **刪減卡片 (Remove Card)**：在 [`card-header-title.tsx`](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/card-header-title.tsx) 為每張卡片常態提供微型 `✕` 關閉按鈕（以及標題下拉選單內的「關閉此卡片」選項）。當畫面卡片數 > 1 時，點擊即可刪減單張卡片，其餘卡片自動觸發 Auto-Merge 平滑填滿視野空間，0 空白空洞；最後 1 張核心卡片受防誤刪保護。
+
+4. **實機截圖存證（眼見為憑）**：
+   - 頂部 `[+ 新增卡片 4/6]` 與每張卡片 `✕` 關閉按鈕總覽：[`catos_8890_add_remove_overview.png`](file:///C:/Users/kai/.gemini/antigravity-ide/brain/57b93e2d-f876-4b94-891c-5b6f304c8966/catos_8890_add_remove_overview.png)
+   - 點擊展開「主畫面卡片庫」面板（自由選擇 6 大卡片開關）：[`catos_8890_card_manager_open.png`](file:///C:/Users/kai/.gemini/antigravity-ide/brain/57b93e2d-f876-4b94-891c-5b6f304c8966/catos_8890_card_manager_open.png)
+   - 點擊 `✕` 刪減卡片後：自動平滑合併為三分割（按鈕即時變為 `3/6`）：[`catos_8890_card_removed_tri.png`](file:///C:/Users/kai/.gemini/antigravity-ide/brain/57b93e2d-f876-4b94-891c-5b6f304c8966/catos_8890_card_removed_tri.png)
+   - Demo 模式切換狀態：[`catos_8890_stage1_demo_mode.png`](file:///C:/Users/kai/.gemini/antigravity-ide/brain/57b93e2d-f876-4b94-891c-5b6f304c8966/catos_8890_stage1_demo_mode.png)
+
+5. **後續階段規劃**：
+   - **Stage 2 (第二階段)**：台灣 XQ 風格頂部微型佈局快捷板（四分割 60:40 / 大圖三分割 / 對等雙分割 / 單窗聚焦）一鍵切換與自訂比例一鍵復位。
+   - **Stage 3 (第三階段)**：台灣 XQ 多分頁自訂桌面系統（例如「我的盯盤版面」、「極速下單版面」等）自訂命名與本機儲存。
+
+---
+
+## 4. 政策邊界與不可碰事項
 
 - **嚴禁事項**：禁止接觸真實 OKX API Key、禁止向外發出實盤交易請求、禁止引入 Docker / PostgreSQL / Redis 等外置依賴。
 - **金融底線**：交易計算嚴格維持 Decimal / SQLite TEXT；SWAP 委託強制包含 tag: `41cb53c54d6dABDE`；OKX 子帳戶專用，禁止陌生部位處置。
+
+---
+
+## 5. 明日公司電腦接續指引 (Quick Resume Guide)
+
+### 1. 取得最新程式碼
+若已提交並推送到遠端：
+```bash
+git checkout feature/catos-react-vite
+git pull origin feature/catos-react-vite
+```
+
+### 2. 啟動本機前端服務
+```bash
+cd frontend/cat-os-vite
+npm install
+npm run dev -- --port 8890
+```
+瀏覽器訪問：`http://127.0.0.1:8890/#/` 即可即時預覽並接續開發。
+
+### 3. 明日新對話接續指令 (可以直接貼給 AI)
+```text
+請先讀取 docs/current-handoff.md。目前 feature/catos-react-vite 前端已完成資產配置環圖 (Allocation Donut) 的流體響應式收斂與所有視圖防裁切。今天在公司電腦接續，請確認目前環境狀態，並依據規劃繼續執行下一階段工作。
+```
+
