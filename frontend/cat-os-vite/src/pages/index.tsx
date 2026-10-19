@@ -4,7 +4,6 @@ import { AppShell } from "@/components/catos/shell";
 import { CardHeaderTitle } from "@/components/catos/card-header-title";
 import { AccountEquityBand } from "@/components/catos/account-equity-band";
 import { ActivityPanel } from "@/components/catos/activity-panel";
-import { ExposurePanel } from "@/components/catos/exposure-panel";
 import { V0BotTable } from "@/components/catos/v0-bot-table";
 import { AllocationDonutCard } from "@/components/catos/allocation-donut-card";
 import { cryptoMarkets, type Fill } from "@/lib/mock/data";
@@ -13,6 +12,11 @@ import { fmtMoney, fmtSigned, nowStamp, useLiveFeed } from "@/hooks/use-live";
 import { useI18n } from "@/lib/i18n";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
+
+import { IncidentTimelineCard } from "@/components/catos/incident-timeline-card";
+import { MarketWatchCard } from "@/components/catos/market-watch-card";
+import { StrategyIntentsRadarCard } from "@/components/catos/strategy-intents-radar-card";
+import { UnifiedActivityDeckCard } from "@/components/catos/unified-activity-deck-card";
 
 import { WorkspaceGrid } from "@/components/catos/workspace-grid";
 import type { CardId } from "@/state/layoutStore";
@@ -57,14 +61,23 @@ function Dashboard() {
       case "positions":
         return <ActivityPanel className="h-full" />;
 
-      case "exposure":
-        return <ExposurePanel className="h-full" />;
-
       case "bots":
         return <V0BotTable className="h-full" />;
 
       case "allocation":
         return <AllocationDonutCard className="h-full" />;
+
+      case "incidents":
+        return <IncidentTimelineCard className="h-full" />;
+
+      case "market_watch":
+        return <MarketWatchCard className="h-full" />;
+
+      case "strategy_intents":
+        return <StrategyIntentsRadarCard className="h-full" />;
+
+      case "activity_deck":
+        return <UnifiedActivityDeckCard className="h-full" />;
 
       case "fills":
         return (
@@ -76,13 +89,10 @@ function Dashboard() {
                 subtext={
                   <span className="flex items-center gap-1.5 text-[9px] text-up font-mono ml-1">
                     <PulseBeacon size={4.5} />
-                    {t("live")} · KOL Tag
+                    {t("live")}
                   </span>
                 }
               />
-              <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-                Tag: 41cb53c5
-              </span>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
               <ul className="-mt-1">
@@ -93,7 +103,7 @@ function Dashboard() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="num text-[10px] font-medium text-foreground leading-tight">{f.symbol} <span className={cn("text-[8.5px]", f.side === "BUY" ? "text-up" : "text-down")}>{f.side === "BUY" ? t("buy") : t("sell")}</span></p>
-                      <p className="mt-0.5 num text-[8.5px] text-muted-foreground leading-tight">{f.qty} @ {fmtMoney(f.price, f.price < 1 ? 4 : 2)} · <span className="text-primary font-mono">Tag: 41cb53c5</span></p>
+                      <p className="mt-0.5 num text-[8.5px] text-muted-foreground leading-tight">{f.qty} @ {fmtMoney(f.price, f.price < 1 ? 4 : 2)}</p>
                     </div>
                     <div className="ml-auto text-right">
                       <p className={cn("num text-[10px] font-medium leading-tight", f.pnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(f.pnl)}</p>

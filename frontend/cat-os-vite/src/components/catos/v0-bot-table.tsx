@@ -10,7 +10,11 @@ interface BotPosMeta {
   upnl: number;
   upnlPct: number;
   dd: number;
-  p6Guard: number;
+  p6StopPrice: string;
+  p6DistPct: string;
+  p6Status: "ACTIVE" | "STANDBY" | "ALERT";
+  p6Rounding: string;
+  p6BudgetPct: number;
 }
 
 interface V0BotTableProps {
@@ -83,7 +87,11 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
           upnl: 79.26,
           upnlPct: 1.06,
           dd: -1.24,
-          p6Guard: -5.0,
+          p6StopPrice: "$59,500.00",
+          p6DistPct: "-3.22%",
+          p6Status: "ACTIVE",
+          p6Rounding: "CEIL 向上取整",
+          p6BudgetPct: 15,
         };
       case "calico":
         return {
@@ -93,7 +101,11 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
           upnl: 132.48,
           upnlPct: 2.3,
           dd: -2.15,
-          p6Guard: -5.0,
+          p6StopPrice: "$3,210.00",
+          p6DistPct: "+0.86%",
+          p6Status: "ACTIVE",
+          p6Rounding: "CEIL 向上取整",
+          p6BudgetPct: 15,
         };
       case "mochi":
         return {
@@ -103,7 +115,11 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
           upnl: 52.5,
           upnlPct: 1.95,
           dd: -0.85,
-          p6Guard: -4.0,
+          p6StopPrice: "$142.00",
+          p6DistPct: "-0.27%",
+          p6Status: "ACTIVE",
+          p6Rounding: "CEIL 向上取整",
+          p6BudgetPct: 15,
         };
       case "shiro":
       default:
@@ -114,7 +130,11 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
           upnl: 0,
           upnlPct: 0,
           dd: -3.42,
-          p6Guard: -5.0,
+          p6StopPrice: "—",
+          p6DistPct: "無持倉",
+          p6Status: "STANDBY",
+          p6Rounding: "待命",
+          p6BudgetPct: 0,
         };
     }
   };
@@ -151,7 +171,7 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
               <th className="px-1.5 font-medium">POSITION / NOTIONAL</th>
               <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
               <th className="px-1.5 text-right font-medium hidden sm:table-cell">DAILY / 7D</th>
-              <th className="px-1.5 font-medium hidden md:table-cell">回撤 / 交易所停損</th>
+              <th className="px-1.5 font-medium hidden md:table-cell">MAX DD / 停損錨定</th>
               <th className="py-2 pr-3 pl-1.5 text-right font-medium">TREND & ACT</th>
             </tr>
           </thead>
@@ -238,15 +258,22 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
                     </div>
                   </td>
 
-                  {/* 5. 最大回撤 / P6 災難停損線 */}
+                  {/* 5. 最大回撤與停損錨定 */}
                   <td className="px-1.5 py-2 font-mono hidden md:table-cell">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-[9.5px] text-muted-foreground leading-tight">
-                        DD: <span className="text-rose-400 font-semibold">{pos.dd.toFixed(2)}%</span>
-                      </span>
-                      <span className="text-[8.5px] text-primary/90 leading-tight">
-                        停損: {pos.p6Guard.toFixed(1)}% (OKX)
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9.5px] text-muted-foreground leading-tight">
+                          DD: <span className="text-rose-400 font-semibold">{pos.dd.toFixed(2)}%</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[8.5px] text-muted-foreground leading-tight">
+                        <span className="text-primary font-semibold">
+                          停損: {pos.p6StopPrice}
+                        </span>
+                        {pos.p6Status === "ACTIVE" && (
+                          <span className="text-emerald-400">({pos.p6DistPct})</span>
+                        )}
+                      </div>
                     </div>
                   </td>
 
@@ -264,22 +291,18 @@ export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
                             strokeLinejoin="round"
                           />
                         </svg>
-                      ) : (
-                        <span className="w-16 text-center text-[9px] font-mono text-muted-foreground">—</span>
-                      )}
-
+                      ) : null}
                       <button
                         type="button"
                         onClick={(e) => togglePause(bot.id, e)}
                         className={cn(
-                          "px-1.5 py-0.5 rounded text-[9.5px] font-mono font-medium border transition-colors cursor-pointer",
+                          "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer",
                           isPaused
-                            ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                            : "border-border/60 bg-background/60 text-muted-foreground hover:text-foreground hover:border-border"
+                            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            : "border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
                         )}
-                        title={isPaused ? "恢復運行" : "暫停 Bot 策略"}
                       >
-                        {isPaused ? "啟動" : "暫停"}
+                        {isPaused ? "重啟" : "暫停"}
                       </button>
                     </div>
                   </td>

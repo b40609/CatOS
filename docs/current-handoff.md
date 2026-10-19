@@ -1,34 +1,195 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-19 18:38 (UTC+8；公司電腦本輪成果就緒，3 大 Donut 方案實作保留供體驗挑選，已上 Git 供在家電腦接續)  
+**更新時間**：2026-10-20 00:05 (UTC+8；使用者拍板定案「方案 2：全域戰情日誌 (Activity Deck)」，完成收斂固化與雙軌清除，tsc + vite build 0 錯誤通過)  
 **當前負責者**：前端視覺與互動開發者 (Antigravity / 6.1 Sol) · 待獨立驗收者 (chatgpt-web/gpt-5.6-sol)  
-**工作目錄**：`C:/Users/user/Desktop/CatOS_Astra`  
+**工作目錄**：`C:/Users/kai/Desktop/CatOS_Astra`  
 **Git 分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）  
-**下一成果**：在家電腦啟動 8890 檢視 3 套 Donut 方案並拍板定案，定案後即刻固化寫死並清除切換標籤。
+**下一成果**：明日公司電腦接續開工（本機 8890 實機檢驗定案 5 卡戰情台，推進後續策略目標意圖或 Mock 即時輪詢對接）。
 
 ---
 
-## 1. 今日核心成果交付：T-Split 解耦拓撲固化 & 資產配置 3 大業界方案上線 (2026-10-19)
+## 1. 最新定案固化：【方案 2 全域戰情日誌】拍板定案 (2026-10-20)
 
-### A. 版面拓撲解耦固化 (Row-First Layout Tree 定案)
-1. **二元樹拓撲根本重構**：最外層根節點寫死為水平分層（`direction: "col"`, 50:50），上下兩層垂直分割線徹底獨立解耦。
-   - **上半部（Top Tier）**：`[帳戶權益 (equity)]` ｜ `[量化機器人 (bots)]` ｜ `[資產配置 Donut (allocation)]`，Donut 獨立維持黃金比例不受擠壓。
-   - **下半部（Bottom Tier）**：`[部位與活動 (positions)]` ｜ `[多空標尺 (exposure)]` ｜ `[最新成交動態 (fills)]`，分割線完全解耦，成交流水可自由向左延伸至 40%~60%，徹底消除全域連動綁架。
-2. **收斂固化**：`createDefaultTree()` 正式寫死為方案 1 拓撲，儲存鍵升版為 `catos_layout_tree_root_v4_tsplit`。
-3. **卡片標題原地切換選單廢除**：依指示徹底移除 `CardHeaderTitle` 內部繁雜的 `In-Place Swap` 與關閉下拉選單，還原純粹且專注的標題列抓手。
-4. **執行引擎呼吸燈合併至左下角頭貼**：頂部 Header 移除冗餘 `• Engine online` 標籤；左下角個人頭貼 4 點鐘方位植入精緻翡翠綠呼吸徽章（`PulseBeacon`），副標題整合 `Engine online · OKX-SWAP`。
+使用者已正式拍板**定案方案 2**，依據「定案固化 SOP（Solidify & Purge）」完成所有過渡分支清除與正式程式碼固化：
 
-### B. 資產曝險配置 (Allocation Donut) 3 大業界方案實作上線 (保留供在家挑選)
-遵照「視覺決策鐵律：眼見為憑（No Visual Evidence, No Selection）」，已於 `allocation-donut-card.tsx` 完整實作 3 大業界主流架構，並保留頂部 Candidate Switcher 供在家電腦體驗與挑選：
-- **方案 A（Bloomberg AIM 智慧 HUD）**：中央 HUD 顯示總名義額 `$1,420` + 槓桿，圓弧外置低彩引線（BTC 73.7%, ETH 26.3%），Hover 切片時動態 Drilldown 切換幣種詳情；底部監控單幣 50% 防線。
-- **方案 B（OKX Pro 雙維度風控）**：二元切換「標的曝險」vs「保證金風控水位」，採用四段式保證金刻度（維持保證金 MM 8.5% / 初始保證金 IM 14.2% / 在途凍結 15.0% / 自由保證金 62.3%），徹底消除 99.9% 比例失真。
-- **方案 C（CoinGlass 左環右表複合矩陣）**：左側 110px 精緻迷你 Donut，右側高密度多空矩陣數據清單（佔比、名義額、7D 盈虧）。
-- **待定案動作**：待在家電腦實際操作體驗後拍板定案，拍板後即刻依 SOP 固化寫死並徹底刪除頂部切換列。
+### A. 定案核心架構：5 卡黃金戰情台 (T-Split 解耦佈局)
+1. **右下卡片：常態常駐【全域戰情日誌台】([unified-activity-deck-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/unified-activity-deck-card.tsx)，CardId: `activity_deck`)**
+   - **整合範圍**：將即時成交流水（Fills）、風控警報（Risk Alerts）與系統事件（System Lifecycle）三大日誌源合併為單一高密度戰情時間軸。
+   - **分類篩選**：頂部一體化提供 `[全部 (9)]`、`[成交流 (4)]`、`[風控警報 (1)]`、`[系統事件 (4)]`，並配備 `● 共 9 筆事件 · 1 異常告警` 微光膠囊。
+   - **點擊展開**：點擊任意事件平滑展開詳情與風控細節，右側精確標註已平倉損益（如 `+$142.50`）或告警狀態。
+   - **底座指示**：底部標註「全域戰情日誌：成交流水 + 風控警報 + 系統生命週期 · 同步持久化 SQLite (WAL)」。
+   - **解決痛點**：成交流水不再散落各處，風控警報不再被隱藏，右下卡片視野寬廣，交易員可滾動監控高頻撮合與異常。
 
-### C. 驗證與編譯狀態
-- `npm run typecheck`：**0 錯誤**。
-- `npm run build`：**0 錯誤** 通過。
-- 8890 (React 19 Vite) 正常運行中。
+2. **左下卡片：收斂為純粹的【持倉與在途盤口防線】([activity-panel.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/activity-panel.tsx))**
+   - **過渡清除**：徹底移除「動態流水 (方案 1)」Tab 3，代碼不留任何未使用的變數或分支。
+   - **`[持倉]` 分頁**：聚焦合約部位、持倉量、開倉/標記價、未實現損益、強平距離，並深度整合 **OKX 交易所端 P6 災難停損**（觸發價、幅度、向上/向下取整方向、保護中狀態）。
+   - **`[掛單]` 分頁**：升級為在途盤口作戰台（Client Order ID、方向、限價/POST_ONLY、距現價 Ticks / %、凍結保證金、單筆撤單），底部提供總凍結額與「一鍵全撤在途單」。
+
+3. **系統佈局與快取升級**：
+   - [tree-ops.ts](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/lib/layout-tree/tree-ops.ts)：`createDefaultTree()` 正式寫死為 5 卡黃金配置（上半部：`equity` 0.58 | `bots` | `allocation`；下半部：`positions` 0.52 | `activity_deck` 0.48）。
+   - [layoutStore.ts](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/state/layoutStore.ts)：快取鍵升級至 `v7_clean`，確保瀏覽器重新整理即載入定案排版。
+   - [card-manager-dropdown.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/card-manager-dropdown.tsx)：全卡片選單正式固化 `activity_deck` 標題為 `全域戰情日誌`。
+
+---
+
+## 2. 明日公司電腦接續開工指引 (Quick Resume Guide)
+
+### A. 當前工作區狀態與遠端同步
+- **目前分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）。
+- **待提交變更清單**（符合開發自測與固化 SOP，尚未 commit/push）：
+  - 核心修改：`activity-panel.tsx`、`unified-activity-deck-card.tsx`、`unified-events.ts`、`v0-bot-table.tsx`、`tree-ops.ts`、`layoutStore.ts`、`card-manager-dropdown.tsx`、`index.tsx`、`bots.tsx`、`current-handoff.md`。
+  - 廢棄清除：`exposure-panel.tsx`、`working-orders-safety-card.tsx`。
+- **明日公司接續方式**：
+  - **情境 1（在家先完成提交與推送）**：若今晚使用者指示將當前工作區 commit 並 push 至遠端，明天到公司電腦只需執行：
+    ```bash
+    git checkout feature/catos-react-vite
+    git pull origin feature/catos-react-vite
+    cd frontend/cat-os-vite
+    npm run dev
+    ```
+  - **情境 2（保持現狀明早直接接續）**：若維持現有本機分支未推，明天可直接在公司接續指令中指引。
+
+### B. 明日公司啟動與檢驗指令
+```bash
+# 1. 檢查並編譯前端 (tsc + vite build)
+cd frontend/cat-os-vite
+npm run build
+
+# 2. 啟動前端開發伺服器 (若未常駐)
+npm run dev
+# 瀏覽器訪問：http://127.0.0.1:8890/
+```
+
+### C. 明日接續 Prompt（可直接複製使用）
+> 「你好，我是 Kai。我已在公司電腦打開 CatOS 專案。昨晚我們已經拍板並定案了【方案 2：全域戰情日誌 (Activity Deck)】，且完成 5 卡戰情台的收斂固化，前端運行於 http://127.0.0.1:8890/。請先讀取 `docs/current-handoff.md` 與 `AGENTS.md`，向我報告目前定案後的系統狀態，並協助我推進今日的工作。」
+
+---
+
+## 2. 前期定案收斂成果 (方案 A、做法 1、建議 2 & 3)
+
+依據使用者指示「定案方案 A、1. 定案做法 1、2. 同意建議、3. 同意建議、4. 請給我看到畫面後我再決定」，已全面執行收斂固化（Solidify & Purge）：
+
+### A. 定案方案 A：P6 災難防線深度整合至【部位與活動】卡片
+1. **[activity-panel.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/activity-panel.tsx)（部位活動與盤口防線）**：
+   - **`[持倉]` Tab 深度整合 P6**：每筆持倉清晰標註 `P6 災難停損` 觸發價與距現價幅度（BTC `$59,500.00 (-4.24%)`、ETH `$3,210.00 (-4.89%)`、SOL `$142.00 (-7.06%)`），配備 `● OKX 向上取整` 綠燈標籤。
+   - **`[掛單]` Tab 升級為在途盤口作戰台**：Client Order ID、方向、限價/POST_ONLY、距現價 Ticks / %、凍結保證金、單筆撤單，底部提供總凍結額（`$1,430.00`）與「一鍵全撤在途單」按鈕。
+   - **`[成交流]` Tab**：整合即時成交流水，徹底清除 TAG 欄位與標籤。
+2. **[v0-bot-table.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/v0-bot-table.tsx)（量化機器人矩陣）收斂**：
+   - 移除過渡期的 P6 臨時指示微徽章，標題欄還原純淨 `4 運作 · 0 暫停`。
+   - 移除底部佔用垂直高度的重複 P6 說明橫條，釋放空間給核心數據。
+   - 矩陣第 5 欄正式固化為 `MAX DD / 停損錨定`（如 `DD: -1.24% · 停損: $59,500.00 (-3.22%)`），專注於 Bot 健康指標。
+
+### B. 定案做法 1：杜絕成交流雙重重複，K 線倒數行情進駐主戰情台
+1. **預設佈局調整 ([tree-ops.ts](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/lib/layout-tree/tree-ops.ts))**：
+   - 在 `createDefaultTree()` 中，將原本重複的 `leaf-fills` 正式替換為 `leaf-market-watch` (`cardId: "market_watch"`)。
+   - 主畫面 5 卡黃金佈局：【帳戶權益】+【量化機器人】+【資產配置 Donut】+【部位活動與盤口防線】+【標的行情與 K 線倒數】。
+   - 成交流水完全由【部位活動卡】Tab 3 承接，不浪費獨立視窗，避免同一畫面重複出現兩份成交流。
+2. **[market-watch-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/market-watch-card.tsx)**：
+   - 15m/1H/4H Closed Bar 秒級倒數定時器、收盤前 45 秒琥珀金呼吸波、8H 資金費率倒數、OKX SWAP 高密度報價矩陣。
+
+### C. 同意建議 2 & 3：過時殭屍卡片徹底清理 (依定案固化 SOP)
+1. **清理 `exposure-panel.tsx`**：
+   - 實體檔案已刪除。
+   - `pages/index.tsx`、`layoutStore.ts`、`card-manager-dropdown.tsx` 徹底移除 `exposure` 類型、組件引用與 switch case。
+   - 多空雙向標尺統一由 `allocation-donut-card.tsx` 內部 `[標尺]` 分頁承接。
+2. **清理 `working-orders-safety-card.tsx`**：
+   - 實體檔案已刪除。
+   - `pages/index.tsx`、`layoutStore.ts`、`card-manager-dropdown.tsx` 徹底移除 `working_orders` 類型、組件引用與 switch case。
+3. **佈局快取升級**：
+   - `layoutStore.ts` 快取鍵升級至 `v6_clean`，確保瀏覽器立即載入最新的定案排版。
+
+### D. 第 4 點待定項目（視覺先行導引）
+- 依據視覺決策鐵律「我沒有看到畫面是不會選的（No Visual Evidence, No Selection）」，不要求使用者進行純文字盲選。
+- 前端已將首頁與各子頁面完整構建，服務持續運行於 `http://127.0.0.1:8890/`。
+- 使用者可直接於瀏覽器實機切換檢視：
+  - 首頁：`http://127.0.0.1:8890/#/`（Live Flight Deck 即時作戰台）
+  - 風控中心：`http://127.0.0.1:8890/#/risk`（深層 4 大儀表盤、風控滑桿調整、警報時間軸）
+  - 機器人管理：`http://127.0.0.1:8890/#/bots`（部署 Dialog、集群延遲與契約規範）
+  看完畫面後再指示首頁與子頁面的劃分是否需要進一步微調。
+
+### E. 全域去 Tag 鐵律全面固化
+- 徹底清除 `bots.tsx` 對話框中的 Tag 字串。
+- 徹底清除 `activity-panel.tsx` 中的數據結構殘餘。
+- 前端全界面 100% 絕跡。
+
+### A. 三大卡片組件核心亮點
+1. **[market-watch-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/market-watch-card.tsx) · 標的行情與 K 線收盤倒數 (Market Watch & Bar Timer)**：
+   - 專為 Closed Bar 策略打造的即時收盤倒數定時器（支援 `15m`、`1H`、`4H` 秒級流暢倒數）。
+   - 收盤前 45 秒自適應切換為琥珀金色呼吸波（提示「次根開盤訊號發動預備」），杜絕盤中提前撮合。
+   - 整合 OKX 8H 資金費率結算倒數（00:00/08:00/16:00 UTC）與高密度 SWAP 報價矩陣（BTC/ETH/SOL/DOGE 微鋸齒跳動）。
+   - 底部明示 `Closed Bar 約束：已收盤 K 線決策 · 次根開盤市價撮合`。
+
+2. **[working-orders-safety-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/working-orders-safety-card.tsx) · 在途掛單與 P6 災難停損防線 (Working Orders & P6 Desk)**：
+   - 獨立於部位活動卡的高密度盤口掛單列表（掛單價、距現價 Ticks / %、凍結保證金、開平多空、單筆撤單）。
+   - OKX 交易所端整倉災難停損（P6 Disaster Stop Loss）專用監控台：呈現 3 幣種（BTC/ETH/SOL）停損錨定狀態、提早取整方向（多倉向上 CEIL）、Mark 觸發源與保護名目資產。
+   - 底部總計凍結保證金總額與「一鍵全撤單」操作反饋。
+
+3. **[strategy-intents-radar-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/strategy-intents-radar-card.tsx) · 策略目標意圖信號看板 (Worker Intents & Radar)**：
+   - 貫徹 Supervisor-Worker 架構：Worker 僅輸出純資料目標意圖（Target Intent），無金鑰、不主動連網；Supervisor 獨佔交易與風控。
+   - 展示 4 隻策略 Worker 實例（Tabby 15m 獵貓動能、Calico 1H 夜視回歸、Mochi 15m 波動突破、Shiro 4H 宏觀避險）。
+   - 呈現目標持倉意圖增減（`LONG 0.12 BTC → 0.20 BTC`）、雙向訊號強度長條、三點關鍵指標距離（唐奇安上軌/均線成本/下軌防線）與次根開盤預備委託動作。
+
+### B. 系統佈局與卡片庫完整整合
+- 在 `layoutStore.ts` 註冊 `market_watch`、`working_orders`、`strategy_intents` 之 CardId 與對應標題。
+- 在 `card-manager-dropdown.tsx` 擴充 `ALL_CARDS` 元數據（共 9 張卡片庫），支援自由增刪與動態開關。
+- 在 `pages/index.tsx` 擴充工廠渲染分支，支援拖曳分裂落位與原地切換。
+
+### C. 建置驗證
+- `npm run build` (tsc + vite build)：**0 錯誤** 通過（11.40s）。
+- 本機前端服務正常監聽於 `http://127.0.0.1:8890/`。
+
+### D. 前端 UI 鐵律：徹底清除所有用戶界面 TAG 標籤 (2026-10-19 固化)
+- **使用者核心指示**：`"tag": "41cb53c54d6dABDE"` 僅為後端 Supervisor 向 OKX 交易所發出 SWAP 委託時強制注入之底層 API 路由/返佣參數，**純屬後端底層契約，絕非前端視覺元素，不得顯示給用戶看**。
+- **全域清除處**：
+  1. `market-watch-card.tsx`：移除底部右下角 `Tag: 41cb53c5` 標籤，還原純淨 `Asia/Taipei` 時區標註。
+  2. `working-orders-safety-card.tsx`：移除 Header 副標題 `Tag: 41cb53c5` 與撤單 Toast 提示中的 Tag 字串。
+  3. `strategy-intents-radar-card.tsx`：移除底部右下角 `Tag: 41cb53c5` 標籤，替換為純架構協議 `JSON IPC v2`。
+  4. `pages/index.tsx`：成交流卡片移除 Header `Tag: 41cb53c5` 徽章、移除副標題 `· KOL Tag`，每筆成交流移除末端 `· Tag: 41cb53c5`。
+  5. `activity-panel.tsx`：成交流列表徹底刪除 `TAG` 欄位與 `Tag: 41cb53c5` 膠囊。
+  6. `bots.tsx`：移除工具列與對話框中的 `tag: 41cb53c5` 標籤。
+  7. `personal-os-modal.tsx`：連線面板中的 `固定交易 Tag` 改為 `資料儲存底座: SQLite (WAL)`。
+- 後續所有前端卡片與頁面嚴禁再次於 UI 渲染此類底層參數。
+
+1. **[額度]（方案 A 核心，預設第一頁）**：
+   - **槓桿使用率 (Leverage Utilization) 圓環池**：以「總權益 × 最大槓桿上限 3.0x（總曝險預算 Capacity = $37,500）」為 100% 完整基底。
+   - **中央智慧 HUD**：
+     - 上標籤：`有效槓桿 / 上限`
+     - 主數值：`0.43x / 3.0x`（大氣粗體金色 16px）
+     - 下標籤：`已用 14.3% · 剩餘可開`
+   - **下半部 5 條獨立水平進度長條（全展開零滾動）**：
+     - `BTC (已開倉 (0.84x))`：$10,564.0 (28.2%)
+     - `ETH (已開倉 (0.22x))`：$2,695.0 (7.2%)
+     - `SOL (已開倉 (0.22x))`：$2,750.0 (7.3%)
+     - `在途 (掛單中 (0.11x))`：$1,430.0 (3.8%)
+     - `可用 (可用額度 (1.61x))`：$20,061.0 (53.5%)
+     嚴格數學加總 100.0%！
+   - **底部結構化風控微卡**：
+     - 左欄：`保證金佔用率 14.2% SAFE`
+     - 右欄：`總預算上限 (3x) $37,500.00`
+     回答交易員「我離 3 倍上限還剩多少空間能開倉」的終極問題。
+
+2. **[標尺]（多空雙向標尺）**：
+   - 表頭標尺刻度重構：`← 空頭`、`0 基準 (±50%)`、`多頭 →` 絕對居中對齊中線，徹底消除表頭文字擠壓重疊。
+   - 中段雙向尺規：向左紅色空頭積木塊、向右綠色多頭積木塊、中央金色淨曝險指針。
+   - 底部 4 格微卡：多頭總額 ($19,195)、空頭總額 ($3,185)、淨槓桿比率 (0.40x / 3.0x)、可用保證金 ($37,587)，自適應高度不切邊。
+
+3. **[幣種]（標的持倉相對配比）**：
+   - 呈現 BTC (73.7%)、ETH (26.3%)、SOL (0.0%) 之部位相對規模與單幣防線 (BTC 28%/50% SAFE)。
+
+4. **[Bot]（機器人策略視角）**：
+   - 呈現 Tabby (56.8%)、Calico (20.3%)、Shiro (22.9%) 掌管資產規模與多空主力/避險角色。
+
+5. **定案固化清除**：
+   - 徹底刪除多空分母不一相加高達 122.9% 且文字擠壓嚴重的「矩陣」分頁。
+   - 徹底清除未採用的獨立「水位」分頁（已完美融合進「額度」視圖中）。
+
+### B. 交付驗收鐵律（2026-10-19 使用者最新定案）
+- **完工後不需要截圖給使用者看，使用者會親自至網頁 (http://127.0.0.1:8890/) 驗收**。
+- 開發者完成修改後，只需確認服務正常運行、build 0 錯誤並說明修改差異即可交付，禁止在對話中主動貼圖或截圖。
+
+### C. 建置驗證
+- `npm run build` (tsc + vite build)：**0 錯誤** 通過（12.36s）。
+- 前端本機服務運行於 `http://127.0.0.1:8890/`。
 
 
 ---

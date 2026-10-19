@@ -88,7 +88,7 @@ function NewBotDialog() {
             部署新 Bot 執行單元 (1 Bot : 1 SWAP)
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            catOS 嚴格規範：單一合約由單一 Bot 獨佔，強制注入 KOL 返佣 Tag。
+            catOS 嚴格規範：單一合約由單一 Bot 獨佔，OKX 專用子帳戶隔離。
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
@@ -127,7 +127,7 @@ function NewBotDialog() {
               <span>Supervisor 強制注入參數</span>
             </div>
             <p className="text-muted-foreground font-mono text-[10px] pl-5">
-              tag: "41cb53c54d6dABDE" · margin: cross · posMode: net_mode
+              margin: cross · posMode: net_mode
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@ function BotManagement() {
           <span className="text-muted-foreground">今日損益: <strong className={cn("font-bold", totalPnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(totalPnl)}</strong></span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP · tag: 41cb53c5</span>
+          <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP (獨佔合約)</span>
           <NewBotDialog />
         </div>
       </div>
@@ -331,10 +331,6 @@ function BotManagement() {
                 <span>風控與執行契約 (Invariants)</span>
               </div>
               <div className="text-[10px] font-mono text-muted-foreground space-y-1">
-                <div className="flex justify-between">
-                  <span>OKX Order Tag:</span>
-                  <span className="text-foreground">41cb53c54d6dABDE</span>
-                </div>
                 <div className="flex justify-between">
                   <span>Margin & Mode:</span>
                   <span className="text-foreground">cross + net_mode</span>

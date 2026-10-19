@@ -16,11 +16,11 @@ export function cloneTree(node: LayoutNode): LayoutNode {
 }
 
 /**
- * 建立系統預設的「定案方案 1：上下分層 T-Split 解耦樹 (Row-First)」
+ * 建立系統預設的「定案方案 2：上下分層 T-Split 解耦樹 (Row-First)」
  * 頂層水平分行 (col, 50:50)，上下兩層之垂直分割線徹底獨立解耦：
  * - 上半部：[帳戶權益 (equity)] ｜ [量化機器人 (bots)] ｜ [資產配置 Donut (allocation)]
- * - 下半部：[部位活動 (positions)] ｜ [多空標尺 (exposure)] ｜ [最新成交動態 (fills 往左寬幅延展)]
- * 垂直分割線互不綁架，成交動態自由向左延伸，Donut 環圖保持黃金比例不變形。
+ * - 下半部：[部位活動與在途防線 (positions)] ｜ [全域戰情日誌 (activity_deck)]
+ * 垂直分割線互不綁架，持倉與在途盤口專注防線，獨立全域戰情日誌台彙總成交流與風控事件。
  */
 export function createDefaultTree(): LayoutNode {
   return {
@@ -46,17 +46,10 @@ export function createDefaultTree(): LayoutNode {
     second: {
       type: "split",
       id: "split-bottom-tier",
-      direction: "row", // 下半部左右分欄 (獨立縱向分割線！)
-      ratio: 0.44, // 部位佔 44%，右側寬幅佔 56% (成交動態大幅往左延伸！)
+      direction: "row", // 下半部左右分欄：部位活動與在途防線 ｜ 全域戰情日誌台 (定案)
+      ratio: 0.52,
       first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
-      second: {
-        type: "split",
-        id: "split-bottom-right",
-        direction: "row",
-        ratio: 0.35,
-        first: { type: "leaf", id: "leaf-exposure", cardId: "exposure" },
-        second: { type: "leaf", id: "leaf-fills", cardId: "fills" },
-      },
+      second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
     },
   };
 }
@@ -77,7 +70,7 @@ export function createTriSplitTree(): LayoutNode {
       direction: "col",
       ratio: 0.5,
       first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
-      second: { type: "leaf", id: "leaf-exposure", cardId: "exposure" },
+      second: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
     },
   };
 }
