@@ -16,29 +16,47 @@ export function cloneTree(node: LayoutNode): LayoutNode {
 }
 
 /**
- * 建立系統預設的「量化核心四分割 (60:40)」樹
+ * 建立系統預設的「定案方案 1：上下分層 T-Split 解耦樹 (Row-First)」
+ * 頂層水平分行 (col, 50:50)，上下兩層之垂直分割線徹底獨立解耦：
+ * - 上半部：[帳戶權益 (equity)] ｜ [量化機器人 (bots)] ｜ [資產配置 Donut (allocation)]
+ * - 下半部：[部位活動 (positions)] ｜ [多空標尺 (exposure)] ｜ [最新成交動態 (fills 往左寬幅延展)]
+ * 垂直分割線互不綁架，成交動態自由向左延伸，Donut 環圖保持黃金比例不變形。
  */
 export function createDefaultTree(): LayoutNode {
   return {
     type: "split",
     id: "split-root",
-    direction: "row", // 左右分欄
-    ratio: 0.6, // 左 60%, 右 40%
+    direction: "col", // 上下分層
+    ratio: 0.5,
     first: {
       type: "split",
-      id: "split-left",
-      direction: "col", // 上下分列
-      ratio: 0.5,
-      first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
-      second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      id: "split-top-tier",
+      direction: "row", // 上半部左右分欄
+      ratio: 0.72,
+      first: {
+        type: "split",
+        id: "split-top-left",
+        direction: "row",
+        ratio: 0.58,
+        first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
+        second: { type: "leaf", id: "leaf-bots", cardId: "bots" },
+      },
+      second: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
     },
     second: {
       type: "split",
-      id: "split-right",
-      direction: "col", // 上下分列
-      ratio: 0.5,
-      first: { type: "leaf", id: "leaf-exposure", cardId: "allocation" },
-      second: { type: "leaf", id: "leaf-bots", cardId: "bots" },
+      id: "split-bottom-tier",
+      direction: "row", // 下半部左右分欄 (獨立縱向分割線！)
+      ratio: 0.44, // 部位佔 44%，右側寬幅佔 56% (成交動態大幅往左延伸！)
+      first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      second: {
+        type: "split",
+        id: "split-bottom-right",
+        direction: "row",
+        ratio: 0.35,
+        first: { type: "leaf", id: "leaf-exposure", cardId: "exposure" },
+        second: { type: "leaf", id: "leaf-fills", cardId: "fills" },
+      },
     },
   };
 }

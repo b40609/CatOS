@@ -2,17 +2,20 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { CardHeaderTitle } from "./card-header-title";
 import { PulseBeacon } from "./pulse-beacon";
 import { cn } from "@/lib/utils";
+import { ShieldCheck, Layers, Sliders, LayoutList } from "lucide-react";
 
-// 定案配色：低彩度、高質感的幣種資料系列色 (收斂刺眼霓虹感，依循 8899 原版)
+// 定案配色：低彩度、高質感的幣種資料系列色
 const cryptoColors = {
   btc: "#e8b45e",       // BTC 蜂蜜金
   in_flight: "#7faee2", // ETH / 在途凍結 雅緻瓦藍
   available: "#65cba7", // 可用額度 薄荷青
   alt: "#8b8df8",       // SOL 沉穩淡靛
-  neutral: "#90969d",   // 中性灰
+  mm: "#f59e0b",        // 維持保證金 琥珀橘
+  im: "#38bdf8",        // 初始保證金 晴空藍
+  free: "#34d399",      // 自由保證金 翡翠綠
 };
 
-export type ViewMode = "ranked_assets" | "leveraged" | "raw_margin" | "compare_all";
+export type CandidateScheme = "scheme_a_bloomberg" | "scheme_b_okx" | "scheme_c_matrix";
 
 interface DonutItem {
   symbol: string;
@@ -22,171 +25,117 @@ interface DonutItem {
   nominal_usdt: number;
   pct_share: number;
   color: string;
-}
-
-const DATA_MODES: Record<
-  ViewMode,
-  {
-    name: string;
-    subtitle: string;
-    items: DonutItem[];
-    summary: { shortLabel: string; nominal_usdt: number; color: string };
-    centerValue: string;
-    centerLabel: string;
-  }
-> = {
-  ranked_assets: {
-    name: "幣種排行",
-    subtitle: "外置微折短鉤視圖",
-    items: [
-      { symbol: "BTC", label: "BTC-USDT", shortLabel: "BTC", sub: "持有中", nominal_usdt: 596.6, pct_share: 73.7, color: cryptoColors.btc },
-      { symbol: "ETH", label: "ETH-USDT", shortLabel: "ETH", sub: "掛單中", nominal_usdt: 213.08, pct_share: 26.3, color: cryptoColors.in_flight },
-      { symbol: "SOL", label: "SOL-USDT", shortLabel: "SOL", sub: "空倉", nominal_usdt: 0.0, pct_share: 0.0, color: cryptoColors.alt },
-    ],
-    summary: { shortLabel: "總額度", nominal_usdt: 1420.5, color: "#94a3b8" },
-    centerValue: "1,420",
-    centerLabel: "總額度",
-  },
-  leveraged: {
-    name: "名義曝險",
-    subtitle: "名義曝險視圖",
-    items: [
-      { symbol: "BTC", label: "BTC 永續持倉", shortLabel: "BTC 持倉", sub: "持倉", nominal_usdt: 596.6, pct_share: 42.0, color: cryptoColors.btc },
-      { symbol: "在途", label: "在途委託凍結", shortLabel: "在途凍結", sub: "凍結", nominal_usdt: 213.08, pct_share: 15.0, color: cryptoColors.in_flight },
-      { symbol: "可用", label: "可用曝險額度", shortLabel: "可用額度", sub: "剩餘", nominal_usdt: 610.82, pct_share: 43.0, color: cryptoColors.available },
-    ],
-    summary: { shortLabel: "總額度", nominal_usdt: 1420.5, color: "#94a3b8" },
-    centerValue: "1,420",
-    centerLabel: "總額度",
-  },
-  raw_margin: {
-    name: "真實本金",
-    subtitle: "真實保證金視圖",
-    items: [
-      { symbol: "佔用", label: "佔用本金", shortLabel: "佔用本金", sub: "保證金", nominal_usdt: 80.97, pct_share: 0.07, color: cryptoColors.btc },
-      { symbol: "可用", label: "自由未佔用", shortLabel: "自由現金", sub: "本金", nominal_usdt: 125400, pct_share: 99.93, color: cryptoColors.available },
-    ],
-    summary: { shortLabel: "總權益", nominal_usdt: 125480.97, color: "#94a3b8" },
-    centerValue: "125.4k",
-    centerLabel: "總權益",
-  },
-  compare_all: {
-    name: "雙軸對照",
-    subtitle: "雙軸對照視圖",
-    items: [
-      { symbol: "BTC", label: "BTC 持倉", shortLabel: "BTC", sub: "槓桿", nominal_usdt: 596.6, pct_share: 42.0, color: cryptoColors.btc },
-      { symbol: "在途", label: "在途委託", shortLabel: "在途", sub: "委託", nominal_usdt: 213.08, pct_share: 15.0, color: cryptoColors.in_flight },
-      { symbol: "可用", label: "可用額度", shortLabel: "可用", sub: "預算", nominal_usdt: 610.82, pct_share: 43.0, color: cryptoColors.available },
-    ],
-    summary: { shortLabel: "總額度", nominal_usdt: 1420.5, color: "#94a3b8" },
-    centerValue: "1,420",
-    centerLabel: "總額度",
-  },
-};
-
-function formatUsdt(val: number | string): string {
-  if (typeof val === "string" && val.includes("k")) return val;
-  const num = typeof val === "string" ? parseFloat(val.replace(/,/g, "")) : val;
-  if (isNaN(num)) return String(val);
-  if (num >= 100000) {
-    return Math.round(num).toLocaleString("en-US");
-  }
-  return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  leverage?: string;
+  pnl?: string;
+  pnlUp?: boolean;
 }
 
 export function AllocationDonutCard({ className }: { className?: string }) {
-  const [activeMode, setActiveMode] = useState<ViewMode>("ranked_assets");
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
+  // 3 大業界候選方案切換狀態
+  const [candidateScheme, setCandidateScheme] = useState<CandidateScheme>("scheme_a_bloomberg");
 
-  // 1. 自適應容器寬高 ResizeObserver (雙向響應式，隨卡片拖曳縮放即時聯動重繪)
+  // 方案 B 專用：OKX 雙維度切換 (notional: 標的曝險分佈 | margin: 保證金風控水位)
+  const [okxDimension, setOkxDimension] = useState<"notional" | "margin">("notional");
+
+  // Hover / Active 切片索引 (方案 A & 方案 B 核心 HUD 動態聯動)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // 容器寬高響應式動態捕捉 (Fluid ResizeObserver)
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dims, setDims] = useState<{ width: number; height: number }>({ width: 460, height: 230 });
+  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 380, height: 260 });
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    let rafId: number | null = null;
-    const updateSize = () => {
-      const rect = el.getBoundingClientRect();
-      const w = Math.floor(rect.width);
-      const h = Math.floor(rect.height);
-      if (w > 0 && h > 0) {
-        setDims((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
-      }
-    };
-    updateSize();
-    const ro = new ResizeObserver(() => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updateSize);
+
+    let rAF = 0;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      cancelAnimationFrame(rAF);
+      rAF = requestAnimationFrame(() => {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({
+            width: Math.floor(width),
+            height: Math.floor(height),
+          });
+        }
+      });
     });
-    ro.observe(el);
+
+    observer.observe(el);
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      ro.disconnect();
+      cancelAnimationFrame(rAF);
+      observer.disconnect();
     };
-  }, []);
+  }, [candidateScheme]);
 
-  const effectiveIndex = pinnedIndex !== null ? pinnedIndex : hoveredIndex;
-  const currentConfig = DATA_MODES[activeMode];
-  const items = currentConfig.items;
+  // ==================== 方案數據來源定義 ====================
 
-  // 2. 流體幾何運算 (徹底修正「太大了」與「頂底文字跑版溢出」)
-  const W = dims.width;
-  const H = dims.height;
+  // 方案 A 數據：合約名義曝險（聚焦 BTC & ETH 持倉與待機）
+  const schemeAItems: DonutItem[] = useMemo(() => [
+    { symbol: "BTC", label: "BTC-USDT-SWAP", shortLabel: "BTC", sub: "持有中", nominal_usdt: 596.60, pct_share: 73.7, color: cryptoColors.btc, leverage: "3x Cross", pnl: "+$79.26", pnlUp: true },
+    { symbol: "ETH", label: "ETH-USDT-SWAP", shortLabel: "ETH", sub: "掛單在途", nominal_usdt: 213.08, pct_share: 26.3, color: cryptoColors.in_flight, leverage: "3x Cross", pnl: "+$132.48", pnlUp: true },
+    { symbol: "SOL", label: "SOL-USDT-SWAP", shortLabel: "SOL", sub: "空倉待機", nominal_usdt: 0.00, pct_share: 0.0, color: cryptoColors.alt, leverage: "未持有", pnl: "$0.00", pnlUp: true },
+  ], []);
 
-  // 中心坐標永遠精確坐落卡片核心中點
-  const cx = W / 2;
-  const cy = H / 2;
+  // 方案 B 數據 1：標的曝險分佈
+  const okxNotionalItems: DonutItem[] = useMemo(() => [
+    { symbol: "BTC", label: "BTC 永續持倉", shortLabel: "BTC", sub: "持倉", nominal_usdt: 596.60, pct_share: 42.0, color: cryptoColors.btc, leverage: "3x", pnl: "+$79.2" },
+    { symbol: "在途", label: "在途委託凍結", shortLabel: "在途", sub: "凍結", nominal_usdt: 213.08, pct_share: 15.0, color: cryptoColors.in_flight, leverage: "委託中" },
+    { symbol: "可用", label: "可用曝險預算", shortLabel: "可用", sub: "剩餘額度", nominal_usdt: 610.82, pct_share: 43.0, color: cryptoColors.available, leverage: "額度充裕" },
+  ], []);
 
-  // 動態預估文字寬度：窄卡精簡至 56px，標準/寬卡 76px
-  const estTextW = W < 340 ? 56 : 76;
+  // 方案 B 數據 2：保證金風控水位 (四段式健康刻度，徹底消除 99.9% 失真！)
+  const okxMarginItems: DonutItem[] = useMemo(() => [
+    { symbol: "MM", label: "維持保證金 (MM)", shortLabel: "維持保證金", sub: "強制平倉線", nominal_usdt: 80.97, pct_share: 8.5, color: cryptoColors.mm, leverage: "強平防線" },
+    { symbol: "IM", label: "初始保證金 (IM)", shortLabel: "初始保證金", sub: "已開倉佔用", nominal_usdt: 135.40, pct_share: 14.2, color: cryptoColors.im, leverage: "常規佔用" },
+    { symbol: "掛單", label: "在途凍結保證金", shortLabel: "在途凍結", sub: "限價掛單", nominal_usdt: 143.00, pct_share: 15.0, color: cryptoColors.alt, leverage: "在途預留" },
+    { symbol: "可用", label: "自由保證金緩衝", shortLabel: "自由保證金", sub: "爆倉緩衝區", nominal_usdt: 593.63, pct_share: 62.3, color: cryptoColors.free, leverage: "安全緩衝" },
+  ], []);
 
-  // 垂直空間預留：上下各預留約 42px (合計 84px) 給折線與上下兩行文字
-  // 嚴格確保圓環外徑不超過容器高度的 58%，杜絕頂天立地膨脹感
-  const maxRadiusByH = Math.max(26, (H - 84) / 2.32);
+  // 方案 C 數據：高密度左環右表
+  const schemeCItems = schemeAItems;
 
-  // 水平空間預留：兩側預留文字與折線
-  const maxRadiusByW = Math.max(26, (W / 2 - 20 - estTextW) / 1.35);
+  // 根據當前方案挑選生效的 Donut 資料列
+  const currentItems: DonutItem[] = useMemo(() => {
+    if (candidateScheme === "scheme_a_bloomberg") return schemeAItems;
+    if (candidateScheme === "scheme_b_okx") return okxDimension === "notional" ? okxNotionalItems : okxMarginItems;
+    return schemeCItems;
+  }, [candidateScheme, okxDimension, schemeAItems, okxNotionalItems, okxMarginItems, schemeCItems]);
 
-  // 自適應半徑：上限收斂至 75px (外徑 ~174px)，克制大方，徹底解決「太大了」的視覺壓迫
-  const radius = Math.round(Math.min(75, Math.max(26, Math.min(maxRadiusByW, maxRadiusByH))));
+  // ==================== 圓環幾何參數自適應計算 ====================
+  const W = dimensions.width || 380;
+  const H = dimensions.height || 260;
+  const cx = candidateScheme === "scheme_c_matrix" ? Math.floor(W * 0.24) : Math.floor(W / 2);
+  const cy = Math.floor(H / 2);
 
-  // 環身厚度：收斂在 12~24px 之間，維持定案的扎實質感但絕不臃腫
-  const strokeWidth = Math.max(12, Math.min(24, Math.round(radius * 0.32)));
-  const r_out = radius + strokeWidth / 2;
+  // 依方案縮放圓環尺寸 (方案 C 為精緻迷你環，方案 A/B 為大氣 HUD 環)
+  const isCompact = candidateScheme === "scheme_c_matrix";
+  const r_out = isCompact
+    ? Math.min(56, Math.max(42, Math.floor(H * 0.30)))
+    : Math.min(76, Math.max(50, Math.floor(Math.min(W, H) * 0.28)));
+  const strokeWidth = isCompact ? 12 : Math.min(22, Math.max(14, Math.floor(r_out * 0.24)));
+  const radius = r_out - strokeWidth / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // 外置微折短鉤幾何尺寸 (隨半徑等比微調)
-  const elbowDist = Math.max(9, Math.min(18, Math.round(radius * 0.18)));
-  const hookLen = Math.max(8, Math.min(14, Math.round(radius * 0.14)));
+  // 方案 A/B 引線參數
+  const elbowDist = Math.min(18, Math.max(10, Math.floor(r_out * 0.20)));
+  const hookLen = Math.min(14, Math.max(8, Math.floor(r_out * 0.16)));
+  const estTextW = Math.min(78, Math.max(52, Math.floor(W * 0.22)));
 
-  // 字級隨圖表縮放動態匹配
-  const isCompact = radius < 55;
-  const isLarge = radius >= 72;
-  const fontSizes = {
-    pct: isCompact ? "10.5px" : isLarge ? "13px" : "11.5px",
-    amt: isCompact ? "9px" : isLarge ? "10.5px" : "9.5px",
-    sub: isCompact ? "8px" : isLarge ? "9.5px" : "8.5px",
-    lineGap: isCompact ? 11 : isLarge ? 14 : 12,
-  };
-
-  // 定案方案 A（微折短鉤）幾何計算
-  const slicesWithCallouts = useMemo(() => {
+  // 計算圓弧段與短鉤引線
+  const donutSlices = useMemo(() => {
     let accumulated = 0;
-    const gapPx = 2.0;
+    const gapPx = currentItems.filter((i) => i.pct_share > 0).length > 1 ? 2.5 : 0;
 
-    return items.map((item, idx) => {
-      let effectivePct = item.pct_share;
-      if (activeMode === "raw_margin" && item.pct_share < 1 && item.pct_share > 0) {
-        effectivePct = 6.0;
-      }
-      const fullArc = (effectivePct / 100) * circumference;
+    return currentItems.map((item, idx) => {
+      const fullArc = (item.pct_share / 100) * circumference;
       const arcLength = Math.max(0, fullArc - gapPx);
       const strokeDasharray = `${arcLength} ${circumference - arcLength}`;
       const strokeDashoffset = -accumulated;
 
-      // 弧度中間角（從頂部 -90° 開始順時針）
       const startAngle = (accumulated / circumference) * 2 * Math.PI - Math.PI / 2;
       const arcAngle = (fullArc / circumference) * 2 * Math.PI;
       const midAngle = startAngle + arcAngle / 2;
@@ -196,11 +145,9 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       const sin = Math.sin(midAngle);
       const isRight = cos >= 0;
 
-      // 1. 起點：圓環外沿定位點
       const x1 = cx + r_out * cos;
       const y1 = cy + r_out * sin;
 
-      // 2. 拐點：斜向 45° 放射肘點 (若接近正上/正下方 12點或6點鐘，加強側向延伸避免垂直撞邊)
       const isNearlyVertical = Math.abs(cos) < 0.32;
       const effectiveElbowDist = isNearlyVertical ? elbowDist + 5 : elbowDist;
       let x2 = cx + (r_out + effectiveElbowDist) * cos;
@@ -209,255 +156,407 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       }
 
       let y2 = cy + (r_out + effectiveElbowDist) * sin;
-      // 垂直上下防溢出安全夾持 (Clamp)：確保文字與短鉤絕對落在畫布 [18, H - 24] 安全區內
-      const minY2 = 18;
-      const maxY2 = H - fontSizes.lineGap - 10;
-      y2 = Math.max(minY2, Math.min(maxY2, y2));
+      y2 = Math.max(18, Math.min(H - 22, y2));
 
-      // 3. 方案 A 微折短鉤：僅 8~14px 微型轉折，徹底廢除長底線，絕不穿透切割文字
       const x3 = isRight ? x2 + hookLen : x2 - hookLen;
-
-      // 4. 文字錨點：坐落在短鉤外側 5px，嚴格夾持在安全邊界內，徹底防裁切
       let textX = isRight ? x3 + 5 : x3 - 5;
       if (isRight) {
         textX = Math.min(W - estTextW - 4, Math.max(x3 + 4, textX));
       } else {
         textX = Math.max(estTextW + 4, Math.min(x3 - 4, textX));
       }
-      const textAnchor: "start" | "end" = isRight ? "start" : "end";
 
       return {
         ...item,
         strokeDasharray,
         strokeDashoffset,
-        isHovered: effectiveIndex === idx,
-        hasCallout: item.pct_share > 0, // 僅大於 0% 伸出牽引線
-        callout: {
-          x1, y1,
-          x2, y2,
-          x3,
-          textX,
-          textAnchor,
-          isRight,
-        },
+        isHovered: hoveredIndex === idx,
+        hasCallout: item.pct_share > 0 && candidateScheme !== "scheme_c_matrix",
+        callout: { x1, y1, x2, y2, x3, textX, isRight },
       };
     });
-  }, [items, activeMode, circumference, effectiveIndex, cx, cy, r_out, elbowDist, hookLen, W]);
+  }, [currentItems, circumference, cx, cy, r_out, elbowDist, hookLen, estTextW, W, H, hoveredIndex, candidateScheme]);
+
+  // 目前 Hover 的單項
+  const activeHoverItem = hoveredIndex !== null ? currentItems[hoveredIndex] : null;
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. 卡片頂部工具列 (收斂固化，純淨專業排版) */}
+      {/* 1. 卡片頂部標題列 (純淨標題抓手) */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-secondary/50 border-b border-border/80 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <CardHeaderTitle
             cardId="allocation"
             title="資產曝險配置"
-            subtext={<span className="text-[10px] text-muted-foreground font-mono ml-1">{currentConfig.subtitle}</span>}
+            subtext={
+              <span className="text-[10px] text-muted-foreground font-mono ml-1">
+                {candidateScheme === "scheme_a_bloomberg" && "Bloomberg AIM · 智慧 HUD"}
+                {candidateScheme === "scheme_b_okx" && "OKX Pro · 雙維度風控"}
+                {candidateScheme === "scheme_c_matrix" && "CoinGlass · 左環右表複合矩陣"}
+              </span>
+            }
           />
         </div>
 
-        {/* 即時同步動態指示 (符合制度規範) */}
         <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-mono text-muted-foreground">
           <PulseBeacon size={4.5} />
-          <span>即時同步</span>
+          <span>即時計算</span>
         </div>
       </div>
 
-      {/* 2. 業務視圖切換列 (4 等分 Micro-tabs) */}
-      <div className="flex bg-black/30 border-b border-white/[0.06] p-0.5 shrink-0">
-        {(["ranked_assets", "leveraged", "raw_margin", "compare_all"] as const).map((mode) => (
+      {/* 2. 方案候選切換列 (3 大業界方案一鍵切換對比) */}
+      <div className="flex items-center justify-between bg-black/40 border-b border-white/[0.08] px-2 py-1 shrink-0 gap-1.5">
+        <div className="flex items-center gap-1 flex-1">
           <button
-            key={mode}
             type="button"
-            onClick={() => {
-              setActiveMode(mode);
-              setHoveredIndex(null);
-              setPinnedIndex(null);
-            }}
+            onClick={() => { setCandidateScheme("scheme_a_bloomberg"); setHoveredIndex(null); }}
             className={cn(
-              "flex-1 text-center py-1 text-[10.5px] font-semibold rounded-xs transition-colors whitespace-nowrap",
-              activeMode === mode
-                ? "bg-white/[0.1] text-white font-bold shadow-2xs"
-                : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+              "flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10.5px] font-mono transition-all cursor-pointer",
+              candidateScheme === "scheme_a_bloomberg"
+                ? "bg-primary/20 text-primary border border-primary/50 font-bold shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent"
             )}
           >
-            {DATA_MODES[mode].name}
+            <Sliders className="size-3" />
+            <span>方案 A: 彭博智慧 HUD</span>
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() => { setCandidateScheme("scheme_b_okx"); setHoveredIndex(null); }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10.5px] font-mono transition-all cursor-pointer",
+              candidateScheme === "scheme_b_okx"
+                ? "bg-primary/20 text-primary border border-primary/50 font-bold shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent"
+            )}
+          >
+            <Layers className="size-3" />
+            <span>方案 B: OKX 專業雙維度</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setCandidateScheme("scheme_c_matrix"); setHoveredIndex(null); }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10.5px] font-mono transition-all cursor-pointer",
+              candidateScheme === "scheme_c_matrix"
+                ? "bg-primary/20 text-primary border border-primary/50 font-bold shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent"
+            )}
+          >
+            <LayoutList className="size-3" />
+            <span>方案 C: 左環右表矩陣</span>
+          </button>
+        </div>
       </div>
 
-      {/* 3. 核心內容區 (自適應全尺寸縮放 · 隨卡片縮放無縫動態重繪) */}
+      {/* 方案 B 次級切換列 (標的曝險 vs 保證金水位) */}
+      {candidateScheme === "scheme_b_okx" && (
+        <div className="flex bg-secondary/30 border-b border-border/60 px-3 py-1 items-center justify-between shrink-0 text-[10px] font-mono">
+          <span className="text-muted-foreground">金融視圖維度：</span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { setOkxDimension("notional"); setHoveredIndex(null); }}
+              className={cn(
+                "px-2 py-0.5 rounded transition-all cursor-pointer",
+                okxDimension === "notional"
+                  ? "bg-primary text-primary-foreground font-semibold"
+                  : "bg-surface hover:bg-secondary text-muted-foreground"
+              )}
+            >
+              1. 標的合約曝險 (Notional)
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOkxDimension("margin"); setHoveredIndex(null); }}
+              className={cn(
+                "px-2 py-0.5 rounded transition-all cursor-pointer",
+                okxDimension === "margin"
+                  ? "bg-primary text-primary-foreground font-semibold"
+                  : "bg-surface hover:bg-secondary text-muted-foreground"
+              )}
+            >
+              2. 保證金風控水位 (Margin)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. 核心繪圖與內容展示區 */}
       <div className="flex-1 min-h-0 flex flex-col justify-between overflow-hidden p-2">
-        {/* SVG 畫布容器：由 ResizeObserver 監聽即時像素寬高 */}
-        <div ref={containerRef} className="flex-1 min-h-0 w-full h-full flex items-center justify-center relative overflow-hidden">
-          <svg
-            width={W}
-            height={H}
-            viewBox={`0 0 ${W} ${H}`}
-            className="w-full h-full block select-none"
-          >
-            {/* 1. 底環背景軌道 */}
-            <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#1c2027" strokeWidth={strokeWidth} />
+        <div ref={containerRef} className="flex-1 min-h-0 w-full h-full relative overflow-hidden flex items-center">
+          
+          {/* ==================== 方案 A & 方案 B：完整環圖 + 智慧中央 HUD ==================== */}
+          {(candidateScheme === "scheme_a_bloomberg" || candidateScheme === "scheme_b_okx") && (
+            <div className="w-full h-full relative">
+              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="w-full h-full block select-none">
+                {/* 底環軌道 */}
+                <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#1c2027" strokeWidth={strokeWidth} />
 
-            {/* 2. 多幣種切片環 */}
-            <g className="-rotate-90 origin-center" style={{ transformOrigin: `${cx}px ${cy}px` }}>
-              {slicesWithCallouts.map((s, idx) => (
-                <circle
-                  key={s.label}
-                  cx={cx}
-                  cy={cy}
-                  r={radius}
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={s.isHovered ? strokeWidth + 4 : strokeWidth}
-                  strokeDasharray={s.strokeDasharray}
-                  strokeDashoffset={s.strokeDashoffset}
-                  className="cursor-pointer"
-                  style={{
-                    transition: "stroke-width 0.18s ease, opacity 0.18s ease",
-                    opacity: effectiveIndex !== null && effectiveIndex !== idx ? 0.35 : 1,
-                  }}
-                  onMouseEnter={() => {
-                    if (pinnedIndex === null) setHoveredIndex(idx);
-                  }}
-                  onMouseLeave={() => {
-                    if (pinnedIndex === null) setHoveredIndex(null);
-                  }}
-                  onClick={() => setPinnedIndex((prev) => (prev === idx ? null : idx))}
-                />
-              ))}
-            </g>
+                {/* 數據圓弧切片 */}
+                {donutSlices.map((slice, idx) => {
+                  if (slice.pct_share <= 0) return null;
+                  return (
+                    <circle
+                      key={slice.symbol}
+                      cx={cx}
+                      cy={cy}
+                      r={radius}
+                      fill="none"
+                      stroke={slice.color}
+                      strokeWidth={slice.isHovered ? strokeWidth + 4 : strokeWidth}
+                      strokeDasharray={slice.strokeDasharray}
+                      strokeDashoffset={slice.strokeDashoffset}
+                      className="cursor-pointer transition-all duration-150"
+                      style={{
+                        transform: "rotate(-90deg)",
+                        transformOrigin: `${cx}px ${cy}px`,
+                        filter: slice.isHovered ? `drop-shadow(0 0 8px ${slice.color}90)` : undefined,
+                      }}
+                      onMouseEnter={() => setHoveredIndex(idx)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    />
+                  );
+                })}
 
-            {/* 3. 外置微折短鉤標註 */}
-            {slicesWithCallouts.map((s, idx) => {
-              if (!s.hasCallout) return null;
-              const c = s.callout;
-              const isHovered = effectiveIndex === idx;
-              const isDimmed = effectiveIndex !== null && !isHovered;
-
-              return (
-                <g
-                  key={`callout-${s.label}`}
-                  className="cursor-pointer transition-all duration-200"
-                  style={{ opacity: isDimmed ? 0.3 : 1 }}
-                  onMouseEnter={() => {
-                    if (pinnedIndex === null) setHoveredIndex(idx);
-                  }}
-                  onMouseLeave={() => {
-                    if (pinnedIndex === null) setHoveredIndex(null);
-                  }}
-                  onClick={() => setPinnedIndex((prev) => (prev === idx ? null : idx))}
-                >
-                  {/* 起點圓環定位點 */}
-                  <circle
-                    cx={c.x1}
-                    cy={c.y1}
-                    r={isHovered ? 4 : 2.8}
-                    fill={s.color}
-                    style={{ filter: isHovered ? `drop-shadow(0 0 5px ${s.color})` : "none" }}
-                  />
-
-                  {/* 方案 A 微折短鉤 (乾淨俐落收尾) */}
-                  <polyline
-                    points={`${c.x1},${c.y1} ${c.x2},${c.y2} ${c.x3},${c.y2}`}
-                    fill="none"
-                    stroke={s.color}
-                    strokeWidth={isHovered ? 2 : 1.3}
-                    strokeOpacity={isHovered ? 1 : 0.8}
-                  />
-
-                  {/* 上行文字：幣種名稱與佔比 */}
-                  <text
-                    x={c.textX}
-                    y={c.y2 - 2}
-                    textAnchor={c.textAnchor}
-                    className="select-none"
-                    style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
-                  >
-                    <tspan fill="#f8fafc" fontWeight="700" fontSize={fontSizes.pct} letterSpacing="0.02em">
-                      {s.symbol || s.shortLabel}
-                    </tspan>
-                    <tspan
-                      dx="5"
-                      fill={s.color}
-                      fontWeight="800"
-                      fontSize={fontSizes.pct}
-                      style={{ fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace' }}
-                    >
-                      {s.pct_share.toFixed(1)}%
-                    </tspan>
-                  </text>
-
-                  {/* 下行文字：名目金額與狀態 */}
-                  <text
-                    x={c.textX}
-                    y={c.y2 + fontSizes.lineGap}
-                    textAnchor={c.textAnchor}
-                    className="select-none"
-                    style={{ fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace' }}
-                  >
-                    <tspan fill="#cbd5e1" fontSize={fontSizes.amt} fontWeight="600">
-                      ${formatUsdt(s.nominal_usdt)}
-                    </tspan>
-                    {W >= 340 && (
-                      <tspan
-                        dx="4"
-                        fill="#64748b"
-                        fontSize={fontSizes.sub}
-                        fontWeight="500"
-                        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                {/* 方案 A/B 微折短鉤引線與外部標籤 */}
+                {donutSlices.map((slice) => {
+                  if (!slice.hasCallout) return null;
+                  const c = slice.callout;
+                  return (
+                    <g key={`callout-${slice.symbol}`} className="pointer-events-none transition-opacity duration-150">
+                      <polyline
+                        points={`${c.x1},${c.y1} ${c.x2},${c.y2} ${c.x3},${c.y2}`}
+                        fill="none"
+                        stroke={slice.color}
+                        strokeWidth="1.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={slice.isHovered ? "opacity-100" : "opacity-85"}
+                      />
+                      <circle cx={c.x3} cy={c.y2} r="1.5" fill={slice.color} />
+                      <text
+                        x={c.textX}
+                        y={c.y2 - 3}
+                        textAnchor={c.isRight ? "start" : "end"}
+                        className="font-mono font-bold select-none"
+                        fill="#ffffff"
+                        fontSize={Math.max(10.5, Math.min(12.5, W * 0.032))}
                       >
-                        ({s.sub})
-                      </tspan>
+                        {slice.shortLabel || slice.symbol} {slice.pct_share.toFixed(1)}%
+                      </text>
+                      <text
+                        x={c.textX}
+                        y={c.y2 + 9}
+                        textAnchor={c.isRight ? "start" : "end"}
+                        className="font-mono select-none"
+                        fill="#94a3b8"
+                        fontSize={Math.max(9, Math.min(10.5, W * 0.026))}
+                      >
+                        ${slice.nominal_usdt.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+
+              {/* 中央智慧 HUD (Hero 數據核心 · 徹底消滅黑洞！) */}
+              <div
+                className="absolute flex flex-col items-center justify-center text-center pointer-events-none transition-all duration-200"
+                style={{
+                  left: `${cx - radius + strokeWidth}px`,
+                  top: `${cy - radius + strokeWidth}px`,
+                  width: `${(radius - strokeWidth) * 2}px`,
+                  height: `${(radius - strokeWidth) * 2}px`,
+                }}
+              >
+                {activeHoverItem ? (
+                  // Hover 聚焦展示單項詳情
+                  <div className="flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-100">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-tight">
+                      {activeHoverItem.shortLabel || activeHoverItem.symbol}
+                    </span>
+                    <span
+                      className="num font-bold text-base leading-tight tracking-tight my-0.5"
+                      style={{ color: activeHoverItem.color }}
+                    >
+                      {activeHoverItem.pct_share.toFixed(1)}%
+                    </span>
+                    <span className="text-[9.5px] font-mono text-muted-foreground/90">
+                      ${activeHoverItem.nominal_usdt.toFixed(1)}
+                    </span>
+                    {activeHoverItem.leverage && (
+                      <span className="mt-0.5 px-1 py-0.2 rounded bg-white/10 text-[8.5px] font-mono text-white/90">
+                        {activeHoverItem.leverage}
+                      </span>
                     )}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+                  </div>
+                ) : (
+                  // 常態總覽 HUD
+                  <div className="flex flex-col items-center justify-center">
+                    <span className="text-[9.5px] font-mono text-muted-foreground uppercase tracking-wider">
+                      {candidateScheme === "scheme_b_okx" && okxDimension === "margin" ? "保證金率" : "總名義額"}
+                    </span>
+                    <span className="num font-bold text-[15px] sm:text-[17px] text-foreground leading-tight tracking-tight my-0.5 text-primary">
+                      {candidateScheme === "scheme_b_okx" && okxDimension === "margin" ? "14.2%" : "$1,420"}
+                    </span>
+                    <span className="text-[9px] font-mono text-muted-foreground flex items-center gap-1">
+                      {candidateScheme === "scheme_b_okx" && okxDimension === "margin" ? (
+                        <span className="text-up font-semibold">緩衝 +85.8%</span>
+                      ) : (
+                        <span>0.01x / 3x</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ==================== 方案 C：CoinGlass 左環右表量化矩陣 ==================== */}
+          {candidateScheme === "scheme_c_matrix" && (
+            <div className="w-full h-full flex items-center justify-between gap-3 overflow-hidden">
+              {/* 左側精巧迷你 Donut */}
+              <div className="relative shrink-0 flex items-center justify-center" style={{ width: `${cx * 2}px`, height: `${H}px` }}>
+                <svg width={cx * 2} height={H} viewBox={`0 0 ${cx * 2} ${H}`} className="block select-none">
+                  <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#1c2027" strokeWidth={strokeWidth} />
+                  {donutSlices.map((slice, idx) => {
+                    if (slice.pct_share <= 0) return null;
+                    return (
+                      <circle
+                        key={slice.symbol}
+                        cx={cx}
+                        cy={cy}
+                        r={radius}
+                        fill="none"
+                        stroke={slice.color}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={slice.strokeDasharray}
+                        strokeDashoffset={slice.strokeDashoffset}
+                        style={{
+                          transform: "rotate(-90deg)",
+                          transformOrigin: `${cx}px ${cy}px`,
+                        }}
+                        onMouseEnter={() => setHoveredIndex(idx)}
+                        onMouseLeave={() => setHoveredIndex(null)}
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* 迷你環中央數值 */}
+                <div
+                  className="absolute flex flex-col items-center justify-center text-center pointer-events-none"
+                  style={{
+                    left: `${cx - radius + strokeWidth}px`,
+                    top: `${cy - radius + strokeWidth}px`,
+                    width: `${(radius - strokeWidth) * 2}px`,
+                    height: `${(radius - strokeWidth) * 2}px`,
+                  }}
+                >
+                  <span className="text-[8.5px] font-mono text-muted-foreground uppercase">總曝險</span>
+                  <span className="num font-bold text-[13px] text-primary leading-tight">$1,420</span>
+                  <span className="text-[8px] font-mono text-muted-foreground">3x cross</span>
+                </div>
+              </div>
+
+              {/* 右側高密度量化數據矩陣表 */}
+              <div className="flex-1 min-w-0 h-full flex flex-col justify-center gap-1.5 pr-2 overflow-y-auto">
+                <div className="text-[9.5px] font-mono text-muted-foreground/70 uppercase tracking-wider flex items-center justify-between border-b border-border/50 pb-1">
+                  <span>標的 / 策略</span>
+                  <span>佔比 · 名義額</span>
+                  <span>未平盈虧</span>
+                </div>
+
+                {schemeCItems.map((item, idx) => (
+                  <div
+                    key={item.symbol}
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    className={cn(
+                      "flex items-center justify-between p-1.5 rounded-md border transition-all cursor-pointer font-mono text-[11px]",
+                      hoveredIndex === idx
+                        ? "bg-secondary/70 border-primary/40 shadow-xs"
+                        : "bg-surface/50 border-border/60 hover:bg-secondary/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-foreground text-[11.5px] truncate">{item.label}</span>
+                        <span className="text-[9px] text-muted-foreground">{item.leverage}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col text-right">
+                      <span className="font-bold text-foreground text-[11.5px]">{item.pct_share.toFixed(1)}%</span>
+                      <span className="text-[9.5px] text-muted-foreground">${item.nominal_usdt.toFixed(1)}</span>
+                    </div>
+
+                    <div className="flex flex-col text-right">
+                      <span className={cn("text-[11px] font-semibold", item.pnlUp ? "text-up" : "text-down")}>
+                        {item.pnl}
+                      </span>
+                      <span className="text-[8.5px] text-muted-foreground">7D 損益</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* 4. 底部整合式量化資訊面板 (徹底防破版 · 支援各尺寸卡片) */}
-        <div className="shrink-0 mt-0.5 border-t border-white/[0.06] bg-black/25 px-2.5 py-1.5 rounded-b flex flex-col gap-1 select-none">
-          {/* 上列：資產幣種配置與總名目額度 (嚴格防止文字斷行疊字) */}
-          <div className="flex items-center justify-between text-[10px] gap-2 overflow-hidden whitespace-nowrap">
-            <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-              {items.map((it, idx) => (
-                <div
-                  key={it.label}
-                  className="inline-flex items-center gap-1 cursor-pointer shrink-0"
-                  onMouseEnter={() => setHoveredIndex(idx)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                >
-                  <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: it.color }} />
-                  <span className={cn("font-medium", effectiveIndex === idx ? "text-white font-bold" : "text-slate-400")}>
-                    {it.symbol}
-                  </span>
-                  <span className="font-mono text-slate-300 font-semibold">{it.pct_share.toFixed(1)}%</span>
-                  {it.pct_share === 0 && <span className="text-[9px] text-slate-500 font-mono hidden sm:inline">(空)</span>}
-                </div>
-              ))}
-            </div>
+        {/* 4. 底部量化風控與狀態列 (依方案收斂，零浪費排版) */}
+        <div className="mt-1 pt-1.5 border-t border-border/70 flex items-center justify-between text-[10px] font-mono shrink-0 whitespace-nowrap overflow-x-hidden">
+          {candidateScheme === "scheme_a_bloomberg" && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">單幣預算防線:</span>
+                <span className="text-primary font-bold">BTC 42.0% / 50%</span>
+                <span className="text-up bg-up/10 px-1 py-0.2 rounded border border-up/20 text-[9px]">SAFE</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>多空淨敞口: <span className="text-foreground font-semibold">+$810 (多74%)</span></span>
+                <span>·</span>
+                <span>在途凍結: <span className="text-foreground font-semibold">$213.08</span></span>
+              </div>
+            </>
+          )}
 
-            {/* 總額 */}
-            <div className="inline-flex items-center gap-1 font-mono shrink-0">
-              <span className="text-slate-400 text-[9px]">總配置額</span>
-              <span className="text-white font-bold text-[10.5px]">${formatUsdt(currentConfig.summary.nominal_usdt)} U</span>
-            </div>
-          </div>
+          {candidateScheme === "scheme_b_okx" && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">
+                  {okxDimension === "margin" ? "維持保證金 MM:" : "總曝險預算:"}
+                </span>
+                <span className="text-foreground font-bold">
+                  {okxDimension === "margin" ? "$80.97 (8.5%)" : "$37,500.00"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span>Asia/Taipei 00:00: <span className="text-up font-semibold">日損 0.0%/10% (SAFE)</span></span>
+                <span>·</span>
+                <span>強平安全距離: <span className="text-foreground font-semibold">+85.8%</span></span>
+              </div>
+            </>
+          )}
 
-          {/* 下列：風控核心三指標 (簡明精準，杜絕斷行) */}
-          <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-[9.5px] font-mono whitespace-nowrap gap-1 overflow-hidden">
-            <span className="text-slate-400 shrink-0">
-              槓桿 <b className="text-[#65cba7] font-bold">0.01x</b> <span className="text-slate-500 text-[8.5px]">/3x</span>
-            </span>
-            <span className="text-slate-400 shrink-0">
-              在途 <b className="text-[#e8b45e] font-bold">213 U</b> <span className="text-slate-500 text-[8.5px]">(15%)</span>
-            </span>
-            <span className="text-slate-400 shrink-0">
-              可用 <b className="text-[#e5e8ec] font-bold">375k U</b> <span className="text-[#65cba7] text-[8.5px]">SAFE</span>
-            </span>
-          </div>
+          {candidateScheme === "scheme_c_matrix" && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">總資產淨值:</span>
+                <span className="text-primary font-bold">$47,855.08</span>
+                <span>·</span>
+                <span>有效槓桿: <span className="text-foreground font-semibold">0.43x / 3x</span></span>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <ShieldCheck className="size-3 text-up" />
+                <span className="text-up font-semibold">風控 Latch 監控中</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

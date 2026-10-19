@@ -1,14 +1,39 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-18 21:55 (UTC+8；前端資產配置環圖全響應式流體化定案與版面收斂完成，準備跨機交接)  
+**更新時間**：2026-10-19 18:38 (UTC+8；公司電腦本輪成果就緒，3 大 Donut 方案實作保留供體驗挑選，已上 Git 供在家電腦接續)  
 **當前負責者**：前端視覺與互動開發者 (Antigravity / 6.1 Sol) · 待獨立驗收者 (chatgpt-web/gpt-5.6-sol)  
-**工作目錄**：`C:/Users/kai/Desktop/CatOS_Astra`  
+**工作目錄**：`C:/Users/user/Desktop/CatOS_Astra`  
 **Git 分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）  
-**明日目標**：接續至公司電腦開發環境，啟動 Vite 驗證，並依序推進 Stage 2 佈局快捷板或策略回測聯調。
+**下一成果**：在家電腦啟動 8890 檢視 3 套 Donut 方案並拍板定案，定案後即刻固化寫死並清除切換標籤。
 
 ---
 
-## 1. 今日核心成果交付：資產曝險配置環圖 (Allocation Donut) 完美收斂定案 (2026-10-18)
+## 1. 今日核心成果交付：T-Split 解耦拓撲固化 & 資產配置 3 大業界方案上線 (2026-10-19)
+
+### A. 版面拓撲解耦固化 (Row-First Layout Tree 定案)
+1. **二元樹拓撲根本重構**：最外層根節點寫死為水平分層（`direction: "col"`, 50:50），上下兩層垂直分割線徹底獨立解耦。
+   - **上半部（Top Tier）**：`[帳戶權益 (equity)]` ｜ `[量化機器人 (bots)]` ｜ `[資產配置 Donut (allocation)]`，Donut 獨立維持黃金比例不受擠壓。
+   - **下半部（Bottom Tier）**：`[部位與活動 (positions)]` ｜ `[多空標尺 (exposure)]` ｜ `[最新成交動態 (fills)]`，分割線完全解耦，成交流水可自由向左延伸至 40%~60%，徹底消除全域連動綁架。
+2. **收斂固化**：`createDefaultTree()` 正式寫死為方案 1 拓撲，儲存鍵升版為 `catos_layout_tree_root_v4_tsplit`。
+3. **卡片標題原地切換選單廢除**：依指示徹底移除 `CardHeaderTitle` 內部繁雜的 `In-Place Swap` 與關閉下拉選單，還原純粹且專注的標題列抓手。
+4. **執行引擎呼吸燈合併至左下角頭貼**：頂部 Header 移除冗餘 `• Engine online` 標籤；左下角個人頭貼 4 點鐘方位植入精緻翡翠綠呼吸徽章（`PulseBeacon`），副標題整合 `Engine online · OKX-SWAP`。
+
+### B. 資產曝險配置 (Allocation Donut) 3 大業界方案實作上線 (保留供在家挑選)
+遵照「視覺決策鐵律：眼見為憑（No Visual Evidence, No Selection）」，已於 `allocation-donut-card.tsx` 完整實作 3 大業界主流架構，並保留頂部 Candidate Switcher 供在家電腦體驗與挑選：
+- **方案 A（Bloomberg AIM 智慧 HUD）**：中央 HUD 顯示總名義額 `$1,420` + 槓桿，圓弧外置低彩引線（BTC 73.7%, ETH 26.3%），Hover 切片時動態 Drilldown 切換幣種詳情；底部監控單幣 50% 防線。
+- **方案 B（OKX Pro 雙維度風控）**：二元切換「標的曝險」vs「保證金風控水位」，採用四段式保證金刻度（維持保證金 MM 8.5% / 初始保證金 IM 14.2% / 在途凍結 15.0% / 自由保證金 62.3%），徹底消除 99.9% 比例失真。
+- **方案 C（CoinGlass 左環右表複合矩陣）**：左側 110px 精緻迷你 Donut，右側高密度多空矩陣數據清單（佔比、名義額、7D 盈虧）。
+- **待定案動作**：待在家電腦實際操作體驗後拍板定案，拍板後即刻依 SOP 固化寫死並徹底刪除頂部切換列。
+
+### C. 驗證與編譯狀態
+- `npm run typecheck`：**0 錯誤**。
+- `npm run build`：**0 錯誤** 通過。
+- 8890 (React 19 Vite) 正常運行中。
+
+
+---
+
+## 2. 前期核心成果：資產曝險配置環圖 (Allocation Donut) 完美收斂定案 (2026-10-18)
 
 針對使用者指示「顯示比例問題」與「卡片縮放未跟隨、太大了頂天立地、字體跑版切邊」等問題，已徹底完成全方位幾何重構與收斂固化：
 
