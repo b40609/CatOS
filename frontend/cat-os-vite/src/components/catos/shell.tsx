@@ -329,9 +329,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2 shrink-0">
             {current?.to === "/" && <CardManagerDropdown />}
             <ModeSelector />
-            <span className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground hidden sm:flex">
-              <PulseBeacon size={4} variant="up" /> Engine online
-            </span>
           </div>
         </header>
 

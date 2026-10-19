@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { usePersonalOs } from "@/state/personalOsStore";
 import { PersonalOsModal } from "@/components/catos/personal-os-modal";
+import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
 
 const itemCls =
@@ -100,25 +101,43 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
             )}
             title={isFolded ? `${effectiveName} (${displayEmail})` : undefined}
           >
-            {/* 定案「無界純淨」：無外圈、消除基線下沉、Hover 微彈 */}
-            <span
-              className={cn(
-                "flex items-center justify-center leading-none select-none text-foreground shrink-0 transition-transform duration-200 group-hover:scale-115",
-                isFolded ? "size-10 text-[20px]" : "size-7 text-[18px]"
-              )}
-            >
-              {avatar}
-            </span>
+            {/* 頭像 + 執行引擎呼吸燈狀態指示 (4 點鐘方位) */}
+            <div className="relative shrink-0 flex items-center justify-center">
+              <span
+                className={cn(
+                  "flex items-center justify-center leading-none select-none text-foreground shrink-0 transition-transform duration-200 group-hover:scale-115",
+                  isFolded ? "size-10 text-[20px]" : "size-7 text-[18px]"
+                )}
+              >
+                {avatar}
+              </span>
+              <span
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 rounded-full bg-background p-0.5 shadow-xs flex items-center justify-center",
+                  isFolded ? "size-3.5" : "size-3"
+                )}
+                title="本地執行引擎 (Supervisor · 127.0.0.1:8770) 在線運行中"
+              >
+                <PulseBeacon size={isFolded ? 4.5 : 3.5} variant="up" />
+              </span>
+            </div>
 
             {!isFolded && (
               <>
                 <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
-                  <span className="block truncate text-[13px] font-medium text-foreground/90 transition-colors group-hover:text-foreground group-hover:font-semibold">
-                    {effectiveName}
-                  </span>
-                  <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground/75 transition-colors group-hover:text-muted-foreground">
-                    {displayEmail}
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="truncate text-[13px] font-medium text-foreground/90 transition-colors group-hover:text-foreground group-hover:font-semibold">
+                      {effectiveName}
+                    </span>
+                    <span className="shrink-0 rounded bg-primary/10 px-1 py-0.2 font-mono text-[8.5px] text-primary border border-primary/20">
+                      {traderBadge}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1 text-[10px] font-mono text-muted-foreground/80 leading-tight">
+                    <span className="text-up font-semibold">Engine online</span>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span className="truncate text-muted-foreground/60">{subAccountAlias || "OKX-SWAP"}</span>
+                  </div>
                 </div>
                 <ChevronsUpDown className="size-3.5 text-muted-foreground transition-colors group-hover:text-primary shrink-0" />
               </>

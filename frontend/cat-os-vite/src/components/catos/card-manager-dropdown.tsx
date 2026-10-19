@@ -252,18 +252,18 @@ export function CardManagerDropdown() {
 
           {/* 3. 底部快速預設與還原 */}
           <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10px] font-mono">
-            <span className="text-muted-foreground">快速佈局預設：</span>
-            <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">佈局重置：</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
-                  applyLayoutPreset("quad");
+                  applyLayoutPreset("default");
                   setIsOpen(false);
                 }}
-                className="px-1.5 py-0.5 rounded bg-secondary hover:bg-primary/20 hover:text-primary text-muted-foreground border border-border/60 transition-colors cursor-pointer"
-                title="恢復為量化核心四分割 (60:40)"
+                className="px-2 py-0.5 rounded bg-primary/15 hover:bg-primary text-primary hover:text-primary-foreground border border-primary/40 font-semibold transition-all cursor-pointer shadow-2xs"
+                title="恢復為定案之「量化戰情 T-Split (上下解耦 · 寬幅成交流)」"
               >
-                四分割
+                T-Split (預設)
               </button>
               <button
                 type="button"

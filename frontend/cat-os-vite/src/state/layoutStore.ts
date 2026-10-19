@@ -43,12 +43,12 @@ export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string 
 
 export const DEFAULT_PROFILES: LayoutProfile[] = [
   {
-    id: "layout_quad_v0_core",
-    name: "量化核心四分割 (60:40)",
-    shortName: "量化核心",
-    ratioText: "60:40",
+    id: "layout_tsplit_v1_core",
+    name: "量化戰情 T-Split (上下解耦 · 定案)",
+    shortName: "T-Split",
+    ratioText: "T-Split",
     icon: "🔲",
-    desc: "權益走勢 · 部位活動 · 多空標尺 · 機器人矩陣 專業量化佈局",
+    desc: "權益走勢 · 機器人矩陣 · 資產 Donut · 部位活動 · 多空標尺 · 寬幅成交流水",
     isSystem: true,
     rootNode: createDefaultTree(),
     leftColWidth: 60,
@@ -112,7 +112,7 @@ export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tact
 const STORAGE_KEY_PROFILES = "catos_layout_profiles_v4_quad";
 const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v4_quad";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v3";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v4_tsplit";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";
@@ -160,7 +160,7 @@ interface LayoutState {
   moveAndSplitNode: (sourceLeafId: string, targetLeafId: string, pos: DropPosition) => void;
   setDraggingLeafId: (id: string | null) => void;
   setHoverTarget: (target: HoverDropTarget | null) => void;
-  applyLayoutPreset: (preset: "quad" | "tri" | "dual") => void;
+  applyLayoutPreset: (preset: "default" | "quad" | "tri" | "dual") => void;
   addNewCard: (cardId: CardId) => void;
   replaceLeafNode: (leafId: string, newCardId: CardId) => void;
 
@@ -378,9 +378,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   applyLayoutPreset: (preset) => {
     let newTree: LayoutNode;
     let label = "";
-    if (preset === "quad") {
+    if (preset === "default" || preset === "quad") {
       newTree = createDefaultTree();
-      label = "量化核心四分割 (60:40)";
+      label = "量化戰情 T-Split (上下解耦 · 定案)";
     } else if (preset === "tri") {
       newTree = createTriSplitTree();
       label = "主視野三分割 (左一右二)";
