@@ -13,7 +13,16 @@ import {
   getAllLeaves,
 } from "@/lib/layout-tree/tree-ops";
 
-export type CardId = "equity" | "positions" | "allocation" | "fills" | "bots" | "exposure";
+export type CardId =
+  | "equity"
+  | "positions"
+  | "allocation"
+  | "fills"
+  | "bots"
+  | "incidents"
+  | "market_watch"
+  | "strategy_intents"
+  | "activity_deck";
 export type SlotKey = "leftUpper" | "leftLower" | "rightUpper" | "rightLower";
 
 export interface LayoutProfile {
@@ -34,21 +43,24 @@ export interface LayoutProfile {
 
 export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string }> = {
   equity: { zh: "帳戶權益 (Equity & Drawdown)", en: "Equity & Drawdown", icon: "📈" },
-  positions: { zh: "部位與活動 (Positions & Activity)", en: "Positions & Activity", icon: "📊" },
-  exposure: { zh: "多空曝險配置 (Exposure)", en: "Exposure & Margin", icon: "📐" },
+  positions: { zh: "部位活動與盤口防線 (Positions, Orders & P6)", en: "Positions, Orders & Safety", icon: "📊" },
   bots: { zh: "量化機器人 (Bots Matrix)", en: "Bots Matrix", icon: "🤖" },
-  allocation: { zh: "資產配置比例 (Donut)", en: "Asset Allocation", icon: "🪙" },
+  allocation: { zh: "資產曝險配置 (Allocation)", en: "Asset & Exposure Allocation", icon: "🪙" },
   fills: { zh: "即時成交流 (Fills)", en: "Recent Fills", icon: "⚡" },
+  incidents: { zh: "系統警報與事件時間軸 (Incident Stream)", en: "Incident Stream", icon: "🚨" },
+  market_watch: { zh: "標的行情與 K 線倒數 (Market Watch)", en: "Market Watch & Bar Timer", icon: "⏱️" },
+  strategy_intents: { zh: "策略目標意圖信號看板 (Worker Intents & Radar)", en: "Worker Intents & Radar", icon: "🎯" },
+  activity_deck: { zh: "全域戰情日誌 (Activity Deck)", en: "Activity Deck", icon: "📜" },
 };
 
 export const DEFAULT_PROFILES: LayoutProfile[] = [
   {
     id: "layout_tsplit_v1_core",
-    name: "量化戰情 T-Split (上下解耦 · 定案)",
+    name: "量化戰情 T-Split (上下解耦 · 5卡定案)",
     shortName: "T-Split",
     ratioText: "T-Split",
     icon: "🔲",
-    desc: "權益走勢 · 機器人矩陣 · 資產 Donut · 部位活動 · 多空標尺 · 寬幅成交流水",
+    desc: "權益走勢 · 機器人矩陣 · 資產曝險配置 · 持倉與盤口防線 · 全域戰情日誌台",
     isSystem: true,
     rootNode: createDefaultTree(),
     leftColWidth: 60,
@@ -77,7 +89,7 @@ export const DEFAULT_PROFILES: LayoutProfile[] = [
     slots: {
       leftUpper: "equity",
       leftLower: "positions",
-      rightUpper: "exposure",
+      rightUpper: "allocation",
       rightLower: "bots",
     },
     updatedAt: "預設方案",
@@ -97,7 +109,7 @@ export const DEFAULT_PROFILES: LayoutProfile[] = [
     slots: {
       leftUpper: "equity",
       leftLower: "positions",
-      rightUpper: "exposure",
+      rightUpper: "allocation",
       rightLower: "bots",
     },
     updatedAt: "預設方案",
@@ -109,10 +121,10 @@ export type SeamStyle = "seamless" | "compact" | "floating";
 export type DragPreviewMode = "real-card" | "minimal-blueprint" | "mini-tag";
 export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tactical_icon";
 
-const STORAGE_KEY_PROFILES = "catos_layout_profiles_v4_quad";
-const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v4_quad";
+const STORAGE_KEY_PROFILES = "catos_layout_profiles_v7_clean";
+const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v7_clean";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v4_tsplit";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v7_clean";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";

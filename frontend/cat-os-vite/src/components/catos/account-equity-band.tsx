@@ -221,25 +221,7 @@ export function AccountEquityBand({
               </div>
             </div>
 
-            {/* 額外填補數據 (拉高卡片時自然展現專業金融指標，消除空洞) */}
-            <div className="mt-auto pt-2 border-t border-border/40 flex flex-col gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-              <div className="flex justify-between">
-                <span>有效槓桿</span>
-                <span className="text-foreground font-semibold">0.43x <span className="text-muted-foreground font-normal">/ 3.0x</span></span>
-              </div>
-              <div className="flex justify-between">
-                <span>保證金率</span>
-                <span className="text-foreground font-semibold">14.2%</span>
-              </div>
-              <div className="flex justify-between">
-                <span>最大回撤</span>
-                <span className="text-emerald-400 font-semibold">-3.12%</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-border/30 text-[9px]">
-                <span className="text-muted-foreground">風控防線</span>
-                <span className="text-emerald-400 font-bold">00:00 · SAFE</span>
-              </div>
-            </div>
+
           </div>
 
           {/* 右側 SVG 走勢圖 (100% 響應垂直拉伸) */}

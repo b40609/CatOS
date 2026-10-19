@@ -702,8 +702,8 @@ export function PersonalOsModal({
                     <span className="text-emerald-400 font-bold">{ping} ms</span>
                   </div>
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
-                    <span className="text-[9.5px] text-muted-foreground block">固定交易 Tag</span>
-                    <span className="text-primary truncate block font-bold">41cb53c54d6dABDE</span>
+                    <span className="text-[9.5px] text-muted-foreground block">資料儲存底座</span>
+                    <span className="text-foreground truncate block font-bold">SQLite (WAL)</span>
                   </div>
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
                     <span className="text-[9.5px] text-muted-foreground block">本地服務埠</span>
