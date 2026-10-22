@@ -48,9 +48,12 @@ DEMO_QUIESCENT_BASELINE_SOURCE = "demo_quiescent_midnight_equivalence_v1"
 DEMO_QUIESCENT_BASELINE_CONTRACT = "demo_quiescent_midnight_equivalence_evidence_v1"
 DEMO_QUIESCENT_BASELINE_EVENT_SEMANTICS = "quiescent_interval_equivalent_midnight_equity"
 DAY_CONTEXT_CONTRACT = "taipei_day_context_v1"
+RISK_PERIOD_SOURCE = "local_sim_risk_period_v1"
+RISK_PERIOD_CONTRACT = "risk_period_observation_v1"
 AUTHORIZED_BASELINE_SOURCES = frozenset({
     SYNTHETIC_BASELINE_SOURCE,
     DEMO_QUIESCENT_BASELINE_SOURCE,
+    RISK_PERIOD_SOURCE,
 })
 
 
@@ -131,6 +134,14 @@ class BaselineEvidence:
                     or self.observed_at_ms != self.trading_day_start_ms
                     or any(value is not None for value in q1_fields)):
                 raise ipc.ProtocolError("invalid synthetic midnight baseline evidence")
+        elif self.source == RISK_PERIOD_SOURCE:
+            if (self.contract_id != RISK_PERIOD_CONTRACT or self.environment != "local-sim"
+                    or self.event_semantics != "observed_period_equity"
+                    or not self.trading_day_start_ms <= self.observed_at_ms < self.trading_day_start_ms + DAY_MS
+                    or any(value is not None for value in (self.expected_uid_sha256, self.cutoff_ms,
+                        self.balance_content_digest, self.collection_evidence_digest, self.zero_event_digest))):
+                raise ipc.ProtocolError("invalid local risk period evidence")
+            _sha256_text(self.report_content_digest, "period report digest")
         elif self.source == DEMO_QUIESCENT_BASELINE_SOURCE:
             if (self.contract_id != DEMO_QUIESCENT_BASELINE_CONTRACT
                     or self.event_semantics != DEMO_QUIESCENT_BASELINE_EVENT_SEMANTICS
@@ -161,6 +172,8 @@ class BaselineEvidence:
                 collection_evidence_digest=self.collection_evidence_digest,
                 zero_event_digest=self.zero_event_digest,
             )
+        elif self.source == RISK_PERIOD_SOURCE:
+            data["report_content_digest"] = self.report_content_digest
         return data
 
     @classmethod
@@ -301,6 +314,9 @@ def is_verified_baseline(basis: DayBasis | None, *, account_alias: str, environm
         if (evidence.cutoff_ms != evidence.observed_at_ms
                 or not trading_day_start_ms < evidence.observed_at_ms < trading_day_start_ms + DAY_MS):
             return False
+    elif basis.source == RISK_PERIOD_SOURCE:
+        if environment != "local-sim" or not trading_day_start_ms <= evidence.observed_at_ms < trading_day_start_ms + DAY_MS:
+            return False
     else:
         return False
     expected_digest = compute_baseline_digest(
@@ -339,6 +355,8 @@ class Snapshot:
     margin_ok: bool = True
     position_verified: bool = True
     reduction_conflict: bool = False
+    flow_basis_id: str | None = None
+    flow_start_ms: int | None = None
 
     def __post_init__(self):
         ipc.integer(self.seq, "risk sequence", 1)
@@ -357,6 +375,10 @@ class Snapshot:
         if self.basis is not None and (not isinstance(self.basis, DayBasis)
                                       or self.basis.day != taipei_day(self.time_ms)):
             raise ipc.ProtocolError("basis must identify this Taipei day")
+        if self.flow_basis_id is not None:
+            ipc.token(self.flow_basis_id, "flow basis")
+        if self.flow_start_ms is not None:
+            ipc.integer(self.flow_start_ms, "flow start")
 
     def to_wire(self):
         return {name: (str(value) if isinstance(value, Decimal) else
@@ -395,13 +417,15 @@ class State:
     basis: DayBasis | None = None
     snapshot: Snapshot | None = None
     basis_blocked_day: int | None = None
+    basis_established_day: int | None = None
 
     def to_wire(self):
         return dict(seq=self.seq, time_ms=self.time_ms, mode=self.mode, health=self.health,
                     phase=self.phase, reasons=sorted(self.reasons), epoch=self.epoch,
                     flatten_id=self.flatten_id, basis=None if self.basis is None else self.basis.to_wire(),
                     snapshot=None if self.snapshot is None else self.snapshot.to_wire(),
-                    basis_blocked_day=self.basis_blocked_day)
+                    basis_blocked_day=self.basis_blocked_day,
+                    basis_established_day=self.basis_established_day)
 
     @classmethod
     def from_wire(cls, data):
@@ -419,6 +443,8 @@ class State:
         values["snapshot"] = None if values["snapshot"] is None else Snapshot.from_wire(values["snapshot"])
         if values.get("basis_blocked_day") is not None:
             ipc.integer(values["basis_blocked_day"], "blocked basis day")
+        if values.get("basis_established_day") is not None:
+            ipc.integer(values["basis_established_day"], "established basis day")
         return cls(**values)
 
 
@@ -437,12 +463,19 @@ def halt(state, reasons):
 def loss_reasons(state, limits):
     s, basis = state.snapshot, state.basis
     if (s is None or basis is None or basis.day != taipei_day(s.time_ms)
-            or not s.valuation_known or not s.flows_known):
+            or not s.valuation_known or not s.flows_known or not period_flows_match(basis, s)):
         return frozenset()
     with localcontext(research._CONTEXT):
         loss = (s.equity - basis.equity - s.external_net) / basis.equity
         return frozenset(name for name, limit in (("soft_loss", limits.soft_loss),
                          ("hard_loss", limits.hard_loss)) if loss <= -limit)
+
+
+def period_flows_match(basis, snapshot):
+    return (basis is None or basis.source != RISK_PERIOD_SOURCE or
+            (snapshot.flow_basis_id == basis.evidence_id
+             and snapshot.flow_start_ms == basis.evidence.observed_at_ms
+             and snapshot.time_ms >= snapshot.flow_start_ms))
 
 
 def observe(state, snapshot, limits=Limits()):
@@ -452,9 +485,6 @@ def observe(state, snapshot, limits=Limits()):
     blocked_day = state.basis_blocked_day
     if blocked_day is not None and day > blocked_day:
         blocked_day = None
-    previous_day = None if state.seq == 0 else taipei_day(state.time_ms)
-    if (state.seq == 0 or previous_day != day) and snapshot.basis is None:
-        blocked_day = day
     if blocked_day == day and snapshot.basis is not None:
         raise ipc.ProtocolError("missing day basis cannot be rebuilt before next Taipei day")
     basis = state.basis
@@ -464,11 +494,13 @@ def observe(state, snapshot, limits=Limits()):
         basis = snapshot.basis
     basis_known = basis is not None and basis.day == taipei_day(snapshot.time_ms)
     health = "HEALTHY" if (basis_known and snapshot.valuation_known and snapshot.flows_known
+                            and period_flows_match(basis, snapshot)
                             and snapshot.equity > 0 and snapshot.risk_equity > 0
                             and snapshot.margin_ok) else "DEGRADED"
     result = replace(state, seq=snapshot.seq, time_ms=snapshot.time_ms, snapshot=snapshot,
                      basis=basis, health=health, epoch=state.epoch + (state.health != health),
-                     basis_blocked_day=blocked_day)
+                     basis_blocked_day=blocked_day,
+                     basis_established_day=basis.day if basis_known else state.basis_established_day)
     result = halt(result, loss_reasons(result, limits))
     if result.mode == "FLAT" and result.phase == "DONE" and (snapshot.position != 0
             or snapshot.pending_buy != 0 or snapshot.pending_sell != 0 or snapshot.other_notional != 0):

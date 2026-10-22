@@ -78,10 +78,9 @@ export function getEquitySeries(range: DashboardRange) {
 }
 
 export const openPositions = [
-  { symbol: "BTC-PERP", code: "BTC", side: "LONG", size: 1.24, entry: 62_840, mark: 64_182.5, strategy: "CAT-MOM-01", venue: "Binance" },
-  { symbol: "ETH-PERP", code: "ETH", side: "SHORT", size: 4.2, entry: 3_228.4, mark: 3_182.6, strategy: "CAT-VOL-09", venue: "OKX" },
-  { symbol: "SOL-PERP", code: "SOL", side: "LONG", size: 18.5, entry: 138.72, mark: 142.38, strategy: "CAT-NLP-05", venue: "Binance" },
-  { symbol: "ETH-USDT", code: "ETH", side: "LONG", size: 2.8, entry: 3_201.8, mark: 3_182.6, strategy: "CAT-MR-07", venue: "OKX" },
+  { symbol: "BTC-USDT-SWAP", code: "BTC", side: "LONG", size: 0.85, entry: 61_480.0, mark: 62_140.5, strategy: "Tabby (Breakout)", venue: "OKX" },
+  { symbol: "ETH-USDT-SWAP", code: "ETH", side: "LONG", size: 9.50, entry: 3_320.0, mark: 3_375.2, strategy: "Calico (Trend)", venue: "OKX" },
+  { symbol: "SOL-USDT-SWAP", code: "SOL", side: "LONG", size: 95.0, entry: 148.20, mark: 152.80, strategy: "Mochi (Grid)", venue: "OKX" },
 ] as const;
 
 export function positionPnl(position: { side: string; size: number; entry: number; mark: number }) {
@@ -89,9 +88,7 @@ export function positionPnl(position: { side: string; size: number; entry: numbe
 }
 
 export const recentFills = [
-  { id: "tf1", time: "10:02:18", symbol: "BTC-PERP", side: "BUY" as const, qty: 0.35, price: 64_182.5, pnl: 812.4 },
-  { id: "tf2", time: "10:01:54", symbol: "ETH-PERP", side: "SELL" as const, qty: 1.2, price: 3_182.6, pnl: 461.9 },
-  { id: "tf3", time: "10:00:32", symbol: "SOL-PERP", side: "BUY" as const, qty: 12, price: 142.38, pnl: -48.2 },
-  { id: "tf4", time: "09:58:41", symbol: "BTC-PERP", side: "SELL" as const, qty: 0.2, price: 64_120.8, pnl: 284.7 },
-  { id: "tf5", time: "09:56:05", symbol: "ETH-USDT", side: "BUY" as const, qty: 2.8, price: 3_201.8, pnl: -53.76 },
+  { id: "tf1", time: "10:02:18", symbol: "BTC-USDT-SWAP", side: "BUY" as const, qty: 0.85, price: 61_480.0, pnl: 561.43 },
+  { id: "tf2", time: "10:01:54", symbol: "ETH-USDT-SWAP", side: "BUY" as const, qty: 9.50, price: 3_320.0, pnl: 524.40 },
+  { id: "tf3", time: "10:00:32", symbol: "SOL-USDT-SWAP", side: "BUY" as const, qty: 95.0, price: 148.20, pnl: 437.00 },
 ];

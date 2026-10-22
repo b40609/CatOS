@@ -1,17 +1,17 @@
 # catOS 正式唯讀 Reconciliation Gate 契約
 
-更新：2026-09-22。此文件定義第一個 Demo 閉環之前的唯讀對帳 gate；不產生交易授權。9/21 各節為契約與歷史實作紀錄；9/22 新授權的 Demo 唯讀 evidence 結果見下方，未改 DB schema／交易邊界。
+更新：2026-10-20（R1 local-sim 已實作並完成開發自測，待獨驗）。此文件記錄唯讀對帳 gate 契約；不產生交易授權。9/21、9/22 evidence 為歷史紀錄，不代表當前帳戶狀態。2026-09-23 起全分類目錄 coverage 僅供資訊，實際 unknown／forbidden bills 仍阻擋；Journal／protection 已支援 durable `posId`／`algo_id`。R1 取代第 4 節相應舊基準政策，完整政策見[精簡評估第 5 節](retail-v1-simplification-assessment-20261020.md#5-已定案金融變更r1-操作性風控基準)，實作與 197 項本機自測見[R1 交付](risk-period-r1-local-sim.md)。Demo／Q1 既有路徑仍保留舊來源契約，未接入 R1。
 
 ## 2026-09-22 當期 evidence 與未解除條件
 
-- [本輪唯讀證據](reconciliation-readonly-evidence-20260922.md)：subtypes 32 類／185 組已取得，11 組明確分類、174 組仍 unknown。新版本與既有靜態 Transfer 版本都保持 complete=false；完整目錄不等於完整 production classification，formal gate 的 completeness 要求不變。
+- [當期唯讀證據](reconciliation-readonly-evidence-20260922.md)：當時 subtypes 32 類／185 組已取得，11 組明確分類、174 組仍 unknown，新版本與既有靜態 Transfer 版本均為 complete=false。此為 9/22 歷史狀態；當時的全目錄 completeness 阻斷要求已由 9/23 分類縮減政策取代。
 - 後續 [F1 freshness 補證](reconciliation-f1-freshness-evidence-20260922.md) 已完成：4 次正常 13-source／41-GET collection 為 20159–20216 ms；gate-adjacent report age 132–170 ms、clock sample age 66–85 ms、midpoint offset +2837～+2848 ms。另有 360 GET／179993 ms 真實 pagination stress 由 deadline fail closed。F1 四值已定案；snapshot semantics 仍未獲新證明。
 - 2026-09-22 後續審查已把 clock sample age 從 clock offset 拆開：`max_clock_skew_ms` 只約束 server/local offset，新增 `max_clock_sample_age_ms` 約束 sample 到 `checked_at_ms` 的年齡；不藉放寬 skew 吸收批次耗時。詳見 [分類與 freshness 審查](reconciliation-classification-freshness-review-20260922.md)。
 - 本輪 collection_complete=true，但 reconciled=false、trade_authorized=false；balance adjEq missing 與既有 attribution／E_0／P6／foreign／window 等實際差異仍保留。詳見 evidence；未使用真實帳戶資料作單元測試。
 
 ## 1. 目的與邊界
 
-2026-09-22 C1-B/C2-A/C3-B/C4-B 已核准。classification residual closure 後現行 coverage 為 153/185，32 unknown、complete=false。`FlowClassificationEntry.category` 支援 external/internal/forbidden；forbidden 計入已知分類，但 report 觀察到禁止 bill（包含零金額與非 USDT）必須產生 `unsupported_account_activity`，external-flow 小計 unavailable，formal gate 固定阻斷。分類完整性、DayLedger、freshness 或其他證據不得覆蓋此 blocker。禁止表項本身不代表本批出現禁止活動。external 同時包含核准 C3-B 的非策略 equity adjustment，也包含 C2-A 明確跨 verified trading-account equity scope 的 Funding/OTC system-account transfer；C2 邊界與 verified account equity scope 一致（不再綁定單一欄位名稱；acctLv=2 依單一無負債 USDT details[].eq，adjEq="" 視為合法 not applicable；acctLv=3 依有效 adjEq）。最新分類與剩餘 32 組見 `reconciliation-classification-closure-20260922.md`。
+2026-09-22 C1-B/C2-A/C3-B/C4-B 已核准。當期 classification residual closure 後 coverage 為 153/185，32 unknown、complete=false；此數字為歷史盤點，coverage 不再單獨阻斷。`FlowClassificationEntry.category` 支援 external/internal/forbidden；forbidden 計入已知分類，但 report 觀察到禁止 bill（包含零金額與非 USDT）必須產生 `unsupported_account_activity`，external-flow 小計 unavailable，formal gate 固定阻斷。分類完整性、DayLedger、freshness 或其他證據不得覆蓋此 blocker。禁止表項本身不代表本批出現禁止活動。external 同時包含核准 C3-B 的非策略 equity adjustment，也包含 C2-A 明確跨 verified trading-account equity scope 的 Funding/OTC system-account transfer；C2 邊界與 verified account equity scope 一致（不再綁定單一欄位名稱；acctLv=2 依單一無負債 USDT details[].eq，adjEq="" 視為合法 not applicable；acctLv=3 依有效 adjEq）。當期分類與剩餘 32 組見 `reconciliation-classification-closure-20260922.md`。
 
 正式 gate 只回答一件事：指定 Bot 在指定本地 revision 下，現有本地責任與一批完整、可驗證的 OKX 唯讀證據是否一致。
 
@@ -23,7 +23,7 @@ gate 不自動接管陌生部位／委託／algo，不因 tag、`clOrdId`、`alg
 
 ### 2.1 Collection report
 
-輸入既有 `account_report.build_report()` 產生的私有報告，至少保留：
+Demo 輸入既有 `account_report.build_report()` 產生的私有報告；R1 本機模擬由受信合成報告經 `risk_period.project()` 投影。至少保留：
 
 - account/environment/instrument/window scope。
 - `collection_complete`、來源分頁完整性、digest／cursor chain 結果。
@@ -55,7 +55,7 @@ snapshot_digest
 
 來源限定為 Journal 已持久化資料；Worker 不得提供或覆寫 ownership。
 
-目前可直接取得的資料：`ownership`、`execution_orders`、protection state。現況缺口：Journal 沒有持久化 OKX position `posId`，protection 也沒有持久化遠端 `algoId`。因此非零遠端 position 或需歸屬的遠端 algo 在缺少 durable remote identity 時必須阻斷，不能以 symbol、tag 或 client ID 補猜。此缺口不在本片以 schema migration 解決。
+目前可直接取得的資料：`ownership`、`execution_orders`、protection state。Journal 已支援 `ownership.remote_pos_id`，protection state 已保存遠端 `algo_id`；早期「沒有持久化 identity」的缺口敘述已被後續實作取代。這不代表每個帳戶都已有合格 identity：非零遠端 position 或需歸屬的遠端 algo 缺少 durable remote identity 時仍阻斷，不能以 symbol、tag 或 client ID 補猜。首次 position identity 綁定須通過既有本地／遠端成交 lineage 與 revision 驗證；詳見 [identity 政策與實作紀錄](reconciliation-policy-decision-pack.md)。
 
 ### 2.3 Revision fence
 
@@ -137,13 +137,23 @@ W1 已定義 `w1-exact-window-pagination.v1`：`DemoReadTransport` 對 fills/fil
 ### 3.3 P6 protection
 
 - P6 啟用時，active/pending/uncertain/triggered responsibility 必須與 durable remote `algoId` 及其 child orders／fills 建立證據鏈。
-- 現行 protection state 只有本地 request/client identity，沒有 durable remote `algoId`；只要 gate 需要證明現存遠端 protection responsibility，即回傳 `algo_identity_unavailable`／`p6_protection_unverified`。
+- 現行 protection state 已保存 durable remote `algoId`；既存責任缺少該 identity 或保護條件不符，仍回傳 `algo_identity_unavailable`／`p6_protection_unverified`，不能以 request/client identity 代替。
 - `TRIGGERED` 不是 flat 或 fills complete 的證明；維持 `p6_triggered_not_reconciled` 直到 child order/fill 對帳完成。
 - P6 ratio=0 且沒有 active/pending/uncertain/triggered obligation 時，不要求建立不存在的遠端 algo ownership。
 
-## 4. E_0 與 external flow
+## 4. 風控基準與 external flow
 
-既有政策固定使用 Asia/Taipei 00:00 日界與固定日初權益分母；本契約不改此政策。
+### 4.1 R1 本機模擬路徑
+
+保留 Asia/Taipei 00:00 日界，以當日首個合格觀測的實際時間與固定權益建立風控期間。候選須綁定 account／local-sim／day／Decimal equity／report digest，經 Journal 單 writer 交易內的完整 gate 驗證與 COMMIT 才可供風控使用；無需精確午夜證據。
+
+`DayLedgerEvidence` 在下列共用欄位外帶入已驗證 `period_basis`；report 的 `risk_period_basis_id`、`risk_period_start_ms`、`day_flow_start_ms` 必須匹配基準證據，cutoff 與 report window 完全相等，完整窗口必須覆蓋起算點。`Snapshot.flow_basis_id`／`flow_start_ms` 再將風控小計綁定同一期間。
+
+external flow 從完整 bill facts 依實際起算點重算；起算前不重複排除，恰在邊界須有綁定精確基準的前／後歸屬證據，否則 unavailable。實際 unknown／forbidden 活動、缺頁、freshness、ownership、UNKNOWN、成交與 P6 blocker 均保留。
+
+首次／新日暫缺可等待及重試，不自動整天封鎖；合格前禁增倉。同日既存基準不得替換，持久化標記或本日執行責任存在卻缺少／損壞基準須停止恢復，不能假裝首次建立。新期間不解除 latch。報告明示「風控期間損益」與起算時間、`full_day=false`，不宣稱完整台北日日損。
+
+### 4.2 共用欄位與舊 Demo／精確午夜來源
 
 正式 gate 的 day ledger evidence 至少包含：
 
@@ -156,17 +166,17 @@ flow_classification_id
 unknown_flow_count
 ```
 
-必要條件：
+舊 Demo／精確午夜來源的必要條件如下；R1 的 `trading_day_start_ms` 仍是台北 00:00，但其固定 equity 與實際觀測時間由 4.1 的期間基準驗證，並不要求 equity 來自午夜：
 
 - `trading_day_start_ms` 必須是目標交易日台北時間 00:00。
 - E_0 必須是既有持久化且可追溯的日初基準；不能由目前 balance 倒推。
 - external flow 僅使用明示 `(type, subType)` 白名單；未知分類不得當 0。
-- account report 必須保存實際用來計算 external flow 的 `flow_classification_id` 與明示 completeness attestation；ID 必須與 `DayLedgerEvidence.flow_classification_id` 完全一致，不一致時以 `external_flow_mismatch` fail closed。classification 尚未覆蓋當期官方完整 type/subType 對照時，即使本次 bills 沒出現未知 code，也以 `unknown_external_flow` fail closed。
+- account report 必須保存實際用來計算 external flow 的 `flow_classification_id` 與目錄 completeness 資訊；ID 必須與 `DayLedgerEvidence.flow_classification_id` 完全一致，不一致時以 `external_flow_mismatch` fail closed。依 2026-09-23 政策，完整目錄 coverage 僅供資訊；未使用的 type/subType 尚未分類不阻斷，實際流水出現 unknown／forbidden 仍阻斷。目錄 completeness 與採集／窗口 completeness 不可混為一談。
 - `unknown_flow_count > 0`、bills coverage 不完整或 external flow unavailable 時阻斷。
 
-缺失 E_0 已定案採 E1：一旦當日缺失 verified baseline，該台北日維持 fail closed，不以目前 equity 或啟動 equity 倒推，同日不得重建；下一個台北日才可接受新 verified baseline。尚未定義的資金流 `(type, subType)` 生產分類仍回傳 `unknown_external_flow`。
+歷史 E1 的「首次缺失即封鎖整天」已由 R1 取代；現有明示 `basis_blocked_day` 與舊 Demo provider 的封鎖行為仍保留，不由本輪自動清除或擴大採集授權。舊精確午夜來源仍須提供可追溯證據，不能拿目前 balance 冒充午夜。尚未定義的資金流 `(type, subType)` 生產分類仍回傳 `unknown_external_flow`，R1 不取消此條件。
 
-2026-09-22 completeness fail-closed 已補上：`FlowClassification.complete` 必須明示為 true 才能滿足 formal day-ledger gate，且 completeness 會綁入 classification ID。公開 OKX API v5 文件的 `Get bill types` 靜態範例只明示 `type=1` Transfer 下的 `subType=11` Transfer in 與 `subType=12` Transfer out；本機常數只收這兩項為 `external` 並維持 `complete=false`，不把範例擴張成完整生產白名單。官方文件同時指出完整 type/subType 對照由 `GET /api/v5/account/subtypes` 提供；本輪未呼叫帳戶 endpoint，其他 code 維持 unknown。
+歷史沿革：2026-09-22 曾要求 `FlowClassification.complete=true`，該阻斷政策已於 2026-09-23 取消；completeness 資訊與 classification ID 仍保留。不能從靜態範例自行推廣未知分類，也不必為未出現的 subtype 補齊整份目錄才可對帳。現行行為見 `reconciliation_gate._day_blockers`／`_period_blockers` 與 `test_partial_catalog_allows_known_flows_but_keeps_actual_blockers`；本輪已包含合成本機回歸，未重新採集。
 
 ## 5. Gate 輸出
 
@@ -192,7 +202,7 @@ evidence_id
 3. 所有現存 position/order/algo responsibility 已 durable attribution，且沒有 foreign／UNKNOWN。
 4. fills evidence 完整且與 owned orders 累計一致。
 5. freshness 與 window coverage 依明示 policy 驗證通過。
-6. E_0 可追溯、external flow coverage 完整且沒有未知分類。
+6. 適用來源的固定基準可追溯（R1 為已保存風控期間），external flow coverage 完整且沒有未知分類。
 7. P6 若啟用，現存 protection lifecycle evidence 完整。
 
 任一條件不成立即 `reconciled=false`。`warnings` 不得承載會影響帳務、ownership、風控或交易安全的問題；這類問題一律放 `blockers`。
@@ -276,11 +286,11 @@ p6_triggered_not_reconciled
 
 ## 11. 政策／Identity 決策後續
 
-已定案並實作 E1、P6 `algoId` JSON 與 position P1 core schema v2。external-flow 生產 code 與 freshness 數值仍需官方／實測證據後定案；未有證據前對應 blocker 維持 fail closed。真實 Demo HTTPS、帳戶採集與交易仍需另行授權。
+以下為 2026-09-21 歷史狀態：當時已定案並實作 E1、P6 `algoId` JSON 與 position P1 core schema v2。後續 F1 數值與分類縮減依上文更新；2026-10-20 R1 已取代首次暫缺的 E1 政策，並完成 local-sim 自測。真實 Demo HTTPS、帳戶採集與交易仍需另行授權。
 
 ## 12. E1 與 durable identity 實作
 
-2026-09-21 使用者已定案並完成本機實作：
+2026-09-21 使用者已定案並完成本機實作，以下保留歷史行為及原驗證；第 1 點首次暫缺的政策由 4.1 的 R1 取代，durable identity 保證維持：
 
 1. E_0 採 E1：`risk.State` 持久化 `basis_blocked_day`。某台北日第一次需要 basis 卻缺失後，該日後續 basis 注入一律拒絕；只有下一台北日可接受新 verified basis。跨日仍不自動解除既有 latch。
 2. P6 remote `algoId` 保存在既有 protection JSON；LIVE／CANCELED／TRIGGERED 證據缺 remote identity 直接拒絕。ownership snapshot 從 active／triggered report 取得 durable `algoId`；舊 obligation 缺 ID 保持 fail closed。

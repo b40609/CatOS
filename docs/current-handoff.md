@@ -1,16 +1,157 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-20 00:05 (UTC+8；使用者拍板定案「方案 2：全域戰情日誌 (Activity Deck)」，完成收斂固化與雙軌清除，tsc + vite build 0 錯誤通過)  
-**當前負責者**：前端視覺與互動開發者 (Antigravity / 6.1 Sol) · 待獨立驗收者 (chatgpt-web/gpt-5.6-sol)  
-**工作目錄**：`C:/Users/kai/Desktop/CatOS_Astra`  
-**Git 分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）  
-**下一成果**：明日公司電腦接續開工（本機 8890 實機檢驗定案 5 卡戰情台，推進後續策略目標意圖或 Mock 即時輪詢對接）。
+**更新時間**：2026-10-22 21:50 (UTC+8；卡片 Tab 堆疊 Container 與右側折疊檢驗抽屜 Inspector Drawer 落地實作，tsc 與 vite build 0 錯誤通過，8890 主戰情台與 8887 預覽台背景常駐運行熱更新，等待使用者於瀏覽器親自驗收與微調)
+**當前負責者**：前端視覺與互動開發者 (Antigravity) · 獨立驗收者 (GPT-6 Sol)
+**工作目錄**：C:/Users/user/Desktop/CatOS_Astra
+**Git 分支**：`feature/catos-react-vite`
+**下一成果**：使用者親至 8890 / 8887 網頁驗收 Tab 堆疊與右側抽屜體感，依回饋微調後固化。
 
 ---
 
-## 1. 最新定案固化：【方案 2 全域戰情日誌】拍板定案 (2026-10-20)
+## 前端核心互動升級：卡片 Tab 堆疊與右側折疊檢驗抽屜（2026-10-22）
+1. **卡片 Tab 堆疊 (Tabbed Container)**：
+   - 多卡時動態渲染 26px 標籤列，具備選中指示線、獨立 X 關閉、+ 號單點堆疊下拉選單。
+   - 單卡時 0 額外高度浪費（Zero-Waste）。
+   - 拖曳放置命中卡片中央 40% 區間時判定為 center（Dock as Tab），外圍邊界維持二元空間分割。
+2. **右側折疊式檢驗抽屜 (Inspector Drawer)**：
+   - 常駐 36px 垂直微型 Rail，點擊或按 Ctrl+B / Ctrl+1~4 滑出 380px 推擠式無遮罩抽屜，盤面等比縮放實時跳動。
+   - 4 大審計視圖：🤖 Bot（五階段鏈與掛單連動）、🛡️ P6（OKX CEIL 停損取整）、⚖️ R1（台北日固定基準 E0 與日損緩衝）、⚡ 撮合（逐筆成交流水與滑價偏離）。
+3. **驗證與運行狀態**：
+   - 8890 主戰情台與 8887 預覽台常駐熱更。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
+   -
 
-使用者已正式拍板**定案方案 2**，依據「定案固化 SOP（Solidify & Purge）」完成所有過渡分支清除與正式程式碼固化：
+
+## 散戶 v1 精簡與 R1 定案（2026-10-20）
+
+- [完整評估與已定案 R1](retail-v1-simplification-assessment-20261020.md)：以 1,000～10,000 USDT、本機自用為尺度，列出保留／延後／警告／阻擋動作、原與新保證、漏判案例及必要測試。核對現行程式後確認：沒有每單全歷史重播；合法減倉已有條件分流；S9／S10 尚未接交易或 funding，不能宣稱已具備背景實盤補帳。
+- 前次評估已修正 [gate 契約](reconciliation-gate-contract.md) 中過時分類／identity 敘述；本次同步 R1 local-sim 契約，舊 Demo／Q1 來源路徑保留。歷史 evidence 不代表當前帳戶或本輪採集。
+- 建議後續首個交易閉環不以多 Lot／精細費用分攤／進階研究為前提；UI 後續沿用 Bot／日誌元件呈現可做動作、主因與恢復指引，不由 UI 自行授權交易。此建議不取代下方已交辦的前端工作。
+- **已定案 R1**：使用者已明確同意每日首次合格觀測建立固定「風控期間基準」，取代精確午夜 E0 強制前置與首次暫缺即封鎖整天的 E1；不涵蓋起算前損失。同日基準不得刷新，起算後外部流須證明歸屬，全部 latch 與其他安全條件保留；完整契約見評估第 5 節。舊 Q1 能力及歷史證據保留，不再作 R1 首次基準的強制條件。
+- **實作／差異**：[R1 交付](risk-period-r1-local-sim.md)。新增 `catos/risk_period.py`、`tests/test_risk_period_r1.py`；修改 `risk.py`／`journal.py`／`supervisor.py`／`reconciliation_gate.py` 與 `tests/test_risk.py`，同步政策、風控／gate 契約及本入口。單 writer 原子建立、同日不可刷新、首次暫缺重試、跨日／重啟 latch、期間外部流／報告摘要均已接通 local-sim；COMMIT 後 ACK 遺失保持失敗且不覆寫已保存基準。
+- **自測／基線**：Python 3.14.6，全新 TemporaryDirectory 既有 schema DB、合成報告／固定 clock／FakeExchange；21 項 R1＋176 項受影響回歸，197／197、0 failure／error／skip。[原始日誌](../reports/risk-period-r1-local-sim-20261020/unittest.log)／[來源 SHA-256 與模組計數](../reports/risk-period-r1-local-sim-20261020/summary.json)。這是開發自測，沒有獨驗或 Git 狀態核對；工作樹仍含其他並行內容，不整理或提交。
+- **GPT-6 Sol 獨立驗收（2026-10-20）**：[報告與範圍](../reports/risk-period-r1-independent-acceptance-20261020-gpt6sol/acceptance.md)。逐檔 SHA-256 17／17 一致；獨立重跑 12 模組 197／197，額外 3 個邊界案例通過；檢查分支、HEAD、未暫存差異與空暫存區。**R1 local-sim PASS**，無 stage／commit／push。全工作樹 `git diff --check` 有本入口第 3–6 行尾端空白；僅 R1 相關程式、測試及契約的檢查通過。
+- **邊界／下一成果**：無 schema／既有 DB 遷移，未動產品 DB／憑證／前端／Yaozi／正式服務，未採集或交易。R1 僅合成 USDT 無負債 scope，未接 HTTP／UI／Demo／Live；報告不宣稱完整台北日日損。獨驗完成，後續最有價值成果是另行授權的 HTTP／UI 或 Demo 串接；commit／push、新採集及 Demo／Live 仍須另有授權。前次僅文件定案的紀錄保留於評估第 7 節，不冒充當時已測。
+
+---
+
+
+
+
+## 實機並排對照快捷組（2026-10-20；提供肉眼可視化比對）
+
+- **頂部 Header 常駐實機對照按鈕群**：
+  直接在頁面頂端右上角工具列（`[卡片管理]` 左側）掛載 4 個高對比度快捷按鈕，無須深入選單：
+  1. **`[① 策略 vs 意圖]`**：左右 50:50 並排。左邊展示「策略機器人矩陣」（點擊展開看內嵌意圖與五階段鏈），右邊展示獨立的「策略目標與訊號強度」看板，供肉眼實機對照資訊是否重複。
+  2. **`[② 日誌 vs 流水警報]`**：左右 50:50 並排。左邊展示「交易日誌與風險事件」（點選成交/警報/未解除），右邊展示獨立的「即時成交流水」與「風險警報與異常事件」，供肉眼實機對照日誌是否已涵蓋右側兩卡。
+  3. **`[③ 5 卡收斂版]`**：一鍵還原為收斂後定案的 5 卡黃金戰情排版（T-Split 上下解耦，零冗餘）。
+  4. **`[④ 9 卡全開]`**：將全部 9 張卡片同時並存於同一工作區，體驗多工視窗與空間壓迫感。
+- **自測與自動化驗證**：
+  - `npx tsc --project tsconfig.dashboard-preview.json` 與 `npx tsc --noEmit`：0 錯誤。
+  - Playwright 端到端驗證（4 個按鈕存在性、點擊即時切換卡片數 2/3/9/5、元件渲染正確、Console Errors 為 0）：全部 PASS。
+  - 8887 預覽服務背景持續運行中。
+
+## 全域卡片標題重構與統一命名（2026-10-20；使用者拍板定案）
+
+- **全面廢除中英括號混雜、多重名詞堆疊與軍事中二感**：
+  依據「一眼看懂卡片提供哪些核心資訊」與專業金融終端標準，全域 9 大卡片完成正式固化命名：
+  1. `equity` ➜ **「帳戶權益與損益」**（總資產淨值、今日損益、回撤走勢）
+  2. `positions` ➜ **「持倉明細與在途委託」**（多空持倉、P6 停損防線、盤口在途掛單）
+  3. `bots` ➜ **「策略機器人矩陣」**（4 隻量化 Bot 狀態、策略意圖微摘要、手動暫停/啟用）
+  4. `allocation` ➜ **「槓桿倍數與資產曝險」**（有效槓桿 1.46x / 3.0x、幣種曝險 Donut 環圖）
+  5. `activity_deck` ➜ **「交易日誌與風險事件」**（成交流水、風控未解除警報、一鍵跨卡定位）
+  6. `market_watch` ➜ **「標的行情與資金費率」**（BTC/ETH/SOL 即時報價、OKX 資金費率結算）
+  7. `strategy_intents` ➜ **「策略目標與訊號強度」**（策略大腦純資料目標意圖、多空指標強度）
+  8. `incidents` ➜ **「風險警報與異常事件」**（撮合滑價偏離、P6 更新未確認、風控鎖存警報）
+  9. `fills` ➜ **「即時成交流水」**（OKX SWAP 逐筆實時成交流水與盈虧跳動）
+- **同步更新範圍**：
+  - [layoutStore.ts](file:///c:/Users/user/Desktop/CatOS_Astra/frontend/cat-os-vite/src/state/layoutStore.ts)：`CARD_TITLES`、`RECOMMENDED_PRESETS`、`DEFAULT_PROFILES`。
+  - [card-manager-dropdown.tsx](file:///c:/Users/user/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/card-manager-dropdown.tsx)：`ALL_CARDS`。
+  - [i18n.ts](file:///c:/Users/user/Desktop/CatOS_Astra/frontend/cat-os-vite/src/lib/i18n.ts)：`recent_fills`。
+  - 各卡片 Header 元件：`account-equity-band.tsx`、`activity-panel.tsx`、`v0-bot-table.tsx`、`allocation-donut-card.tsx`、`unified-activity-deck-card.tsx`、`market-watch-card.tsx`、`strategy-intents-radar-card.tsx`、`incident-timeline-card.tsx`、`preview/main.tsx`。
+- **自測與自動化驗證**：
+  - `npx tsc --project tsconfig.dashboard-preview.json` 與 `npx tsc --noEmit`：0 錯誤。
+  - Playwright 端到端驗證（主畫面 5 卡新標題可見度、卡片管理面板 9 卡項目可見度、Console Errors 為 0）：全部 PASS。
+  - 8887 預覽服務背景持續運行中。
+
+## 卡片全數關閉與推薦預設排版支援（2026-10-20；使用者最新指示）
+
+- **解除強制留卡限制**：
+  - 在 `tree-ops.ts` 與 `layoutStore.ts` 中，將卡片節點刪除演算法支援刪除最後 1 張根葉子節點（平滑返回 `null`），徹底移除原本「最後一張核心卡片受保護無法關閉」之限制。
+  - 卡片庫下拉選單 `CardManagerDropdown` 支援自由將主畫面卡片清空至 0 張，並新增「一鍵清空主畫面」快捷按鈕。
+  - 在卡片標題列 `CardHeaderTitle` 增加 Hover 浮現的微型關閉按鈕 (`X`)，按住卡片本體可拖曳，點擊 `X` 即可直接關閉該卡片，零浪費純粹美學。
+- **工作區空狀態引導面板 (Empty Workspace Prompt)**：
+  - 當所有卡片皆被關閉時，主工作區不會崩潰或黑屏，而是渲染專業質感的 `EmptyWorkspacePrompt` 面板。
+  - 面板標註「工作區目前已清空 · 自由自訂模式」，提供精選的推薦預設排版一鍵就位，並提供全部 9 張核心卡片的快捷單點加入 Chips。
+- **新增推薦預設排版（不止 T-Split）**：
+  1. **5卡標準戰情 (T-Split)**：權益 · 機器人 · 資產配置 / 持倉防線 · 戰情日誌（上下解耦定案版）。
+  2. **4卡象限盯盤 (雙欄經典對稱)**：左欄 50%（權益+持倉防線）/ 右欄 50%（機器人+戰情日誌），極致平衡。
+  3. **3卡風控防線專注 (盤口 60% 主視野)**：左側 60% 廣角持倉與在途防線 / 右側 40% 機器人意圖與戰情日誌。
+  4. **6卡操盤旗艦 (全景全功能監控)**：上層（權益+機器人+行情時鐘）/ 下層（持倉防線+戰情日誌+成交流）。
+  5. **單卡滿版專注 (部位與防線全螢幕)**：100% 滿版展示持倉活動、在途掛單撤單與 P6 災難停損防線。
+  6. **一鍵清空 (從零自訂模式)**：完全清空工作區，自由組裝。
+- **自測與驗證**：
+  - `npx tsc --project tsconfig.dashboard-preview.json` 與 `npx tsc --noEmit`：0 錯誤。
+  - Playwright 端到端驗證（清空主畫面 ➜ 空狀態面板 ➜ 套用雙欄對稱 4 卡 ➜ 再次清空 ➜ 單卡加入 ➜ 標題列關閉卡片 ➜ 套用操盤旗艦 6 卡 ➜ 還原 T-Split 5 卡 ➜ Console Errors 為 0）：全部 PASS。
+  - 8887 背景服務正常運作於 `http://127.0.0.1:8887/#/`。
+
+## 原生 Dashboard 整合預覽（2026-10-20；獨立 8887 可互動預覽）
+
+- 依使用者最新要求，徹底移除未獲接受之 A/B 展示過渡列與固定 CSS 網格，在 `http://127.0.0.1:8887/#/` 做收斂整合預覽；不將候選套用至 8890。
+- 沿用 8890 原生 `WorkspaceGrid` 二元空間佈局樹機制、字體、色彩、列高、按鈕與卡片配置，保留原有 T-Split 5 卡黃金戰情樹（`equity`、`bots`、`allocation`、`positions`、`activity_deck`）。
+- **Bot 卡增量整合**：以原 `V0BotTable` 為基礎，保留身分、週期、策略、部位、損益、MAX DD / 停損錨定、走勢微圖、3x Cross 及運行數量統計。策略名稱下增量一行簡短意圖（如「續抱 · 等待 11:15 收盤」、「目標 3 ETH · 委託待對帳」、「保護更新待確認 · 禁增倉」、「已暫停 · 不產生新策略意圖」）。點擊 Bot 名稱或詳情開啟共用側邊面板（Sheet），展示資料時間、目前/目標部位、判定條件、風控限制、委託對帳及五階段流程鏈（資料 → 意圖 → 風控 → 委託 → 對帳），並支援跳轉相關委託與保護。原暫停／啟用按鈕在預覽中有效，同步切換本地狀態、運作數量並即時追加模擬日誌；暫停不代表平倉，啟用不得解除風控限制或 UNKNOWN，按鈕標明本地模擬。
+- **戰情日誌增量整合**：`UnifiedActivityDeckCard` 沿用原時間軸與分類，增加「未解除 (2)」篩選標籤及數量徽章，未解除事件置頂顯示，已解除保留歷史。點擊事件開啟共用詳情面板，呈現時間、來源、原因、影響評估、處置指引及關聯 Bot／委託／部位；提供「查看 Bot（高亮選中）」、「查看委託（自動切至掛單頁並高亮）」、「查看保護（自動切至持倉頁並高亮）」有效跳轉。絕無「已讀」解除風險按鈕，無偽重送/恢復操作。
+- **部位保護增量整合**：`ActivityPanel` 保留原部位表、價格、損益、強平距離與槓桿。原 P6 欄位整合「已確認 / 待確認 / 未啟用」狀態與按鈕，點擊開啟共用面板查看已確認生效價、更新目標價、覆蓋數量、確認時間與來源；更新目標不冒充生效價（Mochi 生效價標為「未知 (未取得終態)」），覆蓋數量顯示「待確認」，Header 防線徽章正確顯示「P6 已確認 2/3 · 1 待確認」，絕無顯示全體保護完成；掛單頁完整展示 Calico 的 UNKNOWN 待對帳增倉委託（`cat_calico_unknown_01`，凍結額 $474.75，額度保留禁盲目重送）。
+- **資料與互動一致性**：由 `src/preview/preview-store.ts` 集中管理四個情境（正常續抱、UNKNOWN 待對帳、保護待確認、暫停），金額採十進位字串，各卡數值（總資產 $12,500.00、總曝險 $18,307、有效槓桿 1.46x / 3.0x）相互吻合一致，關閉隨機跳動；側欄路由邊界核對，點擊非預覽子頁面顯示明確說明並引導返回戰情總覽。
+- **自測與自動化驗證**：
+  - `npx tsc --project tsconfig.dashboard-preview.json` 與 `npx tsc --noEmit` exit 0。
+  - Playwright 端到端腳本 (`scratch/test-e2e-preview.js`) 7 大驗證項全部通過：Bot 意圖標註與抽屜、抽屜跳轉掛單 UNKNOWN 高亮、日誌未解除篩選、日誌跳轉保護高亮、暫停/重啟切換與數量日誌連動、路由邊界說明、1100px / 768px 窄螢幕無橫向溢出、Console Errors 為 0。
+  - 8887 預覽服務保持監聽運行中 (`http://127.0.0.1:8887/#/`)。未獨驗、未截圖、未操作 Git。
+- **邊界與尚未串接部分**：目前為本機純前端合成情境模擬，未串接後端 Python Supervisor/Worker、未連接真實產品 DB、未取得真實 API 憑證、未連接 OKX 交易所或外部行情 provider。
+
+---
+
+## 0. 後端研究並行交付（2026-10-19；封存／查詢工作包就緒）
+
+- **GPT-6 Sol 獨立驗收結果（2026-10-19）**：參數穩定度／Walk-Forward、分市場環境評估、研究驗證封存／後端查詢三包 **PASS（合成與隔離後端範圍）**。已直接讀取本目錄 `AGENTS.md` 與本入口，來源 SHA-256 三組 8／11／25 均零漂移、14 份封存快照一致。本輪專屬測試 22／22、26／26、10／10，另 8 模組 126／126、0 failure／error／skip；逐窗 Decimal 損益／費用／資金費歸屬皆核對成功。唯讀 Git 檢查完成，`git diff --check` 通過，沒有 stage／commit／push。[獨驗報告與原始日誌](../reports/research-independent-acceptance-20261019-gpt6sol/acceptance.md)。此判定不包含實際 8770／8771 更新、真實行情或前端。
+- **授權／分工**：使用者同意推進前端以外的進度；Antigravity IDE 繼續前端。後端開發者完成工作包，GPT-6 Sol 已完成後端獨驗及唯讀 Git 核對；2026-10-19 使用者明確更新驗收模型，取代原 5.6 Sol Web 與舊版禁止 6 Sol 替代的限制。未執行 stage／commit／push。
+- **本輪成果**：新增 `catos/research_validation_job.py`、10 項專屬測試；修改 catalog／service／worker／research API 與 preview POST 白名單。POST `/api/research/validations` 沿用既有 writer、封存及查詢路徑，保存訓練穩定區、OOS、分環境結果、14 份固定來源／資料快照與版本；提交回覆巢狀物件改為獨立副本，避免污染執行中任務。[完整契約／證據](research-validation-api.md)。未更改前端檔案。
+- **邊界／待辦**：示範分類門檻須明示，非通用市場預設／部署門檻；OOS 空倉獨立起跑、期末估值，不是連續投資組合。任務 complete 不代表所有 OOS 成功，前端須讀 evaluation_complete 與各窗狀態。
+- **前端回測 Web UI 隔離瀏覽器 E2E 完整收尾（2026-10-20；100% 隔離驗證通過）**：[日誌與摘要](../reports/browser-backtest-e2e-20261020/summary.json)。
+  - **架構修正**：徹底移除 `backtest.tsx` 在任務完成時強制將後端 `version.active_run_id` 設為 null 的偽造邏輯；任務 complete 與忙碌槽釋放嚴格解耦，持續向後端讀取 `version`，直到後端確認釋放才解鎖提交按鈕。忙碌輪詢間隔縮短至 300ms，在後端釋放時迅速解鎖。`BacktestResultPayload` 補齊 `run_id`、`created_at`、`build_id` 欄位。
+  - **三項補強測試實機通過（tests/verify_e2e_browser_test.mjs + tests/test_browser_backtest_e2e.py）**：
+    1. **快速切換**：歷史任務間快速點擊切換 6 次，斷言最後選取 `data-run-id`（59c00d01）、結果容器 `data-result-run-id`（59c00d01）與顯示的約束／損益數值（period=2, pnl=-0.79532090）嚴格一致，舊請求遲到回應被乾淨丟棄。
+    2. **重新整理**：透過隔離端點注入 3.5s 可控制計算延遲，確保在任務仍處於 running 時觸發 `Page.reload`；斷言重載後後端版本與清單正確保持 running，前端重新發出狀態查詢輪詢（`reQueryObserved=true`），並在延遲結束後自動平滑 complete。
+    3. **離頁／卸載**：在請求／輪詢活躍時導航離頁至 `#/`，斷言卸載後不再排程後續輪詢（`subsequentPollsAfterUnmount=0`），延遲回應被 `!isMountedRef.current` 丟棄，Console 0 報錯（`consoleErrors=0`），重回頁面正常。
+  - **落存與驗證**：測試腳本保存於 `tests/test_browser_backtest_e2e.py` 與 `tests/verify_e2e_browser_test.mjs`；實際日誌存於 `reports/browser-backtest-e2e-20261020/e2e_browser_verification.log`。11 / 11 測試全數 PASS。前端 `tsc --noEmit` 與 `npm run build` 0 錯誤通過（6.11s）。
+  - **實際覆蓋與未覆蓋項目**：
+    - **實際覆蓋**：Web UI 初始渲染、回測提交與輪詢、結果展示與 Decimal 結算、忙碌槽釋放需後端確認、歷史清單累積、快速切換一致性、背景完成不搶檢視、可控延遲重載自動恢復輪詢、離頁無後續輪詢與安全卸載、重新進入回測頁、斷線無假資料回退。
+    - **未覆蓋項目**：未碰 8770/8771 正式服務或產品 DB；未執行全市場回測或 OKX 真實連線；未覆蓋超參數優化與 Walk-Forward 前端 UI 串接；未操作 Git stage/commit/push。
+- **後端能力盤點／前端串接交接（2026-10-20；只讀靜態核對）**：[能力表、API 範例與問題清單](backend-frontend-integration-map.md)。React 回測頁已完成版本、清單、提交、輪詢、結果、快速切換、可控延遲重載與離頁之 100% 隔離 CDP 端到端測試；優化與驗證後端 API 已備妥，React 端待後續 Phase 3/4 推進。本輪未改後端核心、未動產品 DB／憑證。
+
+---
+
+## 1. 最新定案固化：【T-Split 佈局全面固化】與過渡預設清除 (2026-10-20)
+
+使用者正式拍板「定案 T」，依據「定案固化 SOP（Solidify & Purge）」全面收斂佈局系統：
+
+### A. 佈局重置收斂固化 (Card Manager Dropdown)
+1. **未採用選項徹底刪除**：
+   - 移除卡片管理器底部過渡期選項「三分割」與「雙分欄」。
+   - 重置動作固化為單一明確的 `[T-Split (定案)]` 按鈕，點擊即精確恢復為 5 卡黃金戰情樹。
+2. **底層代碼收斂**：
+   - `tree-ops.ts` 徹底刪除未採用的 `createTriSplitTree` 與 `createDualSplitTree` 生成器。
+   - `layoutStore.ts` 移除 `layout_tri_focus` 與 `layout_dual_split` 系統預設，只保留定案 `layout_tsplit_v1_core`。
+   - 快取鍵升級至 `v8_tsplit`，保證前端載入即為純淨定案樹。
+3. **建置驗證**：
+   - `tsc && vite build` **0 錯誤** 通過（3.83s）。
+
+### B. 資產配置額度視圖冗餘清除 (Allocation Donut Card)
+- **使用者指示**：圓圈內 HUD 已標明有效槓桿與已用百分比，底部 `[保證金佔用率 14.2% SAFE] [總預算上限 (3x) $37,500.00]` 屬資訊冗餘，依指示予以徹底移除。
+- **清除成效**：消除重複數據密度干擾，釋放垂直高度予上層環圖與 5 條水平進度長條。
+- **建置驗證**：`tsc && vite build` **0 錯誤** 通過（5.19s）。
+
+使用者的前期拍板**定案方案 2**已完成固化：
 
 ### A. 定案核心架構：5 卡黃金戰情台 (T-Split 解耦佈局)
 1. **右下卡片：常態常駐【全域戰情日誌台】([unified-activity-deck-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/unified-activity-deck-card.tsx)，CardId: `activity_deck`)**
@@ -35,15 +176,15 @@
 ## 2. 明日公司電腦接續開工指引 (Quick Resume Guide)
 
 ### A. 當前工作區狀態與遠端同步
-- **目前分支**：`feature/catos-react-vite`（追蹤遠端 `origin/feature/catos-react-vite`）。
+**Git 分支**：`feature/catos-react-vite`
 - **待提交變更清單**（符合開發自測與固化 SOP，尚未 commit/push）：
   - 核心修改：`activity-panel.tsx`、`unified-activity-deck-card.tsx`、`unified-events.ts`、`v0-bot-table.tsx`、`tree-ops.ts`、`layoutStore.ts`、`card-manager-dropdown.tsx`、`index.tsx`、`bots.tsx`、`current-handoff.md`。
   - 廢棄清除：`exposure-panel.tsx`、`working-orders-safety-card.tsx`。
 - **明日公司接續方式**：
   - **情境 1（在家先完成提交與推送）**：若今晚使用者指示將當前工作區 commit 並 push 至遠端，明天到公司電腦只需執行：
     ```bash
-    git checkout feature/catos-react-vite
-    git pull origin feature/catos-react-vite
+**Git 分支**：`feature/catos-react-vite`
+**Git 分支**：`feature/catos-react-vite`
     cd frontend/cat-os-vite
     npm run dev
     ```
@@ -359,8 +500,8 @@ npm run dev
 ### 1. 取得最新程式碼
 若已提交並推送到遠端：
 ```bash
-git checkout feature/catos-react-vite
-git pull origin feature/catos-react-vite
+**Git 分支**：`feature/catos-react-vite`
+**Git 分支**：`feature/catos-react-vite`
 ```
 
 ### 2. 啟動本機前端服務
@@ -373,6 +514,6 @@ npm run dev -- --port 8890
 
 ### 3. 明日新對話接續指令 (可以直接貼給 AI)
 ```text
-請先讀取 docs/current-handoff.md。目前 feature/catos-react-vite 前端已完成資產配置環圖 (Allocation Donut) 的流體響應式收斂與所有視圖防裁切。今天在公司電腦接續，請確認目前環境狀態，並依據規劃繼續執行下一階段工作。
+**Git 分支**：`feature/catos-react-vite`
 ```
 

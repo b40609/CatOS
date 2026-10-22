@@ -72,8 +72,30 @@ function useLiveBots(seed: Bot[]) {
   return [rows, setRows] as const;
 }
 
-function NewBotDialog() {
+function NewBotDialog({ onDeploy }: { onDeploy: (bot: Bot) => void }) {
   const [open, setOpen] = useState(false);
+  const [name, setName] = useState("CAT-05 / SEOUL");
+  const [strategyId, setStrategyId] = useState(strategies[0]?.id || "s1");
+  const [market, setMarket] = useState("BTC-USDT-SWAP");
+  const [budget, setBudget] = useState("500,000 USDT");
+
+  const handleDeploy = () => {
+    const selectedStrat = strategies.find((s) => s.id === strategyId) || strategies[0];
+    const newBot: Bot = {
+      id: `bot-${Date.now().toString(36)}`,
+      name,
+      strategy: selectedStrat?.name || "SMA 趨勢追蹤",
+      market,
+      status: "running",
+      position: `0.00 ${market.split("-")[0]}`,
+      pnlToday: 0.0,
+      latencyMs: 18,
+      uptimeHours: 0,
+    };
+    onDeploy(newBot);
+    setOpen(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -94,17 +116,22 @@ function NewBotDialog() {
         <div className="space-y-3 py-1">
           <div className="space-y-1">
             <Label className="text-[11px] font-mono text-muted-foreground">機器人名稱 (Worker ID)</Label>
-            <Input placeholder="CAT-07 / SEOUL" className="font-mono text-xs bg-background h-8" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="CAT-05 / SEOUL"
+              className="font-mono text-xs bg-background h-8"
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-[11px] font-mono text-muted-foreground">綁定策略模型</Label>
-            <Select defaultValue={strategies[0]?.id}>
-              <SelectTrigger className="bg-background text-xs h-8">
+            <Select value={strategyId} onValueChange={setStrategyId}>
+              <SelectTrigger className="bg-background text-xs h-8 font-mono">
                 <SelectValue placeholder="選擇策略" />
               </SelectTrigger>
               <SelectContent className="border-border bg-surface">
                 {strategies.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                  <SelectItem key={s.id} value={s.id} className="text-xs font-mono">
                     {s.name} · {s.code} ({s.kind})
                   </SelectItem>
                 ))}
@@ -114,11 +141,19 @@ function NewBotDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-[11px] font-mono text-muted-foreground">OKX SWAP 合約代碼</Label>
-              <Input defaultValue="BTC-USDT-SWAP" className="font-mono text-xs bg-background h-8" />
+              <Input
+                value={market}
+                onChange={(e) => setMarket(e.target.value)}
+                className="font-mono text-xs bg-background h-8"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] font-mono text-muted-foreground">初始保證金預算</Label>
-              <Input defaultValue="500,000 USDT" className="font-mono text-xs bg-background h-8" />
+              <Input
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className="font-mono text-xs bg-background h-8"
+              />
             </div>
           </div>
           <div className="rounded border border-primary/25 bg-primary/5 p-2.5 text-[11px] space-y-1">
@@ -127,16 +162,16 @@ function NewBotDialog() {
               <span>Supervisor 強制注入參數</span>
             </div>
             <p className="text-muted-foreground font-mono text-[10px] pl-5">
-              margin: cross · posMode: net_mode
+              margin: cross · posMode: net_mode · 唯讀 Worker 無金鑰連線
             </p>
           </div>
         </div>
         <DialogFooter>
           <button
-            onClick={() => setOpen(false)}
-            className="w-full border border-primary bg-primary text-primary-foreground font-semibold px-3 py-1.5 text-xs rounded hover:opacity-90 transition-opacity"
+            onClick={handleDeploy}
+            className="w-full border border-primary bg-primary text-primary-foreground font-semibold px-3 py-1.5 text-xs rounded hover:opacity-90 transition-opacity font-mono"
           >
-            確認部署並分配獨佔 Worker
+            確認部署並分配獨佔 Worker (本地模擬)
           </button>
         </DialogFooter>
       </DialogContent>
@@ -168,7 +203,7 @@ function BotManagement() {
 
   return (
     <AppShell>
-      {/* 頂部架構規範與狀態摘要條 (定案 Scheme B 滿版純淨視野) */}
+      {/* 頂部架構規範與狀態摘要條 (Scheme B 滿版純淨視野) */}
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded border border-border/80 bg-surface/90 px-3 py-1.5 text-xs font-mono shadow-xs backdrop-blur-md">
         <div className="flex items-center gap-2.5">
           <span className="font-mono text-[9px] font-bold text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 uppercase tracking-wider">
@@ -187,8 +222,8 @@ function BotManagement() {
           <span className="text-muted-foreground">今日損益: <strong className={cn("font-bold", totalPnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(totalPnl)}</strong></span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP (獨佔合約)</span>
-          <NewBotDialog />
+          <span className="text-[10px] text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP (展示資料 · 本地模擬)</span>
+          <NewBotDialog onDeploy={(b) => { setRows((prev) => [b, ...prev]); setSelectedBotId(b.id); }} />
         </div>
       </div>
 
@@ -325,7 +360,7 @@ function BotManagement() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-1.5 text-[11px]">
+            <div className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 space-y-2 text-[11px]">
               <div className="flex items-center gap-1.5 text-primary font-semibold">
                 <Network className="size-3.5" />
                 <span>風控與執行契約 (Invariants)</span>
@@ -342,6 +377,26 @@ function BotManagement() {
                 <div className="flex justify-between">
                   <span>決策方式:</span>
                   <span className="text-foreground">Closed Bar (Decimal Core)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>返佣標記:</span>
+                  <span className="text-foreground font-mono">Supervisor 自動注入</span>
+                </div>
+              </div>
+
+              {/* 五階段執行鏈 */}
+              <div className="pt-1.5 border-t border-border/40 space-y-1">
+                <span className="text-[10px] text-muted-foreground font-mono block">五階段職責隔離鏈:</span>
+                <div className="flex items-center justify-between text-[9px] font-mono text-muted-foreground bg-background/50 rounded px-1.5 py-1">
+                  <span className="text-foreground">資料</span>
+                  <span>➜</span>
+                  <span className="text-foreground">意圖</span>
+                  <span>➜</span>
+                  <span className="text-primary">風控</span>
+                  <span>➜</span>
+                  <span className="text-foreground">委託</span>
+                  <span>➜</span>
+                  <span className="text-foreground">對帳</span>
                 </div>
               </div>
             </div>

@@ -22,7 +22,8 @@ ASSETS = {"workspace.css": "text/css", "workspace.js": "text/javascript",
 DESK_PAGES = {"research", "execution", "risk", "events", "yaozi", "settings"}
 RESEARCH_PATH = re.compile(
     r"/api/research/(?:version|catalog|runs|runs/[0-9a-f]{32}(?:/result|/report)?)")
-POST_PATHS = {"/api/research/backtests", "/api/research/optimizations"}
+POST_PATHS = {"/api/research/backtests", "/api/research/optimizations",
+              "/api/research/validations"}
 
 
 def workspace_build():

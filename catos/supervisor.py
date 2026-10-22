@@ -142,6 +142,9 @@ class LocalSupervisor:
         immediately even if later snapshots arrive before the writer catches up.
         """
         self._require_risk()
+        if (snapshot.basis is not None and snapshot.basis.source == risk.RISK_PERIOD_SOURCE
+                and (self._risk_persisted is None or snapshot.basis != self._risk_persisted.basis)):
+            raise SupervisorUnavailable("R1 basis is not durably committed")
         self._control_generation += 1
         self._accept_risk(risk.observe(self.risk_state, snapshot, self.risk_limits))
         if self.failure:
@@ -514,17 +517,38 @@ class LocalSupervisor:
     def _trusted_day_context(self):
         return risk.DayContext.from_target_time_ms(self._trusted_wall_ms())
 
-    async def commit_day_basis(self, basis):
+    async def commit_day_basis(self, basis, *, period_observation=None):
         async with self._operation():
             await self._flush_halts()
             day_context = self._trusted_day_context()
             if not isinstance(basis, risk.DayBasis) or basis.day != day_context.day:
                 raise JournalError("day basis must match Supervisor trusted current Taipei day")
             gen_before = self._control_generation
-            state = await self._io(
-                self._journal.commit_day_basis, basis, day_context, frozenset(self.halt_reasons))
+            try:
+                state = await self._io(
+                    self._journal.commit_day_basis, basis, day_context, frozenset(self.halt_reasons), period_observation)
+            except JournalError:
+                raise
+            except BaseException:
+                if basis.source == risk.RISK_PERIOD_SOURCE:
+                    # An ACK failure can follow a successful COMMIT. Read only to
+                    # prevent stale shutdown state from erasing that basis/latches;
+                    # the operation still fails and cannot authorize trading.
+                    try:
+                        stored = await self._io(self._journal.risk_state)
+                        merged = replace(self.risk_state, basis=stored.basis,
+                            basis_blocked_day=stored.basis_blocked_day,
+                            basis_established_day=stored.basis_established_day,
+                            epoch=max(self.risk_state.epoch, stored.epoch))
+                        self._accept_risk(risk.halt(merged, stored.reasons))
+                        self._risk_persisted = stored
+                    except Exception:
+                        pass  # Retain the original storage failure and closed gate.
+                raise
             if self.risk_state is not None:
-                merged = replace(self.risk_state, basis=state.basis, basis_blocked_day=state.basis_blocked_day, epoch=max(self.risk_state.epoch, state.epoch))
+                merged = replace(self.risk_state, basis=state.basis, basis_blocked_day=state.basis_blocked_day,
+                                 basis_established_day=state.basis_established_day,
+                                 epoch=max(self.risk_state.epoch, state.epoch))
                 self._accept_risk(merged)
             else:
                 self._accept_risk(state)
@@ -532,6 +556,63 @@ class LocalSupervisor:
             if self._control_generation != gen_before or self.risk_state != self._risk_persisted:
                 await self._flush_halts()
             return self.risk_state
+
+    async def prepare_risk_period(self, report, *, classifications, freshness_policy, freshness_evidence):
+        """R1 local-sim only: qualify, durably establish, then reconcile."""
+        from copy import deepcopy
+        from catos import risk_period
+        report = deepcopy(report)
+        # Validate identity/equity even when a durable period already exists.
+        observed, _ = risk_period.observation(report, self.account_id)
+        context = self._trusted_day_context()
+        if (freshness_policy.checked_at_ms != context.target_time_ms
+                or risk.taipei_day(observed) != context.day):
+            raise JournalError("period observation is not current")
+        async with self._operation():
+            await self._flush_halts()
+            basis = await self.load_day_basis(context.day)
+            if basis is None:
+                candidate = risk_period.candidate(report, self.account_id)
+                await self.commit_day_basis(candidate, period_observation=(
+                    report, classifications, freshness_policy, freshness_evidence, self.bot_id))
+                basis = await self.load_day_basis(context.day)
+            if basis is None or self._trusted_day_context().day != basis.day:
+                raise SupervisorUnavailable("period commit unavailable or day changed")
+            projected, ledger = risk_period.project(report, basis, classifications)
+            snapshot = await self._io(self._journal.reconciliation_snapshot, self.bot_id)
+            policy = replace(freshness_policy, checked_at_ms=self._trusted_wall_ms())
+            gate = reconciliation_gate.evaluate(projected, snapshot,
+                revision_before=snapshot.bot_revision, revision_after=snapshot.bot_revision,
+                freshness_policy=policy, freshness_evidence=freshness_evidence, day_ledger=ledger)
+            if gate.reconciled:
+                position_id = (snapshot.owned_remote_position_ids[0][1]
+                    if snapshot.local_position != 0 and len(snapshot.owned_remote_position_ids) == 1 else None)
+                proof = Reconciliation(snapshot.bot_revision, gate.evidence_id, snapshot.local_position,
+                    snapshot.ordinary_open_count, snapshot.conditional_open_count, snapshot.unknown_count,
+                    True, self.bot_id if snapshot.local_position != 0 else None, position_id)
+                self._load(await self._io(self._journal.reconcile, self.bot_id, proof))
+            else:
+                self._degrade_risk()
+            return projected, ledger, gate
+
+    async def observe_risk_period(self, report, snapshot, **qualification):
+        """Bind a synthetic risk observation to its durable period and bill window."""
+        from catos import risk_period
+        async with self._operation():
+            projected, ledger, gate = await self.prepare_risk_period(report, **qualification)
+            if not gate.reconciled:
+                return projected, gate
+            ownership = await self._io(self._journal.reconciliation_snapshot, self.bot_id)
+            if snapshot.time_ms != self._trusted_wall_ms() or snapshot.position != ownership.local_position:
+                self._degrade_risk()
+                raise SupervisorUnavailable("risk observation differs from qualified account")
+            value = risk_period.equity(projected)
+            bound = replace(snapshot, equity=value, risk_equity=value, external_net=ledger.external_flow_usdt,
+                basis=ledger.period_basis, flow_basis_id=ledger.baseline_evidence_id,
+                flow_start_ms=projected["risk_period_start_ms"])
+            self.observe_risk(bound)
+            await self.persist_controls()
+            return projected, gate
 
     async def block_day_basis(self, day):
         async with self._operation():

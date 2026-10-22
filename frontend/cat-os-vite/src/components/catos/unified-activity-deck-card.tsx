@@ -2,68 +2,105 @@ import { useState, useMemo } from "react";
 import {
   ShieldAlert,
   Zap,
-  ChevronDown,
-  ChevronUp,
   CheckCircle2,
-  Database,
 } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
-import { UNIFIED_EVENTS, type EventCategory } from "@/lib/mock/unified-events";
+import { UNIFIED_EVENTS, type EventCategory, type UnifiedEvent } from "@/lib/mock/unified-events";
 import { formatUsd, toneOf } from "@/lib/v0-engine";
 import { cn } from "@/lib/utils";
+import { usePreviewStore } from "@/preview/preview-store";
+
+export interface MonitoredEvent extends UnifiedEvent {
+  resolution?: 'open' | 'resolved';
+  impact?: string;
+  nextStep?: string;
+}
 
 interface UnifiedActivityDeckCardProps {
   className?: string;
   showHeader?: boolean;
+  events?: MonitoredEvent[];
+  isIntegratedPreview?: boolean;
 }
 
 export function UnifiedActivityDeckCard({
   className,
   showHeader = true,
+  events: propEvents,
+  isIntegratedPreview,
 }: UnifiedActivityDeckCardProps) {
-  const [category, setCategory] = useState<EventCategory>("ALL");
-  const [expandedId, setExpandedId] = useState<string | null>("evt_01");
+  const [localCategory, setLocalCategory] = useState<EventCategory | 'OPEN'>("ALL");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // 預覽 Store 綁定
+  const {
+    events: previewEvents,
+    openInspector,
+    highlightTarget,
+  } = usePreviewStore();
+
+  const sourceEvents: MonitoredEvent[] = isIntegratedPreview
+    ? (previewEvents as unknown as MonitoredEvent[])
+    : (propEvents ?? UNIFIED_EVENTS);
+
+  const category = localCategory;
+  const setCategory = setLocalCategory;
 
   const filteredEvents = useMemo(() => {
-    if (category === "ALL") return UNIFIED_EVENTS;
-    return UNIFIED_EVENTS.filter((e) => e.category === category);
-  }, [category]);
+    const filtered = sourceEvents.filter((e) =>
+      category === 'ALL'
+        ? true
+        : category === 'OPEN'
+        ? e.resolution === 'open'
+        : e.category === category
+    );
+
+    // 未解除事件置頂，已解除保留歷史
+    return [...filtered].sort((a, b) => Number(b.resolution === 'open') - Number(a.resolution === 'open'));
+  }, [category, sourceEvents]);
 
   const stats = useMemo(() => {
-    const fills = UNIFIED_EVENTS.filter((e) => e.category === "FILL").length;
-    const alerts = UNIFIED_EVENTS.filter((e) => e.category === "ALERT").length;
-    const system = UNIFIED_EVENTS.filter((e) => e.category === "SYSTEM").length;
-    return { fills, alerts, system, total: UNIFIED_EVENTS.length };
-  }, []);
+    const fills = sourceEvents.filter((e) => e.category === "FILL").length;
+    const alerts = sourceEvents.filter((e) => e.category === "ALERT").length;
+    const system = sourceEvents.filter((e) => e.category === "SYSTEM").length;
+    const open = sourceEvents.filter((e) => e.resolution === 'open').length;
+    return { fills, alerts, system, open, total: sourceEvents.length };
+  }, [sourceEvents]);
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 一體化 Header 與快速過濾列 */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+        <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <div className="flex items-center gap-2">
             <CardHeaderTitle
               cardId="activity_deck"
-              title="全域戰情日誌 (Activity Deck)"
+              title="交易日誌與風險事件"
               subtext={
                 <div className="flex items-center gap-1.5 ml-1">
                   <span className="text-[10px] font-mono text-muted-foreground">
                     共 {stats.total} 筆事件
                   </span>
-                  {stats.alerts > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/25 animate-pulse">
+                  {stats.open > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/25 animate-pulse font-semibold">
+                      <ShieldAlert className="size-2.5" />
+                      {stats.open} 未解除
+                    </span>
+                  ) : stats.alerts > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/25">
                       <ShieldAlert className="size-2.5" />
                       {stats.alerts} 異常告警
                     </span>
-                  )}
+                  ) : null}
                 </div>
               }
             />
           </div>
 
-          {/* 4 大類別篩選標籤 */}
+          {/* 5 大類別篩選標籤 (含未解除獨立篩選與數量) */}
           <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded p-0.5">
             {[
+              { id: 'OPEN', label: `未解除 (${stats.open})` },
               { id: "ALL", label: `全部 (${stats.total})` },
               { id: "FILL", label: `成交流 (${stats.fills})` },
               { id: "ALERT", label: `風控警報 (${stats.alerts})` },
@@ -72,7 +109,8 @@ export function UnifiedActivityDeckCard({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setCategory(tab.id as EventCategory)}
+                onClick={() => setCategory(tab.id as EventCategory | 'OPEN')}
+                aria-pressed={category === tab.id}
                 className={cn(
                   "px-2 py-0.5 text-[10px] font-mono font-medium rounded transition-colors cursor-pointer",
                   category === tab.id
@@ -103,15 +141,24 @@ export function UnifiedActivityDeckCard({
               const isExpanded = expandedId === e.id;
               const isFill = e.category === "FILL";
               const isAlert = e.category === "ALERT";
+              const isOpen = e.resolution === 'open';
+              const isHighlighted = isIntegratedPreview && highlightTarget.type === 'event' && highlightTarget.id === e.id;
 
               return (
                 <tr
                   key={e.id}
-                  onClick={() => setExpandedId(isExpanded ? null : e.id)}
+                  onClick={() => {
+                    if (isIntegratedPreview) {
+                      openInspector('event', e.id);
+                    } else {
+                      setExpandedId(isExpanded ? null : e.id);
+                    }
+                  }}
                   className={cn(
-                    "hover:bg-secondary/40 transition-colors cursor-pointer group",
+                    "hover:bg-secondary/40 transition-all cursor-pointer group",
                     isExpanded && "bg-secondary/50",
-                    isAlert && "bg-amber-500/[0.04]"
+                    isOpen && "bg-amber-500/[0.04]",
+                    isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse"
                   )}
                 >
                   {/* 1. 時間與來源 */}
@@ -160,22 +207,24 @@ export function UnifiedActivityDeckCard({
                     </div>
                   </td>
 
-                  {/* 3. 標題與事件詳情 (可展開) */}
+                  {/* 3. 標題與事件詳情 */}
                   <td className="px-1.5 py-2.5 align-top">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-semibold text-foreground group-hover:text-primary transition-colors">
+                        <span className="text-left text-[11px] font-semibold text-foreground group-hover:text-primary transition-colors">
                           {isFill ? `${e.symbol} · ${e.qty} @ $${e.price}` : e.title}
                         </span>
-                        {isExpanded ? (
-                          <ChevronUp className="size-3 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="size-3 text-muted-foreground opacity-60 group-hover:opacity-100" />
+                        {isIntegratedPreview && (
+                          <span className="text-[9px] text-muted-foreground font-mono opacity-60 group-hover:opacity-100">
+                            [詳情 ↗]
+                          </span>
                         )}
                       </div>
                       <p className={cn("text-[9.5px] text-muted-foreground leading-relaxed mt-0.5", !isExpanded && "line-clamp-1")}>
                         {e.detail}
                       </p>
+                      {isExpanded && e.impact && <p className="mt-2 text-[10px] text-amber-400">影響：{e.impact}</p>}
+                      {isExpanded && e.nextStep && <p className="mt-1 text-[10px] leading-relaxed text-foreground">下一步：{e.nextStep}</p>}
                     </div>
                   </td>
 
@@ -192,6 +241,12 @@ export function UnifiedActivityDeckCard({
                       ) : (
                         <span className="text-[9.5px] text-muted-foreground">開倉撮合</span>
                       )
+                    ) : e.resolution === 'resolved' ? (
+                      <span className="whitespace-nowrap text-[9px] text-muted-foreground">已解除 · 歷程</span>
+                    ) : isOpen ? (
+                      <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/30 animate-pulse">
+                        未解除
+                      </span>
                     ) : isAlert ? (
                       <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/30">
                         風控告警
@@ -207,19 +262,6 @@ export function UnifiedActivityDeckCard({
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* 3. 底部狀態條 */}
-      <div className="px-3 py-1 bg-secondary/70 border-t border-border/80 flex items-center justify-between text-[9px] font-mono text-muted-foreground shrink-0">
-        <div className="flex items-center gap-1.5 truncate">
-          <Database className="size-3 text-primary shrink-0" />
-          <span className="truncate">
-            全域戰情日誌：成交流水 + 風控警報 + 系統生命週期 · 同步持久化 SQLite (WAL)
-          </span>
-        </div>
-        <span className="text-foreground font-semibold shrink-0 hidden sm:inline">
-          9 筆事件就緒
-        </span>
       </div>
     </div>
   );

@@ -56,7 +56,7 @@ export const DICT = {
     manage_bots: "管理機器人",
 
     // Recent Fills
-    recent_fills: "最新成交動態",
+    recent_fills: "即時成交流水",
     live: "即時",
     buy: "買入",
     sell: "賣出",

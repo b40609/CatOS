@@ -14,5 +14,22 @@ export default defineConfig({
   server: {
     port: 8890,
     host: '127.0.0.1',
+    proxy: {
+      '/api/research': {
+        target: 'http://127.0.0.1:8770',
+        changeOrigin: true,
+        headers: {
+          origin: 'http://127.0.0.1:8770',
+        },
+      },
+      '/intel': {
+        target: 'http://127.0.0.1:8770',
+        changeOrigin: true,
+      },
+      '/api/workspace': {
+        target: 'http://127.0.0.1:8770',
+        changeOrigin: true,
+      },
+    },
   },
 });

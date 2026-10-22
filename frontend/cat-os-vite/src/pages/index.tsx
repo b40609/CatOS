@@ -6,6 +6,7 @@ import { AccountEquityBand } from "@/components/catos/account-equity-band";
 import { ActivityPanel } from "@/components/catos/activity-panel";
 import { V0BotTable } from "@/components/catos/v0-bot-table";
 import { AllocationDonutCard } from "@/components/catos/allocation-donut-card";
+import { LayoutModeToolbar } from "@/components/catos/layout-mode-toolbar";
 import { cryptoMarkets, type Fill } from "@/lib/mock/data";
 import { recentFills } from "@/lib/mock/terminal";
 import { fmtMoney, fmtSigned, nowStamp, useLiveFeed } from "@/hooks/use-live";
@@ -16,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { IncidentTimelineCard } from "@/components/catos/incident-timeline-card";
 import { MarketWatchCard } from "@/components/catos/market-watch-card";
 import { StrategyIntentsRadarCard } from "@/components/catos/strategy-intents-radar-card";
-import { UnifiedActivityDeckCard } from "@/components/catos/unified-activity-deck-card";
+import { UnifiedIncidentActivityCard } from "@/components/catos/unified-incident-activity-card";
 
 import { WorkspaceGrid } from "@/components/catos/workspace-grid";
 import type { CardId } from "@/state/layoutStore";
@@ -77,7 +78,7 @@ function Dashboard() {
         return <StrategyIntentsRadarCard className="h-full" />;
 
       case "activity_deck":
-        return <UnifiedActivityDeckCard className="h-full" />;
+        return <UnifiedIncidentActivityCard className="h-full" />;
 
       case "fills":
         return (
@@ -122,8 +123,14 @@ function Dashboard() {
   };
 
   return (
-    <AppShell>
-      {/* 定案方案 3：常態拖曳零按鈕工作台 (120 FPS 流暢分割線拉伸 · 雙擊中線還原 60:40) */}
+    <AppShell
+      dashboardTools={
+        <div className="flex items-center gap-2 shrink min-w-0">
+          <LayoutModeToolbar />
+        </div>
+      }
+    >
+      {/* 定案方案 2：上下分層 T-Split 解耦樹 (120 FPS 流暢分割線拉伸) */}
       <WorkspaceGrid renderCard={renderCard} />
     </AppShell>
   );

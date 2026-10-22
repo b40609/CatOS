@@ -1,7 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
-import { ShieldCheck } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { PositionProtectionTable, type ProtectionMonitoringView } from './position-protection-table';
+import { usePreviewStore } from "@/preview/preview-store";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { NumberTicker } from "./motion/number-ticker";
 
 export type ActivityTab = "positions" | "orders";
 
@@ -28,6 +32,8 @@ export interface PositionRow {
   p6Status: "ACTIVE" | "UPDATING" | "ALERT";
   p6Rounding: "向上取整" | "向下取整";
   protectedNotional: string;
+  p6ActiveStopPrice?: string;
+  p6TargetStopPrice?: string;
 }
 
 export interface OrderRow {
@@ -37,7 +43,7 @@ export interface OrderRow {
   botName: string;
   symbol: string;
   side: "buy" | "sell";
-  type: "限價" | "停損" | "POST_ONLY";
+  type: string;
   price: string;
   qty: string;
   distPct: string;
@@ -45,11 +51,16 @@ export interface OrderRow {
   frozenMargin: string;
   notionalUsd: string;
   placed: string;
+  isUnknown?: boolean;
+  statusText?: string;
+  detail?: string;
 }
 
 interface ActivityPanelProps {
   className?: string;
   showHeader?: boolean;
+  monitoring?: ProtectionMonitoringView;
+  isIntegratedPreview?: boolean;
 }
 
 const DEFAULT_POSITIONS: PositionRow[] = [
@@ -60,22 +71,22 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     symbol: "BTC-USDT-SWAP",
     base: "BTC",
     side: "long",
-    qty: "0.12",
+    qty: "0.85",
     entry: "61,480.00",
     mark: "62,140.50",
-    notional: "7,457",
-    upnl: 79.26,
-    upnlPct: 1.06,
+    notional: "52,820",
+    upnl: 561.43,
+    upnlPct: 1.07,
     leverage: "3x 全倉 (cross)",
     opened: "04:30",
     liqPrice: "54,210.00",
     distLiqPct: "+12.7%",
     mmr: "0.40%",
     p6StopPrice: "59,500.00",
-    p6DistPct: "-4.24%",
+    p6DistPct: "-4.25%",
     p6Status: "ACTIVE",
     p6Rounding: "向上取整",
-    protectedNotional: "$7,457",
+    protectedNotional: "$52,820",
   },
   {
     id: "p2",
@@ -84,11 +95,11 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     symbol: "ETH-USDT-SWAP",
     base: "ETH",
     side: "long",
-    qty: "2.40",
+    qty: "9.50",
     entry: "3,320.00",
     mark: "3,375.20",
-    notional: "5,880",
-    upnl: 132.48,
+    notional: "32,060",
+    upnl: 524.40,
     upnlPct: 1.66,
     leverage: "3x 全倉 (cross)",
     opened: "10/5 06:00",
@@ -99,7 +110,7 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     p6DistPct: "-4.89%",
     p6Status: "ACTIVE",
     p6Rounding: "向上取整",
-    protectedNotional: "$5,880",
+    protectedNotional: "$32,060",
   },
   {
     id: "p3",
@@ -108,81 +119,44 @@ const DEFAULT_POSITIONS: PositionRow[] = [
     symbol: "SOL-USDT-SWAP",
     base: "SOL",
     side: "long",
-    qty: "18.00",
+    qty: "95.00",
     entry: "148.20",
     mark: "152.80",
-    notional: "2,750",
-    upnl: 82.8,
-    upnlPct: 3.1,
+    notional: "14,516",
+    upnl: 437.00,
+    upnlPct: 3.10,
     leverage: "3x 全倉 (cross)",
     opened: "08:15",
     liqPrice: "131.50",
     distLiqPct: "+13.9%",
     mmr: "0.50%",
     p6StopPrice: "142.00",
-    p6DistPct: "-7.06%",
-    p6Status: "ACTIVE",
+    p6DistPct: "-7.07%",
+    p6Status: "UPDATING",
     p6Rounding: "向上取整",
-    protectedNotional: "$2,750",
-  },
-  {
-    id: "p4",
-    botId: "tabby",
-    botName: "Tabby",
-    symbol: "DOGE-USDT-SWAP",
-    base: "DOGE",
-    side: "long",
-    qty: "8,000",
-    entry: "0.1680",
-    mark: "0.1740",
-    notional: "1,392",
-    upnl: 48.0,
-    upnlPct: 3.57,
-    leverage: "3x 全倉 (cross)",
-    opened: "09:00",
-    liqPrice: "0.1420",
-    distLiqPct: "+18.4%",
-    mmr: "0.80%",
-    p6StopPrice: "0.1600",
-    p6DistPct: "-8.05%",
-    p6Status: "ACTIVE",
-    p6Rounding: "向上取整",
-    protectedNotional: "$1,392",
+    protectedNotional: "$14,516",
   },
 ];
 
 const INITIAL_ORDERS: OrderRow[] = [
   {
-    id: "o1",
-    clientOrderId: "cat_tabby_0941",
-    botId: "tabby",
-    botName: "Tabby",
-    symbol: "BTC-USDT-SWAP",
-    side: "buy",
-    type: "POST_ONLY",
-    price: "63,920.00",
-    qty: "0.08",
-    distPct: "-0.41%",
-    distTicks: "-26 ticks",
-    frozenMargin: "$511.36",
-    notionalUsd: "$5,113",
-    placed: "11:02",
-  },
-  {
-    id: "o2",
-    clientOrderId: "cat_calico_0812",
+    id: "order_calico_unknown_01",
+    clientOrderId: "cat_calico_unknown_01",
     botId: "calico",
     botName: "Calico",
     symbol: "ETH-USDT-SWAP",
     side: "buy",
-    type: "限價",
-    price: "3,165.00",
-    qty: "1.50",
-    distPct: "-0.55%",
-    distTicks: "-17 ticks",
+    type: "限價/市價增倉",
+    price: "3,375.00",
+    qty: "0.60",
+    distPct: "0.00%",
+    distTicks: "0 ticks",
     frozenMargin: "$474.75",
-    notionalUsd: "$4,747",
-    placed: "10:45",
+    notionalUsd: "$2,025",
+    placed: "11:10:02",
+    isUnknown: true,
+    statusText: "UNKNOWN · 待對帳",
+    detail: "11:10:02 回覆逾時；是否成交尚未確認。額度仍保留，禁止盲目重送。",
   },
   {
     id: "o3",
@@ -192,12 +166,12 @@ const INITIAL_ORDERS: OrderRow[] = [
     symbol: "SOL-USDT-SWAP",
     side: "sell",
     type: "限價",
-    price: "145.80",
+    price: "155.80",
     qty: "10.0",
-    distPct: "+2.40%",
-    distTicks: "+34 ticks",
+    distPct: "+1.96%",
+    distTicks: "+30 ticks",
     frozenMargin: "$145.80",
-    notionalUsd: "$1,458",
+    notionalUsd: "$1,558",
     placed: "09:30",
   },
   {
@@ -218,14 +192,28 @@ const INITIAL_ORDERS: OrderRow[] = [
   },
 ];
 
-export function ActivityPanel({ className, showHeader = true }: ActivityPanelProps) {
-  const [tab, setTab] = useState<ActivityTab>("positions");
+export function ActivityPanel({ className, showHeader = true, monitoring, isIntegratedPreview }: ActivityPanelProps) {
+  const { tickers, botsLive } = useLiveMarketStore();
+  const [localTab, setLocalTab] = useState<ActivityTab>("positions");
   const [orders, setOrders] = useState<OrderRow[]>(INITIAL_ORDERS);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [flashRows, setFlashRows] = useState<Record<string, "up" | "down">>({});
 
-  // 模擬 Tick 波動微光跳動 (已定案固化)
+  // 預覽 Store 綁定
+  const {
+    positions: previewPositions,
+    positionsTab,
+    setPositionsTab,
+    openInspector,
+    highlightTarget,
+  } = usePreviewStore();
+
+  const tab = isIntegratedPreview ? positionsTab : localTab;
+  const setTab = isIntegratedPreview ? setPositionsTab : setLocalTab;
+
+  // 模擬 Tick 波動微光跳動 (已定案固化，預覽模式維持數據嚴格一致)
   useEffect(() => {
+    if (monitoring || isIntegratedPreview) return;
     const timer = setInterval(() => {
       const targetIdx = Math.floor(Math.random() * DEFAULT_POSITIONS.length);
       const isUp = Math.random() > 0.45;
@@ -242,7 +230,7 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
       }, 700);
     }, 2400);
     return () => clearInterval(timer);
-  }, []);
+  }, [monitoring, isIntegratedPreview]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -251,14 +239,21 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
 
   const handleCancelOrder = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const targetOrder = orders.find((o) => o.id === id);
+    if (targetOrder?.isUnknown) {
+      showToast("此委託處於 UNKNOWN 待對帳中；禁止手動撤銷或重送，須等待終態");
+      return;
+    }
     setOrders((prev) => prev.filter((o) => o.id !== id));
     showToast("已成功發出撤單請求");
   };
 
   const handleCancelAll = () => {
     if (orders.length === 0) return;
-    setOrders([]);
-    showToast("已全撤在途限價委託 · 緊急平倉通道保持就緒");
+    // UNKNOWN 單受保護不隨意取消
+    const remaining = orders.filter((o) => o.isUnknown);
+    setOrders(remaining);
+    showToast("已全撤在途限價委託 · UNKNOWN 待對帳單受保護保留");
   };
 
   const totalFrozen = useMemo(() => {
@@ -268,19 +263,187 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
     }, 0);
   }, [orders]);
 
+  // 動態盤口掛單距離計算
+  const ordersData = useMemo(() => {
+    return orders.map((o) => {
+      if (o.isUnknown) return o;
+      if (o.symbol === "SOL-USDT-SWAP") {
+        const orderPrice = Number(o.price);
+        const solMark = tickers.SOL.price;
+        const distPctVal = ((orderPrice - solMark) / solMark) * 100;
+        const ticksVal = Math.round((orderPrice - solMark) / 0.1);
+        return {
+          ...o,
+          distPct: `${distPctVal >= 0 ? "+" : ""}${distPctVal.toFixed(2)}%`,
+          distTicks: `${ticksVal >= 0 ? "+" : ""}${ticksVal} ticks`,
+        };
+      }
+      return o;
+    });
+  }, [orders, tickers]);
+
+  // 動態部位計算（連動即時行情撮合引擎）
+  const liveDefaultPositions: PositionRow[] = useMemo(() => {
+    const btcMark = tickers.BTC.price;
+    const ethMark = tickers.ETH.price;
+    const solMark = tickers.SOL.price;
+
+    const btcNotional = 0.85 * btcMark;
+    const btcUpnl = (btcMark - 61480.00) * 0.85;
+    const btcUpnlPct = ((btcMark - 61480.00) / 61480.00) * 100;
+    const btcDistLiq = ((btcMark - 54210.00) / btcMark) * 100;
+    const btcP6Dist = ((59500.00 - btcMark) / btcMark) * 100;
+
+    const ethNotional = 9.50 * ethMark;
+    const ethUpnl = (ethMark - 3320.00) * 9.50;
+    const ethUpnlPct = ((ethMark - 3320.00) / 3320.00) * 100;
+    const ethDistLiq = ((ethMark - 2980.00) / ethMark) * 100;
+    const ethP6Dist = ((3210.00 - ethMark) / ethMark) * 100;
+
+    const solNotional = 95.00 * solMark;
+    const solUpnl = (solMark - 148.20) * 95.00;
+    const solUpnlPct = ((solMark - 148.20) / 148.20) * 100;
+    const solDistLiq = ((solMark - 131.50) / solMark) * 100;
+    const solP6Dist = ((142.00 - solMark) / solMark) * 100;
+
+    return [
+      {
+        id: "p1",
+        botId: "tabby",
+        botName: "Tabby",
+        symbol: "BTC-USDT-SWAP",
+        base: "BTC",
+        side: "long",
+        qty: "0.85",
+        entry: "61,480.00",
+        mark: btcMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        notional: Math.round(btcNotional).toLocaleString("en-US"),
+        upnl: btcUpnl,
+        upnlPct: btcUpnlPct,
+        leverage: "3x 全倉 (cross)",
+        opened: "04:30",
+        liqPrice: "54,210.00",
+        distLiqPct: `+${btcDistLiq.toFixed(1)}%`,
+        mmr: "0.40%",
+        p6StopPrice: "59,500.00",
+        p6DistPct: `${btcP6Dist.toFixed(2)}%`,
+        p6Status: "ACTIVE",
+        p6Rounding: "向上取整",
+        protectedNotional: `$${Math.round(btcNotional).toLocaleString("en-US")}`,
+      },
+      {
+        id: "p2",
+        botId: "calico",
+        botName: "Calico",
+        symbol: "ETH-USDT-SWAP",
+        base: "ETH",
+        side: "long",
+        qty: "9.50",
+        entry: "3,320.00",
+        mark: ethMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        notional: Math.round(ethNotional).toLocaleString("en-US"),
+        upnl: ethUpnl,
+        upnlPct: ethUpnlPct,
+        leverage: "3x 全倉 (cross)",
+        opened: "10/5 06:00",
+        liqPrice: "2,980.00",
+        distLiqPct: `+${ethDistLiq.toFixed(1)}%`,
+        mmr: "0.40%",
+        p6StopPrice: "3,210.00",
+        p6DistPct: `${ethP6Dist.toFixed(2)}%`,
+        p6Status: "ACTIVE",
+        p6Rounding: "向上取整",
+        protectedNotional: `$${Math.round(ethNotional).toLocaleString("en-US")}`,
+      },
+      {
+        id: "p3",
+        botId: "mochi",
+        botName: "Mochi",
+        symbol: "SOL-USDT-SWAP",
+        base: "SOL",
+        side: "long",
+        qty: "95.00",
+        entry: "148.20",
+        mark: solMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        notional: Math.round(solNotional).toLocaleString("en-US"),
+        upnl: solUpnl,
+        upnlPct: solUpnlPct,
+        leverage: "3x 全倉 (cross)",
+        opened: "08:15",
+        liqPrice: "131.50",
+        distLiqPct: `+${solDistLiq.toFixed(1)}%`,
+        mmr: "0.50%",
+        p6StopPrice: "142.00",
+        p6DistPct: `${solP6Dist.toFixed(2)}%`,
+        p6Status: "UPDATING",
+        p6Rounding: "向上取整",
+        protectedNotional: `$${Math.round(solNotional).toLocaleString("en-US")}`,
+      },
+    ];
+  }, [tickers]);
+
+  const positionsData = isIntegratedPreview
+    ? previewPositions.map((pp) => {
+        const liveBot = botsLive[pp.botId];
+        const quote = tickers[pp.base];
+        const currentMark = quote
+          ? quote.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : pp.mark;
+        const currentNotional = liveBot ? liveBot.notional.toLocaleString("en-US") : pp.notional;
+        const currentUpnl = liveBot ? liveBot.upnl : pp.upnl;
+        const currentUpnlPct = liveBot ? liveBot.upnlPct : pp.upnlPct;
+        const currentP6Dist = liveBot?.p6DistPct ?? (pp.p6Status === "CONFIRMED" ? "-4.24%" : "-7.06%");
+
+        return {
+          id: pp.id,
+          botId: pp.botId,
+          botName: pp.botName,
+          symbol: pp.symbol,
+          base: pp.base,
+          side: pp.side,
+          qty: pp.qty,
+          entry: pp.entry,
+          mark: currentMark,
+          notional: currentNotional,
+          upnl: currentUpnl,
+          upnlPct: currentUpnlPct,
+          leverage: pp.leverage,
+          opened: pp.opened,
+          liqPrice: pp.liqPrice,
+          distLiqPct: pp.distLiqPct,
+          mmr: "0.40%",
+          p6StopPrice: pp.p6Status === "CONFIRMED" ? pp.p6ActiveStopPrice.replace("$", "") : pp.p6TargetStopPrice.replace("$", ""),
+          p6DistPct: currentP6Dist,
+          p6Status: (pp.p6Status === "CONFIRMED" ? "ACTIVE" : "UPDATING") as "ACTIVE" | "UPDATING" | "ALERT",
+          p6Rounding: "向上取整" as const,
+          protectedNotional: `$${currentNotional}`,
+          p6ActiveStopPrice: pp.p6ActiveStopPrice,
+          p6TargetStopPrice: pp.p6TargetStopPrice,
+        };
+      })
+    : liveDefaultPositions;
+
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. 一體化 Header 與 3 Tab 切換開關 (方案 A：內嵌 P6 交易所端防線指示) */}
+      {/* 1. 一體化 Header 與 2 Tab 切換開關 */}
       {showHeader && (
         <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
           <CardHeaderTitle
             cardId="positions"
-            title="部位活動與盤口防線"
+            title="持倉明細與在途委託"
             subtext={
               <div className="flex items-center gap-1.5 ml-1">
-                <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.2 rounded border border-emerald-400/25">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  P6 交易所端 100% 錨定
+                <span className={cn(
+                  "flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border",
+                  isIntegratedPreview
+                    ? "text-amber-400 bg-amber-400/10 border-amber-400/30 font-semibold"
+                    : "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
+                )}>
+                  <span className={cn(
+                    "size-1.5 rounded-full",
+                    isIntegratedPreview ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                  )} />
+                  {isIntegratedPreview ? "P6 已確認 2/3 · 1 待確認" : "P6 交易所端 100% 錨定"}
                 </span>
               </div>
             }
@@ -293,11 +456,11 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
               className={cn(
                 "px-2 py-0.5 text-[10.5px] font-mono font-medium rounded transition-colors cursor-pointer",
                 tab === "positions"
-                  ? "bg-secondary text-primary border border-border font-semibold"
+                  ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              持倉 ({DEFAULT_POSITIONS.length})
+              持倉 ({positionsData.length})
             </button>
 
             <button
@@ -317,10 +480,11 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
       )}
 
       {/* 2. 內容展示區 */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col justify-between">
-        {/* ================= Tab 1: 持倉明細 (方案 A: 深度整合 P6 災難防線) ================= */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto flex flex-col justify-between min-w-0 max-w-full">
+        {monitoring ? <PositionProtectionTable {...monitoring} tab={tab} /> : <>
+        {/* ================= Tab 1: 持倉明細 (原部位表 + P6 保護確認整合) ================= */}
         {tab === "positions" && (
-          <table className="w-full text-left border-collapse table-auto">
+          <table className="w-full text-left border-collapse table-auto min-w-[540px]">
             <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
               <tr>
                 <th className="py-2 pl-3 pr-1.5 font-medium">BOT / CONTRACT</th>
@@ -329,22 +493,25 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                 <th className="px-1.5 text-right font-medium">ENTRY / MARK</th>
                 <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
                 <th className="px-1.5 text-right font-medium hidden sm:table-cell">預估強平 / 距爆倉</th>
-                <th className="px-1.5 text-right font-medium hidden md:table-cell">P6 災難停損 (OKX)</th>
+                <th className="px-1.5 text-right font-medium">P6 災難停損 (OKX)</th>
                 <th className="py-2 pr-3 pl-1.5 text-right font-medium hidden lg:table-cell">LEVERAGE</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40 text-xs">
-              {DEFAULT_POSITIONS.map((p) => {
+              {positionsData.map((p) => {
                 const flash = flashRows[p.id];
                 const isPositive = p.upnl >= 0;
+                const isUpdating = p.p6Status === "UPDATING";
+                const isHighlighted = isIntegratedPreview && highlightTarget.type === 'protection' && (highlightTarget.id === p.id || highlightTarget.id === p.botId);
 
                 return (
                   <tr
                     key={p.id}
                     className={cn(
-                      "hover:bg-secondary/40 transition-colors group",
+                      "hover:bg-secondary/40 transition-all group",
                       flash === "up" && "flash-up",
-                      flash === "down" && "flash-down"
+                      flash === "down" && "flash-down",
+                      isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse"
                     )}
                   >
                     <td className="py-2 pl-3 pr-1.5">
@@ -368,24 +535,28 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                     <td className="px-1.5 py-2 text-right font-mono">
                       <div className="flex flex-col items-end">
                         <span className="text-[10.5px] font-bold text-foreground leading-tight">{p.qty} {p.base}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight">${p.notional}</span>
+                        <span className="text-[9px] text-muted-foreground leading-tight flex items-center">
+                          <NumberTicker value={Number(p.notional.replace(/,/g, ""))} decimals={0} prefix="$" />
+                        </span>
                       </div>
                     </td>
 
                     <td className="px-1.5 py-2 text-right font-mono">
                       <div className="flex flex-col items-end">
                         <span className="text-[10.5px] font-medium text-foreground leading-tight">${p.entry}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight">${p.mark}</span>
+                        <span className="text-[9px] text-muted-foreground leading-tight flex items-center">
+                          <NumberTicker value={Number(p.mark.replace(/,/g, ""))} decimals={2} prefix="$" />
+                        </span>
                       </div>
                     </td>
 
                     <td className="px-1.5 py-2 text-right font-mono">
                       <div className="flex flex-col items-end">
-                        <span className={cn("text-[10.5px] font-bold leading-tight", isPositive ? "text-up" : "text-down")}>
-                          {isPositive ? "+" : ""}${p.upnl.toFixed(2)}
+                        <span className={cn("text-[10.5px] font-bold leading-tight flex items-center", isPositive ? "text-up" : "text-down")}>
+                          {isPositive ? "+" : ""}<NumberTicker value={p.upnl} decimals={2} prefix="$" />
                         </span>
-                        <span className={cn("text-[9px] leading-tight", isPositive ? "text-up" : "text-down")}>
-                          {isPositive ? "+" : ""}{p.upnlPct.toFixed(2)}%
+                        <span className={cn("text-[9px] leading-tight flex items-center", isPositive ? "text-up" : "text-down")}>
+                          {isPositive ? "+" : ""}<NumberTicker value={p.upnlPct} decimals={2} suffix="%" />
                         </span>
                       </div>
                     </td>
@@ -399,21 +570,46 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                       </div>
                     </td>
 
-                    {/* 方案 A: 深度整合 P6 災難停損防線欄 */}
-                    <td className="px-1.5 py-2 text-right hidden md:table-cell">
+                    {/* 整合 P6 欄位：已確認 / 更新待確認 / 未啟用 */}
+                    <td className="px-1.5 py-2 text-right">
                       <div className="flex flex-col items-end">
                         <div className="flex items-center gap-1 font-mono">
-                          <span className="text-[10.5px] text-primary font-bold leading-tight">
-                            ${p.p6StopPrice}
-                          </span>
-                          <span className="text-[9px] text-amber-400/90 font-semibold">
-                            ({p.p6DistPct})
-                          </span>
+                          {isUpdating ? (
+                            <span className="text-[10px] text-amber-400 font-bold leading-tight" title="更新目標不能冒充生效價；生效價目前未知">
+                              目標 ${p.p6TargetStopPrice ? p.p6TargetStopPrice.replace('$', '') : p.p6StopPrice}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-[10.5px] text-primary font-bold leading-tight">
+                                ${p.p6StopPrice}
+                              </span>
+                              <span className="text-[9px] text-amber-400/90 font-semibold">
+                                ({p.p6DistPct})
+                              </span>
+                            </>
+                          )}
                         </div>
-                        <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
-                          <span className="size-1 rounded-full bg-emerald-400" />
-                          OKX {p.p6Rounding}
-                        </span>
+
+                        {isIntegratedPreview ? (
+                          <button
+                            type="button"
+                            onClick={() => openInspector('protection', p.id)}
+                            className={cn(
+                              "mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-mono border transition-all cursor-pointer",
+                              isUpdating
+                                ? "border-amber-400/40 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 font-bold animate-pulse"
+                                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20"
+                            )}
+                          >
+                            <span className={cn("size-1 rounded-full", isUpdating ? "bg-amber-400" : "bg-emerald-400")} />
+                            <span>{isUpdating ? "▲ 更新待確認 (詳情 ↗)" : "● 已確認 (詳情 ↗)"}</span>
+                          </button>
+                        ) : (
+                          <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
+                            <span className="size-1 rounded-full bg-emerald-400" />
+                            OKX {p.p6Rounding}
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -430,7 +626,7 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
           </table>
         )}
 
-        {/* ================= Tab 2: 當前掛單 (方案 A: 高密度在途掛單 + 凍結保證金 + 一鍵全撤) ================= */}
+        {/* ================= Tab 2: 當前掛單 (高密度盤口掛單 + UNKNOWN 待對帳單) ================= */}
         {tab === "orders" && (
           <div className="flex flex-col h-full justify-between">
             {orders.length === 0 ? (
@@ -439,7 +635,7 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                 <span className="text-[10px] text-muted-foreground mt-1">策略次根委託意圖觸發時將即時顯示於此</span>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse table-auto">
+              <table className="w-full text-left border-collapse table-auto min-w-[620px]">
                 <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
                     <th className="py-2 pl-3 pr-1.5 font-medium">BOT / CONTRACT</th>
@@ -448,63 +644,90 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
                     <th className="px-1.5 text-right font-medium">QTY</th>
                     <th className="px-1.5 text-right font-medium">DIST (TICKS)</th>
                     <th className="px-1.5 text-right font-medium hidden sm:table-cell">FROZEN MARGIN</th>
-                    <th className="py-2 pr-3 pl-1.5 text-right font-medium">ACTION</th>
+                    <th className="py-2 pr-3 pl-1.5 text-right font-medium">ACTION / STATUS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-xs font-mono">
-                  {orders.map((o) => (
-                    <tr key={o.id} className="hover:bg-secondary/40 transition-colors group">
-                      <td className="py-2 pl-3 pr-1.5">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-foreground leading-tight">{o.symbol}</span>
-                          <span className="text-[9px] text-muted-foreground leading-tight">{o.botName} · {o.clientOrderId}</span>
-                        </div>
-                      </td>
+                  {ordersData.map((o) => {
+                    const isHighlighted = isIntegratedPreview && highlightTarget.type === 'order' && highlightTarget.id === o.id;
 
-                      <td className="px-1.5 py-2">
-                        <div className="flex items-center gap-1">
-                          <span
-                            className={cn(
-                              "px-1 py-0.2 rounded text-[8.5px] font-bold",
-                              o.side === "buy" ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400"
-                            )}
-                          >
-                            {o.side === "buy" ? "買" : "賣"}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground">{o.type}</span>
-                        </div>
-                      </td>
+                    return (
+                      <tr
+                        key={o.id}
+                        className={cn(
+                          "hover:bg-secondary/40 transition-all group",
+                          o.isUnknown && "bg-amber-500/[0.04]",
+                          isHighlighted && "ring-1 ring-primary bg-primary/15 shadow-[0_0_12px_rgba(232,180,94,0.35)] animate-pulse"
+                        )}
+                      >
+                        <td className="py-2 pl-3 pr-1.5">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-bold text-foreground leading-tight">{o.symbol}</span>
+                            <span className="text-[9px] text-muted-foreground leading-tight">{o.botName} · {o.clientOrderId}</span>
+                          </div>
+                        </td>
 
-                      <td className="px-1.5 py-2 text-right font-bold text-foreground text-[10.5px]">${o.price}</td>
-                      <td className="px-1.5 py-2 text-right text-muted-foreground text-[10px]">{o.qty}</td>
-                      <td className="px-1.5 py-2 text-right text-[10px]">
-                        <span className="text-amber-400 font-semibold">{o.distPct}</span>
-                        <span className="text-[8.5px] text-muted-foreground block">{o.distTicks}</span>
-                      </td>
-                      <td className="px-1.5 py-2 text-right text-[10.5px] font-semibold text-foreground hidden sm:table-cell">
-                        {o.frozenMargin}
-                      </td>
-                      <td className="py-2 pr-3 pl-1.5 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => handleCancelOrder(o.id, e)}
-                          className="px-1.5 py-0.5 rounded text-[9.5px] text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
-                        >
-                          撤單
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-1.5 py-2">
+                          <div className="flex items-center gap-1">
+                            <span
+                              className={cn(
+                                "px-1 py-0.2 rounded text-[8.5px] font-bold",
+                                o.side === "buy" ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400"
+                              )}
+                            >
+                              {o.side === "buy" ? "買" : "賣"}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground">{o.type}</span>
+                          </div>
+                        </td>
+
+                        <td className="px-1.5 py-2 text-right font-bold text-foreground text-[10.5px]">${o.price}</td>
+                        <td className="px-1.5 py-2 text-right text-muted-foreground text-[10px]">{o.qty}</td>
+                        <td className="px-1.5 py-2 text-right text-[10px]">
+                          {o.isUnknown ? (
+                            <span className="text-amber-400 font-semibold">待對帳</span>
+                          ) : (
+                            <>
+                              <span className="text-amber-400 font-semibold">{o.distPct}</span>
+                              <span className="text-[8.5px] text-muted-foreground block">{o.distTicks}</span>
+                            </>
+                          )}
+                        </td>
+                        <td className="px-1.5 py-2 text-right text-[10.5px] font-semibold text-foreground hidden sm:table-cell">
+                          {o.frozenMargin}
+                        </td>
+                        <td className="py-2 pr-3 pl-1.5 text-right">
+                          {o.isUnknown ? (
+                            <span
+                              className="px-2 py-0.5 rounded text-[9px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/40 inline-flex items-center gap-1"
+                              title={o.detail || "11:10:02 回覆逾時；額度保留待對帳"}
+                            >
+                              <AlertTriangle className="size-2.5" />
+                              <span>UNKNOWN 待對帳</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleCancelOrder(o.id, e)}
+                              className="px-1.5 py-0.5 rounded text-[9.5px] text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
+                            >
+                              撤單
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
 
-            {/* 方案 A: 掛單頁底部統計與全撤單控制 */}
+            {/* 掛單頁底部統計與控制 */}
             <div className="px-3 py-1.5 bg-secondary/60 border-t border-border/80 flex items-center justify-between text-[9.5px] font-mono text-muted-foreground shrink-0 mt-auto">
               <div className="flex items-center gap-2">
                 <span>在途凍結: <strong className="text-foreground">${totalFrozen.toFixed(2)}</strong></span>
                 <span className="text-border">|</span>
-                <span>在途總額: <strong className="text-foreground">$11,319</strong></span>
+                <span>在途總額: <strong className="text-foreground">$5,464</strong></span>
                 {toastMessage && (
                   <span className="text-amber-400 font-semibold bg-amber-500/10 px-1 rounded animate-in fade-in">
                     {toastMessage}
@@ -514,32 +737,20 @@ export function ActivityPanel({ className, showHeader = true }: ActivityPanelPro
               <button
                 type="button"
                 onClick={handleCancelAll}
-                disabled={orders.length === 0}
+                disabled={orders.filter(o => !o.isUnknown).length === 0}
                 className={cn(
                   "px-2 py-0.5 rounded text-[9px] font-semibold transition-all cursor-pointer",
-                  orders.length > 0
+                  orders.filter(o => !o.isUnknown).length > 0
                     ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30"
                     : "text-muted-foreground/40 cursor-not-allowed border border-transparent"
                 )}
               >
-                一鍵全撤在途單
+                一鍵全撤在途限價單
               </button>
             </div>
           </div>
         )}
-      </div>
-
-      {/* 底部微型防線狀態 */}
-      <div className="px-3 py-1 bg-secondary/70 border-t border-border/80 flex items-center justify-between text-[9px] font-mono text-muted-foreground shrink-0">
-        <div className="flex items-center gap-1.5 truncate">
-          <ShieldCheck className="size-3 text-emerald-400 shrink-0" />
-          <span className="truncate">
-            OKX 交易所端 P6 災難防線：Mark 觸發 · 提早取整 · 均價變動自動重錨
-          </span>
-        </div>
-        <span className="text-foreground font-semibold shrink-0 hidden sm:inline">
-          4 幣保護中
-        </span>
+        </>}
       </div>
     </div>
   );

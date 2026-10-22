@@ -11,7 +11,7 @@ from decimal import Decimal, localcontext
 import hashlib
 import json
 
-from catos import research
+from catos import research, risk
 from catos.okx_collection import SNAPSHOT_SEMANTICS_CONTRACT, WINDOW_COVERAGE_CONTRACT
 
 
@@ -513,9 +513,12 @@ class DayLedgerEvidence:
     flow_classification_id: str
     unknown_flow_count: int
     day_flow_cutoff_ms: int | None = None
+    period_basis: risk.DayBasis | None = None
 
     def __post_init__(self):
         _integer(self.trading_day_start_ms, "trading_day_start_ms")
+        if self.period_basis is not None and not isinstance(self.period_basis, risk.DayBasis):
+            raise ValueError("invalid risk period basis")
         _money(self.baseline_equity_usdt, "baseline equity", positive=True)
         _token(self.baseline_evidence_id, "baseline evidence")
         _money(self.external_flow_usdt, "external flow")
@@ -749,6 +752,8 @@ TAIPEI_OFFSET_MS = 28_800_000
 def _day_blockers(report, evidence, freshness_policy=None):
     if not isinstance(evidence, DayLedgerEvidence):
         return {"day_baseline_unverified"}
+    if evidence.period_basis is not None:
+        return _period_blockers(report, evidence, freshness_policy)
     blockers = set()
     if (evidence.trading_day_start_ms + TAIPEI_OFFSET_MS) % DAY_MS != 0:
         blockers.add("day_baseline_unverified")
@@ -828,6 +833,46 @@ def _day_blockers(report, evidence, freshness_policy=None):
     return blockers
 
 
+def _period_blockers(report, evidence, policy):
+    basis = evidence.period_basis
+    target = getattr(policy, "checked_at_ms", report.get("completed_ms"))
+    blockers = set()
+    if (type(target) is not int or basis.source != risk.RISK_PERIOD_SOURCE
+            or not risk.is_verified_baseline(basis, account_alias=report.get("account_alias"),
+                environment=report.get("environment"), target_day=risk.taipei_day(target))):
+        return {"day_baseline_unverified"}
+    start = basis.evidence.observed_at_ms
+    cutoff = evidence.day_flow_cutoff_ms
+    begin, end = report.get("window_start_ms"), report.get("window_end_ms")
+    if (evidence.trading_day_start_ms != basis.evidence.trading_day_start_ms
+            or evidence.baseline_equity_usdt != basis.equity
+            or evidence.baseline_evidence_id != basis.evidence_id
+            or report.get("risk_period_start_ms") != start
+            or report.get("risk_period_basis_id") != basis.evidence_id
+            or report.get("day_flow_start_ms") != start
+            or type(begin) is not int or begin > start
+            or type(cutoff) is not int or not start <= cutoff <= target
+            or type(end) is not int or cutoff != end
+            or report.get("day_flow_cutoff_ms") != cutoff
+            or report.get("started_ms", -1) < basis.evidence.trading_day_start_ms):
+        blockers.add("day_baseline_unverified")
+    if evidence.unknown_flow_count or report.get("day_unknown_flow_count"):
+        blockers.add("unknown_external_flow")
+    if report.get("flow_classification_id") != evidence.flow_classification_id:
+        blockers.add("external_flow_mismatch")
+    try:
+        if _money(report.get("day_external_flow_usdt"), "period flow") != evidence.external_flow_usdt:
+            blockers.add("external_flow_mismatch")
+    except ValueError:
+        blockers.add("external_flow_unavailable")
+    for fact in report.get("facts", []):
+        if fact.get("kind") == "bill" and fact.get("ts") == start:
+            if (fact.get("timing_verified") not in ("prior_to_baseline", "after_baseline")
+                    or fact.get("timing_evidence_id") != basis.evidence_id):
+                blockers.add("external_flow_unavailable")
+    return blockers
+
+
 def evaluate(report, snapshot, *, revision_before, revision_after,
              freshness_policy=None, freshness_evidence=None,
              day_ledger=None):
@@ -865,7 +910,10 @@ def evaluate(report, snapshot, *, revision_before, revision_after,
     if type(report) is not dict:
         blockers.add("evidence_integrity_failed")
     else:
-        if report.get("instrument") != getattr(snapshot, "inst_id", None) or report.get("environment") != "demo":
+        local_period = (isinstance(day_ledger, DayLedgerEvidence)
+                        and isinstance(day_ledger.period_basis, risk.DayBasis)
+                        and report.get("environment") == "local-sim")
+        if report.get("instrument") != getattr(snapshot, "inst_id", None) or (report.get("environment") != "demo" and not local_period):
             blockers.add("scope_mismatch")
         if report.get("collection_complete") is not True:
             blockers.add("collection_incomplete")

@@ -142,8 +142,8 @@ export function IncidentTimelineCard({ className }: IncidentTimelineCardProps) {
         <div className="flex items-center gap-2">
           <CardHeaderTitle
             cardId="incidents"
-            title="系統警報與事件時間軸"
-            subtext="INCIDENT STREAM"
+            title="風險警報與異常事件"
+            subtext=""
           />
           {alertCount > 0 && (
             <span className="flex items-center gap-1 text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">

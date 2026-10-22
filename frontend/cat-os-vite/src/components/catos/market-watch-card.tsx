@@ -4,10 +4,11 @@ import {
   Clock,
   TrendingUp,
   TrendingDown,
-  ShieldCheck,
   Flame,
 } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { NumberTicker } from "./motion/number-ticker";
 import { cn } from "@/lib/utils";
 
 export type BarTimeframe = "15m" | "1H" | "4H";
@@ -31,10 +32,10 @@ const INITIAL_MARKETS: MarketItem[] = [
   {
     symbol: "BTC-USDT-SWAP",
     code: "BTC",
-    price: 64182.5,
-    change24h: 2.84,
-    high24h: 64850.0,
-    low24h: 62120.0,
+    price: 62140.5,
+    change24h: 1.42,
+    high24h: 62850.0,
+    low24h: 61120.0,
     funding: 0.0102,
     fundingTimeLeft: "03:39:15",
     spreadBps: 0.8,
@@ -45,24 +46,24 @@ const INITIAL_MARKETS: MarketItem[] = [
   {
     symbol: "ETH-USDT-SWAP",
     code: "ETH",
-    price: 3182.6,
-    change24h: 1.46,
-    high24h: 3245.0,
-    low24h: 3110.0,
+    price: 3375.2,
+    change24h: 1.66,
+    high24h: 3440.0,
+    low24h: 3280.0,
     funding: 0.0084,
     fundingTimeLeft: "03:39:15",
     spreadBps: 0.3,
     volUsd: "$5.4B",
-    tickDirection: "flat",
+    tickDirection: "up",
     openInterest: "$1.89B",
   },
   {
     symbol: "SOL-USDT-SWAP",
     code: "SOL",
-    price: 142.38,
-    change24h: -0.92,
-    high24h: 146.5,
-    low24h: 139.8,
+    price: 152.8,
+    change24h: 3.10,
+    high24h: 156.5,
+    low24h: 146.2,
     funding: -0.0031,
     fundingTimeLeft: "03:39:15",
     spreadBps: 1.4,
@@ -91,9 +92,10 @@ interface MarketWatchCardProps {
 }
 
 export function MarketWatchCard({ className }: MarketWatchCardProps) {
+  const { quotes } = useLiveMarketStore();
   const [timeframe, setTimeframe] = useState<BarTimeframe>("15m");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("BTC-USDT-SWAP");
-  const [markets, setMarkets] = useState<MarketItem[]>(INITIAL_MARKETS);
+  const [markets] = useState<MarketItem[]>(INITIAL_MARKETS);
   const [now, setNow] = useState<Date>(new Date());
 
   // 1. 每秒更新時鐘與計算 K 線倒數
@@ -102,28 +104,6 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
       setNow(new Date());
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  // 2. 模擬盤口高頻微跳動 (微鋸齒報價，模擬真實量化盤口)
-  useEffect(() => {
-    const tickInterval = setInterval(() => {
-      setMarkets((prev) =>
-        prev.map((item) => {
-          if (Math.random() < 0.4) {
-            const deltaPct = (Math.random() - 0.49) * 0.0006;
-            const newPrice = Number((item.price * (1 + deltaPct)).toFixed(item.price < 1 ? 4 : 2));
-            const direction = newPrice > item.price ? "up" : newPrice < item.price ? "down" : "flat";
-            return {
-              ...item,
-              price: newPrice,
-              tickDirection: direction,
-            };
-          }
-          return { ...item, tickDirection: "flat" };
-        })
-      );
-    }, 1800);
-    return () => clearInterval(tickInterval);
   }, []);
 
   // 計算 K 線倒數 (Closed Bar Countdown)
@@ -183,6 +163,8 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
   }, [now]);
 
   const activeMarket = markets.find((m) => m.symbol === selectedSymbol) || markets[0];
+  const activeQuote = quotes[activeMarket.code];
+  const activeFunding = activeQuote?.funding ?? activeMarket.funding;
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
@@ -190,7 +172,7 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
       <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
         <CardHeaderTitle
           cardId="market_watch"
-          title="標的行情與 K 線倒數"
+          title="標的行情與資金費率"
           subtext={
             <div className="flex items-center gap-1.5 ml-1">
               <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.2 rounded border border-emerald-400/25">
@@ -288,13 +270,13 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
               <span
                 className={cn(
                   "text-[10px] font-mono font-semibold px-1 py-0.2 rounded",
-                  activeMarket.funding >= 0
+                  activeFunding >= 0
                     ? "text-emerald-400 bg-emerald-400/10"
                     : "text-rose-400 bg-rose-400/10"
                 )}
               >
-                {activeMarket.funding >= 0 ? "+" : ""}
-                {(activeMarket.funding * 100).toFixed(4)}%
+                {activeFunding >= 0 ? "+" : ""}
+                {(activeFunding * 100).toFixed(4)}%
               </span>
             </div>
           </div>
@@ -330,7 +312,11 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
           <tbody className="divide-y divide-border/50">
             {markets.map((m) => {
               const isSelected = selectedSymbol === m.symbol;
-              const isPositive = m.change24h >= 0;
+              const quote = quotes[m.code];
+              const currentPrice = quote?.price ?? m.price;
+              const currentChg = quote?.change24h ?? m.change24h;
+              const isPositive = currentChg >= 0;
+              const tickDir = quote?.lastDir ?? m.tickDirection;
 
               return (
                 <tr
@@ -359,20 +345,19 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
                     </div>
                   </td>
 
-                  {/* 最新價與微跳動指示 */}
+                  {/* 最新價與微跳動指示 (NumberTicker) */}
                   <td className="py-2 px-2 text-right">
-                    <span
+                    <NumberTicker
+                      value={currentPrice}
+                      decimals={m.code === "DOGE" ? 4 : 2}
+                      prefix="$"
+                      duration={400}
                       className={cn(
-                        "font-semibold transition-colors",
-                        m.tickDirection === "up" && "text-emerald-400 font-bold",
-                        m.tickDirection === "down" && "text-rose-400 font-bold",
-                        m.tickDirection === "flat" && "text-foreground"
+                        "font-semibold",
+                        tickDir === "up" && "text-emerald-400",
+                        tickDir === "down" && "text-rose-400"
                       )}
-                    >
-                      {m.price < 1
-                        ? m.price.toFixed(4)
-                        : m.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                    />
                   </td>
 
                   {/* 24h 漲跌幅 */}
@@ -384,8 +369,14 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
                       )}
                     >
                       {isPositive ? <TrendingUp className="size-2.5" /> : <TrendingDown className="size-2.5" />}
-                      {isPositive ? "+" : ""}
-                      {m.change24h.toFixed(2)}%
+                      <NumberTicker
+                        value={Math.abs(currentChg)}
+                        prefix={isPositive ? "+" : "-"}
+                        suffix="%"
+                        decimals={2}
+                        duration={400}
+                        flashOnChange={false}
+                      />
                     </span>
                   </td>
 
@@ -415,19 +406,6 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* 4. 底部 Invariant 約束資訊 (Zero-Waste 緊湊單行) */}
-      <div className="px-3 py-1.5 bg-secondary/60 border-t border-border/80 flex items-center justify-between text-[9.5px] font-mono text-muted-foreground shrink-0">
-        <div className="flex items-center gap-1.5 truncate">
-          <ShieldCheck className="size-3 text-primary shrink-0" />
-          <span className="truncate">
-            Closed Bar 約束：已收盤 K 線決策 · 次根開盤市價撮合
-          </span>
-        </div>
-        <span className="text-muted-foreground/70 font-mono shrink-0 hidden sm:inline">
-          Asia/Taipei
-        </span>
       </div>
     </div>
   );

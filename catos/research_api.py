@@ -22,6 +22,8 @@ RUNTIME_FILES = (
     "catos/research_api.py", "catos/research_catalog.py", "catos/research_service.py",
     "catos/research_worker.py", "catos/research_strategy.py", "catos/research.py",
     "catos/research_optimization.py", "catos/optimization.py",
+    "catos/research_validation.py", "catos/research_regimes.py",
+    "catos/research_validation_job.py",
     "catos/data_io.py", "catos/reporting.py", "catos/market_api.py", "catos/app_shell.py",
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
     "examples/closed_bar_demo.py", "examples/research-web-synthetic.csv",
@@ -155,6 +157,14 @@ def create_app(*, output_dir=None, market_db=None):
         value = await parse_submission(request)
         try:
             return service.submit_optimization(value, loaded_build)
+        except (ValueError, TypeError) as error:
+            raise HTTPException(422, str(error)) from None
+
+    @app.post("/api/research/validations", status_code=202)
+    async def validation_submit(request: Request):
+        value = await parse_submission(request)
+        try:
+            return service.submit_validation(value, loaded_build)
         except (ValueError, TypeError) as error:
             raise HTTPException(422, str(error)) from None
 

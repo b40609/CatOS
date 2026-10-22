@@ -29,26 +29,26 @@ interface CardMeta {
   icon: typeof TrendingUp;
 }
 
-const ALL_CARDS: CardMeta[] = [
+export const ALL_CARDS: CardMeta[] = [
   {
     id: "equity",
-    nameZh: "帳戶權益走勢",
+    nameZh: "帳戶權益與損益",
     nameEn: "Equity & Drawdown",
     category: "資產風控",
-    desc: "即時權益淨值、今日/週期損益與 7D 響應式走勢圖",
+    desc: "即時淨值資產、今日損益與 7D 響應式走勢圖",
     icon: TrendingUp,
   },
   {
     id: "positions",
-    nameZh: "部位活動與盤口防線",
-    nameEn: "Positions, Orders & Safety",
+    nameZh: "持倉明細與在途委託",
+    nameEn: "Positions & Orders",
     category: "交易明細",
     desc: "多空持倉 (內嵌 P6 停損)、高密度在途掛單 (撤單/凍結保證金) 與成交流",
     icon: LineChart,
   },
   {
     id: "bots",
-    nameZh: "量化機器人矩陣",
+    nameZh: "策略機器人矩陣",
     nameEn: "Bots Matrix",
     category: "策略執行",
     desc: "4 隻專用 KOL 策略機器人、狀態監控與一鍵啟動/暫停",
@@ -56,50 +56,50 @@ const ALL_CARDS: CardMeta[] = [
   },
   {
     id: "allocation",
-    nameZh: "資產曝險配置",
-    nameEn: "Exposure Donut & Scales",
+    nameZh: "槓桿倍數與資產曝險",
+    nameEn: "Leverage & Allocation",
     category: "資產風控",
-    desc: "宏觀 Donut 環圖、多條進度條與多空雙向風控標尺",
+    desc: "帳戶有效槓桿倍數、幣種名義曝險與多空 Donut 資產分佈環圖",
     icon: PieChart,
   },
   {
     id: "fills",
-    nameZh: "最新成交動態",
+    nameZh: "即時成交流水",
     nameEn: "Recent Fills",
     category: "即時流水",
-    desc: "OKX SWAP 實時成交流水與盈虧跳動",
+    desc: "OKX SWAP 實時逐筆成交流水與盈虧跳動",
     icon: Zap,
   },
   {
     id: "incidents",
-    nameZh: "系統警報與事件時間軸",
-    nameEn: "Incident Stream",
+    nameZh: "風險警報與異常事件",
+    nameEn: "Risk Incidents",
     category: "系統監控",
     desc: "撮合滑價偏離、P6 保險停損更新與風控異常警報流",
     icon: ShieldAlert,
   },
   {
     id: "market_watch",
-    nameZh: "標的行情與 K 線倒數",
-    nameEn: "Market Watch & Bar Timer",
+    nameZh: "標的行情與資金費率",
+    nameEn: "Market Watch & Rates",
     category: "行情時鐘",
-    desc: "BTC/ETH/SOL 即時報價、資金費率結算倒數與 Closed Bar 收盤定時器",
+    desc: "BTC/ETH/SOL 即時報價、OKX 資金費率結算倒數與收盤定時器",
     icon: Timer,
   },
   {
     id: "strategy_intents",
-    nameZh: "策略目標意圖信號看板",
-    nameEn: "Worker Intents & Radar",
+    nameZh: "策略目標與訊號強度",
+    nameEn: "Signals & Radar",
     category: "策略大腦",
-    desc: "Worker 傳出的純資料目標意圖、訊號強度與突破/均線指標距離",
+    desc: "Worker 傳出的純資料目標意圖、多空訊號強度與突破/均線指標距離",
     icon: Target,
   },
   {
     id: "activity_deck",
-    nameZh: "全域戰情日誌",
-    nameEn: "Activity & Audit Deck",
+    nameZh: "交易日誌與風險事件",
+    nameEn: "Activity & Events",
     category: "動態流水",
-    desc: "成交流水 + 風控警報 + 系統生命週期三合一全域獨立日誌台",
+    desc: "成交流水 + 風控警報 + 系統生命週期全域稽核日誌台",
     icon: Zap,
   },
 ];
@@ -118,7 +118,7 @@ export function CardManagerDropdown() {
   // 取得當前樹中所有正在顯示的葉子節點
   const currentLeaves = getAllLeaves(rootNode);
   const activeCardIds = currentLeaves.map((l) => l.cardId);
-  const canRemove = currentLeaves.length > 1;
+  const canRemove = true;
 
   // 點擊外部自動收起下拉選單
   useEffect(() => {
@@ -168,7 +168,7 @@ export function CardManagerDropdown() {
         title="開啟卡片庫，自由選擇主畫面要顯示的卡片"
       >
         <Plus className={cn("size-3.5 transition-transform duration-200", isOpen && "rotate-45")} />
-        <span className="font-sans font-semibold tracking-tight">新增卡片</span>
+        <span className="font-sans font-semibold tracking-tight">卡片管理</span>
         <span
           className={cn(
             "ml-0.5 px-1 py-0.2 rounded text-[9.5px] font-mono",
@@ -193,11 +193,11 @@ export function CardManagerDropdown() {
             <div className="flex items-center gap-1.5">
               <LayoutGrid className="size-3.5 text-primary" />
               <span className="text-[12px] font-bold text-foreground tracking-tight">
-                主畫面卡片庫
+                版面卡片編輯
               </span>
             </div>
             <span className="text-[9.5px] font-mono text-muted-foreground">
-              點擊開關卡片 · 即時排版
+              點擊增刪卡片 · 即時排版
             </span>
           </div>
 
@@ -255,7 +255,7 @@ export function CardManagerDropdown() {
                             ? "text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 group-hover:bg-rose-400/15 group-hover:text-rose-400 group-hover:border-rose-400/30"
                             : "text-emerald-400/80 bg-emerald-400/10 border border-emerald-400/20"
                         )}
-                        title={canRemove ? "點擊從主畫面中移除" : "保護中 (主畫面至少需保留 1 張卡片)"}
+                        title="點擊從主畫面中移除"
                       >
                         <Check className="size-2.5 group-hover:hidden" />
                         <X className="size-2.5 hidden group-hover:inline" />
@@ -276,44 +276,20 @@ export function CardManagerDropdown() {
             })}
           </div>
 
-          {/* 3. 底部快速預設與還原 */}
-          <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10px] font-mono">
-            <span className="text-muted-foreground">佈局重置：</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  applyLayoutPreset("default");
-                  setIsOpen(false);
-                }}
-                className="px-2 py-0.5 rounded bg-primary/15 hover:bg-primary text-primary hover:text-primary-foreground border border-primary/40 font-semibold transition-all cursor-pointer shadow-2xs"
-                title="恢復為定案之「量化戰情 T-Split (上下解耦 · 寬幅成交流)」"
-              >
-                T-Split (預設)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  applyLayoutPreset("tri");
-                  setIsOpen(false);
-                }}
-                className="px-1.5 py-0.5 rounded bg-secondary hover:bg-primary/20 hover:text-primary text-muted-foreground border border-border/60 transition-colors cursor-pointer"
-                title="主視野三分割 (左一右二)"
-              >
-                三分割
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  applyLayoutPreset("dual");
-                  setIsOpen(false);
-                }}
-                className="px-1.5 py-0.5 rounded bg-secondary hover:bg-primary/20 hover:text-primary text-muted-foreground border border-border/60 transition-colors cursor-pointer"
-                title="雙分欄佈局 (50:50)"
-              >
-                雙分欄
-              </button>
-            </div>
+          {/* 3. 底部定案標準重置 */}
+          <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10.5px]">
+            <span className="text-muted-foreground font-mono text-[10px]">定案排版架構</span>
+            <button
+              type="button"
+              onClick={() => {
+                applyLayoutPreset("tsplit");
+                setIsOpen(false);
+              }}
+              className="px-2.5 py-1 rounded text-[10.5px] font-medium bg-primary/15 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
+              title="將主畫面重置為定案之 5 卡標準戰情佈局"
+            >
+              重置為 5 卡標準版
+            </button>
           </div>
         </div>
       )}

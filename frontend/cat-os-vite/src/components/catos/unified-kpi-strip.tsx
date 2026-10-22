@@ -1,33 +1,31 @@
 import { Wallet, TrendingUp, Bot, Activity } from "lucide-react";
 import { useCatStore } from "@/state/catStore";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
 import { useI18n } from "@/lib/i18n";
 
 export function UnifiedKpiStrip() {
   const kpis = useCatStore((s) => s.kpis);
   const bots = useCatStore((s) => s.bots);
+  const liveMarket = useLiveMarketStore();
   const { t, language } = useI18n();
 
   // Compute live active bots count from authoritative queue
-  const runningBotsCount = bots.length > 0 ? bots.filter((b) => b.state === "running").length : (kpis?.running_bots_count ?? 4);
-  const totalBotsCount = bots.length > 0 ? bots.length : (kpis?.total_bots_count ?? 6);
+  const runningBotsCount = bots.length > 0 ? bots.filter((b) => b.state === "running").length : (kpis?.running_bots_count ?? 3);
+  const totalBotsCount = bots.length > 0 ? bots.length : (kpis?.total_bots_count ?? 4);
 
-  // Format Total Equity from store or fallback
-  const totalEquity = kpis?.total_equity && kpis.total_equity !== "--"
-    ? Number(kpis.total_equity).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : "12,482,114.05";
+  // Format Total Equity from liveMarketStore or kpis
+  const rawEquity = liveMarket?.totalEquity ?? (kpis?.total_equity && kpis.total_equity !== "--" ? Number(kpis.total_equity) : 48550.00);
+  const totalEquity = rawEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const equityDelta = kpis?.equity_change_pct ?? "↗ +0.47%";
+  const equityDelta = liveMarket?.todayPct ? `↗ +${liveMarket.todayPct.toFixed(2)}%` : (kpis?.equity_change_pct ?? "↗ +3.14%");
 
   // Format Today's PnL
-  const todayPnl = kpis?.today_pnl && kpis.today_pnl !== "--"
-    ? (Number(kpis.today_pnl) >= 0 ? `+${Number(kpis.today_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : Number(kpis.today_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-    : "+58,447.77";
+  const rawTodayPnl = liveMarket?.todayPnl ?? (kpis?.today_pnl && kpis.today_pnl !== "--" ? Number(kpis.today_pnl) : 1522.80);
+  const todayPnl = (rawTodayPnl >= 0 ? "+" : "") + rawTodayPnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const todayPnlPct = kpis?.today_pnl_pct && !kpis.today_pnl_pct.includes("NaN")
-    ? (kpis.today_pnl_pct.startsWith("+") || kpis.today_pnl_pct.startsWith("↗") ? kpis.today_pnl_pct : `↗ ${kpis.today_pnl_pct}`)
-    : "↗ +12.0%";
+  const todayPnlPct = liveMarket?.todayPct ? `↗ +${liveMarket.todayPct.toFixed(2)}%` : (kpis?.today_pnl_pct ?? "↗ +3.14%");
 
-  const botsNote = language === "zh-TW" ? "1 暫停 · 1 待關注" : "1 paused · 1 attention";
+  const botsNote = language === "zh-TW" ? "3 運行中 · 1 暫停" : "3 running · 1 paused";
 
   return (
     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
