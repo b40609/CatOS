@@ -1,6 +1,6 @@
-# CatOS (Quantitative Trading Operating System)
+# CatOS (Crypto Agent Trading OS)
 
-> **極簡、本機專用（Localhost-Only）的高精度量化交易作業系統與專業執行終端**  
+> **極簡、本機專用（Localhost-Only）的加密貨幣智慧體量化交易作業系統與專業執行終端**  
 > 專為 OKX 永續合約（USDT-M SWAP）與已收盤 K 線（Closed Bar）策略設計，具備全鏈路零浮點誤差（Strict Decimal Core）、嚴格進程安全隔離與機構級風控防線。
 
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
@@ -13,7 +13,7 @@
 
 ## 專案定位與核心理念
 
-**CatOS**（全名 **Quantitative Trading Operating System**，貓式極簡量化交易作業系統）旨在為專業量化交易員與個人自營交易（Prop Trading）打造一個**極低運維負擔、極高金融確定性**的單機量化交易與策略研究環境。
+**CatOS**（全名 **Crypto Agent Trading OS**，加密貨幣智慧體量化交易作業系統）旨在為專業量化交易員與個人自營交易（Prop Trading）打造一個**極低運維負擔、極高金融確定性**的單機智慧體量化交易與策略研究環境。
 
 系統徹底摒棄了微服務架構在個人本機環境帶來的肥大與脆弱性（**禁止 Docker、禁止 PostgreSQL、禁止 Redis**），僅依賴 **Python 3.11+**、**SQLite（WAL 模式）** 與現代化 **React 19 / TypeScript** 戰情前端。
 
