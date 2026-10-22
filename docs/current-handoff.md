@@ -1,25 +1,52 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-22 21:50 (UTC+8；卡片 Tab 堆疊 Container 與右側折疊檢驗抽屜 Inspector Drawer 落地實作，tsc 與 vite build 0 錯誤通過，8890 主戰情台與 8887 預覽台背景常駐運行熱更新，等待使用者於瀏覽器親自驗收與微調)
+**更新時間**：2026-10-22 22:55 (UTC+8；徹底刪除頁面底座狀態列 Grounded Footer 與右側 Inspector 抽屜，畫面釋放垂直與水平 100% 空間，Zero-Waste 純粹高密度呈現，tsc 與 vite build 0 錯誤通過，8890 與 8887 常駐運行中)
 **當前負責者**：前端視覺與互動開發者 (Antigravity) · 獨立驗收者 (GPT-6 Sol)
 **工作目錄**：C:/Users/user/Desktop/CatOS_Astra
 **Git 分支**：`feature/catos-react-vite`
-**下一成果**：使用者親至 8890 / 8887 網頁驗收 Tab 堆疊與右側抽屜體感，依回饋微調後固化。
+**下一成果**：使用者親至 8890 / 8887 網頁驗收純淨滿版無底部狀態列的交易台體驗。
 
 ---
 
-## 前端核心互動升級：卡片 Tab 堆疊與右側折疊檢驗抽屜（2026-10-22）
-1. **卡片 Tab 堆疊 (Tabbed Container)**：
-   - 多卡時動態渲染 26px 標籤列，具備選中指示線、獨立 X 關閉、+ 號單點堆疊下拉選單。
-   - 單卡時 0 額外高度浪費（Zero-Waste）。
-   - 拖曳放置命中卡片中央 40% 區間時判定為 center（Dock as Tab），外圍邊界維持二元空間分割。
-2. **右側折疊式檢驗抽屜 (Inspector Drawer)**：
-   - 常駐 36px 垂直微型 Rail，點擊或按 Ctrl+B / Ctrl+1~4 滑出 380px 推擠式無遮罩抽屜，盤面等比縮放實時跳動。
-   - 4 大審計視圖：🤖 Bot（五階段鏈與掛單連動）、🛡️ P6（OKX CEIL 停損取整）、⚖️ R1（台北日固定基準 E0 與日損緩衝）、⚡ 撮合（逐筆成交流水與滑價偏離）。
-3. **驗證與運行狀態**：
-   - 8890 主戰情台與 8887 預覽台常駐熱更。
+## 頁面底座收斂：徹底刪除 Grounded Footer 狀態列（2026-10-22）
+1. **依指示徹底移除頁面底部狀態列（Grounded Footer Purge）**：
+   - 在 [shell.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/shell.tsx) 中徹底移除 `footer` 元素及其回放進度綁定。
+   - 釋放垂直高度，杜絕非必要的心跳列與回放進度條佔位，全螢幕每一像素皆服務於量化核心交易數據。
+2. **驗證與運行狀態**：
+   - 8890 主戰情台與 8887 預覽台背景常駐運行熱更。
    - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
-   -
+
+---
+
+## 前端核心收斂：徹底移除右側檢驗抽屜（Inspector Drawer Purge）
+1. **依指示徹底移除右側抽屜（Zero-Waste 零浪費純資料密度）**：
+   - 移除常駐的 36px 垂直微型錨定條 (Inspector Rail)。
+   - 移除推擠式 380px 檢驗抽屜 (Inspector Drawer) 與主工作區之寬度擠壓。
+   - 主工作區 Layout Tree 恢復 100% 滿版無干擾寬度。
+   - 保留卡片 Tab 堆疊 (Tabbed Container) 與 Bot 表格內行內展開能力。
+2. **驗證與運行狀態**：
+   - 8890 主戰情台與 8887 預覽台背景常駐運行熱更。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
+
+---
+
+## 資產曝險卡片定案固化：TradingView 極簡甜甜圈 C 參數（2026-10-22）
+1. **定案參數固化（Solidify）**：
+   - `donutRatio: 51`（左側圓環寬度佔比 51%，右側資訊棧 49%）
+   - `radius: 66`（圓環外半徑 66px，大氣舒展）
+   - `strokeWidth: 10`（精緻雅緻 10px 環身）
+   - `sliceGap: 2`（2px 物理微隙）
+   - `hudFontSize: 28`（28px TradingView 醒目 Hero 主數值）
+   - `hudYOffset: -13`（-13px 垂直位移完美置中與右側資訊棧齊平）
+   - `barHeight: 3`（3px 極簡微軌道）
+   - `limitMarkLength: 0`（完全隱藏 50% 冗餘刻度，保持純淨）
+2. **除錯分支與臨時控制徹底刪除（Purge on Decision）**：
+   - 依「定案固化 SOP」徹底刪除候選模式切換（A 膠囊容量、B 半圓儀表、D 多空標尺）及冗餘資料計算。
+   - 徹底刪除 8 大滑桿微調面板、預設按鈕、複製/重置按鈕與相關 localStorage 狀態。
+   - 程式碼自 1417 行精簡至 234 行，零冗餘純粹高密度呈現。
+3. **驗證與運行狀態**：
+   - 8890 主戰情台與 8887 預覽台背景常駐運行熱更。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
 
 
 ## 散戶 v1 精簡與 R1 定案（2026-10-20）
