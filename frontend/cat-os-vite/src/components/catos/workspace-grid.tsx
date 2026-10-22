@@ -14,7 +14,6 @@ import type { LayoutNode, DropPosition } from "@/lib/layout-tree/types";
 import { ALL_CARDS } from "./card-registry";
 import { LayoutGrid, Plus, ArrowRight, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InspectorDrawer } from "./inspector/inspector-drawer";
 
 interface WorkspaceGridProps {
   renderCard: (cardId: CardId) => ReactNode;
@@ -333,9 +332,6 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
           <EmptyWorkspacePrompt />
         )}
       </div>
-
-      {/* 右側折疊式檢驗抽屜 (Inspector Drawer · 36px Rail + 380px/480px 推擠式抽屜) */}
-      <InspectorDrawer />
     </div>
   );
 }

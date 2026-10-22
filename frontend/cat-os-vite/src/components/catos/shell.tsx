@@ -98,7 +98,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
   const [isResizing, setIsResizing] = useState(false);
 
   // 啟動全域撮合心跳與資金費率倒數 (1 秒 1 Tick 驅動 10 分鐘真實微觀行情循環帶)
-  const { triggerManualTick, decrementCountdown, isRunning, tapeProgress } = useLiveMarketStore();
+  const { triggerManualTick, decrementCountdown, isRunning } = useLiveMarketStore();
   useEffect(() => {
     if (!isRunning) return;
     const tickTimer = setInterval(() => {
@@ -366,19 +366,6 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
         </header>
 
         <main className="w-full p-3 lg:p-4">{children}</main>
-
-        {/* 頁面底座 Grounded Footer */}
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-[10px] text-muted-foreground lg:px-6">
-          <div className="flex items-center gap-2">
-            <PulseBeacon size={4.5} />
-            <span>OKX SWAP WebSocket <span className="num font-medium text-foreground/80">14ms</span></span>
-            <span className="mx-1 text-border">|</span>
-            <span>Supervisor IPC <span className="num font-medium text-foreground/80">&lt;1ms</span></span>
-            <span className="mx-1 text-border">|</span>
-            <span>10M 微觀行情回放 <span className="num font-mono text-primary font-medium">{tapeProgress}</span></span>
-          </div>
-          <div>catOS Terminal · {t("simulated_data")}</div>
-        </footer>
       </div>
 
       {/* 全域快捷指令台 (Ctrl + K) */}
