@@ -1,10 +1,11 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-22 22:55 (UTC+8；徹底刪除頁面底座狀態列 Grounded Footer 與右側 Inspector 抽屜，畫面釋放垂直與水平 100% 空間，Zero-Waste 純粹高密度呈現，tsc 與 vite build 0 錯誤通過，8890 與 8887 常駐運行中)
+**更新時間**：2026-10-22 23:18 (UTC+8；GitHub 倉庫名稱正式重命名為 CatOS，公開網址 https://github.com/b40609/CatOS，本地 remote 同步對齊，8890 與 8887 常駐運行中)
 **當前負責者**：前端視覺與互動開發者 (Antigravity) · 獨立驗收者 (GPT-6 Sol)
 **工作目錄**：C:/Users/user/Desktop/CatOS_Astra
-**Git 分支**：`feature/catos-react-vite`
-**下一成果**：使用者親至 8890 / 8887 網頁驗收純淨滿版無底部狀態列的交易台體驗。
+**GitHub 倉庫**：https://github.com/b40609/CatOS (Public)
+**Git 分支**：`feature/catos-react-vite` / `main`
+**下一成果**：提供 GitHub 網址給 HR 檢視。
 
 ---
 
