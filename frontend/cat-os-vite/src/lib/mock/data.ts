@@ -433,7 +433,7 @@ const LOG_POOL: { level: LogLevel; source: string; message: string }[] = [
   { level: "INFO", source: "engine", message: "rebalance check complete drift=0.8% within band" },
   { level: "WARN", source: "risk", message: "exposure SOL-USDT-SWAP 42.8% approaching budget limit 50.0%" },
   { level: "WARN", source: "feed", message: "market data gap detected symbol=SOL-USDT-SWAP recovered=2 ticks" },
-  { level: "WARN", source: "exec", message: "partial fill BTC-USDT-SWAP 0.12/0.35 tag=41cb53c54d6dABDE — retrying" },
+  { level: "WARN", source: "exec", message: "partial fill BTC-USDT-SWAP 0.45/0.85 tag=41cb53c54d6dABDE — retrying" },
   { level: "ERROR", source: "feed", message: "websocket okx: heartbeat timeout after 5000ms, reconnecting (attempt 2)" },
   { level: "ERROR", source: "exec", message: "order rejected reason=insufficient_margin bot=CAT-04" },
   { level: "TRADE", source: "exec", message: "FILL ETH-USDT-SWAP SELL 2.5000 @ 3,412.80 tag=41cb53c54d6dABDE bot=CAT-02" },

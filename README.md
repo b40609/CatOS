@@ -2,6 +2,12 @@
 
 新對話先讀[目前接續入口](docs/current-handoff.md)，確認階段、待決政策、分工與授權；詳細歷史留在各切片文件。
 
+2026-10-19 後端研究新增[參數鄰域穩定度與滾動樣本外驗證](docs/research-validation.md)：有界完整格點、固定訓練選參後測 OOS、獨立視窗及 Decimal JSON，初輪開發自測含必要回歸 48/48 通過，待指定角色獨驗。合成範例 `py -3 -B -m examples.research_validation_demo`；OOS 視窗不是連續投資組合績效。
+
+同日接續完成[分市場環境評估](docs/research-regimes.md)：明示趨勢／震盪與波動規則，用前一根收盤標籤歸屬當根估值損益，保留未知、樣本數及成本。26 項專屬＋40 項必要回歸，66/66 開發自測通過，待指定角色獨驗；合成範例 `py -3 -B -m examples.research_regimes_demo`。未改前端或原選參／回測行為。
+
+同日第三個工作包完成[研究驗證封存與後端查詢](docs/research-validation-api.md)：POST `/api/research/validations` 沿用單一 writer，保存各窗穩定區／OOS／分環境結果及來源快照，透過既有 runs／result／report API 查詢。126/126 開發自測通過，待指定角色獨驗；未改前端、MCP 送出工具、DB schema 或正式服務，實際服務尚未載入新版本。
+
 2026-10-01 W2／W3 已由指定 5.6 Sol (Web) 獨立驗收，分別 50/50、33/33 PASS；W4 已將 W2／W3 載入正式 8770，限定啟停驗收 PASS。W5 已完成正式 UI 單次 start、reload 後持續至自然 completed，並依使用者本次例外授權由 6.1 Sol 限定唯讀獨立驗收 PASS（原始證據 41 項斷言）。8771 preview 保留原 owner，不掛 simulation mutation。以上為既有驗收紀錄；本次收尾另獲 6.1 Sol 三片本機提交授權，未重跑案例、測試或 R4，未重啟服務或 push。詳見 [W2](docs/local-sim-bot-control-w2-handoff-20261001.md)／[W3](docs/local-sim-bot-control-w3-handoff-20261001.md)／[W4](docs/local-sim-bot-control-w4-handoff-20261001.md)／[W5 獨立驗收](docs/local-sim-bot-control-w5-acceptance-20261001.md)。
 
 正式工作台入口：在本目錄執行 `powershell -ExecutionPolicy Bypass -File scripts/start-research.ps1`（或 `python -B -m catos.workspace_api`），開啟 `http://127.0.0.1:8770/`。Gemini 首頁、六頁工作台與研究 API 共用同一 ResearchService／writer，無須 8771 預覽。舊研究頁保留於 `/research/`，舊 F1 工作台保留於 `/workspace/legacy`。更新程式前先等研究任務完成，於啟動終端按 Ctrl+C 再重啟；8770 被占用時直接退出，不自動停其他程序。下列 R1／R2 啟動方式為歷史紀錄，日常使用以上正式入口。

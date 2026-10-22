@@ -131,6 +131,12 @@ class ResearchService:
         snapshot, _, _ = validate_optimization_request(request)
         return self._submit(snapshot, build_id, "optimization")
 
+    def submit_validation(self, request, build_id):
+        from catos.research_validation_job import validate_validation_request
+
+        snapshot, *_ = validate_validation_request(request)
+        return self._submit(snapshot, build_id, "validation")
+
     def _submit(self, snapshot, build_id, kind):
         with self._guard:
             if self._closing or self._owner_file is None:
@@ -154,13 +160,15 @@ class ResearchService:
             self._active = run_id
             self._thread = threading.Thread(target=self._execute, args=(envelope, status), daemon=False)
             self._thread.start()
-            return dict(status)
+            # A caller must not mutate the live task's request/provenance through
+            # nested objects in the submission reply.
+            return json.loads(json_text(status))
 
     def _compute(self, envelope):
         # Only benign OS bootstrap variables. No inherited API credentials, user
         # profile, proxy, Python hooks, clients, signer, or database write handle.
         environment = {key: os.environ[key] for key in ("SystemRoot", "WINDIR") if key in os.environ}
-        if envelope.get("kind") == "optimization":
+        if envelope.get("kind") in ("optimization", "validation"):
             import importlib.util
 
             packaging_spec = importlib.util.find_spec("packaging")

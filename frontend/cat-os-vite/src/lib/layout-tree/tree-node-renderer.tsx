@@ -4,13 +4,21 @@ import { TreeSplitter } from "./tree-splitter";
 import {
   CARD_TITLES,
   type CardId,
+  useLayoutStore,
 } from "@/state/layoutStore";
 import type {
   LayoutNode,
   LeafNode,
 } from "./types";
-import { useLayoutStore } from "@/state/layoutStore";
 import { CardSlotContext } from "./card-slot-context";
+import { X, Plus } from "lucide-react";
+import { ALL_CARDS } from "@/components/catos/card-registry";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface TreeNodeRendererProps {
   node: LayoutNode;
@@ -88,6 +96,43 @@ interface LeafCardPaneProps extends TreeNodeRendererProps {
   leaf: LeafNode;
 }
 
+function TabAddDropdown({ leafId, currentTabs }: { leafId: string; currentTabs: CardId[] }) {
+  const addTabToLeafNode = useLayoutStore((s) => s.addTabToLeafNode);
+  const availableCards = ALL_CARDS.filter((c) => !currentTabs.includes(c.id));
+
+  if (availableCards.length === 0) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-no-drag
+          className="p-1 rounded hover:bg-surface/60 text-muted-foreground hover:text-primary transition-colors cursor-pointer shrink-0"
+          title="加入分頁標籤 (Tab Dock)"
+        >
+          <Plus className="size-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 bg-surface/95 border-border backdrop-blur-md">
+        <div className="px-2 py-1 text-[10px] font-mono text-muted-foreground border-b border-border/60">
+          堆疊分頁至此視窗 (Tab Dock)
+        </div>
+        {availableCards.map((card) => (
+          <DropdownMenuItem
+            key={card.id}
+            onClick={() => addTabToLeafNode(leafId, card.id)}
+            className="flex items-center gap-2 text-xs font-mono cursor-pointer hover:bg-primary/10 hover:text-primary"
+          >
+            <card.icon className="size-3.5 text-primary shrink-0" />
+            <span>{card.nameZh}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function LeafCardPane({
   leaf,
   isResizing,
@@ -98,6 +143,11 @@ function LeafCardPane({
   const containerRef = useRef<HTMLDivElement>(null);
   const seamStyle = useLayoutStore((s) => s.seamStyle);
   const replaceLeafNode = useLayoutStore((s) => s.replaceLeafNode);
+  const switchLeafTabNode = useLayoutStore((s) => s.switchLeafTabNode);
+  const removeTabFromLeafNode = useLayoutStore((s) => s.removeTabFromLeafNode);
+
+  const tabs = leaf.tabs && leaf.tabs.length > 1 ? leaf.tabs : null;
+  const activeCardId = leaf.activeTab || leaf.cardId;
   const isDraggingThis = draggingLeafId === leaf.id;
 
   // 1. 如果此節點為「實時流體落位預演槽 (Live Landing Slot)」
@@ -197,14 +247,14 @@ function LeafCardPane({
       // 容錯處理：若瀏覽器不支援 setPointerCapture 則靜默略過
     }
 
-    onStartDrag(leaf.id, leaf.cardId, e);
+    onStartDrag(leaf.id, activeCardId, e);
   };
 
   return (
     <div
       ref={containerRef}
       data-leaf-id={leaf.id}
-      data-card-id={leaf.cardId}
+      data-card-id={activeCardId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
       onPointerDown={handlePointerDown}
@@ -218,15 +268,55 @@ function LeafCardPane({
         isDraggingThis && "opacity-35 border-2 border-dashed border-primary/70 ring-1 ring-primary/30"
       )}
     >
+      {/* 若為多卡 Tab 容器：頂部渲染 28px 高質感緊湊標籤列 */}
+      {tabs && (
+        <div className="flex items-center justify-between px-2 py-1 bg-secondary/80 border-b border-border/80 shrink-0 select-none overflow-x-auto no-scrollbar gap-1 z-10">
+          <div className="flex items-center gap-1 min-w-0">
+            {tabs.map((tabId) => {
+              const isActive = tabId === activeCardId;
+              const meta = CARD_TITLES[tabId];
+              return (
+                <div
+                  key={tabId}
+                  onClick={() => switchLeafTabNode(leaf.id, tabId)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono cursor-pointer transition-all border",
+                    isActive
+                      ? "bg-surface/95 text-foreground font-semibold border-primary/50 shadow-2xs relative after:absolute after:bottom-0 after:left-1.5 after:right-1.5 after:h-[1.5px] after:bg-primary"
+                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-surface/40 border-transparent"
+                  )}
+                >
+                  <span className="text-xs">{meta?.icon || "📄"}</span>
+                  <span className="truncate max-w-[120px]">{meta?.zh?.split(" ")[0] || tabId}</span>
+                  <button
+                    type="button"
+                    data-no-drag
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeTabFromLeafNode(leaf.id, tabId);
+                    }}
+                    className="ml-0.5 p-0.5 rounded hover:bg-destructive/20 hover:text-destructive text-muted-foreground/60 transition-colors"
+                    title="關閉分頁"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <TabAddDropdown leafId={leaf.id} currentTabs={tabs} />
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden [&_.panel]:border-0 [&_.panel]:rounded-none [&_.panel]:bg-transparent [&_.panel]:backdrop-blur-none [&_.panel]:shadow-none">
         <CardSlotContext.Provider
           value={{
             leafId: leaf.id,
-            cardId: leaf.cardId,
+            cardId: activeCardId,
             replaceCard: (newCardId) => replaceLeafNode(leaf.id, newCardId),
           }}
         >
-          {renderCard(leaf.cardId)}
+          {renderCard(activeCardId)}
         </CardSlotContext.Provider>
       </div>
     </div>

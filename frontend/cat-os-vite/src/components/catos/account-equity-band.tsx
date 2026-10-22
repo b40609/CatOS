@@ -9,12 +9,14 @@ import {
   toneOf,
   accountSeries,
   summarize,
-  accountSnapshot,
   INITIAL_BOTS,
   type Period,
 } from "@/lib/v0-engine";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
+import { NumberTicker } from "./motion/number-ticker";
+import { BorderBeam } from "./motion/border-beam";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
 
 interface AccountEquityBandProps {
   className?: string;
@@ -33,9 +35,17 @@ export function AccountEquityBand({
   const [chartHeight, setChartHeight] = useState(240);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
-  // 1. 取得帳戶整體 Series 與當前週期摘要
+  // 1. 取得即時市場撮合與帳戶波動 Store
+  const {
+    equity,
+    todayPnl,
+    todayPct,
+    totalUpnl,
+    realized,
+  } = useLiveMarketStore();
+
+  // 取得帳戶整體 Series 與當前週期摘要
   const totalSeries = useMemo(() => accountSeries(INITIAL_BOTS), []);
-  const snap = useMemo(() => accountSnapshot(INITIAL_BOTS), []);
   const periodSum = useMemo(() => summarize(totalSeries, period), [totalSeries, period]);
 
   // 2. 自適應容器寬高 ResizeObserver (雙向響應式，根除高度硬編碼)
@@ -147,7 +157,7 @@ export function AccountEquityBand({
         <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
           <CardHeaderTitle
             cardId="equity"
-            title="帳戶權益 (Equity & Drawdown)"
+            title="帳戶權益與損益"
           />
 
           <div className="flex items-center gap-2">
@@ -174,26 +184,35 @@ export function AccountEquityBand({
       )}
 
       {/* 2. 定案方案 B：Bloomberg AIM / TradingView (左側緊湊對齊側欄 + 右側 100% 自適應走勢圖) */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+          {/* 邊界微光流動 (Magic UI Border Beam) */}
+          <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
+
           {/* 左側緊湊 KPI 欄位 (移除 justify-between 撕裂，改為頂部自然緊湊對齊) */}
           <div className="w-[195px] shrink-0 p-2.5 border-r border-border/80 flex flex-col gap-2 overflow-y-auto bg-surface/30">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">帳戶權益</span>
+              <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
+                <span>帳戶權益</span>
+                <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  即時撮合中
+                </span>
+              </span>
               <div className="font-mono text-2xl font-bold text-foreground tracking-tight">
-                {formatUsd(snap.equity)}
+                <NumberTicker value={equity} prefix="$" decimals={2} />
               </div>
-              <div className={cn("font-mono text-[11px] font-semibold", toneOf(snap.totalPnl))}>
-                {formatUsd(snap.totalPnl, true)} ({formatPct((snap.totalPnl / snap.capital) * 100)})
+              <div className={cn("font-mono text-[11px] font-semibold", toneOf(todayPnl))}>
+                <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} /> ({todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`})
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] text-muted-foreground">今日損益</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(snap.todayPnl))}>
-                  {formatUsd(snap.todayPnl, true)}
+                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(todayPnl))}>
+                  <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} />
                 </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{formatPct(snap.todayPct)}</span>
+                <span className="text-[9.5px] text-muted-foreground font-mono">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
               </div>
 
               <div className="flex flex-col gap-0.5">
@@ -206,16 +225,16 @@ export function AccountEquityBand({
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] text-muted-foreground">未實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(snap.upnl))}>
-                  {formatUsd(snap.upnl, true)}
+                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(totalUpnl))}>
+                  <NumberTicker value={Math.abs(totalUpnl)} prefix={totalUpnl >= 0 ? "+$" : "-$"} decimals={2} />
                 </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{snap.positionsCount} 筆部位</span>
+                <span className="text-[9.5px] text-muted-foreground font-mono">3 筆持倉聯動</span>
               </div>
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-[10px] text-muted-foreground">已實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(snap.realized))}>
-                  {formatUsd(snap.realized, true)}
+                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(realized))}>
+                  {formatUsd(realized, true)}
                 </span>
                 <span className="text-[9.5px] text-muted-foreground font-mono">OKX-SWAP</span>
               </div>

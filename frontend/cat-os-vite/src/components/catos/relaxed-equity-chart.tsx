@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
 
 export type DashboardRange = "1D" | "7D" | "30D" | "YTD";
 
@@ -13,10 +14,10 @@ const rangeDays: Record<DashboardRange, number> = {
 };
 
 const rangeReturns: Record<DashboardRange, number> = {
-  "1D": 0.0047,
-  "7D": 0.0382,
-  "30D": 0.1246,
-  YTD: 0.348,
+  "1D": 0.0314,
+  "7D": 0.0825,
+  "30D": 0.1680,
+  YTD: 0.4250,
 };
 
 interface RelaxedEquityChartProps {
@@ -29,10 +30,11 @@ export function RelaxedEquityChart({
   defaultRange = "30D",
 }: RelaxedEquityChartProps) {
   const [selectedRange, setSelectedRange] = useState<DashboardRange>(defaultRange);
+  const liveEquity = useLiveMarketStore((s) => s.totalEquity) ?? 48550.0;
 
-  // 1:1 精確復刻 8899 的數學公式與時間序列
+  // 1:1 精確連動帳戶真實權益規模
   const series = useMemo(() => {
-    const end = 12_483_920;
+    const end = liveEquity;
     const start = end / (1 + rangeReturns[selectedRange]);
     let peak = start;
     const count = 72;
@@ -79,7 +81,7 @@ export function RelaxedEquityChart({
       out.push({ label, equity, drawdown, x, yEq, yDd });
     }
     return out;
-  }, [selectedRange]);
+  }, [selectedRange, liveEquity]);
 
   const returnPctText = useMemo(() => {
     const ret = rangeReturns[selectedRange] * 100;
@@ -162,7 +164,7 @@ export function RelaxedEquityChart({
         <div>
           <div className="flex items-baseline gap-1.5">
             <span className="font-mono text-xl font-medium tracking-tight text-foreground">
-              12,483,920.00
+              {liveEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">USDT</span>
           </div>
@@ -224,7 +226,7 @@ export function RelaxedEquityChart({
               fontSize="9"
               fontFamily="var(--font-mono)"
             >
-              12.6M
+              {((liveEquity * 1.05) / 1000).toFixed(0)}K
             </text>
 
             <line
@@ -244,7 +246,7 @@ export function RelaxedEquityChart({
               fontSize="9"
               fontFamily="var(--font-mono)"
             >
-              12.2M
+              {((liveEquity * 1.00) / 1000).toFixed(0)}K
             </text>
 
             <line
@@ -264,7 +266,7 @@ export function RelaxedEquityChart({
               fontSize="9"
               fontFamily="var(--font-mono)"
             >
-              11.8M
+              {((liveEquity * 0.95) / 1000).toFixed(0)}K
             </text>
 
             <line
@@ -284,7 +286,7 @@ export function RelaxedEquityChart({
               fontSize="9"
               fontFamily="var(--font-mono)"
             >
-              11.5M
+              {((liveEquity * 0.90) / 1000).toFixed(0)}K
             </text>
 
             {/* Y 軸右側回撤刻度標籤 (0% 與 -4%) */}

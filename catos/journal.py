@@ -472,10 +472,17 @@ class Journal:
             previous = self.risk_state()
             if state.seq < previous.seq or state.epoch < previous.epoch or not previous.reasons <= state.reasons:
                 raise JournalError("risk state cannot move backwards")
+            if (previous.basis_established_day is not None and
+                    (state.basis_established_day is None or state.basis_established_day < previous.basis_established_day)):
+                raise JournalError("established basis marker cannot move backwards")
+            if ((state.basis is not None and state.basis.source == risk.RISK_PERIOD_SOURCE)
+                    or (previous.basis is not None and previous.basis.source == risk.RISK_PERIOD_SOURCE)):
+                if state.basis != previous.basis:
+                    raise JournalError("R1 basis requires qualified single-writer commit")
             self._write_risk(state)
 
     def commit_day_basis(self, basis: risk.DayBasis, day_context: risk.DayContext,
-                         in_flight_reasons: frozenset[str] = frozenset()):
+                         in_flight_reasons: frozenset[str] = frozenset(), period_observation=None):
         if self.risk_limits is None:
             raise JournalError("risk mode is not enabled")
         if not isinstance(basis, risk.DayBasis):
@@ -492,12 +499,44 @@ class Journal:
                 raise JournalError("day basis cannot move backwards")
             if state.basis is not None and state.basis.day == basis.day:
                 if state.basis == basis:
-                    return state
+                    updated = risk.halt(state, in_flight_reasons)
+                    if updated != state:
+                        self._write_risk(updated)
+                    return updated
                 raise JournalError("fixed day basis cannot be replaced")
+            if state.basis_established_day is not None and basis.day <= state.basis_established_day:
+                raise JournalError("previously established basis is missing; recovery required")
+            if basis.source == risk.RISK_PERIOD_SOURCE:
+                from catos import risk_period, reconciliation_gate
+                if period_observation is None:
+                    raise JournalError("R1 requires qualified local observation")
+                report, classifications, policy, freshness, bot_id = period_observation
+                if (policy.checked_at_ms != day_context.target_time_ms
+                        or risk_period.candidate(report, self.account_id) != basis
+                        or basis.evidence.observed_at_ms > day_context.target_time_ms):
+                    raise JournalError("R1 observation does not match trusted current context")
+                # Legacy state can have responsibility without the new JSON marker.
+                for row in self.connection.execute("SELECT p.input_json FROM intents i JOIN inputs p USING(bot_id,seq) WHERE i.disposition='RESERVED_SIMULATION'"):
+                    payload = json.loads(row[0])["payload"]
+                    stamp = payload["account"]["time_ms"]
+                    if risk.taipei_day(stamp) == basis.day:
+                        raise JournalError("same-day execution responsibility has no basis")
+                if (state.basis is None and state.seq and risk.taipei_day(state.time_ms) == basis.day
+                        and self.connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='execution_orders'").fetchone()
+                        and self.connection.execute("SELECT 1 FROM execution_orders LIMIT 1").fetchone()):
+                    raise JournalError("execution responsibility has no basis")
+                projected, ledger = risk_period.project(report, basis, classifications)
+                snapshot = self._reconciliation_snapshot_in_transaction(bot_id)
+                gate = reconciliation_gate.evaluate(projected, snapshot,
+                    revision_before=snapshot.bot_revision, revision_after=snapshot.bot_revision,
+                    freshness_policy=policy, freshness_evidence=freshness, day_ledger=ledger)
+                if not gate.reconciled:
+                    raise JournalError("R1 observation unqualified: " + ",".join(gate.blockers))
             combined_reasons = state.reasons | set(in_flight_reasons)
             if combined_reasons - state.reasons:
                 state = risk.halt(state, combined_reasons)
-            updated = replace(state, basis=basis, epoch=state.epoch + 1)
+            updated = replace(state, basis=basis, basis_established_day=basis.day,
+                              basis_blocked_day=None, epoch=state.epoch + 1)
             self._write_risk(updated)
             return updated
 
@@ -661,26 +700,32 @@ class Journal:
 
     def reconciliation_snapshot(self, bot_id):
         """Pin one read-only WAL snapshot of durable local exchange responsibility."""
-        from catos.reconciliation_gate import ownership_snapshot_from_rows
         if self.connection.in_transaction:
             raise JournalError("reconciliation snapshot requires an idle writer")
         self.connection.execute("BEGIN DEFERRED")
         try:
-            bot, owner = self._require_owner(bot_id)
-            rows = tuple(dict(row) for row in self.connection.execute(
-                "SELECT * FROM execution_orders WHERE bot_id=? ORDER BY rowid", (bot_id,)))
-            protection = self.protection.state(bot_id)
-            position = (None if owner["position"] is None
-                        else ipc.decimal_text(owner["position"], "owned position", derived=True))
-            return ownership_snapshot_from_rows(
-                bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
-                local_position=position, owner_reconciled_revision=owner["reconciled_revision"],
-                fills_reconciled=bool(owner["fills_reconciled"]), isolated=bool(bot["isolated"]),
-                execution_rows=rows, protection=protection,
-                remote_position_id=owner["remote_pos_id"])
+            return self._reconciliation_snapshot_in_transaction(bot_id)
         finally:
             if self.connection.in_transaction:
                 self.connection.rollback()
+
+    def _reconciliation_snapshot_in_transaction(self, bot_id):
+        """Read responsibility inside the caller's pinned read/write transaction."""
+        from catos.reconciliation_gate import ownership_snapshot_from_rows
+        if not self.connection.in_transaction:
+            raise JournalError("reconciliation snapshot requires a pinned transaction")
+        bot, owner = self._require_owner(bot_id)
+        rows = tuple(dict(row) for row in self.connection.execute(
+            "SELECT * FROM execution_orders WHERE bot_id=? ORDER BY rowid", (bot_id,)))
+        protection = self.protection.state(bot_id)
+        position = (None if owner["position"] is None
+                    else ipc.decimal_text(owner["position"], "owned position", derived=True))
+        return ownership_snapshot_from_rows(
+            bot_id=bot_id, bot_revision=bot["revision"], inst_id=bot["inst_id"],
+            local_position=position, owner_reconciled_revision=owner["reconciled_revision"],
+            fills_reconciled=bool(owner["fills_reconciled"]), isolated=bool(bot["isolated"]),
+            execution_rows=rows, protection=protection,
+            remote_position_id=owner["remote_pos_id"])
 
     def position_bootstrap_lineage(self, bot_id):
         """Pin durable local fills that can prove a first remote position identity."""

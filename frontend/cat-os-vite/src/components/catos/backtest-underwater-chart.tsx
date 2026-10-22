@@ -11,65 +11,51 @@ import {
 import { TrendingUp, AlertTriangle, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// 合成 30 天的回測淨值與水下載回撤數據
-const BACKTEST_CURVE_DATA = [
-  { date: "09/01", equity: 10000, dd: 0.0 },
-  { date: "09/03", equity: 10240, dd: 0.0 },
-  { date: "09/05", equity: 10180, dd: -0.58 },
-  { date: "09/07", equity: 10450, dd: 0.0 },
-  { date: "09/09", equity: 10320, dd: -1.24 },
-  { date: "09/11", equity: 10150, dd: -2.87 },
-  { date: "09/13", equity: 10015, dd: -4.15 }, // Max Drawdown Peak
-  { date: "09/15", equity: 10350, dd: -0.95 },
-  { date: "09/17", equity: 10580, dd: 0.0 },
-  { date: "09/19", equity: 10820, dd: 0.0 },
-  { date: "09/21", equity: 10740, dd: -0.74 },
-  { date: "09/23", equity: 11100, dd: 0.0 },
-  { date: "09/25", equity: 11350, dd: 0.0 },
-  { date: "09/27", equity: 11240, dd: -0.97 },
-  { date: "09/29", equity: 11680, dd: 0.0 },
-  { date: "09/30", equity: 11842, dd: 0.0 },
-];
+// Real curve interfaces and empty state support
 
-const MONTHLY_MATRIX = [
-  {
-    year: "2026",
-    months: [
-      { m: "1月", v: 3.42 },
-      { m: "2月", v: 2.15 },
-      { m: "3月", v: -1.04 },
-      { m: "4月", v: 4.80 },
-      { m: "5月", v: -0.62 },
-      { m: "6月", v: 3.12 },
-      { m: "7月", v: 2.85 },
-      { m: "8月", v: -1.45 },
-      { m: "9月", v: 6.20 },
-      { m: "10月", v: 1.84 },
-    ],
-    ytd: 23.45,
-  },
-  {
-    year: "2025",
-    months: [
-      { m: "1月", v: 4.10 },
-      { m: "2月", v: -2.30 },
-      { m: "3月", v: 5.60 },
-      { m: "4月", v: 1.20 },
-      { m: "5月", v: 3.40 },
-      { m: "6月", v: -0.90 },
-      { m: "7月", v: 4.50 },
-      { m: "8月", v: 2.10 },
-      { m: "9月", v: -1.80 },
-      { m: "10月", v: 3.90 },
-      { m: "11月", v: 6.40 },
-      { m: "12月", v: 2.50 },
-    ],
-    ytd: 31.80,
-  },
-];
+export interface BacktestUnderwaterChartProps {
+  equityCurve?: { time_ms: number; equity: string }[];
+  drawdownCurve?: { time_ms: number; drawdown_pct: string }[];
+  currentEquity?: string;
+  returnPct?: string;
+  maxDrawdownPct?: string;
+  dataNotice?: string;
+  loading?: boolean;
+}
 
-export function BacktestUnderwaterChart() {
+export function BacktestUnderwaterChart({
+  equityCurve,
+  drawdownCurve,
+  currentEquity,
+  returnPct,
+  maxDrawdownPct,
+  dataNotice,
+  loading = false,
+}: BacktestUnderwaterChartProps = {}) {
   const [activeTab, setActiveTab] = useState<"curve" | "heatmap">("curve");
+
+  const hasData = Array.isArray(equityCurve) && equityCurve.length > 0;
+
+  // Format real curves if provided
+  const chartData = hasData
+    ? equityCurve.map((point, index) => {
+        const ddPoint = drawdownCurve && drawdownCurve[index];
+        const ddVal = ddPoint ? -Math.abs(parseFloat(ddPoint.drawdown_pct) || 0) : 0;
+        const d = new Date(point.time_ms);
+        const timeLabel = isNaN(d.getTime())
+          ? `#${index + 1}`
+          : `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+        return {
+          date: timeLabel,
+          equity: parseFloat(point.equity) || 0,
+          dd: ddVal,
+        };
+      })
+    : [];
+
+  const displayEquity = currentEquity || "--";
+  const displayReturn = returnPct ? `${parseFloat(returnPct) >= 0 ? '+' : ''}${returnPct}%` : "--";
+  const displayMaxDd = maxDrawdownPct ? `-${Math.abs(parseFloat(maxDrawdownPct))}%` : "--";
 
   return (
     <div className="rounded-xl border border-border/80 bg-surface/90 overflow-hidden shadow-xs backdrop-blur-md">
@@ -81,7 +67,7 @@ export function BacktestUnderwaterChart() {
             回測深度量化分析 (Quant Equity & Underwater)
           </span>
           <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline">
-            · Jesse / Freqtrade 標準
+            · Decimal 核心精確曲線
           </span>
         </div>
 
@@ -114,7 +100,20 @@ export function BacktestUnderwaterChart() {
         </div>
       </div>
 
-      {activeTab === "curve" ? (
+      {loading ? (
+        <div className="p-8 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-2">
+          <div className="size-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span>回測數據計算中 / 載入中...</span>
+        </div>
+      ) : !hasData ? (
+        <div className="p-8 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-1.5">
+          <TrendingUp className="size-5 text-muted-foreground/40" />
+          <span className="text-foreground font-medium">暫無回測曲線數據</span>
+          <span className="text-[11px] text-muted-foreground">
+            請點擊右上角「發起新回測」或於左側歷史清單選取已完成任務
+          </span>
+        </div>
+      ) : activeTab === "curve" ? (
         <div className="p-3 space-y-2">
           {/* 上半部：累積淨值曲線 (Equity Curve) */}
           <div>
@@ -122,12 +121,17 @@ export function BacktestUnderwaterChart() {
               <span className="flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-400" />
                 累積帳戶權益 (Cumulative Equity, USDT)
+                {dataNotice && (
+                  <span className="text-[10px] text-amber-400/80 font-normal">
+                    · {dataNotice}
+                  </span>
+                )}
               </span>
-              <span className="text-up font-bold">當前 11,842.00 USDT (+18.42%)</span>
+              <span className="text-up font-bold">當前 {displayEquity} ({displayReturn})</span>
             </div>
             <div className="h-[125px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={BACKTEST_CURVE_DATA} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-up)" stopOpacity={0.35} />
@@ -136,7 +140,7 @@ export function BacktestUnderwaterChart() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.3} />
                   <XAxis dataKey="date" hide />
-                  <YAxis domain={["dataMin - 100", "dataMax + 100"]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
+                  <YAxis domain={["dataMin - 10", "dataMax + 10"]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)", fontSize: "11px", fontFamily: "var(--font-mono)" }}
                     formatter={(v: number) => [`$${v.toLocaleString()} USDT`, "權益"]}
@@ -154,11 +158,11 @@ export function BacktestUnderwaterChart() {
                 <AlertTriangle className="size-3" />
                 水下載歷史回撤 (Underwater Drawdown %)
               </span>
-              <span className="text-down font-bold">歷史最深回撤 -4.15% (修復耗時 4 天)</span>
+              <span className="text-down font-bold">最大回撤 {displayMaxDd}</span>
             </div>
             <div className="h-[80px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={BACKTEST_CURVE_DATA} margin={{ top: 2, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 2, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="underwaterGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-down)" stopOpacity={0.0} />
@@ -167,7 +171,7 @@ export function BacktestUnderwaterChart() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.3} />
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
-                  <YAxis domain={[-5, 0]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => `${v}%`} />
+                  <YAxis domain={["dataMin", 0]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)", fontSize: "11px", fontFamily: "var(--font-mono)" }}
                     formatter={(v: number) => [`${v.toFixed(2)}%`, "距峰頂回撤"]}
@@ -180,49 +184,12 @@ export function BacktestUnderwaterChart() {
         </div>
       ) : (
         /* 月度收益熱力矩陣 (Monthly Heatmap) */
-        <div className="p-3 overflow-x-auto">
-          <table className="w-full text-center border-collapse text-xs font-mono">
-            <thead>
-              <tr className="border-b border-border/70 text-[10px] text-muted-foreground">
-                <th className="py-1.5 px-2 text-left font-normal">年份</th>
-                {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map((m) => (
-                  <th key={m} className="py-1.5 px-1 font-normal">{m}月</th>
-                ))}
-                <th className="py-1.5 px-2 font-bold text-primary">YTD 年化</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {MONTHLY_MATRIX.map((row) => (
-                <tr key={row.year} className="hover:bg-secondary/20">
-                  <td className="py-2 px-2 text-left font-bold text-foreground">{row.year}</td>
-                  {Array.from({ length: 12 }).map((_, idx) => {
-                    const item = row.months[idx];
-                    if (!item) {
-                      return <td key={idx} className="py-2 px-1 text-muted-foreground/30">-</td>;
-                    }
-                    const isPositive = item.v >= 0;
-                    return (
-                      <td key={idx} className="py-2 px-1">
-                        <span
-                          className={cn(
-                            "inline-block w-full rounded py-1 text-[10.5px] font-semibold transition-transform hover:scale-105",
-                            isPositive
-                              ? "bg-up/15 text-up border border-up/30"
-                              : "bg-down/15 text-down border border-down/30"
-                          )}
-                        >
-                          {isPositive ? `+${item.v.toFixed(1)}%` : `${item.v.toFixed(1)}%`}
-                        </span>
-                      </td>
-                    );
-                  })}
-                  <td className="py-2 px-2 font-bold text-primary text-xs">
-                    +{row.ytd.toFixed(2)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="p-6 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-1.5">
+          <Calendar className="size-5 text-muted-foreground/40" />
+          <span className="text-foreground font-medium">單日 96 根 K 線合成取樣（無跨月份歷史資料）</span>
+          <span className="text-[11px] text-muted-foreground">
+            月度跨期熱力收益矩陣需載入長週期多月行情；後端當前契約為單一合成資料集。
+          </span>
         </div>
       )}
     </div>

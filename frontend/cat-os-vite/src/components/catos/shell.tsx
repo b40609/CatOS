@@ -1,12 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, Search, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
+import { CommandPalette } from "@/components/catos/command-palette";
+import { useLiveMarketStore } from "@/state/liveMarketStore";
 import { cn } from "@/lib/utils";
 
 
@@ -79,7 +81,7 @@ import {
   EXPAND_THRESHOLD,
 } from "@/state/sidebarStore";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, dashboardTools }: { children: ReactNode; dashboardTools?: ReactNode }) {
   const {
     collapsed,
     sidebarWidth,
@@ -94,6 +96,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t, language } = useI18n();
 
   const [isResizing, setIsResizing] = useState(false);
+
+  // 啟動全域撮合心跳與資金費率倒數 (1 秒 1 Tick 驅動 10 分鐘真實微觀行情循環帶)
+  const { triggerManualTick, decrementCountdown, isRunning, tapeProgress } = useLiveMarketStore();
+  useEffect(() => {
+    if (!isRunning) return;
+    const tickTimer = setInterval(() => {
+      triggerManualTick();
+    }, 1000);
+    const countdownTimer = setInterval(() => {
+      decrementCountdown();
+    }, 1000);
+    return () => {
+      clearInterval(tickTimer);
+      clearInterval(countdownTimer);
+    };
+  }, [isRunning, triggerManualTick, decrementCountdown]);
 
   // 使用 Refs 杜絕閉包陳舊問題，確保拖曳過程中有精確的段落感吸附與切換
   const collapsedRef = useRef(collapsed);
@@ -323,11 +341,26 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span className="hidden text-muted-foreground/40 sm:inline">/</span>
               <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
             </div>
+
+            {/* Ctrl+K 全域快捷指令台按鈕 (Linear / Cmdk 風格) */}
+            <button
+              type="button"
+              onClick={() => {
+                const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true });
+                document.dispatchEvent(event);
+              }}
+              className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground text-[10.5px] font-mono border border-border/70 transition-colors cursor-pointer ml-3"
+              title="快捷指令面板 (Ctrl + K)"
+            >
+              <Search className="size-3 text-primary" />
+              <span>搜尋或跳轉...</span>
+              <kbd className="px-1 py-0.2 rounded bg-background/80 border border-border/60 text-[9px] text-muted-foreground">Ctrl K</kbd>
+            </button>
           </div>
 
           {/* 右側：工作台卡片庫與核心交易模式切換 */}
           <div className="flex items-center gap-2 shrink-0">
-            {current?.to === "/" && <CardManagerDropdown />}
+            {dashboardTools ?? (current?.to === "/" ? <CardManagerDropdown /> : null)}
             <ModeSelector />
           </div>
         </header>
@@ -338,13 +371,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-2 text-[10px] text-muted-foreground lg:px-6">
           <div className="flex items-center gap-2">
             <PulseBeacon size={4.5} />
-            <span>Binance <span className="num font-medium text-foreground/80">18ms</span></span>
+            <span>OKX SWAP WebSocket <span className="num font-medium text-foreground/80">14ms</span></span>
             <span className="mx-1 text-border">|</span>
-            <span>OKX <span className="num font-medium text-foreground/80">24ms</span></span>
+            <span>Supervisor IPC <span className="num font-medium text-foreground/80">&lt;1ms</span></span>
+            <span className="mx-1 text-border">|</span>
+            <span>10M 微觀行情回放 <span className="num font-mono text-primary font-medium">{tapeProgress}</span></span>
           </div>
           <div>catOS Terminal · {t("simulated_data")}</div>
         </footer>
       </div>
+
+      {/* 全域快捷指令台 (Ctrl + K) */}
+      <CommandPalette />
     </div>
   );
 }

@@ -40,6 +40,8 @@ ENGINE_FILES = (
     "catos/research.py", "catos/data_io.py", "catos/reporting.py",
     "catos/research_catalog.py", "catos/research_worker.py",
     "catos/research_optimization.py", "catos/optimization.py",
+    "catos/research_validation.py", "catos/research_regimes.py",
+    "catos/research_validation_job.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -52,10 +54,21 @@ MAX_RUNS = 200
 TIMEOUT_SECONDS = 30
 MAX_OUTPUT_BYTES = 2_000_000
 MAX_TRIALS = 20
+MAX_VALIDATION_CANDIDATES = 20
+MAX_VALIDATION_RUNS = 100
+MAX_VALIDATION_WINDOWS = 8
 DEFAULT_OPTIMIZATION = {
     "backtest": {**DEFAULT_REQUEST, "warmup_bars": 8},
     "search_space": {"period": {"low": 2, "high": 8, "step": 1}},
     "n_trials": 8, "seed": 42,
+}
+DEFAULT_VALIDATION = {
+    "backtest": {**DEFAULT_REQUEST, "warmup_bars": 4},
+    "search_space": {"period": {"low": 2, "high": 4, "step": 1}},
+    "plan": {"train_bars": 24, "test_bars": 16, "windows": 3},
+    "regime_rule": {"lookback_bars": 4, "trend_efficiency": "0.5",
+                    "high_volatility_bps": "250"},
+    "max_candidates": 3, "max_runs": 12,
 }
 
 
@@ -278,6 +291,11 @@ def catalog():
         "optimization": {"defaults": DEFAULT_OPTIMIZATION, "max_trials": MAX_TRIALS,
                          "score_name": "return_pct", "direction": "maximize",
                          "notice": "僅合成資料、樣本內搜尋；未執行樣本外檢驗。"},
+        "validation": {"example_request": DEFAULT_VALIDATION,
+                       "max_candidates": MAX_VALIDATION_CANDIDATES,
+                       "max_runs": MAX_VALIDATION_RUNS, "max_windows": MAX_VALIDATION_WINDOWS,
+                       "score_name": "return_pct", "direction": "maximize",
+                       "notice": "合成資料；穩定區選參後做滾動 OOS 與分環境評估。門檻僅供示範，須明示。"},
         "limits": {"concurrent_tasks": 1, "max_bars": MAX_BARS,
                    "timeout_seconds": TIMEOUT_SECONDS, "max_runs": MAX_RUNS,
                    "max_output_bytes": MAX_OUTPUT_BYTES},

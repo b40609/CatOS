@@ -1,9 +1,15 @@
 import { create } from "zustand";
-import type { LayoutNode, SplitDirection, DropPosition, HoverDropTarget } from "@/lib/layout-tree/types";
+import type { LayoutNode, LeafNode, SplitDirection, DropPosition, HoverDropTarget } from "@/lib/layout-tree/types";
 import {
   createDefaultTree,
-  createTriSplitTree,
-  createDualSplitTree,
+  createQuadTree,
+  createSentinelTree,
+  createFlagshipTree,
+  createFocusTree,
+  createCompareIntentTree,
+  createCompareActivityTree,
+  createFull9Tree,
+  createMasterDetailTree,
   updateRatio,
   splitLeaf,
   removeLeaf,
@@ -11,6 +17,9 @@ import {
   moveAndSplit,
   countLeaves,
   getAllLeaves,
+  addTabToLeaf,
+  switchLeafTab,
+  removeTabFromLeaf,
 } from "@/lib/layout-tree/tree-ops";
 
 export type CardId =
@@ -22,7 +31,8 @@ export type CardId =
   | "incidents"
   | "market_watch"
   | "strategy_intents"
-  | "activity_deck";
+  | "activity_deck"
+  | "bot_inspector";
 export type SlotKey = "leftUpper" | "leftLower" | "rightUpper" | "rightLower";
 
 export interface LayoutProfile {
@@ -33,7 +43,7 @@ export interface LayoutProfile {
   icon: string;
   desc: string;
   isSystem: boolean;
-  rootNode?: LayoutNode;
+  rootNode?: LayoutNode | null;
   leftColWidth: number;
   leftUpperHeight: number;
   rightUpperHeight: number;
@@ -42,16 +52,90 @@ export interface LayoutProfile {
 }
 
 export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string }> = {
-  equity: { zh: "帳戶權益 (Equity & Drawdown)", en: "Equity & Drawdown", icon: "📈" },
-  positions: { zh: "部位活動與盤口防線 (Positions, Orders & P6)", en: "Positions, Orders & Safety", icon: "📊" },
-  bots: { zh: "量化機器人 (Bots Matrix)", en: "Bots Matrix", icon: "🤖" },
-  allocation: { zh: "資產曝險配置 (Allocation)", en: "Asset & Exposure Allocation", icon: "🪙" },
-  fills: { zh: "即時成交流 (Fills)", en: "Recent Fills", icon: "⚡" },
-  incidents: { zh: "系統警報與事件時間軸 (Incident Stream)", en: "Incident Stream", icon: "🚨" },
-  market_watch: { zh: "標的行情與 K 線倒數 (Market Watch)", en: "Market Watch & Bar Timer", icon: "⏱️" },
-  strategy_intents: { zh: "策略目標意圖信號看板 (Worker Intents & Radar)", en: "Worker Intents & Radar", icon: "🎯" },
-  activity_deck: { zh: "全域戰情日誌 (Activity Deck)", en: "Activity Deck", icon: "📜" },
+  equity: { zh: "帳戶權益與損益", en: "Equity & Drawdown", icon: "📈" },
+  positions: { zh: "持倉明細與在途委託", en: "Positions & Orders", icon: "📊" },
+  bots: { zh: "策略機器人矩陣", en: "Bots Matrix", icon: "🤖" },
+  allocation: { zh: "槓桿倍數與資產曝險", en: "Leverage & Allocation", icon: "🪙" },
+  fills: { zh: "即時成交流水", en: "Recent Fills", icon: "⚡" },
+  incidents: { zh: "風險警報與異常事件", en: "Risk Incidents", icon: "🚨" },
+  market_watch: { zh: "標的行情與資金費率", en: "Market Watch & Rates", icon: "⏱️" },
+  strategy_intents: { zh: "策略目標與訊號強度", en: "Signals & Radar", icon: "🎯" },
+  activity_deck: { zh: "交易日誌與風險事件", en: "Activity & Events", icon: "📜" },
+  bot_inspector: { zh: "機器人深層檢測 (Master-Detail)", en: "Bot Inspector", icon: "🔍" },
 };
+
+
+export type LayoutPresetId =
+  | "tsplit"
+  | "quad"
+  | "sentinel"
+  | "flagship"
+  | "focus_positions"
+  | "empty"
+  | "compare_intent"
+  | "compare_activity"
+  | "full9"
+  | "master_detail";
+
+export interface LayoutPresetMeta {
+  id: LayoutPresetId;
+  nameZh: string;
+  shortName: string;
+  tag: string;
+  cardCount: number;
+  desc: string;
+}
+
+export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
+  {
+    id: "tsplit",
+    nameZh: "5卡標準戰情 (T-Split 上下解耦)",
+    shortName: "T-Split",
+    tag: "推薦定案",
+    cardCount: 5,
+    desc: "權益損益 · 策略機器人 · 槓桿曝險 / 持倉委託 · 交易日誌",
+  },
+  {
+    id: "quad",
+    nameZh: "4卡象限盯盤 (雙欄經典對稱)",
+    shortName: "雙欄對稱",
+    tag: "高頻盯盤",
+    cardCount: 4,
+    desc: "左欄：權益損益+持倉委託 / 右欄：策略機器人+交易日誌 (50:50 對稱)",
+  },
+  {
+    id: "sentinel",
+    nameZh: "3卡風控防線 (盤口 60% 主視野)",
+    shortName: "風控防線",
+    tag: "防線專注",
+    cardCount: 3,
+    desc: "左側 60% 持倉與在途委託 / 右側 40% 策略機器人與交易日誌",
+  },
+  {
+    id: "flagship",
+    nameZh: "6卡操盤旗艦 (全景全功能監控)",
+    shortName: "操盤旗艦",
+    tag: "全景多螢",
+    cardCount: 6,
+    desc: "上層：權益損益+策略機器人+標的行情 / 下層：持倉委託+交易日誌+成交流水",
+  },
+  {
+    id: "focus_positions",
+    nameZh: "單卡滿版專注 (部位與防線全螢幕)",
+    shortName: "部位全螢幕",
+    tag: "單卡專注",
+    cardCount: 1,
+    desc: "100% 滿版展示多空持倉、在途掛單撤單與 P6 災難停損防線",
+  },
+  {
+    id: "empty",
+    nameZh: "清空自訂版面 (從零自訂模式)",
+    shortName: "一鍵清空",
+    tag: "從零自訂",
+    cardCount: 0,
+    desc: "完全清空主畫面卡片，自由從 [＋卡片] 挑選組裝專屬戰情視窗",
+  },
+];
 
 export const DEFAULT_PROFILES: LayoutProfile[] = [
   {
@@ -60,7 +144,7 @@ export const DEFAULT_PROFILES: LayoutProfile[] = [
     shortName: "T-Split",
     ratioText: "T-Split",
     icon: "🔲",
-    desc: "權益走勢 · 機器人矩陣 · 資產曝險配置 · 持倉與盤口防線 · 全域戰情日誌台",
+    desc: "權益損益 · 策略機器人 · 槓桿曝險 · 持倉委託 · 交易日誌",
     isSystem: true,
     rootNode: createDefaultTree(),
     leftColWidth: 60,
@@ -74,46 +158,6 @@ export const DEFAULT_PROFILES: LayoutProfile[] = [
     },
     updatedAt: "定案配置",
   },
-  {
-    id: "layout_tri_focus",
-    name: "主視野三分割 (左一右二)",
-    shortName: "三分割",
-    ratioText: "60:40",
-    icon: "📐",
-    desc: "左側權益大圖 · 右側部位與曝險上下佈局",
-    isSystem: true,
-    rootNode: createTriSplitTree(),
-    leftColWidth: 60,
-    leftUpperHeight: 100,
-    rightUpperHeight: 50,
-    slots: {
-      leftUpper: "equity",
-      leftLower: "positions",
-      rightUpper: "allocation",
-      rightLower: "bots",
-    },
-    updatedAt: "預設方案",
-  },
-  {
-    id: "layout_dual_split",
-    name: "雙分欄佈局 (50:50)",
-    shortName: "雙分欄",
-    ratioText: "50:50",
-    icon: "⚖️",
-    desc: "左側權益 · 右側持倉明細",
-    isSystem: true,
-    rootNode: createDualSplitTree(),
-    leftColWidth: 50,
-    leftUpperHeight: 100,
-    rightUpperHeight: 100,
-    slots: {
-      leftUpper: "equity",
-      leftLower: "positions",
-      rightUpper: "allocation",
-      rightLower: "bots",
-    },
-    updatedAt: "預設方案",
-  },
 ];
 
 export type ToolbarMode = "header" | "card" | "always_on" | "ribbon";
@@ -121,10 +165,10 @@ export type SeamStyle = "seamless" | "compact" | "floating";
 export type DragPreviewMode = "real-card" | "minimal-blueprint" | "mini-tag";
 export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tactical_icon";
 
-const STORAGE_KEY_PROFILES = "catos_layout_profiles_v7_clean";
-const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v7_clean";
+const STORAGE_KEY_PROFILES = "catos_layout_profiles_v8_tsplit";
+const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v8_tsplit";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v7_clean";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v8_tsplit";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";
@@ -150,7 +194,7 @@ interface LayoutState {
   setGripStyle: (style: GripStyle) => void;
 
   // 自研 Layout Tree 引擎核心節點
-  rootNode: LayoutNode;
+  rootNode: LayoutNode | null;
   draggingLeafId: string | null;
   hoverTarget: HoverDropTarget | null;
 
@@ -165,16 +209,21 @@ interface LayoutState {
   toastMessage: string | null;
 
   // Layout Tree 引擎 Actions
-  setRootNode: (node: LayoutNode, persist?: boolean) => void;
+  setRootNode: (node: LayoutNode | null, persist?: boolean) => void;
+  clearAllCards: () => void;
   updateSplitRatio: (splitId: string, ratio: number, persist?: boolean) => void;
   splitLeafNode: (targetLeafId: string, direction: SplitDirection, side: "before" | "after", newCardId: CardId) => void;
   removeLeafNode: (leafId: string) => void;
   moveAndSplitNode: (sourceLeafId: string, targetLeafId: string, pos: DropPosition) => void;
   setDraggingLeafId: (id: string | null) => void;
   setHoverTarget: (target: HoverDropTarget | null) => void;
-  applyLayoutPreset: (preset: "default" | "quad" | "tri" | "dual") => void;
+  resetToDefaultLayout: () => void;
+  applyLayoutPreset: (preset?: LayoutPresetId) => void;
   addNewCard: (cardId: CardId) => void;
   replaceLeafNode: (leafId: string, newCardId: CardId) => void;
+  addTabToLeafNode: (leafId: string, cardId: CardId) => void;
+  switchLeafTabNode: (leafId: string, cardId: CardId) => void;
+  removeTabFromLeafNode: (leafId: string, cardId: CardId) => void;
 
   // 舊版相容 Actions
   setToolbarMode: (mode: ToolbarMode) => void;
@@ -198,7 +247,7 @@ function loadInitial(): {
   profiles: LayoutProfile[];
   currentId: string;
   activeProfile: LayoutProfile;
-  rootNode: LayoutNode;
+  rootNode: LayoutNode | null;
   seamStyle: SeamStyle;
   dragPreviewMode: DragPreviewMode;
   gripStyle: GripStyle;
@@ -229,10 +278,12 @@ function loadInitial(): {
     const active = profiles.find((p) => p.id === currentId) || profiles[0];
 
     // 載入持久化 Layout Tree
-    let rootNode: LayoutNode = active.rootNode ?? defaultTree;
+    let rootNode: LayoutNode | null = active.rootNode ?? defaultTree;
     const rawTree = localStorage.getItem(STORAGE_KEY_TREE);
     if (rawTree) {
-      try {
+      if (rawTree === "null") {
+        rootNode = null;
+      } else try {
         const parsedTree = JSON.parse(rawTree);
         if (parsedTree && (parsedTree.type === "leaf" || parsedTree.type === "split")) {
           const leaves = getAllLeaves(parsedTree);
@@ -344,7 +395,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   updateSplitRatio: (splitId, ratio, persist = true) => {
-    const nextTree = updateRatio(get().rootNode, splitId, ratio);
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = updateRatio(cur, splitId, ratio);
     set({ rootNode: nextTree });
     if (persist && typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
@@ -352,7 +405,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   splitLeafNode: (targetLeafId, direction, side, newCardId) => {
-    const nextTree = splitLeaf(get().rootNode, targetLeafId, direction, side, newCardId);
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = splitLeaf(cur, targetLeafId, direction, side, newCardId);
     set({ rootNode: nextTree });
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
@@ -362,22 +417,29 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   removeLeafNode: (leafId) => {
-    const leavesCount = countLeaves(get().rootNode);
-    if (leavesCount <= 1) {
-      get().showToast("最後一張核心卡片受保護，無法關閉");
-      return;
-    }
-    const nextTree = removeLeaf(get().rootNode, leafId);
+    const currentTree = get().rootNode;
+    if (!currentTree) return;
+    const nextTree = removeLeaf(currentTree, leafId);
     set({ rootNode: nextTree });
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+      if (nextTree) {
+        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+      } else {
+        localStorage.setItem(STORAGE_KEY_TREE, "null");
+      }
     }
-    get().showToast("已關閉卡片，空間已自動合併填滿");
+    if (!nextTree) {
+      get().showToast("已清空工作區，可由頂部 [＋卡片] 或推薦預設自由自訂");
+    } else {
+      get().showToast("已關閉卡片，空間已自動合併填滿");
+    }
   },
 
   moveAndSplitNode: (sourceLeafId, targetLeafId, pos) => {
     if (sourceLeafId === targetLeafId) return;
-    const nextTree = moveAndSplit(get().rootNode, sourceLeafId, targetLeafId, pos);
+    const currentTree = get().rootNode;
+    if (!currentTree) return;
+    const nextTree = moveAndSplit(currentTree, sourceLeafId, targetLeafId, pos);
     set({ rootNode: nextTree });
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
@@ -387,33 +449,81 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   setDraggingLeafId: (id) => set({ draggingLeafId: id }),
   setHoverTarget: (target) => set({ hoverTarget: target }),
 
-  applyLayoutPreset: (preset) => {
-    let newTree: LayoutNode;
-    let label = "";
-    if (preset === "default" || preset === "quad") {
-      newTree = createDefaultTree();
-      label = "量化戰情 T-Split (上下解耦 · 定案)";
-    } else if (preset === "tri") {
-      newTree = createTriSplitTree();
-      label = "主視野三分割 (左一右二)";
-    } else {
-      newTree = createDualSplitTree();
-      label = "雙分欄佈局 (50:50)";
+  resetToDefaultLayout: () => {
+    get().applyLayoutPreset("tsplit");
+  },
+
+  clearAllCards: () => {
+    get().applyLayoutPreset("empty");
+  },
+
+  applyLayoutPreset: (presetId = "tsplit") => {
+    let newTree: LayoutNode | null = null;
+    switch (presetId) {
+      case "master_detail":
+        newTree = createMasterDetailTree();
+        break;
+      case "compare_intent":
+        newTree = createCompareIntentTree();
+        break;
+      case "compare_activity":
+        newTree = createCompareActivityTree();
+        break;
+      case "full9":
+        newTree = createFull9Tree();
+        break;
+      case "tsplit":
+        newTree = createDefaultTree();
+        break;
+      case "quad":
+        newTree = createQuadTree();
+        break;
+      case "sentinel":
+        newTree = createSentinelTree();
+        break;
+      case "flagship":
+        newTree = createFlagshipTree();
+        break;
+      case "focus_positions":
+        newTree = createFocusTree("positions");
+        break;
+      case "empty":
+        newTree = null;
+        break;
+      default:
+        newTree = createDefaultTree();
     }
     set({ rootNode: newTree });
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(newTree));
+      if (newTree) {
+        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(newTree));
+      } else {
+        localStorage.setItem(STORAGE_KEY_TREE, "null");
+      }
     }
-    get().showToast(`已切換至「${label}」`);
+    const meta = RECOMMENDED_PRESETS.find((p) => p.id === presetId);
+    get().showToast(`已套用排版：${meta?.nameZh || presetId}`);
   },
 
   addNewCard: (cardId) => {
-    const leaves = getAllLeaves(get().rootNode);
+    const currentTree = get().rootNode;
+    if (!currentTree) {
+      const newLeaf: LeafNode = {
+        type: "leaf",
+        id: `leaf-${cardId}-${Date.now()}`,
+        cardId,
+      };
+      set({ rootNode: newLeaf });
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(newLeaf));
+      }
+      get().showToast(`已建立卡片 [${CARD_TITLES[cardId].zh.split(" ")[0]}]`);
+      return;
+    }
+
+    const leaves = getAllLeaves(currentTree);
     if (leaves.length === 0) return;
 
-    // 優先挑選合適的目標節點進行分裂：
-    // 若葉子節點數為 1 或 2，採用水平左右分欄 (row)；
-    // 若已達 3 張或以上，優先在最後一張卡片垂直向下分列 (col)，保持閱讀視野與寬度
     const target = leaves[leaves.length - 1];
     const direction: SplitDirection = leaves.length >= 2 ? "col" : "row";
 
@@ -421,12 +531,50 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   replaceLeafNode: (leafId, newCardId) => {
-    const nextTree = replaceLeafCard(get().rootNode, leafId, newCardId);
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = replaceLeafCard(cur, leafId, newCardId);
     set({ rootNode: nextTree });
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
     }
     get().showToast(`已替換為 [${CARD_TITLES[newCardId]?.zh?.split(" ")[0] || newCardId}]`);
+  },
+
+  addTabToLeafNode: (leafId, cardId) => {
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = addTabToLeaf(cur, leafId, cardId);
+    set({ rootNode: nextTree });
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+    }
+    get().showToast(`已將 [${CARD_TITLES[cardId]?.zh?.split(" ")[0] || cardId}] 堆疊為分頁標籤`);
+  },
+
+  switchLeafTabNode: (leafId, cardId) => {
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = switchLeafTab(cur, leafId, cardId);
+    set({ rootNode: nextTree });
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+    }
+  },
+
+  removeTabFromLeafNode: (leafId, cardId) => {
+    const cur = get().rootNode;
+    if (!cur) return;
+    const nextTree = removeTabFromLeaf(cur, leafId, cardId);
+    set({ rootNode: nextTree });
+    if (typeof window !== "undefined") {
+      if (nextTree) {
+        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+      } else {
+        localStorage.setItem(STORAGE_KEY_TREE, "null");
+      }
+    }
+    get().showToast(`已關閉 [${CARD_TITLES[cardId]?.zh?.split(" ")[0] || cardId}] 分頁`);
   },
 
   // ==================== 舊版相容實作 ====================

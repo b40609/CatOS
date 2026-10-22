@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Target,
-  ShieldCheck,
   Zap,
 } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
@@ -41,18 +40,18 @@ const DEFAULT_INTENTS: StrategyIntent[] = [
     strategyName: "獵貓動能 (Trend Following)",
     symbol: "BTC-USDT-SWAP",
     timeframe: "15m",
-    currentPosition: "LONG 0.12 BTC",
-    targetIntent: "LONG 0.20 BTC",
-    intentDelta: "+0.08 BTC",
+    currentPosition: "LONG 0.85 BTC",
+    targetIntent: "LONG 1.10 BTC",
+    intentDelta: "+0.25 BTC",
     intentAction: "增倉",
     signalScore: 82,
     signalLabel: "STRONG BUY 突破增倉",
     indicators: {
-      upperDistance: "距 +0.52% ($64,520)",
+      upperDistance: "距 +1.14% ($62,850)",
       upperLabel: "唐奇安上軌 (DH)",
-      midDistance: "站穩 +0.60% ($63,800)",
+      midDistance: "站穩 +0.39% ($61,900)",
       midLabel: "EMA 20 成本線",
-      lowerDistance: "防線 ($62,100)",
+      lowerDistance: "防線 ($61,120)",
       lowerLabel: "唐奇安下軌 (DL)",
     },
     nextBarAction: "次根開盤市價委託 (Market Buy at Open)",
@@ -67,8 +66,8 @@ const DEFAULT_INTENTS: StrategyIntent[] = [
     strategyName: "夜視回歸 (Mean Reversion)",
     symbol: "ETH-USDT-SWAP",
     timeframe: "1H",
-    currentPosition: "LONG 2.40 ETH",
-    targetIntent: "LONG 2.40 ETH",
+    currentPosition: "LONG 9.50 ETH",
+    targetIntent: "LONG 9.50 ETH",
     intentDelta: "0.00 (HOLD)",
     intentAction: "維持",
     signalScore: 45,
@@ -93,9 +92,9 @@ const DEFAULT_INTENTS: StrategyIntent[] = [
     strategyName: "波動突破 (ATR Breakout)",
     symbol: "SOL-USDT-SWAP",
     timeframe: "15m",
-    currentPosition: "LONG 18.00 SOL",
+    currentPosition: "LONG 95.00 SOL",
     targetIntent: "FLAT 0.00 SOL",
-    intentDelta: "-18.00 SOL",
+    intentDelta: "-95.00 SOL",
     intentAction: "平倉",
     signalScore: -68,
     signalLabel: "EXIT SIGNAL 停利出場",
@@ -171,7 +170,7 @@ export function StrategyIntentsRadarCard({ className }: StrategyIntentsRadarCard
       <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
         <CardHeaderTitle
           cardId="strategy_intents"
-          title="策略目標意圖信號看板"
+          title="策略目標與訊號強度"
           subtext={
             <div className="flex items-center gap-1.5 ml-1">
               <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.2 rounded border border-emerald-400/25">
@@ -337,19 +336,6 @@ export function StrategyIntentsRadarCard({ className }: StrategyIntentsRadarCard
             </div>
           );
         })}
-      </div>
-
-      {/* 3. 底部架構約定說明 (Zero-Waste 緊湊單行) */}
-      <div className="px-3 py-1.5 bg-secondary/60 border-t border-border/80 flex items-center justify-between text-[9.5px] font-mono text-muted-foreground shrink-0">
-        <div className="flex items-center gap-1.5 truncate">
-          <ShieldCheck className="size-3 text-emerald-400 shrink-0" />
-          <span className="truncate">
-            Worker 邊界：僅純資料意圖 · Supervisor 唯一交易出口
-          </span>
-        </div>
-        <span className="text-muted-foreground/70 font-mono shrink-0 hidden sm:inline">
-          JSON IPC v2
-        </span>
       </div>
     </div>
   );

@@ -299,6 +299,1108 @@ body, aside, nav, header {
 .allocation-sol { background: var(--allocation-sol); }
 .allocation-arb { background: var(--allocation-arb); }
 .allocation-cash { background: var(--allocation-cash); }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
+
+/* =========================================================================
+ * 頂級量化狀態雷達聲吶 (High-End Quantum Sonar & Crystal Breathe)
+ * ========================================================================= */
+@keyframes sonar-wave-amber {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.85;
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.8);
+  }
+  50% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(3.0);
+    opacity: 0;
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes crystal-glow-amber {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.8), 0 0 10px rgba(245, 158, 11, 0.4);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(245, 158, 11, 1), 0 0 18px rgba(245, 158, 11, 0.6);
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes ambient-card-warn {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.35);
+    background-color: rgba(245, 158, 11, 0.03);
+    box-shadow: 0 0 0px rgba(245, 158, 11, 0);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 0.65);
+    background-color: rgba(245, 158, 11, 0.08);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
+  }
+}
+
+.sonar-ripple-amber {
+  animation: sonar-wave-amber 2.2s cubic-bezier(0.16, 0.8, 0.3, 1) infinite;
+}
+
+.sonar-ripple-amber-delayed {
+  animation: sonar-wave-amber 2.2s cubic-bezier(0.16, 0.8, 0.3, 1) infinite;
+  animation-delay: 1.1s;
+}
+
+.crystal-breathe-amber {
+  animation: crystal-glow-amber 2.2s ease-in-out infinite;
+}
+
+.ambient-alert-card {
+  animation: ambient-card-warn 2.8s ease-in-out infinite;
+}
+
+
+/* =========================================================================
+ * 3 套頂級時間軸連線與點呼吸動效 (Timeline Line & Dot Dynamics)
+ * ========================================================================= */
+
+/* 方案 1: 光子流脈衝 (Photon Flow) */
+@keyframes photon-flow-down {
+  0% {
+    top: -24px;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% + 24px);
+    opacity: 0;
+  }
+}
+
+.timeline-photon-beam {
+  position: absolute;
+  left: 0;
+  left: -1px;
+  width: 3.5px;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, rgba(232, 180, 94, 0.95), transparent);
+  box-shadow: 0 0 10px rgba(232, 180, 94, 0.9), 0 0 4px #ffffff;
+  border-radius: 9999px;
+  animation: photon-flow-down 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 方案 2: 聲吶波注入 (Sonar Injected Downward Wave) */
+@keyframes sonar-wave-down {
+  0% {
+    top: 0;
+    height: 0px;
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0.7;
+  }
+  100% {
+    top: 140px;
+    height: 60px;
+    opacity: 0;
+  }
+}
+
+.timeline-sonar-inject {
+  position: absolute;
+  left: 0;
+  left: -1px;
+  width: 3.5px;
+  background: linear-gradient(to bottom, rgba(245, 158, 11, 0.9), transparent);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+  border-radius: 9999px;
+  animation: sonar-wave-down 2.2s cubic-bezier(0.16, 0.8, 0.3, 1) infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 方案 3: 電路微蠕動 (Circuit Crawl) */
+@keyframes circuit-dash-move {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.timeline-circuit-crawl {
+  animation: circuit-dash-move 3.5s linear infinite;
+}
+
+/* 通用全節點柔和呼吸微光 (不使用 scale 避免尺寸變形，鎖死 8px 純淨呼吸) */
+@keyframes dot-gentle-breathe {
+  0%, 100% {
+    opacity: 0.75;
+    filter: brightness(0.95);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+}
+
+.dot-all-breathe {
+  animation: dot-gentle-breathe 2.2s ease-in-out infinite;
+}
+
+/* prefers-reduced-motion reset removed to preserve vital trading telemetry animations */
+
+
+/* =========================================================================
+ * 開源頂級 Magic UI & Aceternity UI 純 SVG 光子流 (100% 軌道內位移奔跑、0 穿模)
+ * 核心原理：透過 pathLength="100" 與 stroke-dashoffset，將能量束在 SVG 線內沿 Y 軸高速滑行
+ * ========================================================================= */
+
+/* 模式 1：Magic UI 彗星光子束 (長度 24%，流暢穿越全部節點) */
+@keyframes magic-beam-travel {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.magic-beam-glow-anim {
+  stroke-dasharray: 24 100;
+  animation: magic-beam-travel 2.4s cubic-bezier(0.25, 1, 0.35, 1) infinite;
+}
+
+.magic-beam-core-anim {
+  stroke-dasharray: 18 106;
+  animation: magic-beam-travel 2.4s cubic-bezier(0.25, 1, 0.35, 1) infinite;
+}
+
+/* 模式 2：Aceternity UI 高頻脈衝 (長度 14%，1.6s 敏捷巡航) */
+@keyframes tracing-pulse-travel {
+  0% {
+    stroke-dashoffset: 14;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.tracing-pulse-glow-anim {
+  stroke-dasharray: 14 100;
+  animation: tracing-pulse-travel 1.6s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+}
+
+.tracing-pulse-core-anim {
+  stroke-dasharray: 10 104;
+  animation: tracing-pulse-travel 1.6s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+}
+
+/* 模式 3：雙量子交替流 (兩束光子相差 50% 相位交替奔流) */
+@keyframes quantum-stream-travel {
+  0% {
+    stroke-dashoffset: 18;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.quantum-stream-1-anim {
+  stroke-dasharray: 18 100;
+  animation: quantum-stream-travel 2.2s cubic-bezier(0.3, 0.9, 0.3, 1) infinite;
+}
+
+.quantum-stream-2-anim {
+  stroke-dasharray: 18 100;
+  animation: quantum-stream-travel 2.2s cubic-bezier(0.3, 0.9, 0.3, 1) infinite;
+  animation-delay: 1.1s;
+}
+
+/* 模式 4：Magic UI / Linear Border Beam 光束軌跡環繞 */
+@keyframes border-beam {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+/* =========================================================================
+ * 交易終端專用：零延遲 / 極低干擾動效體系 (Zero Latency Perception Engine)
+ * ========================================================================= */
+
+/* 方案 B：微心跳導軌 (Subtle Heartbeat) - 4.5s 超低頻、長度 6% 極淡光斑，零視覺疲勞 */
+@keyframes heartbeat-beam-travel {
+  0% {
+    stroke-dashoffset: 10;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.heartbeat-beam-anim {
+  stroke-dasharray: 6 100;
+  animation: heartbeat-beam-travel 4.5s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+}
+
+/* 方案 C：事件瞬態單次反饋 (Event Flash Pulse) */
+@keyframes event-flash-glow {
+  0% {
+    opacity: 0.9;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+  }
+  100% {
+    opacity: 0.4;
+    box-shadow: 0 0 2px rgba(245, 158, 11, 0.2);
+  }
+}
+
+.event-flash-active {
+  animation: event-flash-glow 0.18s ease-out forwards;
+}
+
+/* 交易級超微弱告警呼吸 (取代狂閃火警波紋，僅在節點維持 3.2s 深度平靜微光) */
+@keyframes crystal-glow-subtle {
+  0%, 100% {
+    opacity: 0.85;
+    box-shadow: 0 0 3px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+  }
+}
+
+.crystal-breathe-subtle {
+  animation: crystal-glow-subtle 3.2s ease-in-out infinite;
+}
+
+/* 毫秒級手風琴急停展開 (Snap Accordion) */
+.snap-accordion-enter {
+  animation: snap-enter 0.11s cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+@keyframes snap-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* 更多類似微心跳的低干擾方案 (More Low-Latency Trading Variants) */
+
+/* 1. 光纖微呼吸 (Breathing Rail) - 整條導軌在原地 4.8s 極低頻平靜呼吸，零位移干擾 */
+@keyframes fiber-breathe {
+  0%, 100% {
+    stroke-opacity: 0.10;
+  }
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+
+.fiber-breathe-anim {
+  animation: fiber-breathe 4.8s ease-in-out infinite;
+}
+
+/* 2. 量子極細微光 (Sub-pixel Whisper) - 3% 極短光斑，3.2s 敏捷滑行 */
+@keyframes subpixel-whisper-travel {
+  0% {
+    stroke-dashoffset: 4;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.subpixel-whisper-anim {
+  stroke-dasharray: 3 100;
+  animation: subpixel-whisper-travel 3.2s cubic-bezier(0.25, 0.9, 0.3, 1) infinite;
+}
+
+/* 3. 雙向交替微脈衝 (Bipolar Pulse) - 意圖下發與成交回報雙向微光交錯 */
+@keyframes bipolar-down-travel {
+  0% {
+    stroke-dashoffset: 6;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes bipolar-up-travel {
+  0% {
+    stroke-dashoffset: -100;
+  }
+  100% {
+    stroke-dashoffset: 6;
+  }
+}
+
+.bipolar-down-anim {
+  stroke-dasharray: 5 100;
+  animation: bipolar-down-travel 4.2s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+}
+
+.bipolar-up-anim {
+  stroke-dasharray: 5 100;
+  animation: bipolar-up-travel 4.2s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  animation-delay: 2.1s;
+}
+
+/* 4. 冷灰幽靈軌 (Stealth Ghost Rail) - 零色彩干擾，18% 冷白次像素，色彩全數歸還狀態標籤 */
+@keyframes ghost-rail-travel {
+  0% {
+    stroke-dashoffset: 6;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+.ghost-rail-anim {
+  stroke-dasharray: 5 100;
+  animation: ghost-rail-travel 4.0s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+}
+
+/* 5. 節點突觸傳導 (Synapse Cascade) - 導軌靜態，節點每隔 4.5s 骨牌式微明暗傳導 */
+@keyframes synapse-dot-ping {
+  0%, 70%, 100% {
+    filter: brightness(1);
+  }
+  12% {
+    filter: brightness(1.75);
+  }
+}
+
+.synapse-dot-0 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0s; }
+.synapse-dot-1 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0.18s; }
+.synapse-dot-2 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0.36s; }
+.synapse-dot-3 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0.54s; }
+.synapse-dot-4 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0.72s; }
+.synapse-dot-5 { animation: synapse-dot-ping 4.5s ease-in-out infinite; animation-delay: 0.90s; }
+
+
+/* =========================================================================
+ * 頂級無方正感：高斯羽化漸層光子 (Feathered Liquid Photon Runners)
+ * 解決 SVG stroke-dasharray 單色切斷造成的「方塊火柴棒」生硬感
+ * ========================================================================= */
+
+@keyframes photon-travel-down {
+  0% {
+    top: -56px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% + 16px);
+    opacity: 0;
+  }
+}
+
+@keyframes photon-travel-up {
+  0% {
+    bottom: -56px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    bottom: calc(100% + 16px);
+    opacity: 0;
+  }
+}
+
+/* 1. 微心跳柔焦光子 (Feathered Amber Comet) - 兩端平滑羽化，白金微核，零方正感 */
+.photon-feathered-amber {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 54px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(245, 158, 11, 0.2) 20%,
+    rgba(255, 255, 255, 0.95) 45%,
+    rgba(245, 158, 11, 0.75) 55%,
+    rgba(245, 158, 11, 0.15) 85%,
+    transparent 100%
+  );
+  box-shadow: 0 0 6px 1px rgba(245, 158, 11, 0.45);
+  border-radius: 9999px;
+  animation: photon-travel-down 4.5s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+/* 2. 量子極細針狀光子 (Feathered Needle) - 極度纖細柔滑 */
+.photon-feathered-needle {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(245, 158, 11, 0.3) 25%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(245, 158, 11, 0.3) 75%,
+    transparent 100%
+  );
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  border-radius: 9999px;
+  animation: photon-travel-down 3.2s cubic-bezier(0.25, 0.9, 0.3, 1) infinite;
+  pointer-events: none;
+}
+
+/* 3. 雙向交替：下行琥珀金 */
+.photon-bipolar-down {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1.2px;
+  height: 46px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(245, 158, 11, 0.2) 20%,
+    rgba(255, 255, 255, 0.9) 45%,
+    rgba(245, 158, 11, 0.7) 55%,
+    transparent 100%
+  );
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.4);
+  border-radius: 9999px;
+  animation: photon-travel-down 4.2s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+/* 3. 雙向交替：上行翡翠綠 */
+.photon-bipolar-up {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1.2px;
+  height: 46px;
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    rgba(16, 185, 129, 0.2) 20%,
+    rgba(255, 255, 255, 0.9) 45%,
+    rgba(16, 185, 129, 0.7) 55%,
+    transparent 100%
+  );
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.4);
+  border-radius: 9999px;
+  animation: photon-travel-up 4.2s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  animation-delay: 2.1s;
+  pointer-events: none;
+}
+
+/* 4. 幽靈冷軌：冷白柔焦光子 */
+.photon-feathered-ghost {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 48px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 20%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(255, 255, 255, 0.15) 80%,
+    transparent 100%
+  );
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+  border-radius: 9999px;
+  animation: photon-travel-down 4.0s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+
+/* =========================================================================
+ * iOS 霜晶極光 & 毛玻璃漫射質感 (iOS Frosted Glass & Subsurface Diffusion)
+ * ========================================================================= */
+
+/* 1. iOS 磨砂玻璃漫射底暈 (雙層：底層 16px 磨砂柔焦暈，頂層 1.5px 晶透微核) */
+.photon-aurora-glow {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 68px;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    rgba(245, 158, 11, 0.45) 0%,
+    rgba(245, 158, 11, 0.15) 50%,
+    transparent 100%
+  );
+  filter: blur(5px);
+  animation: photon-travel-down 4.0s cubic-bezier(0.22, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+.photon-aurora-core {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 56px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.95) 45%,
+    rgba(251, 191, 36, 0.8) 55%,
+    rgba(245, 158, 11, 0.2) 80%,
+    transparent 100%
+  );
+  border-radius: 9999px;
+  box-shadow: 0 0 8px 1px rgba(251, 191, 36, 0.5);
+  animation: photon-travel-down 4.0s cubic-bezier(0.22, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+/* 2. iOS 晨曦微光 (柔霧流線，超長拖尾，極低明度) */
+.photon-dawn-glow {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 74px;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    rgba(245, 158, 11, 0.3) 0%,
+    transparent 80%
+  );
+  filter: blur(3.5px);
+  animation: photon-travel-down 4.0s cubic-bezier(0.22, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+.photon-dawn-core {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 50px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(245, 158, 11, 0.2) 25%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(245, 158, 11, 0.2) 75%,
+    transparent 100%
+  );
+  border-radius: 9999px;
+  animation: photon-travel-down 4.0s cubic-bezier(0.22, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+/* 3. iOS 霜晶冷白幽靈 (極致乾淨磨砂反光) */
+.photon-frost-white-glow {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 60px;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    rgba(255, 255, 255, 0.25) 0%,
+    transparent 80%
+  );
+  filter: blur(4px);
+  animation: photon-travel-down 4.0s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+.photon-frost-white-core {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 46px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(255, 255, 255, 0.2) 80%,
+    transparent 100%
+  );
+  border-radius: 9999px;
+  animation: photon-travel-down 4.0s cubic-bezier(0.2, 0.8, 0.25, 1) infinite;
+  pointer-events: none;
+}
+
+/* 4. iOS 經典磨砂玻璃卡片裝飾 class (Liquid Glassmorphism) */
+.ios-glass-card {
+  background: rgba(18, 18, 22, 0.45);
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px -2px rgba(0, 0, 0, 0.4);
+}
+
+.ios-glass-card:hover {
+  background: rgba(26, 26, 32, 0.55);
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+    0 4px 16px -2px rgba(0, 0, 0, 0.5);
+}
+
+.ios-glass-card-active {
+  background: rgba(28, 28, 36, 0.72);
+  backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.25)) saturate(190%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 16px) * 1.25)) saturate(190%);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+    0 8px 24px -4px rgba(0, 0, 0, 0.6);
+}
+
+.ios-glass-card-warn {
+  background: rgba(245, 158, 11, 0.025);
+  backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px)) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 2px 10px -2px rgba(0, 0, 0, 0.35);
+}
+
+
+/* =========================================================================
+ * 沿路點亮：節點隨光子滑過時的激發脈衝 (Travelling Synaptic Bloom)
+ * 當光子到達該節點垂直位置時，節點與卡片瞬間產生一次白金微脈衝，讓 UI 活起來
+ * ========================================================================= */
+
+@keyframes photon-travel-synced {
+  0% {
+    top: -48px;
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% + 12px);
+    opacity: 0;
+  }
+}
+
+/* 節點被光子經過時的激發微光 (Bloom) */
+@keyframes node-bloom-amber {
+  0%, 14%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 3px rgba(245, 158, 11, 0.4);
+  }
+  4% {
+    transform: scale(1.45);
+    filter: brightness(2.0);
+    box-shadow: 0 0 12px 3px rgba(251, 191, 36, 0.9);
+  }
+  9% {
+    transform: scale(1.08);
+    filter: brightness(1.25);
+    box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+  }
+}
+
+@keyframes node-bloom-emerald {
+  0%, 14%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 3px rgba(16, 185, 129, 0.4);
+  }
+  4% {
+    transform: scale(1.45);
+    filter: brightness(2.0);
+    box-shadow: 0 0 12px 3px rgba(52, 211, 153, 0.9);
+  }
+  9% {
+    transform: scale(1.08);
+    filter: brightness(1.25);
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  }
+}
+
+@keyframes node-bloom-sky {
+  0%, 14%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 3px rgba(56, 189, 248, 0.4);
+  }
+  4% {
+    transform: scale(1.45);
+    filter: brightness(2.0);
+    box-shadow: 0 0 12px 3px rgba(125, 211, 252, 0.9);
+  }
+  9% {
+    transform: scale(1.08);
+    filter: brightness(1.25);
+    box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+  }
+}
+
+/* 伴隨節點被點亮時，外圍漾開的 iOS 柔霧微漣漪 (Soft Mist Ripple) */
+@keyframes mist-ripple-burst {
+  0%, 15%, 100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  3% {
+    opacity: 0.7;
+    transform: scale(1.5);
+  }
+  9% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+/* 卡片在光子撫過時的 1px 稜鏡共振 (Prism Resonance) */
+@keyframes card-prism-shimmer {
+  0%, 15%, 100% {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  4% {
+    border-color: rgba(255, 255, 255, calc(0.08 + 0.25 * var(--card-shimmer-opacity, 0.6)));
+    box-shadow: 
+      inset 0 1px 0 0 rgba(255, 255, 255, calc(0.08 + 0.25 * var(--card-shimmer-opacity, 0.6))),
+      0 4px 16px -2px rgba(245, 158, 11, calc(0.18 * var(--card-shimmer-opacity, 0.6)));
+  }
+}
+
+
+/* =========================================================================
+ * 方案 A & B 精確同步對齊體系 (Millisecond Synchronized Collision & Bloom)
+ * ========================================================================= */
+
+/* 等速線性光子運動 (方案 A 幾何對齊用) */
+@keyframes photon-travel-linear {
+  0% {
+    top: -50px;
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% + 15px);
+    opacity: 0;
+  }
+}
+
+/* 方案 B：真實碰撞觸發之單次爆發微光 (Single Shot Bloom) */
+@keyframes node-hit-bloom-amber {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  }
+  30% {
+    transform: scale(1.55);
+    filter: brightness(2.2);
+    box-shadow: 0 0 16px 4px rgba(251, 191, 36, 0.95);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+  }
+}
+
+@keyframes node-hit-bloom-emerald {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+  }
+  30% {
+    transform: scale(1.55);
+    filter: brightness(2.2);
+    box-shadow: 0 0 16px 4px rgba(52, 211, 153, 0.95);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+  }
+}
+
+@keyframes node-hit-bloom-sky {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(56, 189, 248, 0.4);
+  }
+  30% {
+    transform: scale(1.55);
+    filter: brightness(2.2);
+    box-shadow: 0 0 16px 4px rgba(125, 211, 252, 0.95);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow: 0 0 4px rgba(56, 189, 248, 0.4);
+  }
+}
+
+.node-hit-bloom-amber-active {
+  animation: node-hit-bloom-amber 0.45s ease-out forwards;
+}
+
+.node-hit-bloom-emerald-active {
+  animation: node-hit-bloom-emerald 0.45s ease-out forwards;
+}
+
+.node-hit-bloom-sky-active {
+  animation: node-hit-bloom-sky 0.45s ease-out forwards;
+}
+
+/* 伴隨單次爆發之柔霧微波 */
+@keyframes mist-hit-burst {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+.mist-hit-burst-active {
+  animation: mist-hit-burst 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 卡片單次晶透微稜鏡共振 */
+@keyframes card-hit-shimmer {
+  0% {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  30% {
+    border-color: rgba(255, 255, 255, 0.32);
+    box-shadow: 
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.32),
+      0 4px 18px -2px rgba(245, 158, 11, 0.16);
+  }
+  100% {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.card-hit-shimmer-active {
+  animation: card-hit-shimmer 0.45s ease-out forwards;
+}
+
+
+/* =========================================================================
+ * 天花板級光學點亮：OLED 鑽石晶體光學 Bloom (Zero Scale Distortion)
+ * 徹底消滅泡泡腫脹廉價感，鎖死 8px 幾何尺寸，以光學白金微核與高斯漫射取勝
+ * ========================================================================= */
+
+@keyframes crystal-optical-bloom-amber {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(245, 158, 11, 0.4);
+  }
+  18% {
+    /* 點亮峰值：白金高能核，核心泛白，外層溢出高階磨砂漫射 */
+    filter: brightness(calc(1 + 1.2 * var(--bloom-intensity, 1))) contrast(1.25);
+    box-shadow: 
+      0 0 calc(2px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) #ffffff,
+      0 0 calc(8px * var(--bloom-intensity, 1)) calc(2px * var(--bloom-intensity, 1)) rgba(251, 191, 36, 0.95),
+      0 0 calc(18px * var(--bloom-intensity, 1)) calc(6px * var(--bloom-intensity, 1)) rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    /* 溫潤餘輝階段 (Phosphor Decay) */
+    filter: brightness(calc(1 + 0.35 * var(--bloom-intensity, 1)));
+    box-shadow: 
+      0 0 calc(6px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) rgba(251, 191, 36, 0.6),
+      0 0 calc(12px * var(--bloom-intensity, 1)) calc(3px * var(--bloom-intensity, 1)) rgba(245, 158, 11, 0.2);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(245, 158, 11, 0.4);
+  }
+}
+
+@keyframes crystal-optical-bloom-emerald {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(16, 185, 129, 0.4);
+  }
+  18% {
+    filter: brightness(calc(1 + 1.2 * var(--bloom-intensity, 1))) contrast(1.25);
+    box-shadow: 
+      0 0 calc(2px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) #ffffff,
+      0 0 calc(8px * var(--bloom-intensity, 1)) calc(2px * var(--bloom-intensity, 1)) rgba(52, 211, 153, 0.95),
+      0 0 calc(18px * var(--bloom-intensity, 1)) calc(6px * var(--bloom-intensity, 1)) rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    filter: brightness(calc(1 + 0.35 * var(--bloom-intensity, 1)));
+    box-shadow: 
+      0 0 calc(6px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) rgba(52, 211, 153, 0.6),
+      0 0 calc(12px * var(--bloom-intensity, 1)) calc(3px * var(--bloom-intensity, 1)) rgba(16, 185, 129, 0.2);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(16, 185, 129, 0.4);
+  }
+}
+
+@keyframes crystal-optical-bloom-sky {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(56, 189, 248, 0.4);
+  }
+  18% {
+    filter: brightness(calc(1 + 1.2 * var(--bloom-intensity, 1))) contrast(1.25);
+    box-shadow: 
+      0 0 calc(2px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) #ffffff,
+      0 0 calc(8px * var(--bloom-intensity, 1)) calc(2px * var(--bloom-intensity, 1)) rgba(125, 211, 252, 0.95),
+      0 0 calc(18px * var(--bloom-intensity, 1)) calc(6px * var(--bloom-intensity, 1)) rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    filter: brightness(calc(1 + 0.35 * var(--bloom-intensity, 1)));
+    box-shadow: 
+      0 0 calc(6px * var(--bloom-intensity, 1)) calc(1px * var(--bloom-intensity, 1)) rgba(125, 211, 252, 0.6),
+      0 0 calc(12px * var(--bloom-intensity, 1)) calc(3px * var(--bloom-intensity, 1)) rgba(56, 189, 248, 0.2);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 calc(4px * var(--bloom-intensity, 1)) rgba(56, 189, 248, 0.4);
+  }
+}
+
+.crystal-bloom-amber-active {
+  animation: crystal-optical-bloom-amber 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.crystal-bloom-emerald-active {
+  animation: crystal-optical-bloom-emerald 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.crystal-bloom-sky-active {
+  animation: crystal-optical-bloom-sky 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 次表面柔焦高斯微光環 (Subsurface Halation Ring) */
+@keyframes optical-halation-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+    filter: blur(2px);
+  }
+  25% {
+    opacity: calc(0.65 * var(--bloom-intensity, 1));
+    transform: scale(calc(1 + 0.4 * var(--bloom-intensity, 1)));
+    filter: blur(calc(4px * var(--bloom-intensity, 1)));
+  }
+  100% {
+    opacity: 0;
+    transform: scale(calc(1 + 0.9 * var(--bloom-intensity, 1)));
+    filter: blur(calc(6px * var(--bloom-intensity, 1)));
+  }
+}
+
+.optical-halation-active {
+  animation: optical-halation-fade 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+/* =========================================================================
+ * 由下往上時序流動光子 (Bottom-Up Chronological Stream)
+ * 歷史事件 (底部) ➜ 即時狀態/最新異常 (頂部)
+ * ========================================================================= */
+
+@keyframes photon-travel-upward {
+  0% {
+    bottom: -130px;
+    opacity: 0;
+  }
+  6% {
+    opacity: var(--photon-opacity, 0.85);
+  }
+  92% {
+    opacity: var(--photon-opacity, 0.85);
+  }
+  100% {
+    bottom: calc(100% + 30px);
+    opacity: 0;
+  }
+}
+
+.photon-aurora-glow-up {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 68px;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    rgba(245, 158, 11, 0.45) 0%,
+    rgba(245, 158, 11, 0.15) 50%,
+    transparent 100%
+  );
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+.photon-aurora-core-up {
+  position: absolute;
+  left: 8px;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 56px;
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    rgba(245, 158, 11, 0.15) 15%,
+    rgba(245, 158, 11, 0.7) 45%,
+    rgba(255, 255, 255, 0.95) 75%,
+    rgba(255, 255, 255, 0.2) 90%,
+    transparent 100%
+  );
+  border-radius: 9999px;
+  box-shadow: 0 0 8px 1px rgba(251, 191, 36, 0.55);
+  pointer-events: none;
 }
