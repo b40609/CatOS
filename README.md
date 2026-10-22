@@ -1,9 +1,10 @@
 # CatOS (Crypto Agent Trading OS)
 
-> **極簡、本機專用（Localhost-Only）的加密貨幣智慧體量化交易作業系統與專業執行終端**  
-> 融合 **Astra 核心量化執行引擎** 與 **Yaozi 市場情報雷達**，專為 OKX 永續合約（USDT-M SWAP）與已收盤 K 線（Closed Bar）策略量身打造。具備全鏈路零浮點誤差（Strict Decimal Core）、雙進程安全隔離與機構級風控防線。
+> **專為 AI 智慧體與量化交易員打造的極簡、本機專用（Localhost-Only）量化作業系統與戰情終端**  
+> 融合 **原生 Model Context Protocol (MCP) 智慧體生態**、**Astra 核心量化執行引擎** 與 **Yaozi 市場情報雷達**，專為 OKX 永續合約（USDT-M SWAP）與已收盤 K 線（Closed Bar）策略量身打造。具備全鏈路零浮點誤差（Strict Decimal Core）、雙進程安全隔離與自主交易金融物理護欄。
 
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
+[![MCP Server](https://img.shields.io/badge/MCP-Model%20Context%20Protocol%20Native-8A2BE2.svg)](catos/research_mcp.py)
 [![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20TypeScript%20%7C%20Vite%20%7C%20Tailwind-61dafb.svg)](frontend/cat-os-vite)
 [![Database](https://img.shields.io/badge/Database-SQLite%20(WAL%20Mode)-success.svg)](catos/db)
 [![Precision](https://img.shields.io/badge/Financial%20Core-Strict%20Decimal%20(Zero--Float)-orange.svg)](catos/core)
@@ -11,14 +12,32 @@
 
 ---
 
-## 產品定位與核心解決方案
+## 為什麼選擇 CatOS？四大核心賣點
 
-**CatOS**（全名 **Crypto Agent Trading OS**，加密貨幣智慧體量化交易作業系統）專為專業量化交易員、KOL 與自營交易團隊（Prop Trading）設計，旨在提供一個**極低維護負擔、極高金融確定性**的單機智慧體量化研發與實盤交易戰情室。
+CatOS 不是傳統封閉的手動下單軟體，而是一套**以 AI 智慧體為第一公民（Agent-First）的量化交易作業系統**，專門解決自主 AI 量化研發與資金執行的核心痛點：
 
-### 解決傳統量化系統的痛點
-1. **擺脫過度設計的微服務負擔**：全面禁止 Docker、PostgreSQL、Redis、Celery 等外部常駐服務，僅依賴 **Python 3.11+** 與 **SQLite（WAL 模式）**，雙擊即可啟動，單機擁有完整故障自愈與對帳能力。
-2. **杜絕浮點數資金精度漂移**：傳統量化框架（如 Jesse、Freqtrade）底層大量混用 NumPy/Float，造成不可逆的捨入誤差；CatOS 全流程堅持 **Strict Decimal Core**，價格、數量、手續費與未實現損益零浮點漂移。
-3. **消除終端介面的三重標題浪費**：借鑒 Bloomberg 與 TradingView Pro，開創「Zero-Waste 純資料密度」戰情佈局，徹底消除側邊欄、全域 Header 與卡片標題的三重冗餘（Triple Redundancy）。
+### 1. 原生 MCP (Model Context Protocol) 智慧體生態
+- **大模型即量化研發大腦**：原生內建標準 MCP 伺服器，直接與 Claude Code、GPT-6、Cursor、Antigravity 或自建 Multi-Agent 系統（如 FinMAS）對接。
+- **工具化開放能力**：LLM 可直接調用 MCP 工具發起回測、調優參數、評估分環境表現、讀取不可變策略製品與對帳證據，實現真正的自主量化工作流。
+
+### 2. 「靈感到不可變製品」的全自動研發閉環 (Idea-to-Execution)
+- 交易員只需提供一段 TradingView / Pine Script 指標、YouTube 交易靈感或市場假說，AI Agent 即可透過 MCP 完成：
+  1. **策略代碼合成 (Strategy Synthesis)**：將指標轉化為嚴格遵循受信契約的 Python 無狀態策略。
+  2. **高精度閉盤回測 (Closed Bar Backtesting)**：驗證指標預熱（`warmup_bars`）、滑價與資金費結算。
+  3. **參數鄰域穩定區檢驗 (Neighborhood Stability)**：利用 Optuna 搜尋具有連續穩定島嶼的參數區間，杜絕過擬合。
+  4. **市場環境切片覆盤 (Market Regimes)**：分析在牛市趨勢、橫盤震盪與劇烈波動下的盈虧歸屬。
+  5. **不可變製品簽名 (Immutable Artifact)**：生成具備唯一 SHA256 指紋的策略製品，安全註冊進策略倉庫。
+
+### 3. AI 自主交易的物理級金融護欄 (Financial Hardwall for AI Agents)
+- **徹底解決 AI 交易幻覺失控**：傳統 AI 交易常因幻覺產生頻繁反覆下單、手動覆寫參數或穿倉風險。CatOS Supervisor 充當不可被 Agent 覆寫的**金融硬護欄**：
+  - **進程職責完全隔離**：AI 策略運行於無網路、無 API 金鑰的沙盒 Worker，只能回傳目標意圖（Target Intent）；Supervisor 獨佔金鑰與交易出口。
+  - **R1 台北切日損益硬熔斷 (Hard Latch & Kill-Switch)**：依 Asia/Taipei 00:00 固定 E0 基準日損；一旦虧損達 Hard 門檻 (-20%) 立即強制市價清倉並硬鎖存，AI 智慧體無法自行解鎖，僅限人類在戰情室核驗後手動 re-arm。
+  - **P6 交易所原生託管整倉災難停損**：OKX 伺服器原生條件單託管，向上/向下取整確保提前觸發；即使本地主機斷網或 AI 崩潰，交易所端仍有最終防線。
+  - **唯一強制標籤**：所有 OKX SWAP 委託強制注入 `"tag": "41cb53c54d6dABDE"`，專用子帳戶隔離。
+
+### 4. 全鏈路 Decimal 零浮點金融保證與 Zero-Waste 戰情終端
+- **全流程零浮點誤差**：金額、價格、部位、保證金、手續費與資金費，全流程強制使用 Python `Decimal` 與 SQLite `TEXT` 存儲與計算，**全面禁止 `float`**。
+- **Zero-Waste 純資料密度戰情室**：React 19 + TypeScript + Vite，借鑒 Bloomberg 與 TradingView Pro，消除側邊欄、全域 Header 與卡片標題的三重冗餘，搭載 Dock as Tab 自由容器與 HUD 同心圓資產曝險圖，實現極致的 Human-in-the-Loop 人機協同監控。
 
 ---
 
@@ -27,30 +46,80 @@
 CatOS 採用雙主軸協同設計，所有功能集中於同一本機站點，切換分頁或關閉瀏覽器絕不影響後端交易生命週期：
 
 ```mermaid
-flowchart LR
-    subgraph CatOS["CatOS (Crypto Agent Trading OS)"]
-        direction TB
-        subgraph Astra["Astra 量化交易核心 (Astra Engine)"]
-            Research["策略研究與回測"]
-            Supervisor["Supervisor 資金守護者"]
-            Risk["R1/P6 機構級風控"]
-            Exec["OKX SWAP 唯一交易出口"]
+flowchart TB
+    subgraph AgentEco["AI 智慧體生態 (Model Context Protocol)"]
+        LLM["外部 AI 智慧體 (Claude / GPT-6 / Antigravity / FinMAS)"]
+        MCP_Research["catOS Research MCP Server"]
+        MCP_Strategy["catOS Strategy MCP Server"]
+    end
+
+    subgraph CatOS_Core["CatOS (Crypto Agent Trading OS)"]
+        subgraph Astra["Astra 量化執行引擎 (Supervisor)"]
+            ResearchCore["Closed Bar 回測與 Optuna 穩定區分析"]
+            Supervisor["Supervisor 資金守護者 (SQLite WAL)"]
+            RiskGuard["R1 台北日損風控 / P6 交易所災難防線"]
+            ExecutionGateway["OKX 唯一交易出口 (強制 Tag)"]
+        end
+        subgraph StrategyWorker["策略工作進程 (獨立 Subprocess)"]
+            Worker["無狀態策略 Worker (受信策略邊界)"]
         end
         subgraph Yaozi["Yaozi 市場情報雷達 (Yaozi Intel)"]
-            Social["社群情緒與 KOL 輿情 (X/Twitter)"]
-            Flow["Smart Money 大戶資金流"]
+            Social["社群情緒與輿情 (X / Twitter)"]
+            Flow["Smart Money 巨鯨資金流"]
             Arb["跨所資金費率套利哨兵"]
             Surface["多市場決策曲面 (Decision Surface)"]
         end
-        Terminal["React 19 + Vite 專業戰情工作台 (Port 8890 / 8770)"]
+        UI["React 19 Zero-Waste 戰情終端 (Port 8890 / 8770)"]
     end
-    Terminal <--> Astra
-    Terminal <--> Yaozi
-    Astra <==>|Signed REST / WS| OKX["OKX 永續合約 (USDT-M SWAP)"]
+
+    subgraph External["外部交易所"]
+        OKX["OKX 永續合約 (USDT-M SWAP)"]
+    end
+
+    LLM <-->|stdio MCP| MCP_Research
+    LLM <-->|stdio MCP| MCP_Strategy
+    MCP_Research <--> Astra
+    MCP_Strategy <--> Astra
+    UI <--> Astra
+    UI <--> Yaozi
+    Astra <-->|JSON IPC| Worker
+    ExecutionGateway <==>|Signed HTTPS / WS| OKX
 ```
 
-- **Astra 核心量化引擎**：負責分鐘至小時級已收盤 K 線策略回測、參數優化、多市場環境評估、Supervisor-Worker 雙進程隔離執行，以及單合約獨佔的訂單生命週期管理。
-- **Yaozi 市場情報雷達**：負責整合多源外部情報——包含 X (Twitter) 社群輿情指數、OKX/Binance 資金費率偏離套利監控、巨鯨大額轉移警報與決策曲面（Decision Surface），為策略決策提供情報加權。
+---
+
+## 原生 MCP (Model Context Protocol) 智慧體生態
+
+CatOS 原生提供兩套基於 FastMCP 的標準 MCP 伺服器，讓外部 AI 智慧體能以標準工具調用方式深度驅動量化研究與策略生命週期：
+
+### 1. `catos.research_mcp` (量化研究與回測 MCP)
+- `research_catalog()`：查詢系統中受信註冊的策略與數據集目錄，含版本與 SHA256 來源證據。
+- `research_submit_backtest(strategy, request)`：AI 自主啟動高精度 Closed Bar 回測，支援自定義標的、週期與資金費事件。
+- `research_submit_optimization(strategy, request)`：AI 發起有界 Optuna 參數尋優與參數鄰域穩定區檢驗。
+- `research_get_run(run_id)` / `research_get_result(run_id)`：查詢研究任務執行狀態與獲取維持 Decimal 精度的績效結果。
+- `research_get_report(run_id)`：獲取單次研究任務的可視化離線 HTML 互動分析報告。
+
+### 2. `catos.strategy_mcp` (不可變策略製品與管理 MCP)
+- `strategy_contract()`：讀取系統的 Python 策略契約架構、Worker Hook 介面與受信邊界規範。
+- `list_strategy_versions()`：獲取當前已固化且可重播的不可變策略製品清單及其預設參數。
+- `create_strategy_version(request_id, manifest)`：AI Agent 自主生成、校驗並固化不可變 Python 策略製品，自動生成 SHA256 數位簽名，杜絕策略代碼被意外修改。
+- `list_simulation_results()` / `get_simulation_result(run_id)`：審查本機模擬環境下的交易日誌、訂單序列與最終帳務對帳證據。
+
+#### 在 Claude Desktop / Claude Code / Antigravity 中配置 CatOS MCP：
+```json
+{
+  "mcpServers": {
+    "catos-research": {
+      "command": "python",
+      "args": ["-B", "-m", "catos.research_mcp"]
+    },
+    "catos-strategy": {
+      "command": "python",
+      "args": ["-B", "-m", "catos.strategy_mcp"]
+    }
+  }
+}
+```
 
 ---
 
@@ -73,31 +142,13 @@ CatOS 前端採用現代化 React 19 + TypeScript + Vite + Tailwind CSS 構建�
 
 ---
 
-## 核心技術與金融安全防線
-
-### 1. 全鏈路零浮點保證（Zero-Float Financial Core）
-- 所有金額、價格、部位、保證金、手續費與資金費，全流程強制使用 Python `Decimal` 與 SQLite `TEXT` 存儲與計算。
-- **全面禁止 `float`** 計算，避免 IEEE 754 精度漂移導致的對帳不平或錯誤平倉。
-
-### 2. Supervisor / Worker 進程安全隔離
-- **Supervisor（主行程）**：獨佔 API 憑證、外部連網、OKX 唯一交易出口、風控狀態機與 SQLite WAL 唯一寫入權限。
-- **Worker（策略子進程）**：無網路連線權限、無 API 金鑰、無資料庫寫入權，僅透過標準 JSON IPC 接收已收盤行情並回傳目標意圖（Target Intent），從架構上杜絕策略越權。
-
-### 3. 機構級風控三重保障
-- **R1 固定風控期間基準（Risk Period Benchmark）**：依 Asia/Taipei 每日 00:00 切日建立固定 E0 權益基準，精確計算日損；Soft 止增倉 (-10%) 與 Hard 清倉 (-20%) 一旦觸發立即鎖存（Latch），反彈或入金絕不自動解除，僅限人工核驗後 re-arm。
-- **P6 交易所端整倉災難停損防線**：OKX 伺服器原生條件單託管，向上/向下取整（Ceil/Floor）以確保提早觸發，作為主機離線或斷網時的最後一道物理保險。
-- **專用子帳戶與強制標籤**：所有 OKX SWAP 委託強制注入 `"tag": "41cb53c54d6dABDE"`，專用子帳戶嚴禁與手動交易混用。
-
-### 4. 虛擬批次與逐筆帳務（Virtual Lots & Ledger）
-- S3–S10 逐筆帳務流水支援單筆訂單精確歸屬至 Virtual Lot，具備完整 USDT 手續費核算與成交更正重放證明（Correction Replay Proof）。
-
----
-
 ## 專案結構導覽
 
 ```text
 CatOS/
 ├── catos/                     # 後端 Python 核心架構
+│   ├── research_mcp.py        # 原生 Model Context Protocol (MCP) 研究伺服器
+│   ├── strategy_mcp.py        # 原生 Model Context Protocol (MCP) 策略製品伺服器
 │   ├── core/                  # Decimal 算術、合約規格、事件定義
 │   ├── research/              # Closed Bar 回測引擎、指標庫、撮合模型
 │   ├── optimization/          # Optuna 參數搜尋、鄰域穩定度、樣本外驗證
@@ -151,7 +202,17 @@ npm run dev
 python -B -m catos.workspace_api
 ```
 
-### 3. 執行策略回測與報告生成
+### 3. 啟動 MCP 智慧體伺服器（供 Claude / Agent 連接）
+
+```bash
+# 啟動研究與回測 MCP Server
+python -B -m catos.research_mcp
+
+# 啟動策略製品管理 MCP Server
+python -B -m catos.strategy_mcp
+```
+
+### 4. 執行策略回測與報告生成
 
 ```bash
 # 執行合成 15 分鐘 K 線 SMA 策略回測
@@ -161,14 +222,14 @@ python -B -m examples.closed_bar_demo
 python -B -m examples.report_demo
 ```
 
-### 4. 執行 Optuna 參數調優
+### 5. 執行 Optuna 參數調優
 
 ```bash
 # 執行多目標超參數搜尋與穩定區分析
 python -B -m examples.optuna_demo
 ```
 
-### 5. 執行自動化測試套件
+### 6. 執行自動化測試套件
 
 CatOS 擁有超過 300+ 項高覆蓋率的自動化單元與整合測試，覆蓋 Decimal 算術、訂單狀態機、風控熔斷、對帳大閘與 IPC 序列化：
 
