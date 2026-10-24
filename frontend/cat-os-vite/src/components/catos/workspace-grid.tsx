@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import {
   useLayoutStore,
   RECOMMENDED_PRESETS,
@@ -8,11 +8,13 @@ import {
   countLeaves,
   moveAndSplit,
   finalizeTree,
+  findNode,
+  calculateTreeMinHeight,
 } from "@/lib/layout-tree/tree-ops";
 import { TreeNodeRenderer } from "@/lib/layout-tree/tree-node-renderer";
 import type { LayoutNode, DropPosition } from "@/lib/layout-tree/types";
 import { ALL_CARDS } from "./card-registry";
-import { LayoutGrid, Plus, ArrowRight, Layers } from "lucide-react";
+import { LayoutGrid, Plus, ArrowRight, Layers, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceGridProps {
@@ -112,6 +114,9 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
     setRootNode,
     updateSplitRatio,
     removeLeafNode,
+    maximizedLeafId,
+    restoreMaximizedLeaf,
+    showToast,
   } = useLayoutStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -136,6 +141,18 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
   // 統計目前樹中卡片數
   const totalLeaves = countLeaves(rootNode);
   const canRemove = totalLeaves > 1;
+
+  // 監聽全域 Esc 鍵還原最大化卡片
+  useEffect(() => {
+    if (!maximizedLeafId) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        restoreMaximizedLeaf();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [maximizedLeafId, restoreMaximizedLeaf]);
 
   // 120 FPS 自由拉伸比例處理
   const handleRatioChange = (splitId: string, ratio: number, persist: boolean) => {
@@ -224,7 +241,7 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
         return;
       }
 
-      // 五分區扇區判定：中央 40% 為 Tab 堆疊 (Dock as Tab)，外圍為四向邊界分裂 (Split)
+      // 五分區扇區判定：中央 40% 為卡片對調換位 (Swap ⇄)，外圍為四向邊界分裂 (Split ⊞)
       const rect = hitSnapshot.rect;
       const relX = (clientX - rect.left) / rect.width;
       const relY = (clientY - rect.top) / rect.height;
@@ -249,7 +266,7 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
       currentHoverRef.current = { targetLeafId: hitSnapshot.id, pos };
       if (!rootNodeRef.current) return;
 
-      // 核心演算法：先剪枝來源節點 (原位置瞬間收攏填滿)，再在目標節點分裂展開高對比落位槽
+      // 核心演算法：中央換位或邊界分裂展開落位槽
       const nextTree = moveAndSplit(
         rootNodeRef.current,
         currentDrag.sourceLeafId,
@@ -270,11 +287,15 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
     const handlePointerUp = () => {
       const activePreview = previewTreeRef.current;
       const currentDrag = draggingInfoRef.current;
+      const lastHover = currentHoverRef.current;
 
       // 如果有落位預演樹，提交為最終佈局
       if (activePreview && currentDrag) {
         const finalTree = finalizeTree(activePreview);
         setRootNode(finalTree, true);
+        if (lastHover?.pos === "center") {
+          showToast("已完成卡片對調換位 ⇄");
+        }
       }
 
       cleanupDrag();
@@ -301,37 +322,73 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
       window.removeEventListener("contextmenu", cleanupDrag);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [draggingInfo, setRootNode]);
-
-  // 100% 垂直頂格滿版高度 (定案 Bloomberg AIM 5px 緊湊微隙，極致純淨 Zero-Waste)
-  const colHeightClass = "h-[820px] lg:h-[calc(100vh-80px)] min-h-[660px]";
+  }, [draggingInfo, setRootNode, showToast]);
 
   // 當前渲染樹：若在預演中則直接渲染預演樹，達成極致直觀的即時版面形態演進 (Live Morphing)
   const displayTree = previewTree || rootNode;
 
+  // 尋找當前最大化卡片節點
+  const maximizedLeaf = useMemo(() => {
+    if (!maximizedLeafId || !displayTree) return null;
+    const node = findNode(displayTree, maximizedLeafId);
+    return node && node.type === "leaf" ? node : null;
+  }, [maximizedLeafId, displayTree]);
+
+  // 依據各卡片最小安全閱讀高度計算縱向畫布所需高度 (超出視窗時自動平滑滾動)
+  const requiredCanvasHeight = useMemo(() => {
+    return calculateTreeMinHeight(displayTree);
+  }, [displayTree]);
+
   return (
-    <div className={cn("relative flex flex-row w-full min-w-0 overflow-hidden", colHeightClass, draggingInfo ? "select-none" : "select-text")}>
-      {/* 3. Layout Tree 容器主體 (維持穩定樹渲染，支援 120 FPS 自由縮放與卡片原地模組替換) */}
-      <div
-        ref={containerRef}
-        className="relative flex flex-col flex-1 min-w-0 h-full overflow-hidden"
-      >
-        {displayTree ? (
-          <TreeNodeRenderer
-            node={displayTree}
-            isResizing={isResizing}
-            canRemove={canRemove}
-            draggingLeafId={previewTree ? null : draggingInfo?.sourceLeafId}
-            onStartDrag={handleStartDrag}
-            onRatioChange={handleRatioChange}
-            onResetSplit={handleResetSplit}
-            onRemoveLeaf={removeLeafNode}
-            renderCard={renderCard}
-          />
-        ) : (
-          <EmptyWorkspacePrompt />
-        )}
-      </div>
+    <div
+      className={cn(
+        "relative flex flex-col w-full min-w-0 h-[820px] lg:h-[calc(100vh-80px)] min-h-[660px] overflow-y-auto overflow-x-hidden custom-scrollbar",
+        draggingInfo ? "select-none" : "select-text"
+      )}
+    >
+      {/* 1. 若處於單卡最大化專注模式：100% 填滿視窗，可點擊按鈕或按 Esc 瞬間還原 */}
+      {maximizedLeaf ? (
+        <div className="relative flex flex-col flex-1 min-w-0 h-full overflow-hidden bg-surface/95 backdrop-blur-md rounded-md border border-primary/50 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+          <button
+            type="button"
+            onClick={restoreMaximizedLeaf}
+            className="absolute top-2.5 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded bg-secondary/90 hover:bg-secondary text-foreground text-[11px] font-mono border border-border/80 cursor-pointer shadow-md transition-all group"
+            title="還原平鋪佈局 (Esc)"
+          >
+            <Minimize2 className="size-3 text-primary group-hover:scale-110 transition-transform" />
+            <span>還原平鋪佈局 (Esc)</span>
+          </button>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden [&_.panel]:border-0 [&_.panel]:rounded-none [&_.panel]:bg-transparent [&_.panel]:backdrop-blur-none [&_.panel]:shadow-none">
+            {renderCard(maximizedLeaf.cardId)}
+          </div>
+        </div>
+      ) : (
+        /* 2. 平鋪樹狀工作區：當卡片過多時依據最小閱讀高度自動向下撐開畫布並支援滾動 */
+        <div
+          ref={containerRef}
+          style={{
+            minHeight: "100%",
+            height: requiredCanvasHeight > 0 ? `max(100%, ${requiredCanvasHeight}px)` : "100%",
+          }}
+          className="relative flex flex-col flex-1 min-w-0 w-full shrink-0"
+        >
+          {displayTree ? (
+            <TreeNodeRenderer
+              node={displayTree}
+              isResizing={isResizing}
+              canRemove={canRemove}
+              draggingLeafId={previewTree ? null : draggingInfo?.sourceLeafId}
+              onStartDrag={handleStartDrag}
+              onRatioChange={handleRatioChange}
+              onResetSplit={handleResetSplit}
+              onRemoveLeaf={removeLeafNode}
+              renderCard={renderCard}
+            />
+          ) : (
+            <EmptyWorkspacePrompt />
+          )}
+        </div>
+      )}
     </div>
   );
 }

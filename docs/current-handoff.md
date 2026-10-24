@@ -1,6 +1,6 @@
 # CatOS 目前接續入口
 
-**更新時間**：2026-10-22 23:18 (UTC+8；GitHub 倉庫名稱正式重命名為 CatOS，公開網址 https://github.com/b40609/CatOS，本地 remote 同步對齊，8890 與 8887 常駐運行中)
+**更新時間**：2026-10-23 23:35 (UTC+8；拍板捨棄 8887 全部功能，徹底清除 isIntegratedPreview、抽屜跳轉、意圖微摘要與相關分支，唯一正式服務 8890 常駐運行中)
 **當前負責者**：前端視覺與互動開發者 (Antigravity) · 獨立驗收者 (GPT-6 Sol)
 **工作目錄**：C:/Users/user/Desktop/CatOS_Astra
 **GitHub 倉庫**：https://github.com/b40609/CatOS (Public)
@@ -9,7 +9,84 @@
 
 ---
 
-## 頁面底座收斂：徹底刪除 Grounded Footer 狀態列（2026-10-22）
+## 徹底捨棄 8887 過渡功能與全面回歸正式純粹終端（2026-10-23）
+1. **依使用者指示「8887 的功能都是我不要的 可以捨棄了」徹底執行收斂清除**：
+   - **終止 8887 獨立預覽台進程**：全面停止 Port 8887 監聽服務，正式環境唯一鎖定 `http://127.0.0.1:8890/`。
+   - **量化機器人矩陣徹底純化**（[v0-bot-table.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/v0-bot-table.tsx)）：
+     - 徹底移除策略名稱下額外塞入的「意圖微摘要」行（如「續抱 · 等待 11:15 收盤」等），回歸極致高密度雙層排版。
+     - 徹底移除操作按鈕上的 `(模擬)` 標記與冗餘文字。
+     - 徹底移除 `isIntegratedPreview` prop 與跨卡高亮標記。
+   - **持倉明細與在途防線徹底純化**（[activity-panel.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/activity-panel.tsx)）：
+     - 徹底移除 P6 欄位上的 `[▲ 更新待確認 (詳情 ↗)]` 與 `[● 已確認 (詳情 ↗)]` 抽屜按鈕，回歸純粹的 `OKX 向上取整` 綠燈標記。
+     - Header 徽章固化為純粹綠燈 `P6 交易所端 100% 錨定`。
+     - 徹底移除掛單頁的跨卡跳轉高亮分支。
+   - **風險警報與交易日誌徹底純化**（[unified-incident-activity-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/unified-incident-activity-card.tsx)）：
+     - 徹底移除每筆事件底部的「定位 Bot」與「共用詳情 ↗」抽屜觸發按鈕，去除無效的抽屜呼叫。
+     - 保持方案 C macOS 晶透黑曜石微膠囊美學，純粹呈現時序湧動與事件核心。
+   - **通用活動日誌純化**（[unified-activity-deck-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/unified-activity-deck-card.tsx)）：
+     - 徹底清除 `isIntegratedPreview` prop、`openInspector` 呼叫與 `[詳情 ↗]` 標記。
+2. **驗證與運行狀態**：
+   - 8890 主戰情台（PID 20116）常駐監聽於 `http://127.0.0.1:8890/`。
+   - 8887 預覽服務已完全終止關閉。
+   - `npx tsc --noEmit`：0 錯誤通過。
+   - `npm run build`：0 錯誤通過（6.94s）。
+
+---
+
+## 風險警報與交易日誌視覺風格定案：方案 C macOS 晶透（2026-10-23）
+1. **使用者正式拍板定案「方案 C（macOS Sequoia 晶透黑曜石微膠囊風格）」**：
+   - 全面固化 Apple HIG 晶透質感：
+     - **未解除異常 (WARN)**：`bg-amber-500/15 border border-amber-500/30 text-amber-200 rounded-full px-2 backdrop-blur-xs`，搭配琥珀金光學呼吸核心。
+     - **已解除警報 (RESOLVED)**：`bg-white/[0.04] text-zinc-400 border border-white/[0.06] rounded-full px-2 backdrop-blur-xs`。
+     - **成交 (FILLS)**：買多 `emerald` / 賣空 `rose` 晶透微膠囊圓角標籤，搭配專屬光子次表面暈彩。
+     - **心跳 (OK)**：`bg-slate-500/15 text-slate-300 border border-slate-500/25 rounded-full px-2 backdrop-blur-xs`。
+     - **風控衝擊卡片**：`rounded-lg bg-amber-500/10 border border-amber-500/25 backdrop-blur-xs`，深沉黑曜石玻璃質感。
+2. **依「定案固化 SOP」徹底刪除過渡分支與臨時開關**：
+   - 在 [unified-incident-activity-card.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/unified-incident-activity-card.tsx) 中徹底刪除 Header 右側「風格選項：方案 A Linear 冰晶 | 方案 B Bloomberg 終端 | 方案 C macOS 晶透」切換按鈕。
+   - 徹底移除 `colorTheme` state 與 `ColorThemeMode` 類型定義，清除方案 A 與方案 B 的分支條件程式碼。
+   - Header 右側還原純淨專業微標籤 `SQLite (WAL) 同步`，實現 Zero-Waste 純資料密度。
+3. **驗證與運行狀態**：
+   - 8890 主戰情台（PID 20116）與 8887 預覽台（PID 20732）背景常駐運行熱更。
+   - `npx tsc --noEmit`、`npx tsc --project tsconfig.dashboard-preview.json` 0 錯誤通過。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
+
+---
+
+## 徹底清除生造符號與介面快捷鍵文字（2026-10-23）
+1. **依使用者指示徹底清除 5 大雜質元素**：
+   - 徹底移除頂部導航列之 `搜尋或跳轉... Ctrl K` 按鈕（[shell.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/shell.tsx)）。
+   - 徹底移除未經設計的生造科技雙斜線符號 `//`（[widget-gallery-drawer.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/widget-gallery-drawer.tsx)）。
+   - 徹底移除生造英文裝飾字 `MODULE HUB` 與自嗨狀態條 `SUPERVISOR ACTIVE | WAL 日誌防護 | 100% DECIMAL 核心`。
+   - 徹底移除彈窗與按鈕上的快捷鍵文字標籤（`按 ESC 關閉`、`<kbd>Alt+M</kbd>`、`<kbd>Ctrl K</kbd>`），快捷鍵回歸底層靜態監聽，介面徹底乾淨純粹。
+2. **模組庫純淨收斂**：
+   - 標題回歸樸素克制的「工作區模組庫 (N/9 掛載中)」，右上角保留純粹的關閉 `X` 按鈕。
+   - 側邊欄保留純粹的分類標籤與出廠配置切換。
+3. **驗證與運行狀態**：
+   - 8890 主戰情台（PID 20116）與 8887 預覽台（PID 20732）背景常駐運行熱更。
+   - `npx tsc --noEmit`、`npx tsc --project tsconfig.dashboard-preview.json` 0 錯誤通過。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
+
+---
+
+## 全域戰情日誌分類定案：詞組 2 極限二字零浪費（2026-10-23）
+1. **使用者正式拍板定案「方案 A 詞組 2（極限二字零浪費風格）」**：
+   - 徹底根除「成交流水、風控保護、委託執行、系統對帳」四字生造湊詞。
+   - 固化為 6 大極簡終端 Tabs：
+     1. **`未解除`**（置頂待辦異常，如 UNKNOWN 委託、P6 待確認）
+     2. **`全部`**（全域時序流水）
+     3. **`風控`**（3.0x 槓桿超限、日損 Soft/Hard 熔斷、P6 災難停損保護）
+     4. **`成交`**（SWAP 開平倉撮合、8H 永續資金費結算、外部返佣）
+     5. **`委託`**（委託提交、撤單、UNKNOWN 逾時鎖定、滑價偏離）
+     6. **`系統`**（對帳門禁審計、Bot 啟停生命週期、Closed Bar 延遲恢復）
+2. **依「定案固化 SOP」徹底刪除過渡分支與臨時按鈕**：
+   - 徹底刪除分類架構方案 A/B/C 及用詞風格 1/2/3 臨時切換按鈕。
+   - 程式碼收斂寫死為正式定案邏輯，右側還原為純淨時序湧動微標，無任何過渡冗餘。
+3. **驗證與運行狀態**：
+   - 8890 主戰情台與 8887 預覽台背景常駐運行熱更。
+   - `npx tsc --noEmit`、`npx tsc --project tsconfig.dashboard-preview.json` 0 錯誤通過。
+   - `npm run build` 與 `npx vite build --config vite.dashboard-preview.config.ts` 0 錯誤通過。
+
+---
 1. **依指示徹底移除頁面底部狀態列（Grounded Footer Purge）**：
    - 在 [shell.tsx](file:///c:/Users/kai/Desktop/CatOS_Astra/frontend/cat-os-vite/src/components/catos/shell.tsx) 中徹底移除 `footer` 元素及其回放進度綁定。
    - 釋放垂直高度，杜絕非必要的心跳列與回放進度條佔位，全螢幕每一像素皆服務於量化核心交易數據。

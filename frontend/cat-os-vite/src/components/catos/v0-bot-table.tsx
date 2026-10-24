@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { INITIAL_BOTS, equitySeries, summarize, formatPct, toneOf, type Bot } from "@/lib/v0-engine";
 import { CardHeaderTitle } from "./card-header-title";
 import { BotMonitorTable, type BotMonitoringView } from "./bot-monitor-table";
-import { usePreviewStore } from "@/preview/preview-store";
 import { useInspectorStore } from "@/state/inspectorStore";
 import { InlineBotRow } from "./inspector/inline-bot-row";
 import { useLiveMarketStore } from "@/state/liveMarketStore";
@@ -22,28 +21,18 @@ interface BotPosMeta {
   p6Status: "ACTIVE" | "STANDBY" | "ALERT" | "UPDATING";
   p6Rounding: string;
   p6BudgetPct: number;
-  intentSummary?: string;
-  warning?: boolean;
 }
 
 interface V0BotTableProps {
   className?: string;
   showHeader?: boolean;
   monitoring?: BotMonitoringView;
-  isIntegratedPreview?: boolean;
 }
 
-export function V0BotTable({ className, showHeader = true, monitoring, isIntegratedPreview }: V0BotTableProps) {
+export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTableProps) {
   const [localBots, setLocalBots] = useState<Bot[]>(INITIAL_BOTS);
   const [focusedBotId, setFocusedBotId] = useState<string | null>(null);
   const [flashBotId, setFlashBotId] = useState<Record<string, "up" | "down">>({});
-
-  // 預覽 Store 綁定
-  const {
-    bots: previewBots,
-    toggleBotPause: previewTogglePause,
-    highlightTarget,
-  } = usePreviewStore();
 
   // 定案 B：行內展開 Accordion 狀態綁定
   const {
@@ -56,16 +45,11 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
   // 即時市場撮合心跳 Store
   const { botsLive } = useLiveMarketStore();
 
-  const bots = isIntegratedPreview
-    ? INITIAL_BOTS.map((ib) => {
-        const pb = previewBots.find((p) => p.id === ib.id);
-        return pb ? { ...ib, status: pb.status } : ib;
-      })
-    : localBots;
+  const bots = localBots;
 
-  // 模擬 Tick 波動微光跳動 (已定案固化，預覽模式維持數據嚴格一致)
+  // 模擬 Tick 波動微光跳動
   useEffect(() => {
-    if (monitoring || isIntegratedPreview) return;
+    if (monitoring) return;
     const timer = setInterval(() => {
       const targetIdx = Math.floor(Math.random() * INITIAL_BOTS.length);
       const isUp = Math.random() > 0.45;
@@ -82,19 +66,15 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
       }, 700);
     }, 3200);
     return () => clearInterval(timer);
-  }, [monitoring, isIntegratedPreview]);
+  }, [monitoring]);
 
   const runningCount = bots.filter((b) => b.status === "running").length;
 
   const togglePause = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isIntegratedPreview) {
-      previewTogglePause(id);
-    } else {
-      setLocalBots((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, status: b.status === "running" ? "paused" : "running" } : b))
-      );
-    }
+    setLocalBots((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, status: b.status === "running" ? "paused" : "running" } : b))
+    );
   };
 
   // 生成 Sparkline SVG 迷你走勢線路徑
@@ -120,27 +100,6 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
 
   const getPosMeta = (bot: Bot): BotPosMeta => {
     const live = botsLive[bot.id];
-
-    if (isIntegratedPreview) {
-      const pb = previewBots.find((p) => p.id === bot.id);
-      if (pb) {
-        return {
-          side: pb.side,
-          qtyText: pb.qtyText,
-          notional: live?.notional ?? pb.notional,
-          upnl: live?.upnl ?? pb.upnl,
-          upnlPct: live?.upnlPct ?? pb.upnlPct,
-          dd: pb.dd,
-          p6StopPrice: pb.p6StopPrice,
-          p6DistPct: live?.p6DistPct ?? pb.p6DistPct,
-          p6Status: pb.p6Status,
-          p6Rounding: pb.p6Rounding,
-          p6BudgetPct: 15,
-          intentSummary: pb.intentSummary,
-          warning: pb.warning,
-        };
-      }
-    }
 
     switch (bot.id) {
       case "tabby":
@@ -244,7 +203,6 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
               const pos = getPosMeta(bot);
               const spark = getSparkline(bot);
               const isPaused = bot.status === "paused";
-              const isHighlighted = isIntegratedPreview && highlightTarget.type === 'bot' && highlightTarget.id === bot.id;
               const isSelected = selectedBotId === bot.id;
               const isInlineExpanded = expandedInlineBotIds.includes(bot.id);
 
@@ -260,14 +218,13 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
                       focusedBotId === bot.id && "bg-secondary/50",
                       isSelected && "bg-primary/10 border-l-2 border-primary shadow-[inset_2px_0_0_var(--color-primary)]",
                       isPaused && "opacity-60 bg-background/20",
-                      isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse",
                       flashBotId[bot.id] === "up" && "flash-up",
                       flashBotId[bot.id] === "down" && "flash-down"
                     )}
                     onMouseEnter={() => setFocusedBotId(bot.id)}
                     onMouseLeave={() => setFocusedBotId(null)}
                   >
-                    {/* 1. 機器人與策略 (雙層 + 策略名稱下一行簡短意圖) */}
+                    {/* 1. 機器人與策略 */}
                     <td className="py-2.5 pl-3 pr-2">
                       <div className="flex items-center gap-2">
                         {/* 展開/收合箭頭指示 */}
@@ -280,7 +237,7 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
                         <span
                           className={cn(
                             "w-2 h-2 rounded-full shrink-0",
-                            isPaused ? "bg-muted-foreground/50" : pos.warning ? "bg-amber-400 shadow-[0_0_6px_var(--amber-400)]" : "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
+                            isPaused ? "bg-muted-foreground/50" : "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
                           )}
                         />
                         <div className="flex flex-col min-w-0">
@@ -299,23 +256,6 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
                             <span>{bot.timeframe}</span>
                             <span>· {bot.strategyId}</span>
                           </div>
-
-                          {/* 策略名稱下增加一行簡短意圖 */}
-                          {pos.intentSummary && (
-                            <div className="flex items-center gap-1 text-[9.5px] font-mono leading-tight mt-1 truncate">
-                              <span className={cn(
-                                "px-1 py-0.2 rounded text-[8.5px] font-bold shrink-0",
-                                pos.warning
-                                  ? "bg-amber-400/10 text-amber-300 border border-amber-400/30"
-                                  : "bg-primary/10 text-primary border border-primary/25"
-                              )}>
-                                意圖
-                              </span>
-                              <span className={cn("truncate max-w-[220px]", pos.warning ? "text-amber-200" : "text-muted-foreground")}>
-                                {pos.intentSummary}
-                              </span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -408,7 +348,6 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
                         <button
                           type="button"
                           onClick={(e) => togglePause(bot.id, e)}
-                          title={isIntegratedPreview ? "本地模擬操作：更新本地狀態、運作數量與模擬日誌；暫停不代表平倉，啟用不得解除風控限制" : undefined}
                           className={cn(
                             "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
                             isPaused
@@ -417,7 +356,6 @@ export function V0BotTable({ className, showHeader = true, monitoring, isIntegra
                           )}
                         >
                           <span>{isPaused ? "重啟" : "暫停"}</span>
-                          {isIntegratedPreview && <span className="text-[8.5px] opacity-60">(模擬)</span>}
                         </button>
                       </div>
                     </td>

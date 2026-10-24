@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
 import { AlertTriangle } from "lucide-react";
 import { PositionProtectionTable, type ProtectionMonitoringView } from './position-protection-table';
-import { usePreviewStore } from "@/preview/preview-store";
 import { useLiveMarketStore } from "@/state/liveMarketStore";
 import { NumberTicker } from "./motion/number-ticker";
 
@@ -60,7 +59,6 @@ interface ActivityPanelProps {
   className?: string;
   showHeader?: boolean;
   monitoring?: ProtectionMonitoringView;
-  isIntegratedPreview?: boolean;
 }
 
 const DEFAULT_POSITIONS: PositionRow[] = [
@@ -192,28 +190,16 @@ const INITIAL_ORDERS: OrderRow[] = [
   },
 ];
 
-export function ActivityPanel({ className, showHeader = true, monitoring, isIntegratedPreview }: ActivityPanelProps) {
-  const { tickers, botsLive } = useLiveMarketStore();
-  const [localTab, setLocalTab] = useState<ActivityTab>("positions");
+export function ActivityPanel({ className, showHeader = true, monitoring }: ActivityPanelProps) {
+  const { tickers } = useLiveMarketStore();
+  const [tab, setTab] = useState<ActivityTab>("positions");
   const [orders, setOrders] = useState<OrderRow[]>(INITIAL_ORDERS);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [flashRows, setFlashRows] = useState<Record<string, "up" | "down">>({});
 
-  // 預覽 Store 綁定
-  const {
-    positions: previewPositions,
-    positionsTab,
-    setPositionsTab,
-    openInspector,
-    highlightTarget,
-  } = usePreviewStore();
-
-  const tab = isIntegratedPreview ? positionsTab : localTab;
-  const setTab = isIntegratedPreview ? setPositionsTab : setLocalTab;
-
-  // 模擬 Tick 波動微光跳動 (已定案固化，預覽模式維持數據嚴格一致)
+  // 模擬 Tick 波動微光跳動
   useEffect(() => {
-    if (monitoring || isIntegratedPreview) return;
+    if (monitoring) return;
     const timer = setInterval(() => {
       const targetIdx = Math.floor(Math.random() * DEFAULT_POSITIONS.length);
       const isUp = Math.random() > 0.45;
@@ -230,7 +216,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
       }, 700);
     }, 2400);
     return () => clearInterval(timer);
-  }, [monitoring, isIntegratedPreview]);
+  }, [monitoring]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -382,46 +368,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
     ];
   }, [tickers]);
 
-  const positionsData = isIntegratedPreview
-    ? previewPositions.map((pp) => {
-        const liveBot = botsLive[pp.botId];
-        const quote = tickers[pp.base];
-        const currentMark = quote
-          ? quote.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : pp.mark;
-        const currentNotional = liveBot ? liveBot.notional.toLocaleString("en-US") : pp.notional;
-        const currentUpnl = liveBot ? liveBot.upnl : pp.upnl;
-        const currentUpnlPct = liveBot ? liveBot.upnlPct : pp.upnlPct;
-        const currentP6Dist = liveBot?.p6DistPct ?? (pp.p6Status === "CONFIRMED" ? "-4.24%" : "-7.06%");
-
-        return {
-          id: pp.id,
-          botId: pp.botId,
-          botName: pp.botName,
-          symbol: pp.symbol,
-          base: pp.base,
-          side: pp.side,
-          qty: pp.qty,
-          entry: pp.entry,
-          mark: currentMark,
-          notional: currentNotional,
-          upnl: currentUpnl,
-          upnlPct: currentUpnlPct,
-          leverage: pp.leverage,
-          opened: pp.opened,
-          liqPrice: pp.liqPrice,
-          distLiqPct: pp.distLiqPct,
-          mmr: "0.40%",
-          p6StopPrice: pp.p6Status === "CONFIRMED" ? pp.p6ActiveStopPrice.replace("$", "") : pp.p6TargetStopPrice.replace("$", ""),
-          p6DistPct: currentP6Dist,
-          p6Status: (pp.p6Status === "CONFIRMED" ? "ACTIVE" : "UPDATING") as "ACTIVE" | "UPDATING" | "ALERT",
-          p6Rounding: "向上取整" as const,
-          protectedNotional: `$${currentNotional}`,
-          p6ActiveStopPrice: pp.p6ActiveStopPrice,
-          p6TargetStopPrice: pp.p6TargetStopPrice,
-        };
-      })
-    : liveDefaultPositions;
+  const positionsData = liveDefaultPositions;
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
@@ -433,17 +380,9 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
             title="持倉明細與在途委託"
             subtext={
               <div className="flex items-center gap-1.5 ml-1">
-                <span className={cn(
-                  "flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border",
-                  isIntegratedPreview
-                    ? "text-amber-400 bg-amber-400/10 border-amber-400/30 font-semibold"
-                    : "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
-                )}>
-                  <span className={cn(
-                    "size-1.5 rounded-full",
-                    isIntegratedPreview ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-                  )} />
-                  {isIntegratedPreview ? "P6 已確認 2/3 · 1 待確認" : "P6 交易所端 100% 錨定"}
+                <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border text-emerald-400 bg-emerald-400/10 border-emerald-400/25">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  P6 交易所端 100% 錨定
                 </span>
               </div>
             }
@@ -501,8 +440,6 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
               {positionsData.map((p) => {
                 const flash = flashRows[p.id];
                 const isPositive = p.upnl >= 0;
-                const isUpdating = p.p6Status === "UPDATING";
-                const isHighlighted = isIntegratedPreview && highlightTarget.type === 'protection' && (highlightTarget.id === p.id || highlightTarget.id === p.botId);
 
                 return (
                   <tr
@@ -510,8 +447,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
                     className={cn(
                       "hover:bg-secondary/40 transition-all group",
                       flash === "up" && "flash-up",
-                      flash === "down" && "flash-down",
-                      isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse"
+                      flash === "down" && "flash-down"
                     )}
                   >
                     <td className="py-2 pl-3 pr-1.5">
@@ -570,46 +506,21 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
                       </div>
                     </td>
 
-                    {/* 整合 P6 欄位：已確認 / 更新待確認 / 未啟用 */}
+                    {/* P6 災難停損 (OKX 交易所端) */}
                     <td className="px-1.5 py-2 text-right">
                       <div className="flex flex-col items-end">
                         <div className="flex items-center gap-1 font-mono">
-                          {isUpdating ? (
-                            <span className="text-[10px] text-amber-400 font-bold leading-tight" title="更新目標不能冒充生效價；生效價目前未知">
-                              目標 ${p.p6TargetStopPrice ? p.p6TargetStopPrice.replace('$', '') : p.p6StopPrice}
-                            </span>
-                          ) : (
-                            <>
-                              <span className="text-[10.5px] text-primary font-bold leading-tight">
-                                ${p.p6StopPrice}
-                              </span>
-                              <span className="text-[9px] text-amber-400/90 font-semibold">
-                                ({p.p6DistPct})
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {isIntegratedPreview ? (
-                          <button
-                            type="button"
-                            onClick={() => openInspector('protection', p.id)}
-                            className={cn(
-                              "mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-mono border transition-all cursor-pointer",
-                              isUpdating
-                                ? "border-amber-400/40 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 font-bold animate-pulse"
-                                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20"
-                            )}
-                          >
-                            <span className={cn("size-1 rounded-full", isUpdating ? "bg-amber-400" : "bg-emerald-400")} />
-                            <span>{isUpdating ? "▲ 更新待確認 (詳情 ↗)" : "● 已確認 (詳情 ↗)"}</span>
-                          </button>
-                        ) : (
-                          <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
-                            <span className="size-1 rounded-full bg-emerald-400" />
-                            OKX {p.p6Rounding}
+                          <span className="text-[10.5px] text-primary font-bold leading-tight">
+                            ${p.p6StopPrice}
                           </span>
-                        )}
+                          <span className="text-[9px] text-amber-400/90 font-semibold">
+                            ({p.p6DistPct})
+                          </span>
+                        </div>
+                        <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
+                          <span className="size-1 rounded-full bg-emerald-400" />
+                          OKX {p.p6Rounding}
+                        </span>
                       </div>
                     </td>
 
@@ -648,18 +559,14 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-xs font-mono">
-                  {ordersData.map((o) => {
-                    const isHighlighted = isIntegratedPreview && highlightTarget.type === 'order' && highlightTarget.id === o.id;
-
-                    return (
-                      <tr
-                        key={o.id}
-                        className={cn(
-                          "hover:bg-secondary/40 transition-all group",
-                          o.isUnknown && "bg-amber-500/[0.04]",
-                          isHighlighted && "ring-1 ring-primary bg-primary/15 shadow-[0_0_12px_rgba(232,180,94,0.35)] animate-pulse"
-                        )}
-                      >
+                  {ordersData.map((o) => (
+                    <tr
+                      key={o.id}
+                      className={cn(
+                        "hover:bg-secondary/40 transition-all group",
+                        o.isUnknown && "bg-amber-500/[0.04]"
+                      )}
+                    >
                         <td className="py-2 pl-3 pr-1.5">
                           <div className="flex flex-col">
                             <span className="text-[11px] font-bold text-foreground leading-tight">{o.symbol}</span>
@@ -716,8 +623,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
                           )}
                         </td>
                       </tr>
-                    );
-                  })}
+                    ))}
                 </tbody>
               </table>
             )}

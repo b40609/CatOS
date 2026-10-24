@@ -86,6 +86,8 @@ export interface PreviewOrder {
   relatedEventId?: string;
 }
 
+export type EventDomain = 'FILLS' | 'FUNDING' | 'ORDERS' | 'P6' | 'RISK' | 'RECON' | 'SYSTEM';
+
 export interface PreviewEvent {
   id: string;
   time: string;
@@ -97,6 +99,7 @@ export interface PreviewEvent {
   title: string;
   detail: string;
   resolution: 'open' | 'resolved';
+  domain?: EventDomain;
   impact?: string;
   nextStep?: string;
   relatedOrderId?: string;
@@ -452,6 +455,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_unknown_calico',
     time: '11:10:02',
     category: 'ALERT',
+    domain: 'ORDERS',
     severity: 'WARN',
     source: 'Supervisor',
     botName: 'Calico',
@@ -468,6 +472,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_protection_mochi',
     time: '11:09:18',
     category: 'ALERT',
+    domain: 'P6',
     severity: 'WARN',
     source: 'P6 Guard',
     botName: 'Mochi',
@@ -483,6 +488,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_sys_heartbeat',
     time: '11:14:58',
     category: 'SYSTEM',
+    domain: 'RECON',
     severity: 'OK',
     source: 'Supervisor',
     title: '部位核對完成 · 保護仍有 1 筆待確認',
@@ -493,6 +499,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_resolved_tabby',
     time: '10:45:16',
     category: 'ALERT',
+    domain: 'SYSTEM',
     severity: 'WARN',
     source: 'Market Feed',
     botName: 'Tabby',
@@ -508,6 +515,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_fill_mochi',
     time: '10:30:00',
     category: 'FILL',
+    domain: 'FILLS',
     severity: 'TRADE',
     source: 'OKX-SWAP',
     botName: 'Mochi',
@@ -527,6 +535,7 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     id: 'evt_sys_shiro_paused',
     time: '09:30:10',
     category: 'SYSTEM',
+    domain: 'SYSTEM',
     severity: 'INFO',
     source: 'Supervisor',
     botName: 'Shiro',
@@ -534,6 +543,90 @@ const INITIAL_EVENTS_DATA: PreviewEvent[] = [
     title: 'Shiro 已暫停 · 空倉',
     resolution: 'resolved',
     detail: '沒有在途委託，未取得合約執行權；不產生新策略意圖。',
+  },
+  {
+    id: 'evt_fill_tabby_profit',
+    time: '08:45:12',
+    category: 'FILL',
+    domain: 'FILLS',
+    severity: 'TRADE',
+    source: 'OKX-SWAP',
+    botName: 'Tabby',
+    botId: 'tabby',
+    title: 'BTC 均線突破平多成交',
+    symbol: 'BTC-USDT-SWAP',
+    action: '平多',
+    side: 'sell',
+    qty: '0.40',
+    price: '63,200.00',
+    pnl: 688,
+    resolution: 'resolved',
+    detail: '唐奇安通道上軌訊號觸發，平多 0.40 BTC，成交均價 $63,200.00，實現損益 +$688.00。',
+    relatedPositionId: 'p1',
+  },
+  {
+    id: 'evt_funding_btc',
+    time: '08:00:00',
+    category: 'FILL',
+    domain: 'FUNDING',
+    severity: 'TRADE',
+    source: 'OKX-Funding',
+    title: 'BTC 8H 資金費用結算',
+    symbol: 'BTC-USDT-SWAP',
+    pnl: -3.42,
+    resolution: 'resolved',
+    detail: 'OKX 08:00 (UTC+08:00) 永續合約資金費扣繳 -$3.42 USDT，費率 +0.0100%，標記價 $62,140.50。',
+  },
+  {
+    id: 'evt_order_mochi_limit',
+    time: '07:30:00',
+    category: 'SYSTEM',
+    domain: 'ORDERS',
+    severity: 'INFO',
+    source: 'Supervisor',
+    botName: 'Mochi',
+    botId: 'mochi',
+    title: 'SOL 在途限價掛單已提交',
+    resolution: 'resolved',
+    detail: 'ClientOrderId: cat_mochi_0734，限價 $146.90 買入 6.0 SOL，凍結保證金 $298.10，距現價 -3.86%。',
+    relatedOrderId: 'o4',
+  },
+  {
+    id: 'evt_p6_tabby_confirmed',
+    time: '07:00:00',
+    category: 'SYSTEM',
+    domain: 'P6',
+    severity: 'OK',
+    source: 'OKX-P6-Guard',
+    botName: 'Tabby',
+    botId: 'tabby',
+    title: 'BTC P6 災難停損重新錨定生效',
+    resolution: 'resolved',
+    detail: '部位平均成本微幅改變，交易所端整倉停損單已重新錨定 ($59,500.00，向上取整)，保護覆蓋量 0.85 BTC。',
+    relatedPositionId: 'p1',
+  },
+  {
+    id: 'evt_risk_leverage_check',
+    time: '06:30:00',
+    category: 'SYSTEM',
+    domain: 'RISK',
+    severity: 'OK',
+    source: 'RiskEngine',
+    title: '帳戶有效槓桿事前安全審計通過',
+    resolution: 'resolved',
+    detail: '目前全域名目曝險 $18,307，有效槓桿 1.46x（低於 3.0x 上限）；單幣最高 BTC 佔比 28.2%（低於 50% 上限）。',
+  },
+  {
+    id: 'evt_cashflow_rebate',
+    time: '06:00:00',
+    category: 'SYSTEM',
+    domain: 'FUNDING',
+    severity: 'INFO',
+    source: 'AccountLedger',
+    title: 'OKX KOL 返佣折讓入帳',
+    pnl: 18.5,
+    resolution: 'resolved',
+    detail: '昨結算手續費返佣 +$18.50 USDT 已入帳。符合 R1 白名單，自動排除於策略日損分母計算。',
   },
 ];
 

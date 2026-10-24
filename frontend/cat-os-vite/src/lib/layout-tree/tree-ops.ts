@@ -1,5 +1,6 @@
 import type { CardId } from "@/state/layoutStore";
 import type { LayoutNode, LeafNode, SplitNode, SplitDirection, DropPosition } from "./types";
+import { CARD_DEFAULT_MIN_HEIGHTS } from "@/components/catos/card-registry";
 
 /**
  * 深度拷貝 LayoutNode 樹
@@ -566,11 +567,9 @@ export function removeTabFromLeaf(
 }
 
 /**
- * 拖曳卡片操作 (VS Code 四向扇區分裂插入 ＋ 中央落點分頁堆疊)：
- * 依使用者確認徹底移除多餘的換位 (Swap)；
- * 來源節點移出後，原分支自動平滑合併填滿 (Auto-Merge)；
- * 目標位置若為 center，則堆疊為同一視窗容器之 Tab (Dock as Tab)；
- * 目標位置若為四周邊界，則依據扇區分裂展開 (Dock / Split ⊞)。
+ * 拖曳卡片操作 (四向扇區分裂插入 ＋ 中央落點卡片對調換位 Central Swap ⇄)：
+ * - 若落點為 center，觸發兩張卡片對調換位 (Swap ⇄) 或從卡片庫就地替換；
+ * - 若落點為四周邊界，來源節點移出後原分支自動平滑合併填滿 (Auto-Merge)，並在目標邊界分裂展開 (Dock / Split ⊞)。
  */
 export function moveAndSplit(
   root: LayoutNode,
@@ -583,28 +582,29 @@ export function moveAndSplit(
   if (sourceLeafId === targetLeafId) return root;
 
   const isGalleryNew = sourceLeafId.startsWith("gallery-new-");
-  let sourceCardId: CardId;
+  const sourceNode = isGalleryNew ? null : (findNode(root, sourceLeafId) as LeafNode | null);
+  const sourceCardId: CardId | undefined = isGalleryNew
+    ? (draggedCardId || (sourceLeafId.replace("gallery-new-", "") as CardId))
+    : sourceNode?.cardId;
+
+  if (!sourceCardId) return root;
+
+  // 1. 若落點為中央區域 (center)：觸發卡片對調換位 (Central Swap ⇄) 或自卡片庫就地替換
+  if (dropPosition === "center") {
+    if (isGalleryNew) {
+      return replaceLeafCard(root, targetLeafId, sourceCardId);
+    }
+    return swapLeaves(root, sourceLeafId, targetLeafId);
+  }
+
+  // 2. 四邊邊界分裂：先從原樹中剪除來源節點 (原分支平滑合併關閉)
   let treeAfterPrune: LayoutNode | null = root;
-
-  if (isGalleryNew) {
-    sourceCardId = draggedCardId || (sourceLeafId.replace("gallery-new-", "") as CardId);
-  } else {
-    // 1. 記錄來源卡片型別
-    const sourceNode = findNode(root, sourceLeafId);
-    if (!sourceNode || sourceNode.type !== "leaf") return root;
-    sourceCardId = sourceNode.cardId;
-
-    // 2. 先從原樹中剪除來源節點 (原分支平滑合併關閉，消除卡片移走後仍站著位置的BUG)
+  if (!isGalleryNew) {
     treeAfterPrune = removeLeaf(root, sourceLeafId);
     if (!treeAfterPrune) return root;
   }
 
-  // 3. 若落點為中央區域 (center)：觸發分頁堆疊合併 (Dock as Tab)
-  if (dropPosition === "center") {
-    return addTabToLeaf(treeAfterPrune, targetLeafId, sourceCardId);
-  }
-
-  // 4. 決定新分裂的方向與前後位置
+  // 3. 決定新分裂的方向與前後位置
   let direction: SplitDirection = "row";
   let side: "before" | "after" = "after";
 
@@ -627,7 +627,7 @@ export function moveAndSplit(
       break;
   }
 
-  // 5. 在剪枝後的樹中對目標節點進行分裂插入
+  // 4. 在剪枝後的樹中對目標節點進行分裂插入
   return splitLeaf(
     treeAfterPrune,
     targetLeafId,
@@ -637,6 +637,34 @@ export function moveAndSplit(
     newLeafId || (isGalleryNew ? `leaf-${sourceCardId}-${Date.now()}` : sourceLeafId)
   );
 }
+
+/**
+ * 遞迴計算 Layout Tree 在垂直方向上所需的最小安全閱讀高度 (px)
+ * 當樹狀分割層級過多導致所需高度大於視窗高度時，以此數值作為畫布高度，觸發外層平滑縱向滾動
+ */
+export function calculateTreeMinHeight(
+  node: LayoutNode | null | undefined,
+  minHeights: Record<CardId, number> = CARD_DEFAULT_MIN_HEIGHTS
+): number {
+  if (!node) return 0;
+  if (node.type === "leaf") {
+    return minHeights[node.cardId] || 300;
+  }
+  const hFirst = calculateTreeMinHeight(node.first, minHeights);
+  const hSecond = calculateTreeMinHeight(node.second, minHeights);
+  if (node.direction === "row") {
+    // 左右並排：高度取二者之較大值
+    return Math.max(hFirst, hSecond);
+  } else {
+    // 上下垂直分割：二者高度相加 + 5px 間隙
+    const sumMin = hFirst + hSecond + 5;
+    const r = Math.max(0.1, Math.min(0.9, node.ratio));
+    const ratioFirst = Math.ceil(hFirst / r);
+    const ratioSecond = Math.ceil(hSecond / (1 - r));
+    return Math.max(sumMin, Math.min(ratioFirst, ratioSecond));
+  }
+}
+
 
 /**
  * 提交落位：將即時流體預演中的 preview-slot-* 節點正式轉化為永久葉子節點
