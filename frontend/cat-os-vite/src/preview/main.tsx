@@ -56,13 +56,13 @@ function PreviewDashboard() {
         return <AccountEquityBand className="h-full" />;
 
       case 'bots':
-        return <V0BotTable className="h-full" isIntegratedPreview />;
+        return <V0BotTable className="h-full" />;
 
       case 'allocation':
         return <AllocationDonutCard className="h-full" />;
 
       case 'positions':
-        return <ActivityPanel className="h-full" isIntegratedPreview />;
+        return <ActivityPanel className="h-full" />;
 
       case 'activity_deck':
         return <UnifiedIncidentActivityCard className="h-full" />;

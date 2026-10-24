@@ -8,8 +8,6 @@ import { CardHeaderTitle } from "./card-header-title";
 import { UNIFIED_EVENTS, type EventCategory, type UnifiedEvent } from "@/lib/mock/unified-events";
 import { formatUsd, toneOf } from "@/lib/v0-engine";
 import { cn } from "@/lib/utils";
-import { usePreviewStore } from "@/preview/preview-store";
-
 export interface MonitoredEvent extends UnifiedEvent {
   resolution?: 'open' | 'resolved';
   impact?: string;
@@ -20,31 +18,17 @@ interface UnifiedActivityDeckCardProps {
   className?: string;
   showHeader?: boolean;
   events?: MonitoredEvent[];
-  isIntegratedPreview?: boolean;
 }
 
 export function UnifiedActivityDeckCard({
   className,
   showHeader = true,
   events: propEvents,
-  isIntegratedPreview,
 }: UnifiedActivityDeckCardProps) {
-  const [localCategory, setLocalCategory] = useState<EventCategory | 'OPEN'>("ALL");
+  const [category, setCategory] = useState<EventCategory | 'OPEN'>("ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // 預覽 Store 綁定
-  const {
-    events: previewEvents,
-    openInspector,
-    highlightTarget,
-  } = usePreviewStore();
-
-  const sourceEvents: MonitoredEvent[] = isIntegratedPreview
-    ? (previewEvents as unknown as MonitoredEvent[])
-    : (propEvents ?? UNIFIED_EVENTS);
-
-  const category = localCategory;
-  const setCategory = setLocalCategory;
+  const sourceEvents: MonitoredEvent[] = propEvents ?? UNIFIED_EVENTS;
 
   const filteredEvents = useMemo(() => {
     const filtered = sourceEvents.filter((e) =>
@@ -142,23 +126,15 @@ export function UnifiedActivityDeckCard({
               const isFill = e.category === "FILL";
               const isAlert = e.category === "ALERT";
               const isOpen = e.resolution === 'open';
-              const isHighlighted = isIntegratedPreview && highlightTarget.type === 'event' && highlightTarget.id === e.id;
 
               return (
                 <tr
                   key={e.id}
-                  onClick={() => {
-                    if (isIntegratedPreview) {
-                      openInspector('event', e.id);
-                    } else {
-                      setExpandedId(isExpanded ? null : e.id);
-                    }
-                  }}
+                  onClick={() => setExpandedId(isExpanded ? null : e.id)}
                   className={cn(
                     "hover:bg-secondary/40 transition-all cursor-pointer group",
                     isExpanded && "bg-secondary/50",
-                    isOpen && "bg-amber-500/[0.04]",
-                    isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse"
+                    isOpen && "bg-amber-500/[0.04]"
                   )}
                 >
                   {/* 1. 時間與來源 */}
@@ -214,11 +190,6 @@ export function UnifiedActivityDeckCard({
                         <span className="text-left text-[11px] font-semibold text-foreground group-hover:text-primary transition-colors">
                           {isFill ? `${e.symbol} · ${e.qty} @ $${e.price}` : e.title}
                         </span>
-                        {isIntegratedPreview && (
-                          <span className="text-[9px] text-muted-foreground font-mono opacity-60 group-hover:opacity-100">
-                            [詳情 ↗]
-                          </span>
-                        )}
                       </div>
                       <p className={cn("text-[9.5px] text-muted-foreground leading-relaxed mt-0.5", !isExpanded && "line-clamp-1")}>
                         {e.detail}

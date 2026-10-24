@@ -6,216 +6,108 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
   ShieldAlert,
   Lock,
-  Crosshair,
-  Flame,
-  Gauge,
-  ArrowUp,
-  Sliders,
-  Copy,
-  RotateCcw,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatUsd, toneOf } from '@/lib/v0-engine';
 
-export type EventCategoryFilter = 'OPEN' | 'ALL' | 'FILL' | 'ALERT' | 'SYSTEM';
-export type PhotonRunnerMode = 'sync_bottom_up' | 'sync_collision' | 'snappy_terminal';
+export type EventCategoryFilter = string;
 
-export interface ModeMeta {
-  id: PhotonRunnerMode;
-  name: string;
-  badge: string;
-  desc: string;
+export interface CategoryTabItem {
+  id: string;
+  label: string;
+  badgeCount: number;
+  isAlert?: boolean;
+  filterFn: (ev: PreviewEvent) => boolean;
 }
 
-
-export interface TuningState {
-  durationSec: number;        // 巡航速度 (1.0s ~ 30.0s)
-  photonLength: number;       // 光束長度 (15px ~ 120px)
-  photonWidth: number;        // 光束粗細 (0.5px ~ 4.0px)
-  photonBrightness: number;   // 光子輝度 (10% ~ 100%)
-  glowSpread: number;         // 漫射羽化 (8px ~ 36px)
-  bloomIntensity: number;     // 節點光暈 (0% ~ 250%)
-  glassBlur: number;          // 毛玻璃度 (0px ~ 32px)
-  cardShimmer: number;        // 稜鏡共振 (0% ~ 100%)
-  borderOpacity: number;      // 邊框濃淡 (0% ~ 100%，0% 為完全無框)
+// 輔助函式：安全取得事件領域 (Domain)
+function getEventDomain(ev: PreviewEvent): string {
+  if (ev.domain) return ev.domain;
+  if (ev.category === 'FILL' || ev.severity === 'TRADE') return 'FILLS';
+  if (ev.id.includes('p6') || ev.title.includes('停損') || ev.title.includes('保護')) return 'P6';
+  if (ev.id.includes('unknown') || ev.title.includes('委託') || ev.title.includes('掛單') || ev.relatedOrderId) return 'ORDERS';
+  if (ev.title.includes('風控') || ev.title.includes('槓桿') || ev.title.includes('日損') || ev.title.includes('熔斷')) return 'RISK';
+  if (ev.title.includes('核對') || ev.title.includes('對帳') || ev.title.includes('陌生')) return 'RECON';
+  return 'SYSTEM';
 }
 
-export const TUNING_PRESETS: Record<string, { name: string; tag: string; desc: string; values: TuningState }> = {
-  stealth_ghost: {
-    name: '幽靈冷灰',
-    tag: '無框·暫定',
-    desc: '完全無框純淨數據行 · 極低存在感 · 僅保留節點微弱提示 · 不干擾盤面',
-    values: {
-      durationSec: 12.0,
-      photonLength: 42,
-      photonWidth: 1.0,
-      photonBrightness: 35,
-      glowSpread: 12,
-      bloomIntensity: 45,
-      glassBlur: 0,
-      cardShimmer: 0,
-      borderOpacity: 0,
-    },
-  },
-  default_ios: {
-    name: 'iOS 霜晶極光',
-    tag: '推薦',
-    desc: '黃金比例平衡 · 溫潤晶透 · 零視覺疲勞',
-    values: {
-      durationSec: 8.0,
-      photonLength: 56,
-      photonWidth: 1.5,
-      photonBrightness: 80,
-      glowSpread: 16,
-      bloomIntensity: 100,
-      glassBlur: 16,
-      cardShimmer: 60,
-      borderOpacity: 35,
-    },
-  },
-  deep_breathe: {
-    name: '慢流深呼吸',
-    tag: '慢速',
-    desc: '16s 極慢巡航 · 超長柔焦漫射 · 深度平靜',
-    values: {
-      durationSec: 16.0,
-      photonLength: 85,
-      photonWidth: 1.25,
-      photonBrightness: 65,
-      glowSpread: 24,
-      bloomIntensity: 140,
-      glassBlur: 20,
-      cardShimmer: 80,
-      borderOpacity: 45,
-    },
-  },
-  quantum_needle: {
-    name: '量子超纖針',
-    tag: '敏捷',
-    desc: '3.2s 敏捷滑行 · 26px 極短纖細 · 乾淨俐落',
-    values: {
-      durationSec: 3.2,
-      photonLength: 26,
-      photonWidth: 0.75,
-      photonBrightness: 95,
-      glowSpread: 10,
-      bloomIntensity: 70,
-      glassBlur: 12,
-      cardShimmer: 40,
-      borderOpacity: 20,
-    },
-  },
-  high_energy: {
-    name: '高能雷射',
-    tag: '爆光',
-    desc: '粗線條高飽和 · 強烈鏡頭 Bloom 爆光 · 告警首選',
-    values: {
-      durationSec: 5.0,
-      photonLength: 95,
-      photonWidth: 2.75,
-      photonBrightness: 100,
-      glowSpread: 28,
-      bloomIntensity: 220,
-      glassBlur: 24,
-      cardShimmer: 100,
-      borderOpacity: 65,
-    },
-  },
-};
+// 2026-10-22 使用者拍板定案參數 (純白光子 · 11s 時序湧動 · 完全無框)
+export const INCIDENT_ACTIVITY_PARAMS = {
+  durationSec: 11,
+  photonLength: 15,
+  photonWidth: 0.5,
+  photonBrightness: 100,
+  glowSpread: 8,
+  bloomIntensity: 30,
+  glassBlur: 32,
+  cardShimmer: 0,
+  borderOpacity: 0,
+} as const;
 
-export const RUNNER_MODES: ModeMeta[] = [
-  {
-    id: 'sync_bottom_up',
-    name: '【時序湧動】由下往上幾何對齊 (推薦 · 歷史至最新)',
-    badge: '時序因果',
-    desc: '時序湧動 ➜ 歷史事件 (底) 湧向即時狀態 (頂)，光子撫過節點瞬間精準觸發白金 Bloom',
-  },
-  {
-    id: 'sync_collision',
-    name: '【實時碰撞】由下往上 rAF 微碰撞偵測 (毫秒級零誤差)',
-    badge: '零誤差',
-    desc: '實時碰撞 ➜ rAF 每幀監測光子物理座標，碰上節點即時觸發呼吸，展開收合 100% 吻合',
-  },
-  {
-    id: 'snappy_terminal',
-    name: '【純靜態】Bloomberg 極速終端 (0 動態 · 純數據)',
-    badge: '純靜態',
-    desc: '純靜態 ➜ 0 動態干擾，1px 靜態磨砂導軌，純數據聚焦',
-  },
-];
+const {
+  durationSec: DURATION_SEC,
+  photonLength: PHOTON_LENGTH,
+  photonWidth: PHOTON_WIDTH,
+  photonBrightness: PHOTON_BRIGHTNESS,
+  glowSpread: GLOW_SPREAD,
+  bloomIntensity: BLOOM_INTENSITY,
+  glassBlur: GLASS_BLUR,
+  cardShimmer: CARD_SHIMMER,
+} = INCIDENT_ACTIVITY_PARAMS;
 
 interface UnifiedIncidentActivityCardProps {
   className?: string;
 }
 
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
-  const { events, openInspector, triggerHighlight, highlightTarget } = usePreviewStore();
+  const { events } = usePreviewStore();
 
   // 預設展開最新的未解除告警 (Calico UNKNOWN)
   const [expandedId, setExpandedId] = useState<string | null>('evt_unknown_calico');
-  const [category, setCategory] = useState<EventCategoryFilter>('ALL');
+  const [category, setCategory] = useState<string>('ALL');
 
-  // 預設採用由下往上時序湧動對齊
-  const [runnerMode, setRunnerMode] = useState<PhotonRunnerMode>('sync_bottom_up');
-
-  // 微調控制狀態 (9 大核心參數，預設幽靈冷灰·無框)
-  const [tuning, setTuning] = useState<TuningState>(TUNING_PRESETS.stealth_ghost.values);
-  const [activePreset, setActivePreset] = useState<string>('stealth_ghost');
-  const [isCopied, setIsCopied] = useState<boolean>(false);
-  const [isTuningOpen, setIsTuningOpen] = useState<boolean>(true);
-
-  const updateTuning = <K extends keyof TuningState>(key: K, value: TuningState[K]) => {
-    setTuning((prev) => ({ ...prev, [key]: value }));
-    setActivePreset('custom');
-  };
-
-  const applyPreset = (presetKey: string) => {
-    const p = TUNING_PRESETS[presetKey];
-    if (p) {
-      setTuning(p.values);
-      setActivePreset(presetKey);
-    }
-  };
-
-  const copyParams = () => {
-    const json = JSON.stringify(tuning, null, 2);
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(json);
-    }
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
 
   // DOM 容器與節點座標引用
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // 方案 A/時序湧動：量測各節點真實 offsetTop 相對於底部的延遲 (秒)
+  // 時序湧動：量測各節點真實 offsetTop 相對於底部的延遲 (秒)
   const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
 
-  // 方案 B：碰撞即時狀態
-  const [hitTimestamps, setHitTimestamps] = useState<Record<string, number>>({});
-  const [photonBottomPercent, setPhotonBottomPercent] = useState<number>(0);
-
-  // 統計各類別事件筆數
-  const stats = useMemo(() => {
-    const open = events.filter((e) => e.resolution === 'open' && (e.category === 'ALERT' || e.severity === 'WARN')).length;
-    const fills = events.filter((e) => e.category === 'FILL').length;
-    const alerts = events.filter((e) => e.category === 'ALERT').length;
-    const system = events.filter((e) => e.category === 'SYSTEM').length;
-    return { open, fills, alerts, system, total: events.length };
+  // 統計未解除異常數
+  const openCount = useMemo(() => {
+    return events.filter((e) => e.resolution === 'open' && (e.category === 'ALERT' || e.severity === 'WARN')).length;
   }, [events]);
+
+  // 2026-10-23 定案固化：詞組 2 極限二字 (Bloomberg / TradingView 零浪費極簡純粹風格)
+  const availableTabs = useMemo<CategoryTabItem[]>(() => {
+    const isOpen = (e: PreviewEvent) => e.resolution === 'open' && (e.category === 'ALERT' || e.severity === 'WARN');
+    const countFills = events.filter((e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e))).length;
+    const countRisk = events.filter((e) => ['RISK', 'P6'].includes(getEventDomain(e))).length;
+    const countOrders = events.filter((e) => ['ORDERS'].includes(getEventDomain(e))).length;
+    const countSystem = events.filter((e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e))).length;
+
+    return [
+      { id: 'OPEN', label: `未解除 (${openCount})`, badgeCount: openCount, isAlert: openCount > 0, filterFn: isOpen },
+      { id: 'ALL', label: `全部 (${events.length})`, badgeCount: events.length, filterFn: () => true },
+      { id: 'RISK_P6', label: `風控 (${countRisk})`, badgeCount: countRisk, filterFn: (e) => ['RISK', 'P6'].includes(getEventDomain(e)) },
+      { id: 'FILLS_CASH', label: `成交 (${countFills})`, badgeCount: countFills, filterFn: (e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e)) },
+      { id: 'ORDERS_EXEC', label: `委託 (${countOrders})`, badgeCount: countOrders, filterFn: (e) => ['ORDERS'].includes(getEventDomain(e)) },
+      { id: 'SYSTEM_RECON', label: `系統 (${countSystem})`, badgeCount: countSystem, filterFn: (e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e)) },
+    ];
+  }, [events, openCount]);
+
+  const currentTab = useMemo(() => {
+    return availableTabs.find((t) => t.id === category) ?? availableTabs[1] ?? availableTabs[0];
+  }, [availableTabs, category]);
 
   // 篩選後事件列表 (未解除優先置頂，保持時間序列)
   const filteredEvents = useMemo(() => {
     const list = events.filter((e) => {
-      if (category === 'ALL') return true;
-      if (category === 'OPEN') return e.resolution === 'open' && (e.category === 'ALERT' || e.severity === 'WARN');
-      return e.category === category;
+      if (!currentTab) return true;
+      return currentTab.filterFn(e);
     });
 
     return [...list].sort((a, b) => {
@@ -223,7 +115,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       const bOpen = Number(b.resolution === 'open' && (b.category === 'ALERT' || b.severity === 'WARN'));
       return bOpen - aOpen;
     });
-  }, [events, category]);
+  }, [events, currentTab]);
 
   // 由下往上物理幾何計算：當前節點距離容器底部的真實像素距離比率
   useEffect(() => {
@@ -239,112 +131,79 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         // 由下往上：離底部的距離 = totalH - nodeY
         const distFromBottom = Math.max(0, totalH - nodeY);
         const ratio = Math.max(0, Math.min(1, distFromBottom / totalH));
-        newDelays[ev.id] = Number((ratio * tuning.durationSec).toFixed(3));
+        newDelays[ev.id] = Number((ratio * DURATION_SEC).toFixed(3));
       }
     });
     setBottomUpDelays(newDelays);
-  }, [filteredEvents, expandedId, tuning.durationSec]);
-
-  // 方案 B：由下往上真實碰撞偵測循環 (Bottom-Up rAF)
-  useEffect(() => {
-    if (runnerMode !== 'sync_collision') return;
-
-    let rafId: number;
-    let startTime = performance.now();
-
-    const loop = (now: number) => {
-      const elapsed = (now - startTime) / 1000;
-      const progress = (elapsed % tuning.durationSec) / tuning.durationSec; // 0 ~ 1 由下往上
-      setPhotonBottomPercent(progress * 100);
-
-      if (containerRef.current) {
-        const totalH = containerRef.current.scrollHeight;
-        // 光子當前距離頂部的 Y 座標 (由 bottom=0% 往上移動到 bottom=100%)
-        const currentPhotonY = totalH - (progress * totalH);
-
-        filteredEvents.forEach((ev) => {
-          const el = nodeRefs.current.get(ev.id);
-          if (el) {
-            const nodeY = el.offsetTop + 8;
-            const dist = Math.abs(currentPhotonY - nodeY);
-
-            // 當光子進入節點 16px 碰撞半徑，且間隔大於 500ms
-            if (dist < 16) {
-              setHitTimestamps((prev) => {
-                const lastHit = prev[ev.id] || 0;
-                if (now - lastHit > 500) {
-                  return { ...prev, [ev.id]: now };
-                }
-                return prev;
-              });
-            }
-          }
-        });
-      }
-
-      rafId = requestAnimationFrame(loop);
-    };
-
-    rafId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafId);
-  }, [runnerMode, tuning.durationSec, filteredEvents, expandedId]);
+  }, [filteredEvents, expandedId]);
 
   const toggleIncident = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  // 小圓點與標籤樣式：所有圓點核心絕對等大 (8px)
+  // 小圓點與標籤樣式：定案固化方案 C (macOS Sequoia 晶透黑曜石微膠囊風格)
   const getBadgeMeta = (ev: PreviewEvent) => {
-    const isWarn = ev.severity === 'WARN' || ev.category === 'ALERT';
-    const isTrade = ev.category === 'FILL' || ev.severity === 'TRADE';
-    const isOpen = ev.resolution === 'open' && isWarn;
-    const isOk = ev.severity === 'OK' || ev.resolution === 'resolved';
+    // 1. 精準通知語意判定 (Strict Semantic Classification)
+    const isAlert = ev.category === 'ALERT' || ev.severity === 'WARN';
+    const isOpen = isAlert && ev.resolution === 'open';
+    const isResolvedAlert = isAlert && ev.resolution === 'resolved';
+    const isFill = ev.category === 'FILL' || ev.severity === 'TRADE';
+    const isFillShort = isFill && (ev.action?.includes('空') || ev.action?.includes('賣') || ev.side === 'sell');
+    const isSystemHeartbeat = ev.category === 'SYSTEM' && ev.severity === 'OK';
 
+    // 定案固化方案 C：macOS Sequoia 晶透黑曜石 (Frosted Capsule HIG)
     if (isOpen) {
       return {
         label: 'WARN',
-        badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-        coreClass: 'bg-amber-400 ring-2 ring-background',
-        isSonar: true,
+        badgeClass: 'bg-amber-500/15 text-amber-200 border border-amber-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
+        coreClass: 'bg-[#f59e0b] shadow-[0_0_8px_rgba(245,158,11,0.55)] ring-1 ring-amber-400/40',
+        sonarClass: 'bg-amber-500/25',
+        bloomAnimation: 'crystal-optical-bloom-amber',
       };
     }
-    if (isWarn && !isOpen) {
+    if (isResolvedAlert) {
       return {
-        label: 'WARN',
-        badgeClass: 'bg-amber-500/10 text-amber-400/70 border-amber-500/30',
-        coreClass: 'bg-amber-500/70 shadow-[0_0_4px_rgba(245,158,11,0.4)] ring-2 ring-background',
-        isSonar: false,
+        label: 'RESOLVED',
+        badgeClass: 'bg-white/[0.04] text-zinc-400 border border-white/[0.06] rounded-full px-2 font-medium backdrop-blur-xs',
+        coreClass: 'bg-zinc-600/70 ring-1 ring-zinc-600/40',
+        sonarClass: 'bg-zinc-600/15',
+        bloomAnimation: 'crystal-optical-bloom-neutral',
       };
     }
-    if (isTrade) {
+    if (isFill) {
       return {
         label: ev.action || '成交',
-        badgeClass: ev.action?.includes('空')
-          ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-        coreClass: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)] ring-2 ring-background',
-        isSonar: false,
+        badgeClass: isFillShort
+          ? 'bg-rose-500/15 text-rose-200 border border-rose-500/25 rounded-full px-2 font-medium backdrop-blur-xs'
+          : 'bg-emerald-500/15 text-emerald-200 border border-emerald-500/25 rounded-full px-2 font-medium backdrop-blur-xs',
+        coreClass: isFillShort
+          ? 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.45)] ring-1 ring-rose-400/30'
+          : 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.45)] ring-1 ring-emerald-400/30',
+        sonarClass: isFillShort ? 'bg-rose-500/20' : 'bg-emerald-500/20',
+        bloomAnimation: isFillShort ? 'crystal-optical-bloom-rose' : 'crystal-optical-bloom-emerald',
       };
     }
-    if (isOk) {
+    if (isSystemHeartbeat) {
       return {
         label: 'OK',
-        badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-        coreClass: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)] ring-2 ring-background',
-        isSonar: false,
+        badgeClass: 'bg-slate-500/15 text-slate-300 border border-slate-500/25 rounded-full px-2 font-medium backdrop-blur-xs',
+        coreClass: 'bg-slate-500/70 shadow-[0_0_5px_rgba(100,116,139,0.3)] ring-1 ring-slate-600/40',
+        sonarClass: 'bg-slate-500/15',
+        bloomAnimation: 'crystal-optical-bloom-neutral',
       };
     }
     return {
       label: 'INFO',
-      badgeClass: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-      coreClass: 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)] ring-2 ring-background',
-      isSonar: false,
+      badgeClass: 'bg-white/[0.04] text-zinc-400 border border-white/[0.05] rounded-full px-2 font-medium backdrop-blur-xs',
+      coreClass: 'bg-zinc-600/60 ring-1 ring-zinc-700/30',
+      sonarClass: 'bg-zinc-600/10',
+      bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   };
 
   return (
     <div className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
-      {/* 1. Header 區域：整合卡片標題 + 異常膠囊 + 速度滑桿 (1~30s) + 方案切換 */}
+      {/* 1. Header 區域：整合卡片標題 + 異常膠囊 (定案方案 C 固化) */}
       <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <div className="flex items-center gap-2">
           <CardHeaderTitle
@@ -352,320 +211,38 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
             title="風險警報與交易日誌"
             subtext=""
           />
-          {stats.open > 0 ? (
-            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse font-semibold">
+          {openCount > 0 ? (
+            <span className="flex items-center gap-1 text-[8.5px] px-1.5 py-0.5 rounded-[3px] bg-amber-500/12 text-amber-200 border border-amber-500/30 animate-pulse font-medium">
               <ShieldAlert className="size-2.5" />
-              <span>{stats.open} 異常</span>
+              <span>{openCount} 異常</span>
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">
+            <span className="flex items-center gap-1 text-[8.5px] px-1.5 py-0.5 rounded-[3px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
               <CheckCircle2 className="size-2.5" />
               <span>系統正常</span>
             </span>
           )}
         </div>
 
-        {/* 右側：模式選擇 + 微調控制板開關 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* 微調控制板展開開關 */}
-          <button
-            type="button"
-            onClick={() => setIsTuningOpen(!isTuningOpen)}
-            className={cn(
-              "flex items-center gap-1 rounded px-2 py-0.5 text-[9px] border transition-colors cursor-pointer shadow-2xs font-medium",
-              isTuningOpen
-                ? "bg-primary/20 text-primary border-primary/50 font-bold"
-                : "bg-background/90 text-muted-foreground hover:text-foreground border-border/80"
-            )}
-            title="開啟/收合微調控制板 (8大滑桿 + 5大風格預設)"
-          >
-            <Sliders className="size-2.5 text-primary" />
-            <span>視覺微調板 ({activePreset === 'custom' ? '自訂參數' : TUNING_PRESETS[activePreset]?.name || '自訂'})</span>
-          </button>
 
-          {/* 方案選擇選單 */}
-          <div className="flex items-center gap-1 bg-background/90 border border-primary/40 rounded px-1.5 py-0.5 text-[9px] shadow-2xs">
-            <span className="text-primary font-bold mr-0.5 flex items-center gap-0.5">
-              <Flame className="size-2.5" />
-              模式：
-            </span>
-            <select
-              value={runnerMode}
-              onChange={(e) => setRunnerMode(e.target.value as PhotonRunnerMode)}
-              className="bg-secondary/90 hover:bg-secondary text-foreground border border-border/80 rounded px-1.5 py-0.5 text-[9px] font-mono cursor-pointer outline-none focus:border-primary transition-colors font-medium"
-              title="選擇同步模式"
-            >
-              {RUNNER_MODES.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} [{m.badge}]
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
 
-      {/* 2. 微調實驗控制板 (8 大滑桿 + 5 大風格預設 + 參數複製) */}
-      {isTuningOpen && (
-        <div className="bg-secondary/40 border-b border-border/70 px-3 py-2 text-[9px] flex flex-col gap-2 shrink-0">
-          {/* 上排：風格預設快捷鍵 + 複製 + 重置 */}
-          <div className="flex items-center justify-between gap-1.5 flex-wrap">
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-muted-foreground flex items-center gap-1 font-bold mr-1">
-                <Sparkles className="size-2.5 text-primary" />
-                預設：
-              </span>
-              {Object.entries(TUNING_PRESETS).map(([key, p]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyPreset(key)}
-                  className={cn(
-                    "px-1.5 py-0.5 rounded text-[8.5px] font-medium border transition-colors cursor-pointer",
-                    activePreset === key
-                      ? "bg-primary/25 text-primary border-primary/50 font-bold shadow-2xs"
-                      : "bg-background/80 text-muted-foreground hover:text-foreground border-border/70"
-                  )}
-                  title={p.desc}
-                >
-                  {p.name} [{p.tag}]
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {/* 一鍵無框/有框切換 */}
-              <button
-                type="button"
-                onClick={() => updateTuning('borderOpacity', tuning.borderOpacity === 0 ? 35 : 0)}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[8.5px] font-medium border transition-colors cursor-pointer flex items-center gap-1 shadow-2xs",
-                  tuning.borderOpacity === 0
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold"
-                    : "bg-background/80 text-muted-foreground hover:text-foreground border-border/70"
-                )}
-                title="點擊切換無框或卡片框"
-              >
-                <span>{tuning.borderOpacity === 0 ? '✓ 無框模式' : '卡片框'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={copyParams}
-                className="px-2 py-0.5 rounded text-[8.5px] bg-background/80 hover:bg-background text-zinc-300 hover:text-zinc-100 border border-border/70 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                title="複製目前數值 JSON"
-              >
-                <Copy className="size-2.5 text-primary" />
-                <span>{isCopied ? '已複製參數!' : '複製目前參數'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('stealth_ghost')}
-                className="px-2 py-0.5 rounded text-[8.5px] bg-background/80 hover:bg-background text-zinc-400 hover:text-zinc-200 border border-border/70 flex items-center gap-1 cursor-pointer transition-colors"
-                title="重置為幽靈冷灰 (無框)"
-              >
-                <RotateCcw className="size-2.5" />
-                <span>重置</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 下排：9 個微調滑桿矩陣 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1.5">
-            {/* 1. 巡航速度 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium flex items-center gap-0.5">
-                  <Gauge className="size-2 text-primary shrink-0" />
-                  <span>巡航速度</span>
-                </span>
-                <span className="text-primary font-bold font-mono flex items-center gap-0.5">
-                  <ArrowUp className="size-2 text-primary/80" />
-                  <span>{tuning.durationSec.toFixed(1)}s</span>
-                </span>
-              </div>
-              <input
-                type="range"
-                min="1.0"
-                max="30.0"
-                step="0.5"
-                value={tuning.durationSec}
-                onChange={(e) => updateTuning('durationSec', parseFloat(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="調整由下往上光子週期 (1.0s ~ 30.0s)"
-              />
-            </div>
-
-            {/* 2. 光束長度 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">光束長度</span>
-                <span className="text-primary font-bold font-mono">{tuning.photonLength}px</span>
-              </div>
-              <input
-                type="range"
-                min="15"
-                max="120"
-                step="5"
-                value={tuning.photonLength}
-                onChange={(e) => updateTuning('photonLength', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="光子本體與拖尾長度 (15px ~ 120px)"
-              />
-            </div>
-
-            {/* 3. 光束粗細 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">光束粗細</span>
-                <span className="text-primary font-bold font-mono">{tuning.photonWidth.toFixed(2)}px</span>
-              </div>
-              <input
-                type="range"
-                min="0.5"
-                max="4.0"
-                step="0.25"
-                value={tuning.photonWidth}
-                onChange={(e) => updateTuning('photonWidth', parseFloat(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="中心核心光絲粗細 (0.5px ~ 4.0px)"
-              />
-            </div>
-
-            {/* 4. 光子輝度 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">光子輝度</span>
-                <span className="text-primary font-bold font-mono">{tuning.photonBrightness}%</span>
-              </div>
-              <input
-                type="range"
-                min="10"
-                max="100"
-                step="5"
-                value={tuning.photonBrightness}
-                onChange={(e) => updateTuning('photonBrightness', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="光子整體不透明度與發光強度 (10% ~ 100%)"
-              />
-            </div>
-
-            {/* 5. 漫射羽化 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">漫射羽化</span>
-                <span className="text-primary font-bold font-mono">{tuning.glowSpread}px</span>
-              </div>
-              <input
-                type="range"
-                min="8"
-                max="36"
-                step="2"
-                value={tuning.glowSpread}
-                onChange={(e) => updateTuning('glowSpread', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="兩側高斯磨砂柔光暈染半徑 (8px ~ 36px)"
-              />
-            </div>
-
-            {/* 6. 節點光暈 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">節點光暈</span>
-                <span className="text-primary font-bold font-mono">{tuning.bloomIntensity}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="250"
-                step="10"
-                value={tuning.bloomIntensity}
-                onChange={(e) => updateTuning('bloomIntensity', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="節點被穿透時的白金 Bloom 爆光強度 (0% ~ 250%)"
-              />
-            </div>
-
-            {/* 7. 毛玻璃度 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">毛玻璃度</span>
-                <span className="text-primary font-bold font-mono">{tuning.glassBlur}px</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="32"
-                step="2"
-                value={tuning.glassBlur}
-                onChange={(e) => updateTuning('glassBlur', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="卡片背景磨砂模糊半徑 (0px ~ 32px)"
-              />
-            </div>
-
-            {/* 8. 稜鏡共振 */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">稜鏡共振</span>
-                <span className="text-primary font-bold font-mono">{tuning.cardShimmer}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="10"
-                value={tuning.cardShimmer}
-                onChange={(e) => updateTuning('cardShimmer', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="光子經過時卡片邊框的 1px 晶透微閃 (0% ~ 100%)"
-              />
-            </div>
-
-            {/* 9. 邊框濃淡 (0% 為完全無框) */}
-            <div className="flex flex-col gap-0.5 bg-background/90 border border-border/70 rounded p-1 shadow-2xs">
-              <div className="flex items-center justify-between text-[8px] text-muted-foreground">
-                <span className="font-medium">邊框濃淡</span>
-                <span className={cn("font-bold font-mono", tuning.borderOpacity === 0 ? "text-emerald-400 font-semibold" : "text-primary")}>
-                  {tuning.borderOpacity === 0 ? '無框(0%)' : `${tuning.borderOpacity}%`}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={tuning.borderOpacity}
-                onChange={(e) => updateTuning('borderOpacity', parseInt(e.target.value))}
-                className="w-full h-1 bg-secondary rounded appearance-none cursor-pointer accent-primary"
-                title="卡片外框描邊透明度 (0% 為完全無框純淨數據行)"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. 類別過濾工具列 */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-secondary/30 border-b border-border/60 text-[9.5px] shrink-0">
-        <div className="flex items-center gap-1">
-          <span className="text-muted-foreground mr-1">分類：</span>
-          {[
-            { id: 'OPEN', label: `未解除 (${stats.open})`, isAlert: stats.open > 0 },
-            { id: 'ALL', label: `全部 (${stats.total})` },
-            { id: 'FILL', label: `成交流 (${stats.fills})` },
-            { id: 'ALERT', label: `風控警報 (${stats.alerts})` },
-            { id: 'SYSTEM', label: `系統事件 (${stats.system})` },
-          ].map((tab) => (
+      {/* 2. 類別過濾工具列 + 分類架構對照切換 */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-secondary/30 border-b border-border/60 text-[9.5px] shrink-0 gap-1.5">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <span className="text-zinc-500 mr-0.5 text-[8.5px]">分類：</span>
+          {availableTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setCategory(tab.id as EventCategoryFilter)}
+              onClick={() => setCategory(tab.id)}
               className={cn(
-                'px-1.5 py-0.2 rounded transition-colors cursor-pointer font-medium',
+                'px-1.5 py-0.2 rounded transition-colors cursor-pointer text-[8.5px] whitespace-nowrap',
                 category === tab.id
-                  ? 'bg-secondary text-primary font-bold border border-border shadow-xs'
+                  ? 'bg-white/[0.08] text-zinc-100 font-medium shadow-xs border border-white/10'
                   : tab.isAlert
-                  ? 'text-amber-400 hover:text-amber-300 font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-amber-300/90 hover:text-amber-200 font-medium'
+                  : 'text-zinc-400 hover:text-zinc-200 font-normal'
               )}
             >
               {tab.label}
@@ -673,24 +250,21 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           ))}
         </div>
 
-        <span className="text-[9px] text-muted-foreground hidden md:inline truncate max-w-[55%]">
-          {RUNNER_MODES.find((m) => m.id === runnerMode)?.desc}
-        </span>
       </div>
 
-      {/* 3. 核心時間軸內容區 (使用 key 保證每次速度變更時重置相位，零相位漂移) */}
+      {/* 3. 核心時間軸內容區 */}
       <div
-        key={`timeline-${tuning.durationSec}-${expandedId}-${runnerMode}`}
+        key={`timeline-${expandedId}`}
         ref={containerRef}
         className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative"
         style={{
-          '--photon-duration': `${tuning.durationSec}s`,
-          '--photon-length': `${tuning.photonLength}px`,
-          '--photon-width': `${tuning.photonWidth}px`,
-          '--photon-opacity': `${(tuning.photonBrightness / 100).toFixed(2)}`,
-          '--bloom-intensity': `${(tuning.bloomIntensity / 100).toFixed(2)}`,
-          '--glass-blur': `${tuning.glassBlur}px`,
-          '--card-shimmer-opacity': `${(tuning.cardShimmer / 100).toFixed(2)}`,
+          '--photon-duration': `${DURATION_SEC}s`,
+          '--photon-length': `${PHOTON_LENGTH}px`,
+          '--photon-width': `${PHOTON_WIDTH}px`,
+          '--photon-opacity': `${(PHOTON_BRIGHTNESS / 100).toFixed(2)}`,
+          '--bloom-intensity': `${(BLOOM_INTENSITY / 100).toFixed(2)}`,
+          '--glass-blur': `${GLASS_BLUR}px`,
+          '--card-shimmer-opacity': `${(CARD_SHIMMER / 100).toFixed(2)}`,
         } as React.CSSProperties}
       >
         {filteredEvents.length === 0 ? (
@@ -704,64 +278,32 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
             {/* 導軌系統：由下往上向上湧動 */}
             <div className="absolute left-[20px] -translate-x-1/2 top-2 bottom-2 w-[20px] pointer-events-none z-0 overflow-hidden">
               {/* 1. 底層 1px 磨砂暗色導軌線 */}
-              <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.10]" />
+              <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.08]" />
 
-              {/* 2. 由下往上光子漫射流束 */}
-              {runnerMode === 'sync_bottom_up' && (
-                /* 方案 A：等速向上光子 (時序因果流) */
+              {/* 2. 由下往上光子漫射流束 (純白光) */}
+              <div
+                className="absolute left-[2px] bottom-0 w-[20px]"
+                style={{ animation: `photon-travel-upward ${DURATION_SEC}s linear infinite` }}
+              >
                 <div
-                  className="absolute left-[2px] bottom-0 w-[20px]"
-                  style={{ animation: `photon-travel-upward ${tuning.durationSec}s linear infinite` }}
-                >
-                  <div
-                    className="photon-aurora-glow-up"
-                    style={{
-                      width: `${tuning.glowSpread}px`,
-                      height: `${Math.round(tuning.photonLength * 1.25)}px`,
-                      opacity: tuning.photonBrightness / 100,
-                      filter: `blur(${Math.max(2, Math.round(tuning.glowSpread * 0.28))}px)`,
-                    }}
-                  />
-                  <div
-                    className="photon-aurora-core-up"
-                    style={{
-                      width: `${tuning.photonWidth}px`,
-                      height: `${tuning.photonLength}px`,
-                      opacity: Math.min(1, (tuning.photonBrightness / 100) * 1.2),
-                      boxShadow: `0 0 ${Math.round(8 * (tuning.bloomIntensity / 100))}px ${Math.round(1 * (tuning.bloomIntensity / 100))}px rgba(251, 191, 36, 0.6)`,
-                    }}
-                  />
-                </div>
-              )}
-
-              {runnerMode === 'sync_collision' && (
-                /* 方案 B：由下往上實時碰撞驅動 */
+                  className="photon-aurora-glow-up"
+                  style={{
+                    width: `${GLOW_SPREAD}px`,
+                    height: `${Math.round(PHOTON_LENGTH * 1.25)}px`,
+                    opacity: PHOTON_BRIGHTNESS / 100,
+                    filter: `blur(${Math.max(2, Math.round(GLOW_SPREAD * 0.28))}px)`,
+                  }}
+                />
                 <div
-                  className="absolute left-[2px] w-[20px] translate-y-1/2 transition-none"
-                  style={{ bottom: `${photonBottomPercent}%` }}
-                >
-                  <div
-                    className="photon-aurora-glow-up !top-0"
-                    style={{
-                      width: `${tuning.glowSpread}px`,
-                      height: `${Math.round(tuning.photonLength * 1.25)}px`,
-                      opacity: tuning.photonBrightness / 100,
-                      filter: `blur(${Math.max(2, Math.round(tuning.glowSpread * 0.28))}px)`,
-                    }}
-                  />
-                  <div
-                    className="photon-aurora-core-up !top-0"
-                    style={{
-                      width: `${tuning.photonWidth}px`,
-                      height: `${tuning.photonLength}px`,
-                      opacity: Math.min(1, (tuning.photonBrightness / 100) * 1.2),
-                      boxShadow: `0 0 ${Math.round(8 * (tuning.bloomIntensity / 100))}px ${Math.round(1 * (tuning.bloomIntensity / 100))}px rgba(251, 191, 36, 0.6)`,
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* snappy_terminal：純靜態，無動態光束 */}
+                  className="photon-aurora-core-up"
+                  style={{
+                    width: `${PHOTON_WIDTH}px`,
+                    height: `${PHOTON_LENGTH}px`,
+                    opacity: 1,
+                    boxShadow: `0 0 ${Math.round(8 * (BLOOM_INTENSITY / 100))}px ${Math.round(1 * (BLOOM_INTENSITY / 100))}px rgba(255, 255, 255, 0.7)`,
+                  }}
+                />
+              </div>
             </div>
 
             {filteredEvents.map((ev) => {
@@ -769,15 +311,9 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               const meta = getBadgeMeta(ev);
               const isFill = ev.category === 'FILL';
               const isWarn = ev.severity === 'WARN' || ev.category === 'ALERT';
-              const isOk = ev.severity === 'OK' || ev.resolution === 'resolved';
               const isOpen = ev.resolution === 'open' && isWarn;
-              const isHighlighted = highlightTarget.type === 'event' && highlightTarget.id === ev.id;
 
-              // 方案 B：檢查碰撞時間戳 (500ms 內)
-              const lastHit = hitTimestamps[ev.id] || 0;
-              const isCollisionActive = runnerMode === 'sync_collision' && (performance.now() - lastHit < 500);
-
-              // 方案 A：取得該節點離底部的真實幾何延遲 (秒)
+              // 取得該節點離底部的真實幾何延遲 (秒)
               const bottomDelay = bottomUpDelays[ev.id] ?? 0;
 
               return (
@@ -792,128 +328,66 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                   {/* 時間軸節點小圓點容器 */}
                   <div className="relative mt-1 shrink-0 z-10 flex items-center justify-center size-4 pointer-events-none">
                     {/* 由下往上光子穿透之次表面柔霧微光環 */}
-                    {runnerMode === 'sync_bottom_up' && (
-                      <span
-                        className={cn(
-                          "absolute inline-flex size-2.5 rounded-full pointer-events-none",
-                          isWarn ? "bg-amber-400/80" : isFill || isOk ? "bg-emerald-400/80" : "bg-sky-400/80"
-                        )}
-                        style={{
-                          animation: `optical-halation-fade ${tuning.durationSec}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
-                          animationDelay: `${bottomDelay}s`,
-                          opacity: tuning.bloomIntensity === 0 ? 0 : undefined,
-                        }}
-                      />
-                    )}
-
-                    {runnerMode === 'sync_collision' && isCollisionActive && (
-                      <span
-                        className={cn(
-                          "absolute inline-flex size-3 rounded-full optical-halation-active pointer-events-none",
-                          isWarn ? "bg-amber-400/80" : isFill || isOk ? "bg-emerald-400/80" : "bg-sky-400/80"
-                        )}
-                      />
-                    )}
-
-                    {/* 實心核心點：鎖死 8px 零變形，由下往上光子經過時產生白金光學 Bloom */}
                     <span
                       className={cn(
-                        'relative inline-flex size-2 rounded-full transition-all duration-150',
-                        meta.coreClass,
-                        isOpen && 'crystal-breathe-subtle',
-                        runnerMode === 'sync_collision' && isCollisionActive && (
-                          isWarn
-                            ? 'crystal-bloom-amber-active'
-                            : isFill || isOk
-                            ? 'crystal-bloom-emerald-active'
-                            : 'crystal-bloom-sky-active'
-                        )
+                        "absolute inline-flex size-2 rounded-full pointer-events-none",
+                        meta.sonarClass
                       )}
-                      style={
-                        runnerMode === 'sync_bottom_up'
-                          ? {
-                              animation: `${
-                                isWarn
-                                  ? 'crystal-optical-bloom-amber'
-                                  : isFill || isOk
-                                  ? 'crystal-optical-bloom-emerald'
-                                  : 'crystal-optical-bloom-sky'
-                              } ${tuning.durationSec}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
-                              animationDelay: `${bottomDelay}s`,
-                              filter: tuning.bloomIntensity > 100 ? `drop-shadow(0 0 ${(tuning.bloomIntensity - 100) / 25}px rgba(255,255,255,0.45))` : undefined,
-                            }
-                          : undefined
-                      }
+                      style={{
+                        animation: `optical-halation-fade ${DURATION_SEC}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
+                        animationDelay: `${bottomDelay}s`,
+                      }}
+                    />
+
+                    {/* 實心核心點：5px 寶石微核，光子經過時產生次表面 Bloom */}
+                    <span
+                      className={cn(
+                        'relative inline-flex size-1.5 rounded-full transition-all duration-150',
+                        meta.coreClass,
+                        isOpen && 'crystal-breathe-subtle'
+                      )}
+                      style={{
+                        animation: `${meta.bloomAnimation} ${DURATION_SEC}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
+                        animationDelay: `${bottomDelay}s`,
+                      }}
                     />
                   </div>
 
-                  {/* 事件行容器：支援「無框純淨數據流」或「iOS 半透明磨砂玻璃卡片」 */}
+                  {/* 事件行容器：完全無框純淨數據流 (Zero-Waste) */}
                   <div
                     onClick={() => toggleIncident(ev.id)}
                     className={cn(
-                      'flex-1 min-w-0 transition-all duration-150 cursor-pointer p-2.5',
-                      tuning.borderOpacity === 0
-                        ? cn(
-                            'rounded-md',
-                            isOpen && !isExp
-                              ? 'bg-amber-500/[0.025] hover:bg-amber-500/[0.05]'
-                              : isExp
-                              ? 'bg-white/[0.04]'
-                              : 'hover:bg-white/[0.035]'
-                          )
-                        : cn(
-                            'rounded-lg',
-                            isOpen && !isExp
-                              ? 'ios-glass-card-warn'
-                              : isExp
-                              ? 'ios-glass-card-active'
-                              : 'ios-glass-card'
-                          ),
-                      isHighlighted && 'ring-1 ring-primary bg-primary/10 shadow-[0_0_16px_rgba(232,180,94,0.35)]',
-                      runnerMode === 'sync_collision' && isCollisionActive && 'card-hit-shimmer-active'
+                      'flex-1 min-w-0 transition-all duration-150 cursor-pointer p-2 rounded-md',
+                      isOpen && !isExp
+                        ? 'bg-amber-500/[0.02] hover:bg-amber-500/[0.04]'
+                        : isExp
+                        ? 'bg-white/[0.035]'
+                        : 'hover:bg-white/[0.025]'
                     )}
-                    style={{
-                      ...(runnerMode === 'sync_bottom_up' && tuning.cardShimmer > 0 && tuning.borderOpacity > 0
-                        ? {
-                            animation: `card-prism-shimmer ${tuning.durationSec}s ease-out infinite`,
-                            animationDelay: `${bottomDelay}s`,
-                          }
-                        : {}),
-                      backdropFilter: tuning.borderOpacity > 0 && tuning.glassBlur > 0 ? `blur(${tuning.glassBlur}px) saturate(180%)` : undefined,
-                      WebkitBackdropFilter: tuning.borderOpacity > 0 && tuning.glassBlur > 0 ? `blur(${tuning.glassBlur}px) saturate(180%)` : undefined,
-                      ...(tuning.borderOpacity > 0
-                        ? {
-                            borderColor: `rgba(255, 255, 255, ${(tuning.borderOpacity / 100 * 0.16).toFixed(3)})`,
-                            boxShadow: `inset 0 1px 0 0 rgba(255, 255, 255, ${(tuning.borderOpacity / 100 * 0.14).toFixed(3)})`,
-                          }
-                        : {
-                            border: 'none',
-                            borderWidth: 0,
-                            borderColor: 'transparent',
-                            boxShadow: 'none',
-                          }),
-                    }}
                   >
                     {/* 表頭一行：時間 + 標籤 + 關聯 Bot + 標題 + 右側 PnL/狀態 + 箭頭 */}
-                    <div className="flex items-center justify-between gap-1.5 text-[10px]">
+                    <div className="flex items-center justify-between gap-2 text-[10px]">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {/* 時間戳 */}
-                        <span className="text-zinc-400 text-[9px] shrink-0 font-medium">{ev.time}</span>
+                        <span className="text-zinc-500 text-[9px] shrink-0 font-mono">{ev.time}</span>
 
-                        {/* 類型 Badge */}
-                        <span className={cn('px-1 py-0.2 rounded text-[8px] font-bold border shrink-0', meta.badgeClass)}>
+                        {/* 類型 Badge (依風格即時切換) */}
+                        <span className={cn('px-1.5 py-0.2 rounded text-[8px] shrink-0', meta.badgeClass)}>
                           {meta.label}
                         </span>
 
                         {/* 關聯 Bot 或來源 */}
                         {(ev.botName || ev.source) && (
-                          <span className="text-muted-foreground text-[9px] shrink-0 hidden sm:inline">
+                          <span className="text-zinc-500 text-[9px] shrink-0 font-mono hidden sm:inline">
                             [{ev.botName || ev.source}]
                           </span>
                         )}
 
                         {/* 事件主標題 */}
-                        <span className="font-semibold text-foreground text-[10.5px] truncate leading-tight">
+                        <span className={cn(
+                          "truncate leading-tight tracking-tight",
+                          isOpen ? "text-zinc-100 font-medium text-[10.5px]" : "text-zinc-300 font-normal text-[10.5px]"
+                        )}>
                           {isFill && ev.symbol ? `${ev.symbol} · ${ev.qty} @ $${ev.price}` : ev.title}
                         </span>
                       </div>
@@ -922,23 +396,23 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       <div className="flex items-center gap-2 shrink-0">
                         {isFill ? (
                           ev.pnl && ev.pnl !== 0 ? (
-                            <span className={cn('text-[10.5px] font-bold', toneOf(ev.pnl))}>
+                            <span className={cn('text-[10px] font-semibold font-mono tracking-tight', toneOf(ev.pnl))}>
                               {formatUsd(ev.pnl, true)}
                             </span>
                           ) : (
-                            <span className="text-[9px] text-muted-foreground">開倉撮合</span>
+                            <span className="text-[8.5px] text-zinc-500">撮合</span>
                           )
                         ) : isOpen ? (
-                          <span className="text-[8.5px] font-bold text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/30 animate-pulse">
+                          <span className="text-[8px] font-medium px-2 py-0.2 rounded-full animate-pulse bg-amber-500/15 border border-amber-500/30 text-amber-200 backdrop-blur-xs">
                             未解除
                           </span>
                         ) : ev.resolution === 'resolved' ? (
-                          <span className="text-[8.5px] text-muted-foreground/70 hidden sm:inline">已解除</span>
+                          <span className="text-[8px] text-zinc-500 hidden sm:inline">已解除</span>
                         ) : null}
 
                         <button
                           type="button"
-                          className="text-muted-foreground group-hover:text-foreground shrink-0 transition-transform duration-200"
+                          className="text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-transform duration-200"
                           aria-label={isExp ? '收合' : '展開'}
                         >
                           {isExp ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
@@ -950,67 +424,45 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                     {isExp && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="mt-2 pt-2 border-t border-white/[0.08] text-[9.5px] space-y-1.5 text-zinc-300 snap-accordion-enter"
+                        className="mt-2 pt-2 border-t border-white/[0.05] text-[9.5px] space-y-2 text-zinc-300 snap-accordion-enter"
                       >
                         {/* 詳細說明 */}
-                        <p className="leading-relaxed text-foreground/90 font-normal">
+                        <p className="leading-relaxed text-zinc-300 font-normal pl-0.5">
                           {ev.detail}
                         </p>
 
-                        {/* 事故衝擊與風控判定 (Impact) */}
+                        {/* 事故衝擊與風控判定 (定案方案 C：macOS 晶透黑曜石微膠囊卡片) */}
                         {ev.impact && (
-                          <div className="p-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-[9px] text-amber-300 flex items-start gap-1.5 backdrop-blur-sm">
+                          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 backdrop-blur-xs text-[9px] flex items-start gap-2">
                             <AlertTriangle className="size-3 shrink-0 mt-0.5 text-amber-400" />
-                            <div>
-                              <span className="font-bold">風控衝擊：</span>
-                              <span>{ev.impact}</span>
+                            <div className="leading-relaxed">
+                              <span className="font-semibold text-amber-200 mr-1">風控衝擊：</span>
+                              <span className="text-zinc-200">{ev.impact}</span>
                             </div>
                           </div>
                         )}
 
                         {/* 下一步處置導引 (Next Step) */}
                         {ev.nextStep && (
-                          <p className="text-[9px] text-muted-foreground leading-relaxed">
-                            <span className="font-semibold text-foreground">下一步處置：</span>
+                          <p className="text-[9px] text-zinc-400 leading-relaxed pl-1">
+                            <span className="font-medium text-zinc-300 mr-1">下一步處置：</span>
                             <span>{ev.nextStep}</span>
                           </p>
                         )}
 
                         {/* 底部操作按鈕與來源列 */}
-                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.06] text-[8.5px] text-muted-foreground">
+                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-[8.5px] text-zinc-500">
                           <div className="flex items-center gap-1.5">
                             <span>來源:</span>
-                            <code className="text-primary bg-primary/10 px-1 py-0.2 rounded border border-primary/20">
+                            <code className="text-zinc-300 bg-white/[0.04] px-1 py-0.2 rounded border border-white/[0.06] font-mono">
                               {ev.source}
                             </code>
                             {ev.id === 'evt_unknown_calico' && (
-                              <span className="flex items-center gap-1 text-amber-400 font-semibold ml-1 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25">
-                                <Lock className="size-2.5" />
+                              <span className="flex items-center gap-1 text-amber-200/90 bg-amber-500/8 px-1.5 py-0.2 rounded border border-amber-500/20 font-medium">
+                                <Lock className="size-2.5 text-amber-400/80" />
                                 額度已鎖存 ($474.75)
                               </span>
                             )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {ev.botId && (
-                              <button
-                                type="button"
-                                onClick={() => triggerHighlight('bot', ev.botId!)}
-                                className="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-0.5 cursor-pointer"
-                              >
-                                <Crosshair className="size-2.5" />
-                                <span>定位 Bot</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => openInspector('event', ev.id)}
-                              className="text-zinc-400 hover:text-foreground flex items-center gap-0.5 cursor-pointer"
-                              title="開啟共用詳情抽屜"
-                            >
-                              <span>共用詳情</span>
-                              <ExternalLink className="size-2.5" />
-                            </button>
                           </div>
                         </div>
                       </div>

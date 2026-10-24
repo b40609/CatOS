@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "CatOS: 啟動開發伺服器並開啟瀏覽器對照分頁",
+      "label": "CatOS: 啟動開發伺服器並開啟瀏覽器 (8890)",
       "type": "shell",
       "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\start-laptop-dev.ps1",
       "windows": {

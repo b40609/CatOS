@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, Search, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -341,21 +341,6 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="hidden text-muted-foreground/40 sm:inline">/</span>
               <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
             </div>
-
-            {/* Ctrl+K 全域快捷指令台按鈕 (Linear / Cmdk 風格) */}
-            <button
-              type="button"
-              onClick={() => {
-                const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true });
-                document.dispatchEvent(event);
-              }}
-              className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground text-[10.5px] font-mono border border-border/70 transition-colors cursor-pointer ml-3"
-              title="快捷指令面板 (Ctrl + K)"
-            >
-              <Search className="size-3 text-primary" />
-              <span>搜尋或跳轉...</span>
-              <kbd className="px-1 py-0.2 rounded bg-background/80 border border-border/60 text-[9px] text-muted-foreground">Ctrl K</kbd>
-            </button>
           </div>
 
           {/* 右側：工作台卡片庫與核心交易模式切換 */}

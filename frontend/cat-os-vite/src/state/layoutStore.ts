@@ -208,6 +208,11 @@ interface LayoutState {
 
   toastMessage: string | null;
 
+  // 卡片最大化專注 (Maximize / Focus ⛶)
+  maximizedLeafId: string | null;
+  toggleMaximizeLeaf: (leafId: string) => void;
+  restoreMaximizedLeaf: () => void;
+
   // Layout Tree 引擎 Actions
   setRootNode: (node: LayoutNode | null, persist?: boolean) => void;
   clearAllCards: () => void;
@@ -277,6 +282,23 @@ function loadInitial(): {
     const currentId = localStorage.getItem(STORAGE_KEY_CURRENT) || DEFAULT_PROFILES[0].id;
     const active = profiles.find((p) => p.id === currentId) || profiles[0];
 
+function sanitizeTree(node: LayoutNode | null): LayoutNode | null {
+  if (!node) return null;
+  if (node.type === "leaf") {
+    const cardId = node.activeTab || node.cardId;
+    return {
+      type: "leaf",
+      id: node.id,
+      cardId,
+    };
+  }
+  return {
+    ...node,
+    first: sanitizeTree(node.first)!,
+    second: sanitizeTree(node.second)!,
+  };
+}
+
     // 載入持久化 Layout Tree
     let rootNode: LayoutNode | null = active.rootNode ?? defaultTree;
     const rawTree = localStorage.getItem(STORAGE_KEY_TREE);
@@ -294,6 +316,10 @@ function loadInitial(): {
       } catch {
         // 使用預設樹
       }
+    }
+
+    if (rootNode) {
+      rootNode = sanitizeTree(rootNode);
     }
 
     // 載入持久化接縫風格 (使用者已定案：方案 B Bloomberg 緊湊微隙 5px)
@@ -377,6 +403,16 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   rootNode: init.rootNode,
   draggingLeafId: null,
   hoverTarget: null,
+  maximizedLeafId: null,
+
+  toggleMaximizeLeaf: (leafId: string) => {
+    set((state) => ({
+      maximizedLeafId: state.maximizedLeafId === leafId ? null : leafId,
+    }));
+  },
+  restoreMaximizedLeaf: () => {
+    set({ maximizedLeafId: null });
+  },
 
   // 向下相容舊參數
   leftColWidth: init.activeProfile.leftColWidth,
