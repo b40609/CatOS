@@ -4,6 +4,8 @@
 
 ## CONTEXT
 
+- 2026-10-24 使用者取消主資料夾更名，保留 `C:/Users/user/Desktop/CatOS_Astra`；產品名稱仍為 CatOS，不綁定模型。此決策取代同日較早的 `CatOS_Astra → CatOS` 更名指示；不再執行改名腳本。`CatOS_Yaozi` 維持獨立，歷史路徑與驗收證據保留原意。
+
 - 2026-09-23 使用者已確認：保留 `CatOS_Astra`／`CatOS_Yaozi` 分工開發，最終以同一 localhost 網站的「量化交易／Yaozi 情報」分頁交付，切換頁面不控制策略生命週期。目錄分離不是產品分離；整合規則見 `docs/catos-yaozi-integration.md`。不得整包覆蓋另一工作目錄或於執行期跨 worktree import；既有 Git／驗收分工及交易授權限制不變。
 - 執行與儲存底座僅 Python 3.11+、SQLite（WAL）；禁止 Docker、PostgreSQL、Redis。
 - 核心邏輯嚴格依據 `catOS-architecture-review.md`；原稿可能因中斷不完整，缺漏與尚未核准的政策不得當成已定案需求。

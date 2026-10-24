@@ -23,6 +23,7 @@ export interface CatState {
   // Navigation & Mode
   activeTab: 'dashboard' | 'bots' | 'risk' | 'strategies' | 'logs' | 'settings';
   mode: BotMode;
+  modeGeneration: number;
   activeScenario: ScenarioType;
   language: Language;
   
@@ -70,6 +71,7 @@ export interface CatState {
 export const useCatStore = create<CatState>((set, get) => ({
   activeTab: 'dashboard',
   mode: 'local',
+  modeGeneration: 0,
   activeScenario: 'normal',
   language: (() => {
     if (typeof window !== 'undefined') {
@@ -92,7 +94,22 @@ export const useCatStore = create<CatState>((set, get) => ({
   versionMap: {},
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setMode: (mode) => set({ mode }),
+  setMode: (mode) => set((state) => state.mode === mode ? {} : {
+    mode,
+    modeGeneration: state.modeGeneration + 1,
+    kpis: null,
+    bots: [],
+    strategies: [],
+    risk: null,
+    telemetry: null,
+    equitySeries: [],
+    researchTasks: [],
+    yaoziAlerts: [],
+    auditLogs: [],
+    pendingCommands: [],
+    commandHistory: [],
+    versionMap: {},
+  }),
   setScenario: (scenario) => set({ activeScenario: scenario }),
   setLanguage: (lang) => {
     if (typeof window !== 'undefined') {
@@ -102,6 +119,7 @@ export const useCatStore = create<CatState>((set, get) => ({
   },
 
   applyAuthoritativeUpdate: (domain, version, updateFn) => {
+    if (!Number.isSafeInteger(version) || version < 0) return false;
     const currentVersion = get().versionMap[domain] ?? 0;
     if (version < currentVersion) {
       console.warn(`[CatStore] Dropping stale update for '${domain}': incoming version ${version} < current ${currentVersion}`);
@@ -119,19 +137,18 @@ export const useCatStore = create<CatState>((set, get) => ({
 
   hydrateAll: (payload) => {
     const v = payload.version ?? Date.now();
-    set((state) => ({
-      kpis: payload.kpis ?? state.kpis,
-      bots: payload.bots ?? state.bots,
-      strategies: payload.strategies ?? state.strategies,
-      risk: payload.risk ?? state.risk,
-      telemetry: payload.telemetry ?? state.telemetry,
-      equitySeries: payload.equitySeries ?? state.equitySeries,
-      auditLogs: payload.auditLogs ?? state.auditLogs,
-      versionMap: {
-        ...state.versionMap,
-        global: Math.max(state.versionMap.global ?? 0, v),
-      },
-    }));
+    if (!Number.isSafeInteger(v) || v < 0) return;
+    set((state) => {
+      const update: Partial<CatState> = {};
+      const versionMap: Record<string, number> = { ...state.versionMap, global: Math.max(state.versionMap.global ?? 0, v) };
+      for (const domain of ['kpis', 'bots', 'strategies', 'risk', 'telemetry', 'equitySeries', 'auditLogs'] as const) {
+        if (payload[domain] !== undefined && v >= (state.versionMap[domain] ?? 0)) {
+          Object.assign(update, { [domain]: payload[domain] });
+          versionMap[domain] = v;
+        }
+      }
+      return { ...update, versionMap };
+    });
   },
 
   setPendingCommands: (pendingCommands) => set({ pendingCommands }),

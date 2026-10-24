@@ -348,6 +348,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                         <button
                           type="button"
                           onClick={(e) => togglePause(bot.id, e)}
+                          title="只切換展示狀態，不發送策略控制命令"
                           className={cn(
                             "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
                             isPaused
