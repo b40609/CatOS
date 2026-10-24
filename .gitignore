@@ -67,3 +67,6 @@ CatOS_Astra/
 /frontend/prototypes/
 /frontend/rebuilt-dist-local-resume-20261005/
 /frontend/cat-os-upstream/
+
+# Disposable HTTP dependency verification environment
+/outputs/integration-baseline-20261024/http-venv/

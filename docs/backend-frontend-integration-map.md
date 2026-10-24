@@ -1,19 +1,19 @@
 # CatOS 後端能力與前端串接交接（Antigravity）
 
-更新：2026-10-20。用途：讓前端開發者知道可用功能、接法與未解問題；不要求前端立即定稿、全面串接或完成驗收。
+更新：2026-10-24。用途：讓前端開發者知道可用功能、接法與未解問題；不要求前端立即定稿、全面串接或完成驗收。
 
-本輪僅靜態讀取現行路由、資料契約、React 呼叫端、相關測試與非敏感歷史報告，更新本文件與[接續入口](current-handoff.md)。沒有修改程式、啟停服務、呼叫 HTTP、讀產品 DB／憑證、執行測試或建置。以下「已有 HTTP」指現行程式已掛載路由，**不代表本輪已確認執行中的 8770／8771 載入相同版本**。前端約 80% 為使用者提供的版面／操作進度，不能換算成後端整合完成率。
+本文件保留既有契約索引，依 `149f9fc` 與本輪整合基線修正現況。新增隔離 18870／18890 的 HTTP／Vite／React 自測；正式 8770／8771 僅唯讀核對及改名所需維護，不執行正式控制案例，不讀產品 DB／憑證。實際命令、證據與限制見[整合基線交付](integration-baseline-20261024.md)。下列「已有 HTTP」指程式掛載路由；自測不等於指定角色獨立驗收。
 
 ## 1. 先看功能與可用程度
 
 | 前端功能 | 後端能力 | 接法 | 現況／限制 |
 | --- | --- | --- | --- |
 | 回測、權益／回撤、成交明細 | 已有 HTTP；Decimal 研究核心 | POST `/api/research/backtests`，共用 runs 查詢 | **React 已串接** version、catalog、提交、歷史、輪詢與結果；仍有第 7 節問題，未完成本輪互動驗收。只有登錄的 SMA／96 根合成 15m 資料 |
-| 參數搜尋 | 已有 HTTP；Optuna 樣本內搜尋 | POST `/api/research/optimizations` | **React 尚為展示資料**：固定 TRIALS、EMA／ATR、Sharpe、4 Workers；後端只搜 SMA period，以 return_pct 排序 |
+| 參數搜尋 | 已有 HTTP；Optuna 樣本內搜尋 | POST `/api/research/optimizations` | **React 已接研究 HTTP**：提交、歷史、共用槽輪詢與結果；後端只搜 SMA period，以 return_pct 排序。另有明示「概念展示」的獨立視圖，不能當真實結果 |
 | 參數穩定區 | 已有 HTTP；候選網格與鄰域選參 | POST `/api/research/validations`，讀訓練結果 | React 尚無對應呼叫；不是另一個 stability 端點。Python 核心另有可重用能力，不表示 HTTP 接受任意策略 |
 | Walk-Forward／樣本外 | 已有 HTTP；滾動訓練、固定參數後測試 | 同一 validations 任務，讀各窗 out_of_sample | React 尚無對應呼叫；各窗空倉獨立起跑，不能拼成連續帳戶績效 |
 | 分市場環境評估 | 已有 HTTP；七類環境損益／成本歸屬 | 同一 validations 結果的分環境區段 | React 尚無對應呼叫；示範門檻，非自動部署通過規則 |
-| 研究封存、歷史與報告 | 已有 HTTP；三類任務共用封存 | GET runs、單次狀態、result、report | 回測頁已接 backtest 歷史與 JSON；optimization／validation 歷史與 HTML 報告入口尚未接 React |
+| 研究封存、歷史與報告 | 已有 HTTP；三類任務共用封存 | GET runs、單次狀態、result、report | 回測與優化頁已各接對應 kind 歷史與 JSON；validation 與 HTML 報告入口尚未接 React |
 | 策略版本、Bot 建立／部署 | 已有部分 Python 製品／策略庫／狀態能力，**目前管理 HTTP 未掛載** | 先確認缺口，不能使用 mock 中的網址當 API | 主要狀態仍走 mockAdapter；舊文件／MCP 呼叫不等於路由可用 |
 | 固定模板本機模擬 | 已有 HTTP；單槽 SMA 合成 smoke 模板 start／stop | `/api/workspace/simulation/*` | 尚未透過主 React 狀態 adapter 串接；只限固定 8 根／2 根預熱模板，非任意 Bot 或常駐交易 |
 | 舊 local-sim 證據瀏覽 | 已有唯讀 HTTP | `/api/workspace/local-sim/runs*` | 可讀 manifest／status／events；不是即時帳戶、Worker 存活或風控就緒證明 |
@@ -22,7 +22,7 @@
 | 真實行情研究、任意策略上傳、AI 自主研究、Demo／Live | 本次研究 HTTP 沒有完整可用流程 | 尚未實作此整合，或需另核對／另行授權 | 不能以展示按鈕、模組存在或研究完成推導為交易能力 |
 | Yaozi 情報 | 有唯讀路由，依指定本機資料可用性 | 第 9 節保留路由索引 | 情報頁仍有固定告警／費率；本輪未核實各卡 DTO、實際資料與新鮮度 |
 
-策略／Bot、風控／遙測、帳戶權益與主工作區事件主要仍取自 [stateAdapter.ts](../frontend/cat-os-vite/src/state/stateAdapter.ts) → [mock-adapter.ts](../frontend/cat-os-vite/src/adapters/mock-adapter.ts)。回測頁另外直接使用研究 adapter，**不能因此把整站改稱真實帳戶資料**。
+策略／Bot、風控／遙測、帳戶權益與主工作區事件主要仍取自 [stateAdapter.ts](../frontend/cat-os-vite/src/state/stateAdapter.ts) → [mock-adapter.ts](../frontend/cat-os-vite/src/adapters/mock-adapter.ts)。回測與優化頁另外直接使用研究 adapter，**不能因此把整站改稱真實帳戶資料**。
 
 ## 2. 連線、版本與同源
 
@@ -38,11 +38,11 @@
 
 | 入口／設定 | 現行靜態核對 | 串接意義 |
 | --- | --- | --- |
-| [vite.config.ts](../frontend/cat-os-vite/vite.config.ts) | `127.0.0.1:8890`；`/api/research` 代理到 **127.0.0.1:8770**；changeOrigin 且固定轉送 origin 為 8770 | 正式研究通路已有代理，舊文件「沒有 proxy」已過時；不是隔離後端設定 |
-| 同一 Vite 設定的其他路徑 | 未配置 simulation、workspace、intel 代理 | 不可照抄研究 adapter 的相對路徑就宣稱其他 API 已可經 Vite 使用 |
-| [vite.dashboard-preview.config.ts](../frontend/cat-os-vite/vite.dashboard-preview.config.ts) | 8887、strictPort、獨立 Dashboard 預覽，沒有後端 proxy | 不能當研究串接隔離環境 |
+| [vite.config.ts](../frontend/cat-os-vite/vite.config.ts)／[local integration](../frontend/cat-os-vite/vite.local-integration.ts) | `127.0.0.1:8890`、strictPort；研究、workspace、intel 固定代理到 **127.0.0.1:8770** | 改寫上游 Host／Origin 前先驗證前端 Host／Origin；不允許外站藉代理繞過檢查 |
+| `/api/workspace`／`/intel` | 已配置同一固定代理 | 隔離 fixture 已驗證 workspace GET、simulation POST 與版本防護；不代表 Bot API 已存在或情報來源已逐卡驗收 |
+| [vite.dashboard-preview.config.ts](../frontend/cat-os-vite/vite.dashboard-preview.config.ts) | 舊 8887 設定保留，現行 launcher 不啟用 | 不是現行入口；本輪沒有刪除歷史檔案 |
 | 8771 preview 的後端程式 | 只轉送白名單研究 GET／POST至固定 8770；另有 workspace 證據讀取；不轉送 intel／simulation | preview 仍可能到正式研究 writer，不是獨立研究資料根 |
-| 全新隔離研究環境 | 本輪未找到獨立 React／Vite 研究 proxy 設定 | 未來要做隔離互動時，須先確認專用埠、資料根與固定目標代理；不能沿用 8890→8770 後稱隔離 |
+| 全新隔離自測 | [integration_baseline_test.mjs](../frontend/cat-os-vite/tests/integration_baseline_test.mjs) 啟動 18870／18890 與全新 fixture 資料根 | HTTP 寫入只到 fixture；React 競態使用明示攔截資料。正式 8890→8770 本身不稱隔離 |
 
 本文件描述接法，不授權操作正式服務、建立測試環境或執行控制案例。維持原同源防護，不以關閉檢查或任意 URL 代理解決串接。
 
@@ -96,7 +96,7 @@ GET 狀態完成與失敗的最小辨識欄位：
 {"run_id":"0123456789abcdef0123456789abcdef","kind":"backtest","status":"failed","error":"interrupted_by_service_restart"}
 ```
 
-版本與結果 DTO 節錄不表示可忽略其他欄位。React adapter 現有 getVersion／getCatalog／getRuns／getRunStatus／getRunResult／submitBacktest；**尚無 optimization／validation 提交與 report 方法**。其 getRunResult 目前固定型別為 BacktestResult，run 的 request 也固定為 BacktestRequest；接其他 kind 前要分流 DTO，不能只新增按鈕沿用斷言。
+版本與結果 DTO 節錄不表示可忽略其他欄位。React adapter 已有 submitBacktest／submitOptimization 與各自結果 DTO；getRunResult 支援型別參數。尚無 validation 提交與 report 方法；泛型斷言不是執行期 schema 驗證，不能用 backtest 型別接其他 kind。
 
 ## 4. 研究請求與結果怎麼接
 
@@ -177,7 +177,7 @@ POST `/api/research/optimizations`；完整預設請求：
 
 搜尋僅 period 整數範圍；low／high 介於 2～32，step 為正整數且範圍對齊；預熱 >= high。n_trials 為 1～20，seed 為 0～4294967295 整數。quantity 固定。以 catalog 最新限制為準。
 
-202 與狀態查詢沿用第 3 節。結果節錄的取用方式（adapter 尚未有此專用 DTO；不是現有可直接編譯的呼叫範例）：
+202 與狀態查詢沿用第 3 節。adapter 已有 OptimizationResultPayload；以下僅為結果欄位取用節錄：
 
 ```javascript
 // payload = GET /api/research/runs/{run_id}/result 的 optimization JSON
@@ -338,17 +338,17 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 - **Lot 帳務**：見 [lot-fill-handoff.md](lot-fill-handoff.md)。Python／local-sim 階段與歷史驗證按各切片認定，不提升為現行多 Bot 共用合約、交易、額度預留、內部對沖或完整分攤能力。
 - 模組存在、單元測試通過、MCP 有方法或 mock 有命令，都不等於網站已取得控制能力。要補 HTTP 屬另一個後端工作包，本次只記錄。
 
-## 7. 回測串接的最新問題與待驗證項目
+## 7. 回測串接的來源複核與待驗證項目
 
-本節取代舊版「回測仍全為固定資料／沒有 Vite proxy」及入口中已過時的部分缺陷。來源：[backtest.tsx](../frontend/cat-os-vite/src/pages/backtest.tsx)、[research-api-adapter.ts](../frontend/cat-os-vite/src/adapters/research-api-adapter.ts)、[backtest-underwater-chart.tsx](../frontend/cat-os-vite/src/components/catos/backtest-underwater-chart.tsx)。均為本輪靜態結論，未執行瀏覽器案例。
+本節取代舊版「回測仍全為固定資料／沒有 Vite proxy」及入口中已過時的部分缺陷。來源：[backtest.tsx](../frontend/cat-os-vite/src/pages/backtest.tsx)、[research-api-adapter.ts](../frontend/cat-os-vite/src/adapters/research-api-adapter.ts)、[backtest-underwater-chart.tsx](../frontend/cat-os-vite/src/components/catos/backtest-underwater-chart.tsx)。本節回測仍以靜態複核為主；本輪瀏覽器證據針對優化及展示狀態，不擴大為回測全面驗收。
 
 ### 已確認會影響正確串接的問題
 
 | 項目 | 現行程式證據／影響 | 接線時需要處理的範圍 |
 | --- | --- | --- |
-| 前端自行清空 active_run_id | startPolling 終態後重讀 version，仍把等於該 run 的 active_run_id 改成 null。後端先封存 complete／failed，再於 finally 釋放 active，中間確有合法短窗 | 不覆寫後端權威狀態；直到後端確認釋放再解除忙碌。後端仍可 409 拒絕，不能說已繞過交易／風控 |
+| 共用槽釋放短窗 | `149f9fc` 回測已保留後端 active_run_id；本輪優化 hook 也等 version 確認釋放，並追蹤其他 kind | 優化已做隔離瀏覽器斷言；回測此項為來源複核，未冒充本輪回測互動重驗 |
 | 隔離宣稱與代理目標不符 | 8890 的研究代理固定到正式 8770；8887 沒有研究代理 | 未來隔離 UI 證據須來自真正專用 backend／資料根／proxy；現行正式代理本身不是「沒有設定」 |
-| 非回測 DTO 與路由缺口 | adapter 把所有結果型別斷言成 BacktestResult；未提供優化／驗證提交。策略／Bot HTTP 未掛載 | 對應頁要真接時先補正型別／adapter 或取得後端契約，不猜欄位／路徑 |
+| 尚缺 DTO 與路由 | 優化已有專用 DTO／提交；validation 尚未接 React，策略／Bot HTTP 仍未掛載 | 先取得對應契約；不把展示命令視為已控制 Bot／帳戶風控 |
 | 圖表錯值轉零 | 水下圖使用 parseFloat(value) || 0，缺 drawdown 點也給 0，並按陣列索引配對 | 正常後端有等長證據，但缺欄／非數值／時間錯位可能被畫成正常 0；不能拿此圖判定資料完整或風險正常 |
 
 ### 已有改善，不再照列為尚未修復
@@ -359,7 +359,7 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 - 切到未完成任務會重設 resultLoading；結果請求有 AbortController 與 generation 防止舊結果覆蓋。
 - 舊輪詢完成後，僅在未選任務或仍選該 run 時自動載入結果，不再無條件搶回歷史選擇。
 - 離頁有 mounted 檢查、清除兩個 timer、abort 結果請求。**只有 result 請求傳入 AbortSignal**，不能擴大宣稱所有請求皆取消。
-- 終態已重讀 version／runs；原本「完全沒有刷新版本」已改善，但自行清空 active_run_id 的新問題仍存在。
+- 終態重讀 version／runs，現行回測不再自行清空 active_run_id；優化本輪已補相同權威邊界與共用槽互動證據。
 
 ### 待互動驗證與可延後的流程細節
 
@@ -370,14 +370,14 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 | 背景失敗提示 | failed 分支的 setErrorMsg 不受目前選取 run 條件限制 | 可能在查看其他歷史時顯示背景錯誤；提示應帶 run 身分，待 UI 核對 |
 | 斷線／重連 | adapter 保留 HTTP detail；非 HTTP／JSON parse 例外歸類 status=0 network_error；頁面 ONLINE 依 version 是否存在 | 後續請求失敗仍保留舊 version，ONLINE 不等於目前可達；待斷線互動核對，不補假結果 |
 | 離頁／回頁 | 有前端清理；後端任務繼續，初載可恢復 | 尚無本輪瀏覽器證據證明快速離頁／提交中離頁／回頁皆無重複請求或過期更新 |
-| 假資料與真結果 | 回測 adapter／圖表正常路徑未發現 fixture 回退；整站主狀態與優化／情報仍有展示來源 | 不能宣稱「整站已無 mock」；新卡片接線須核對來源，不把展示帳戶 KPI 當該 run 績效 |
+| 假資料與真結果 | 回測 adapter／圖表正常路徑未發現 fixture 回退；整站主狀態、優化概念視圖與情報仍有展示來源 | 不能宣稱「整站已無 mock」；新卡片接線須核對來源，不把展示帳戶 KPI 當該 run 績效 |
 | 顯示語義 | 回測仍有「期末估值平倉」文案；後端實際估值未強平 | 文案後續收斂；Sharpe／勝率不以成交筆數自算，無完整月資料不補月收益 |
 
 這些問題只對要接入的頁面形成對應限制，不阻擋 Antigravity 繼續完成版面與一般操作。沒有已確認來源／完整性時保留錯誤或缺資料標示。
 
 ## 8. 證據能支持到哪裡
 
-本輪讀取下列原始測試／報告，**沒有重跑，也沒有重新核對所有來源 hash**；歷史 PASS 不自動涵蓋目前 React 或執行中服務。
+下列為原始測試／歷史報告的適用範圍；除整合交付列出的 56 項自測外，沒有重跑或重算歷史證據 hash。歷史 PASS 不自動涵蓋目前 React 或執行中服務。
 
 | 日期／證據 | 實際支持的範圍 | 不支持的宣稱 |
 | --- | --- | --- |

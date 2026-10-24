@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { usePreviewStore, type PreviewEvent } from '@/preview/preview-store';
+import { usePreviewStore, type PreviewEvent } from '@/state/dashboard-demo-store';
 import { CardHeaderTitle } from './card-header-title';
 import {
   AlertTriangle,

@@ -1,70 +1,79 @@
-﻿# start-laptop-dev.ps1
-# 自動檢查依賴、啟動 8890 React 前端 (cat-os-vite)，並自動在瀏覽器開啟：
-# http://127.0.0.1:8890/#/ (CatOS 唯一正式前端)
+﻿[CmdletBinding()]
+param(
+    [switch]$NoBrowser,
+    [switch]$CheckOnly,
+    [ValidateRange(1, 120)][int]$TimeoutSeconds = 20
+)
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-if (-not $scriptDir) {
-    $scriptDir = Join-Path (Get-Location) "scripts"
-}
-$projectRoot = Split-Path -Parent $scriptDir
+$ErrorActionPreference = 'Stop'
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$reactDir = [IO.Path]::GetFullPath((Join-Path $projectRoot 'frontend\cat-os-vite'))
+$url = 'http://127.0.0.1:8890'
+$ownedProcess = $null
 
-Write-Host "=================================================" -ForegroundColor Cyan
-Write-Host "   CatOS 筆電一鍵自動啟動前端 (8890 React)" -ForegroundColor Cyan
-Write-Host "=================================================" -ForegroundColor Cyan
-
-$reactDir = Join-Path $projectRoot "frontend\cat-os-vite"
-
-# 0. 檢查並安裝 node_modules (若為全新環境)
-if (-not (Test-Path (Join-Path $reactDir "node_modules"))) {
-    Write-Host "[1/3] 偵測到 React 前端未安裝依賴，正在執行 npm install..." -ForegroundColor Yellow
-    Start-Process -FilePath "npm.cmd" -ArgumentList "install" -WorkingDirectory $reactDir -Wait -NoNewWindow
-}
-
-function Test-PortOpen ($port) {
+function Get-FrontendIdentity {
     try {
-        $tcp = New-Object System.Net.Sockets.TcpClient
-        $iar = $tcp.BeginConnect("127.0.0.1", $port, $null, $null)
-        $wait = $iar.AsyncWaitHandle.WaitOne(400, $false)
-        if ($wait -and $tcp.Connected) {
-            $tcp.EndConnect($iar)
-            $tcp.Close()
-            return $true
+        Invoke-RestMethod -Uri "$url/__catos/frontend" -TimeoutSec 2
+    } catch { return $null }
+}
+
+function Test-Identity($identity) {
+    return $identity -and $identity.contract -eq 'catos.frontend.v1' -and
+        [string]::Equals($reactDir.TrimEnd('\'), [string]$identity.root.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-PortOccupied {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Parse('127.0.0.1'), 8890)
+    $listener.Server.ExclusiveAddressUse = $true
+    try { $listener.Start(); return $false } catch { return $true } finally { $listener.Stop() }
+}
+
+try {
+    $identity = Get-FrontendIdentity
+    if (-not (Test-Identity $identity)) {
+        if (Test-PortOccupied) { throw 'Port 8890 has an unknown owner or a different checkout. It was not stopped.' }
+        if ($CheckOnly) { throw 'CatOS frontend is not running.' }
+        $node = (Get-Command node.exe -ErrorAction Stop).Source
+        $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
+        $viteCli = Join-Path $reactDir 'node_modules\vite\bin\vite.js'
+        if (-not (Test-Path -LiteralPath $viteCli)) {
+            Push-Location $reactDir
+            try {
+                & $npm ci
+                if ($LASTEXITCODE -ne 0) { throw "npm ci failed: $LASTEXITCODE" }
+            } finally { Pop-Location }
         }
-        $tcp.Close()
-        return $false
-    } catch {
-        return $false
+        $logRoot = Join-Path $projectRoot 'outputs\dev-frontend'
+        New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
+        $stamp = [Guid]::NewGuid().ToString('N')
+        $ownedProcess = Start-Process -FilePath $node -ArgumentList @("`"$viteCli`"") -WorkingDirectory $reactDir -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logRoot "$stamp.stdout.log") -RedirectStandardError (Join-Path $logRoot "$stamp.stderr.log")
+        $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        do {
+            $identity = Get-FrontendIdentity
+            if (Test-Identity $identity) { break }
+            $ownedProcess.Refresh()
+            if ($ownedProcess.HasExited) { throw "Vite exited: $($ownedProcess.ExitCode). See outputs/dev-frontend." }
+            Start-Sleep -Milliseconds 250
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if (-not (Test-Identity $identity)) { throw 'Frontend readiness timeout. Browser was not opened.' }
     }
-}
-
-# 1. 檢查並啟動 8890 (React / cat-os-vite)
-$port8890 = Test-PortOpen 8890
-if (-not $port8890) {
-    Write-Host "[2/3] 啟動 8890 React 前端服務..." -ForegroundColor Yellow
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", "npm.cmd run dev" -WorkingDirectory $reactDir -WindowStyle Minimized
-} else {
-    Write-Host "[2/3] 8890 服務已在運行中。" -ForegroundColor Green
-}
-
-# 2. 等候服務連線就緒 (最多等待 15 秒)
-Write-Host "[3/3] 檢查 8890 服務連線..." -ForegroundColor Cyan
-$timeout = 15
-$ready8890 = Test-PortOpen 8890
-
-for ($i = 0; $i -lt $timeout; $i++) {
-    if (-not $ready8890) {
-        $ready8890 = Test-PortOpen 8890
+    $page = Invoke-WebRequest -UseBasicParsing -Uri "$url/" -TimeoutSec 3
+    if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') { throw 'Frontend HTML is not ready.' }
+    Write-Host "CatOS frontend ready: $url/#/ | root=$reactDir"
+    try {
+        $backend = Invoke-RestMethod -Uri 'http://127.0.0.1:8770/api/research/version' -TimeoutSec 2
+        if ($backend.mode -ne 'local_research_synthetic' -or
+            -not [string]::Equals([string]$backend.workspace, $projectRoot, [StringComparison]::OrdinalIgnoreCase) -or
+            $backend.restart_required) { throw 'Backend identity/source mismatch.' }
+        Write-Host 'Research backend: ready (local synthetic research only).'
+    } catch { Write-Warning 'Research backend: unavailable or identity/source mismatch; frontend readiness does not imply backend readiness.' }
+    if (-not $NoBrowser -and -not $CheckOnly) { Start-Process "$url/#/" }
+    exit 0
+} catch {
+    if ($ownedProcess) {
+        $ownedProcess.Refresh()
+        if (-not $ownedProcess.HasExited) { Stop-Process -Id $ownedProcess.Id -ErrorAction SilentlyContinue }
     }
-    if ($ready8890) {
-        break
-    }
-    Start-Sleep -Seconds 1
+    Write-Error $_ -ErrorAction Continue
+    exit 1
 }
-
-# 3. 自動在預設瀏覽器開啟唯一正式前端
-Write-Host "`n開啟 CatOS 前端網址：" -ForegroundColor Cyan
-Write-Host "  -> http://127.0.0.1:8890/#/ (React 主儀表盤)" -ForegroundColor White
-
-Start-Process "http://127.0.0.1:8890/#/"
-
-Write-Host "`n✓ 8890 服務就緒並已開啟瀏覽器！" -ForegroundColor Green

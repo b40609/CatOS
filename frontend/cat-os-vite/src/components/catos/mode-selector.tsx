@@ -13,21 +13,21 @@ const MODES: {
   {
     key: "local",
     label: "本機",
-    tooltip: "本機模擬環境（可正常啟動與停止策略測試）",
+    tooltip: "本機展示環境；主頁 Bot 操作只影響展示狀態，不會啟停後端策略",
     activeClass: "bg-amber-500/15 text-amber-400 border-amber-500/40 shadow-xs font-semibold",
     dotClass: "bg-amber-400",
   },
   {
     key: "demo",
     label: "Demo",
-    tooltip: "Demo 模擬盤（唯讀隔離展示 · 禁止增倉與交易）",
+    tooltip: "尚未接入 Demo 帳戶；此選項僅切換展示模式",
     activeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/40 shadow-xs font-semibold",
     dotClass: "bg-cyan-400",
   },
   {
     key: "live",
     label: "Live",
-    tooltip: "Live 實盤（嚴格鎖定 · 依 INVARIANTS 限制真實金鑰）",
+    tooltip: "尚未接入 Live 帳戶；此選項僅切換展示模式",
     activeClass: "bg-rose-500/15 text-rose-400 border-rose-500/40 shadow-xs font-semibold",
     dotClass: "bg-rose-400",
   },
@@ -37,7 +37,7 @@ export function ModeSelector({ className }: { className?: string }) {
   const currentMode = useCatStore((s) => s.mode);
 
   const handleSelect = (mode: BotMode) => {
-    stateAdapter.setMode(mode);
+    void stateAdapter.setMode(mode).catch(console.error);
   };
 
   return (
@@ -47,8 +47,9 @@ export function ModeSelector({ className }: { className?: string }) {
         className
       )}
       role="group"
-      aria-label="工作區環境模式切換"
+      aria-label="展示環境模式切換"
     >
+      <span className="px-1.5 text-[10px] text-muted-foreground" title="主頁、Bot 與風控使用展示資料；研究頁的真實研究契約另行標示">展示</span>
       {MODES.map((m) => {
         const isActive = currentMode === m.key;
         return (

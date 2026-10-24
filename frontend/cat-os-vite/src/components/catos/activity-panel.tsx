@@ -231,7 +231,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
       return;
     }
     setOrders((prev) => prev.filter((o) => o.id !== id));
-    showToast("已成功發出撤單請求");
+    showToast("已移除展示委託；未發送撤單請求");
   };
 
   const handleCancelAll = () => {
@@ -239,7 +239,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
     // UNKNOWN 單受保護不隨意取消
     const remaining = orders.filter((o) => o.isUnknown);
     setOrders(remaining);
-    showToast("已全撤在途限價委託 · UNKNOWN 待對帳單受保護保留");
+    showToast("已清除展示委託；保留 UNKNOWN，未發送撤單請求");
   };
 
   const totalFrozen = useMemo(() => {
@@ -380,9 +380,9 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
             title="持倉明細與在途委託"
             subtext={
               <div className="flex items-center gap-1.5 ml-1">
-                <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border text-emerald-400 bg-emerald-400/10 border-emerald-400/25">
-                  <span className="size-1.5 rounded-full bg-emerald-400" />
-                  P6 交易所端 100% 錨定
+                <span title="展示狀態，尚未取得交易所保護確認" className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border text-amber-400 bg-amber-400/10 border-amber-400/25">
+                  <span className="size-1.5 rounded-full bg-amber-400" />
+                  P6 展示 · {positionsData.filter((p) => p.p6Status !== "ACTIVE").length} 筆待確認
                 </span>
               </div>
             }
@@ -517,9 +517,9 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                             ({p.p6DistPct})
                           </span>
                         </div>
-                        <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
-                          <span className="size-1 rounded-full bg-emerald-400" />
-                          OKX {p.p6Rounding}
+                        <span className={cn("text-[8.5px] font-mono leading-tight flex items-center gap-1 mt-0.5", p.p6Status === "ACTIVE" ? "text-emerald-400" : "text-amber-400")}>
+                          <span className={cn("size-1 rounded-full", p.p6Status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-400")} />
+                          {p.p6Status === "ACTIVE" ? `示例 · ${p.p6Rounding}` : p.p6Status === "UPDATING" ? "更新待確認" : "保護異常"}
                         </span>
                       </div>
                     </td>

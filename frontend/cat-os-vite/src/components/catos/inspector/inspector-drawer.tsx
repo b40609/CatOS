@@ -13,7 +13,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { useInspectorStore } from '@/state/inspectorStore';
-import { usePreviewStore } from '@/preview/preview-store';
+import { usePreviewStore } from '@/state/dashboard-demo-store';
 import { cn } from '@/lib/utils';
 
 export function InspectorDrawer() {

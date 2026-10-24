@@ -4,8 +4,8 @@
  * Bridges REST/WebSocket data to Zustand Store.
  * Enforces:
  * 1. Monotonic Version Guard: Stale REST/WS updates are rejected when version is smaller than stored version.
- * 2. Supervisor Authority: Frontend never infers bot lifecycle or risk state; only projects authoritative payloads.
- * 3. Mode Isolation: In Demo/Live mode, simulation resources are hidden or locked.
+ * 2. Current source is mock-adapter; these projections are not Supervisor acknowledgements.
+ * 3. Mode selection only changes mock presentation; it does not connect Demo/Live accounts.
  */
 
 import { useCatStore } from './catStore';
@@ -24,10 +24,11 @@ export class StateAdapter {
   }
 
   /**
-   * Initializes the workspace state from authoritative source (currently mock-adapter)
+   * Initializes the workspace presentation from mock-adapter.
    */
   public async init(scenario: ScenarioType = 'normal'): Promise<void> {
     const store = useCatStore.getState();
+    const modeGeneration = store.modeGeneration;
     store.setScenario(scenario);
 
     const [kpis, bots, strategies, risk, telemetry, equitySeries, auditLogs] =
@@ -41,8 +42,10 @@ export class StateAdapter {
         mockAdapter.fetchAuditEvents(),
       ]);
 
-    const pendingCmd = mockAdapter.getPendingCommand();
-    const commandLogs = mockAdapter.getCommandLogs();
+    if (useCatStore.getState().modeGeneration !== modeGeneration) return;
+
+    const pendingCmd = store.mode === 'local' ? mockAdapter.getPendingCommand() : null;
+    const commandLogs = store.mode === 'local' ? mockAdapter.getCommandLogs() : [];
 
     store.hydrateAll({
       kpis,
@@ -99,14 +102,14 @@ export class StateAdapter {
   }
 
   /**
-   * Change bot execution mode (local, demo, live)
+   * Switch mock presentation mode and load its isolated projections.
    */
-  public setMode(mode: BotMode): void {
+  public async setMode(mode: BotMode): Promise<void> {
     const store = useCatStore.getState();
+    if (store.mode === mode) return;
+    mockAdapter.setMode(mode);
     store.setMode(mode);
-    if (mockAdapter.setMode) {
-      mockAdapter.setMode(mode);
-    }
+    await this.init(store.activeScenario);
   }
 }
 

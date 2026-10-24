@@ -5,9 +5,8 @@
 
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20TypeScript%20%7C%20Vite%20%7C%20Tailwind-61dafb.svg)](frontend/cat-os-vite)
-[![Database](https://img.shields.io/badge/Database-SQLite%20(WAL%20Mode)-success.svg)](catos/db)
-[![Precision](https://img.shields.io/badge/Financial%20Core-Strict%20Decimal%20(Zero--Float)-orange.svg)](catos/core)
-[![License](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
+[![Database](https://img.shields.io/badge/Database-SQLite%20(WAL%20Mode)-success.svg)](catos/journal.py)
+[![Precision](https://img.shields.io/badge/Financial%20Core-Strict%20Decimal%20(Zero--Float)-orange.svg)](catos/research.py)
 
 ---
 
@@ -43,7 +42,7 @@ flowchart LR
 
 ## 現行交付階段與工程邊界
 
-CatOS 遵循審慎嚴謹的金融工程推進原則，區分「已交付能力」與「後續演進方向」：
+目前整合基線與限制以[接續入口](docs/current-handoff.md)及[整合交付](docs/integration-baseline-20261024.md)為準。主頁／Bot／風控仍是明示展示資料；回測與優化已接合成研究 HTTP。以下能力包含 Python／local-sim 層，不能解讀為整站已完成對接或 Demo／Live 已就緒。
 
 - **現階段已交付（Phase 1: 研究核心與本機模擬）**：
   - 高精度 Closed Bar 策略回測引擎（支援 `warmup_bars` 預熱期隔離）。
@@ -65,7 +64,7 @@ CatOS 採用雙主軸協同設計，所有功能集中於同一本機站點，�
 flowchart LR
     subgraph CatOS["CatOS (Crypto Agent Trading OS)"]
         direction TB
-        subgraph Astra["Astra 量化交易核心 (Astra Engine)"]
+        subgraph Quant["量化交易核心 (Quant Engine)"]
             Research["策略研究與回測"]
             Supervisor["Supervisor 資金守護者"]
             Risk["R1/P6 機構級風控"]
@@ -79,12 +78,12 @@ flowchart LR
         end
         Terminal["React 19 + Vite 專業戰情工作台 (Port 8890 / 8770)"]
     end
-    Terminal <--> Astra
+    Terminal <--> Quant
     Terminal <--> Yaozi
-    Astra <==>|Signed REST / WS| OKX["OKX 永續合約 (USDT-M SWAP)"]
+    Quant <==>|Signed REST / WS| OKX["OKX 永續合約 (USDT-M SWAP)"]
 ```
 
-- **Astra 核心量化引擎**：負責分鐘至小時級已收盤 K 線策略回測、參數優化、多市場環境評估、Supervisor-Worker 雙進程隔離執行，以及單合約獨佔的訂單生命週期管理。
+- **量化交易核心**：負責分鐘至小時級已收盤 K 線策略回測、參數優化、多市場環境評估、Supervisor-Worker 雙進程隔離執行，以及單合約獨佔的訂單生命週期管理。
 - **Yaozi 市場情報雷達**：負責整合多源外部情報——包含 X (Twitter) 社群輿情指數、OKX/Binance 資金費率偏離套利監控、巨鯨大額轉移警報與決策曲面（Decision Surface），為策略決策提供情報加權。
 
 ---
@@ -149,7 +148,7 @@ CatOS/
 │   └── package.json
 ├── docs/                      # 深度架構白皮書、風控政策與驗收規範
 │   ├── catOS-architecture-review.md     # 核心架構白皮書
-│   ├── catos-yaozi-integration.md       # Astra / Yaozi 雙引擎整合契約
+│   ├── catos-yaozi-integration.md       # 量化交易 / Yaozi 整合契約
 │   ├── retail-v1-simplification-*.md    # R1 風控政策定義
 │   └── disaster-stop-policy.md          # P6 災難停損規範
 ├── examples/                  # 回測示範、合成資料與 Optuna 範例
@@ -164,6 +163,8 @@ CatOS/
 - **Python**：3.11 或以上（支援 `sqlite3` WAL 模式）
 - **Node.js**：18.0 或以上（前端工作台構建）
 
+產品名稱為 `CatOS`；使用者已取消本機資料夾更名，主目錄維持 `CatOS_Astra`，不需執行改名腳本。`CatOS_Yaozi` 仍獨立開發。Windows 可執行根目錄 `start-laptop-dev.bat`；腳本會核對 8890 身分與就緒狀態，遇其他 owner 不接管。手動啟動如下。
+
 ### 1. 啟動前端專業戰情工作台
 
 ```bash
@@ -171,7 +172,7 @@ CatOS/
 cd frontend/cat-os-vite
 
 # 安裝依賴
-npm install
+npm ci
 
 # 啟動 Vite 開發伺服器（監聽 http://127.0.0.1:8890）
 npm run dev
@@ -182,7 +183,8 @@ npm run dev
 ### 2. 啟動後端量化與情報工作台 API
 
 ```bash
-# 在專案根目錄啟動後端控制面 API (監聽 127.0.0.1:8770)
+# 在專案根目錄安裝 HTTP／研究依賴，再啟動 API（127.0.0.1:8770）
+python -m pip install -r requirements-http.txt
 python -B -m catos.workspace_api
 ```
 
@@ -224,5 +226,5 @@ python -B -m unittest discover -s tests -v
 
 ## 授權條款
 
-本專案採用 [MIT License](LICENSE) 授權開源。
+目前專案根目錄未提供 LICENSE 檔；本次未新增或變更授權條款。
 

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/state_adapter_test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.3",

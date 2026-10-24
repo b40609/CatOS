@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import {
   Award,
   Sparkles,
@@ -23,15 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { ParetoScatterChart, type TrialPoint } from "@/components/catos/pareto-scatter-chart";
-import {
-  researchApi,
-  ResearchApiError,
-  type ResearchVersion,
-  type ResearchCatalog,
-  type ResearchRunStatus,
-  type OptimizationRequest,
-  type OptimizationResultPayload,
-} from "@/adapters/research-api-adapter";
+import type { OptimizationRequest } from "@/adapters/research-api-adapter";
+import { useOptimizationResearch } from "@/hooks/use-optimization-research";
 
 export const Route = createFileRoute("/optimization")({
   head: () => ({
@@ -82,19 +75,11 @@ function OptimizationPage() {
   const [selectedDemoTrial, setSelectedDemoTrial] = useState<OptTrial>(DEMO_TRIALS[0]);
   const [exported, setExported] = useState(false);
 
-  // Real API view states
-  const [version, setVersion] = useState<ResearchVersion | null>(null);
-  const [catalog, setCatalog] = useState<ResearchCatalog | null>(null);
-  const [optRuns, setOptRuns] = useState<ResearchRunStatus[]>([]);
-  const [selectedRun, setSelectedRun] = useState<ResearchRunStatus | null>(null);
-  const [realResult, setRealResult] = useState<OptimizationResultPayload | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [resultLoading, setResultLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const {
+    version, catalog, optRuns, selectedRun, realResult, loading, resultLoading,
+    submitting, errorMsg, fetchRealData, selectRun, submit, isBusy,
+  } = useOptimizationResearch();
 
-  // New task dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [periodLow, setPeriodLow] = useState(2);
   const [periodHigh, setPeriodHigh] = useState(8);
@@ -102,178 +87,17 @@ function OptimizationPage() {
   const [nTrials, setNTrials] = useState(8);
   const [seed, setSeed] = useState(42);
 
-  const isMountedRef = useRef(true);
-  const pollTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (pollTimerRef.current !== null) {
-        window.clearTimeout(pollTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Fetch real research optimization runs
-  const fetchRealData = useCallback(async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const [ver, cat, rList] = await Promise.all([
-        researchApi.getVersion(),
-        researchApi.getCatalog(),
-        researchApi.getRuns(),
-      ]);
-      if (!isMountedRef.current) return;
-      setVersion(ver);
-      setCatalog(cat);
-      const filtered = rList.filter((r) => r.kind === "optimization");
-      setOptRuns(filtered);
-
-      if (filtered.length > 0 && !selectedRun) {
-        selectRun(filtered[0]);
-      }
-    } catch (err: any) {
-      if (!isMountedRef.current) return;
-      if (err instanceof ResearchApiError) {
-        setErrorMsg(`API 連線異常 [${err.status}]: ${err.detail}`);
-      } else {
-        setErrorMsg("無法連線至研究 API 服務 (127.0.0.1:8770)");
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [selectedRun]);
-
-  useEffect(() => {
-    fetchRealData();
-  }, []);
-
-  // Select a specific real optimization run
-  const selectRun = useCallback(async (run: ResearchRunStatus) => {
-    setSelectedRun(run);
-    setRealResult(null);
-    setErrorMsg(null);
-
-    if (run.status !== "complete") {
-      setResultLoading(false);
-      return;
-    }
-
-    setResultLoading(true);
-    try {
-      const res = await researchApi.getRunResult<OptimizationResultPayload>(run.run_id);
-      if (!isMountedRef.current) return;
-      setRealResult(res);
-    } catch (err: any) {
-      if (!isMountedRef.current) return;
-      if (err instanceof ResearchApiError) {
-        setErrorMsg(`讀取優化結果失敗 [${err.status}]: ${err.detail}`);
-      } else {
-        setErrorMsg("讀取優化結果遭遇異常");
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setResultLoading(false);
-      }
-    }
-  }, []);
-
-  // Poll active task status
-  const startPolling = useCallback((targetRunId: string) => {
-    if (pollTimerRef.current !== null) {
-      window.clearTimeout(pollTimerRef.current);
-    }
-    setPollingRunId(targetRunId);
-
-    const step = async () => {
-      if (!isMountedRef.current) return;
-      try {
-        const st = await researchApi.getRunStatus(targetRunId);
-        if (!isMountedRef.current) return;
-
-        if (st.status === "complete" || st.status === "failed") {
-          setPollingRunId(null);
-          const [updatedRuns, updatedVer] = await Promise.all([
-            researchApi.getRuns(),
-            researchApi.getVersion(),
-          ]);
-          if (!isMountedRef.current) return;
-          setVersion(updatedVer);
-          const filtered = updatedRuns.filter((r) => r.kind === "optimization");
-          setOptRuns(filtered);
-
-          const found = filtered.find((r) => r.run_id === targetRunId) || st;
-          if (st.status === "complete") {
-            selectRun(found);
-          } else {
-            setSelectedRun(found);
-            setErrorMsg(`優化任務執行失敗: ${st.error || "未知原因"}`);
-          }
-        } else {
-          pollTimerRef.current = window.setTimeout(step, 600);
-        }
-      } catch (err: any) {
-        if (!isMountedRef.current) return;
-        setPollingRunId(null);
-        setErrorMsg("輪詢任務狀態中斷");
-      }
-    };
-
-    step();
-  }, [selectRun]);
-
-  // Handle submitting real optimization request
   const handleSubmitRealOpt = async () => {
-    if (!version) return;
-    setSubmitting(true);
-    setErrorMsg(null);
-
     const req: OptimizationRequest = {
       backtest: {
-        strategy_id: "sma-trend",
-        dataset_id: "synthetic-btc-15m-v1",
-        parameters: { period: 2, quantity: "2" },
-        initial_balance: "1000",
-        fee_rate: "0.0005",
-        slippage_bps: "2",
-        warmup_bars: Math.max(8, periodHigh),
+        strategy_id: "sma-trend", dataset_id: "synthetic-btc-15m-v1",
+        parameters: { period: 2, quantity: "2" }, initial_balance: "1000",
+        fee_rate: "0.0005", slippage_bps: "2", warmup_bars: Math.max(8, periodHigh),
       },
-      search_space: {
-        period: { low: periodLow, high: periodHigh, step: periodStep },
-      },
-      n_trials: nTrials,
-      seed,
+      search_space: { period: { low: periodLow, high: periodHigh, step: periodStep } },
+      n_trials: nTrials, seed,
     };
-
-    try {
-      const res = await researchApi.submitOptimization(req, version.build_id);
-      setOpenDialog(false);
-      const [updatedRuns, updatedVer] = await Promise.all([
-        researchApi.getRuns(),
-        researchApi.getVersion(),
-      ]);
-      setVersion(updatedVer);
-      const filtered = updatedRuns.filter((r) => r.kind === "optimization");
-      setOptRuns(filtered);
-
-      const found = filtered.find((r) => r.run_id === res.run_id) || res;
-      setSelectedRun(found);
-      startPolling(res.run_id);
-    } catch (err: any) {
-      if (err instanceof ResearchApiError) {
-        setErrorMsg(`提交優化任務失敗 [${err.status}]: ${err.detail}`);
-      } else {
-        setErrorMsg("無法發送優化請求，請確認後端狀態");
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setSubmitting(false);
-      }
-    }
+    if (await submit(req)) setOpenDialog(false);
   };
 
   const handleSelectParetoTrial = (point: TrialPoint) => {
@@ -293,8 +117,6 @@ function OptimizationPage() {
       });
     }
   };
-
-  const isBusy = !!version?.active_run_id || pollingRunId !== null;
 
   return (
     <AppShell>
@@ -333,7 +155,7 @@ function OptimizationPage() {
             {viewMode === "real" && (
               <Button
                 size="sm"
-                disabled={isBusy || version?.restart_required}
+                disabled={!version || loading || isBusy || version.restart_required}
                 onClick={() => setOpenDialog(true)}
                 className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
               >
