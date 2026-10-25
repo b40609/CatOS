@@ -58,7 +58,6 @@ secrets/
 Thumbs.db
 Desktop.ini
 *.zip
-CatOS_Astra/
 
 # Local editor, AI assistant caches, and temporary prototypes
 .codex/

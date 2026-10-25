@@ -163,7 +163,7 @@ CatOS/
 - **Python**：3.11 或以上（支援 `sqlite3` WAL 模式）
 - **Node.js**：18.0 或以上（前端工作台構建）
 
-產品名稱為 `CatOS`；使用者已取消本機資料夾更名，主目錄維持 `CatOS_Astra`，不需執行改名腳本。`CatOS_Yaozi` 仍獨立開發。Windows 可執行根目錄 `start-laptop-dev.bat`；腳本會核對 8890 身分與就緒狀態，遇其他 owner 不接管。手動啟動如下。
+產品名稱為 `CatOS`；主目錄已於 2026-10-25 由 `CatOS_Astra` 更名為 `CatOS`。`_Astra` 後綴僅反映開發期使用的 ASTRA 模型，並非產品命名的一部分。`CatOS_Yaozi` 仍獨立開發。Windows 可執行根目錄 `start-laptop-dev.bat`；腳本會核對 8890 身分與就緒狀態，遇其他 owner 不接管。手動啟動如下。
 
 ### 1. 啟動前端專業戰情工作台
 
