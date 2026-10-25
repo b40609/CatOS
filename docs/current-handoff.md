@@ -1,10 +1,18 @@
 # CatOS 目前接續入口
 
-更新：2026-10-24（Asia/Taipei）。目前工作包：依核准清單備份、刪除 A＋B、正式前端開發自測及指定 GPT-6 Sol 清理差異獨立驗收已完成，限定範圍 PASS。本入口隨核准的整合基線與清理提交交付；主目錄更名已取消。
+## 2026-10-25 GitHub 倉庫收斂
+
+- 使用者明確排除 `CatOS_Yaozi`：該模組維持獨立，本輪範圍僅 `b40609/CatOS` 與 `b40609/catOS_v1`；CatOS 維持公開。
+- 舊版完整 Git 歷史已保存至 `b40609/CatOS` 的 `archive/catos-v1` 分支，提交 `d9e137d32c46f3ac2b5456962e76b5f44ef0ab2a`；來源倉庫 `b40609/catOS_v1` 已封存，可還原，未刪除。
+- 專案外備份：`C:/Users/user/Desktop/CatOS-repository-backup-20261025-202058/catOS_v1.bundle`；`git fsck --full --strict`、bundle 完整歷史驗證及遠端提交雜湊核對通過。詳細收據見同目錄 `consolidation-receipt.json`。
+- 本輪僅集中舊版歷史，未將舊下單、憑證加密或狀態機程式移入主線。倉庫收斂時的遠端基線：`main` 為 `fffed2e`，`feature/catos-react-vite` 為 `113ed09`。另一台 PC 繼續 Antigravity 前端開發；前後端對接延後。
+- 使用者另核准將 9 個名稱與交接相關檔案獨立提交並推送；兩份歷史紀錄還原原始路徑，正式 React 前端原始碼未變更。另一台 PC 應先保存並提交當地前端修改，再拉取本次提交。以下為先前清理工作紀錄。
+
+更新：2026-10-24（Asia/Taipei）。目前工作包：依核准清單備份、刪除 A＋B、正式前端開發自測及指定 GPT-6 Sol 清理差異獨立驗收已完成，限定範圍 PASS。本入口隨核准的整合基線與清理提交交付；主目錄已於 2026-10-25 更名為 `CatOS`。
 
 ## 目前基線
 
-- 使用者已取消 `CatOS_Astra → CatOS`，主目錄維持 `C:/Users/user/Desktop/CatOS_Astra`，產品名稱為 CatOS。未採用的更名腳本已依本輪核准清單備份後移除。
+- 主目錄已於 2026-10-25 由 `C:/Users/user/Desktop/CatOS_Astra` 更名為 `C:/Users/user/Desktop/CatOS`；產品名稱為 CatOS。活躍原始碼、文件與設定中的舊路徑引用已同步替換，`outputs/`、`reports/` 下歷史產物維持原樣。
 - 分支 `feature/catos-react-vite`，清理前基線 `149f9fcbf2a2c5d741aa696750ab1ed62ae14460`。使用者已授權清理差異獨立驗收，通過後依白名單 commit／push；遠端已 fetch，與清理前基線一致。
 - stash `0206ef0110df18d7b77e6880202a95d35215285e` 與 `9087a92fa3df199b1f9dcfbc60fd326f6dc78358` 保留，未套用／刪除。核准清單外的原有未追蹤內容保留。
 - `CatOS_Yaozi` 維持獨立工作目錄，不跨目錄 import、不整包覆蓋。

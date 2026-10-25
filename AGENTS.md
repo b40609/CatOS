@@ -4,9 +4,9 @@
 
 ## CONTEXT
 
-- 2026-10-24 使用者取消主資料夾更名，保留 `C:/Users/user/Desktop/CatOS_Astra`；產品名稱仍為 CatOS，不綁定模型。此決策取代同日較早的 `CatOS_Astra → CatOS` 更名指示；不再執行改名腳本。`CatOS_Yaozi` 維持獨立，歷史路徑與驗收證據保留原意。
+- 2026-10-25 使用者確認執行主資料夾更名：`C:/Users/user/Desktop/CatOS_Astra` → `C:/Users/user/Desktop/CatOS`，並同步替換專案內活躍原始碼、文件與設定中的 `CatOS_Astra` 引用。更名理由：`_Astra` 後綴僅反映開發期使用的 ASTRA 模型，不屬於產品命名，產品名稱自始為 CatOS。此決策推翻 2026-10-24 的「取消更名」決定，該日記錄僅保留為歷史沿革。`outputs/`、`reports/` 下歷史驗收證據與執行產物維持原路徑與原內容，作為當時狀態記錄。`CatOS_Yaozi` 維持獨立工作目錄。
 
-- 2026-09-23 使用者已確認：保留 `CatOS_Astra`／`CatOS_Yaozi` 分工開發，最終以同一 localhost 網站的「量化交易／Yaozi 情報」分頁交付，切換頁面不控制策略生命週期。目錄分離不是產品分離；整合規則見 `docs/catos-yaozi-integration.md`。不得整包覆蓋另一工作目錄或於執行期跨 worktree import；既有 Git／驗收分工及交易授權限制不變。
+- 2026-09-23 使用者已確認：保留 `CatOS`／`CatOS_Yaozi` 分工開發，最終以同一 localhost 網站的「量化交易／Yaozi 情報」分頁交付，切換頁面不控制策略生命週期。目錄分離不是產品分離；整合規則見 `docs/catos-yaozi-integration.md`。不得整包覆蓋另一工作目錄或於執行期跨 worktree import；既有 Git／驗收分工及交易授權限制不變。
 - 執行與儲存底座僅 Python 3.11+、SQLite（WAL）；禁止 Docker、PostgreSQL、Redis。
 - 核心邏輯嚴格依據 `catOS-architecture-review.md`；原稿可能因中斷不完整，缺漏與尚未核准的政策不得當成已定案需求。
 - 目前先完成研究與本機模擬，Demo／Live 分階段再上；第 15 節區分已確認決策與待決細節，不要求一次完成全部生產能力。
