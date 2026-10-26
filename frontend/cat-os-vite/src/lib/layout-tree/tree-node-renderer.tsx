@@ -11,7 +11,6 @@ import type {
   LeafNode,
 } from "./types";
 import { CardSlotContext } from "./card-slot-context";
-import { Maximize2 } from "lucide-react";
 
 interface TreeNodeRendererProps {
   node: LayoutNode;
@@ -99,7 +98,6 @@ function LeafCardPane({
   const containerRef = useRef<HTMLDivElement>(null);
   const seamStyle = useLayoutStore((s) => s.seamStyle);
   const replaceLeafNode = useLayoutStore((s) => s.replaceLeafNode);
-  const toggleMaximizeLeaf = useLayoutStore((s) => s.toggleMaximizeLeaf);
 
   const cardId = leaf.cardId;
   const isDraggingThis = draggingLeafId === leaf.id;
@@ -204,14 +202,6 @@ function LeafCardPane({
     onStartDrag(leaf.id, cardId, e);
   };
 
-  const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    // 雙擊頂部 44px 標題列區域切換全螢幕放大 / 還原
-    if (e.clientY - rect.top <= 44) {
-      toggleMaximizeLeaf(leaf.id);
-    }
-  };
-
   return (
     <div
       ref={containerRef}
@@ -220,7 +210,6 @@ function LeafCardPane({
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
       onPointerDown={handlePointerDown}
-      onDoubleClick={handleDoubleClick}
       className={cn(
         "relative flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-surface/90 backdrop-blur-md group/card select-none",
         seamStyle === "seamless" && "rounded-none border-0 shadow-none",
@@ -231,20 +220,6 @@ function LeafCardPane({
         isDraggingThis && "opacity-35 border-2 border-dashed border-primary/70 ring-1 ring-primary/30"
       )}
     >
-      {/* 業界標準：微型全螢幕放大專注按鈕 (雙擊標題列亦可觸發) */}
-      <button
-        type="button"
-        data-no-drag
-        onClick={(e) => {
-          e.stopPropagation();
-          toggleMaximizeLeaf(leaf.id);
-        }}
-        className="absolute top-2 right-2.5 z-20 p-1 rounded bg-secondary/60 hover:bg-secondary text-muted-foreground/60 hover:text-foreground opacity-0 group-hover/card:opacity-100 transition-opacity cursor-pointer border border-border/50 shadow-xs"
-        title="全螢幕放大專注 (⛶ / 雙擊標題列)"
-      >
-        <Maximize2 className="size-3" />
-      </button>
-
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden [&_.panel]:border-0 [&_.panel]:rounded-none [&_.panel]:bg-transparent [&_.panel]:backdrop-blur-none [&_.panel]:shadow-none">
         <CardSlotContext.Provider
           value={{

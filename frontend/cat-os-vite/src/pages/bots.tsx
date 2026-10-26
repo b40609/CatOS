@@ -263,7 +263,7 @@ function BotManagement() {
                       className={cn(
                         "border-b border-border/50 cursor-pointer transition-colors",
                         isSelected
-                          ? "bg-primary/10 border-l-2 border-l-primary"
+                          ? "bg-secondary/50"
                           : "hover:bg-secondary/40",
                       )}
                     >

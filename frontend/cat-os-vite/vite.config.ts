@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import { localIntegration } from './vite.local-integration';
+// reload localIntegration plugins
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), localIntegration()],

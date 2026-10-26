@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  ShieldAlert,
 } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
 import { cn } from "@/lib/utils";
@@ -97,10 +96,6 @@ export function IncidentTimelineCard({ className }: IncidentTimelineCardProps) {
     return incidents.filter((i) => i.severity === filterSeverity);
   }, [incidents, filterSeverity]);
 
-  const alertCount = useMemo(() => {
-    return incidents.filter((i) => i.severity === "WARN" || i.severity === "CRIT").length;
-  }, [incidents]);
-
   const getSeverityBadge = (severity: IncidentSeverity) => {
     switch (severity) {
       case "CRIT":
@@ -138,53 +133,33 @@ export function IncidentTimelineCard({ className }: IncidentTimelineCardProps) {
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 卡片頂部 Header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
-        <div className="flex items-center gap-2">
-          <CardHeaderTitle
-            cardId="incidents"
-            title="風險警報與異常事件"
-            subtext=""
-          />
-          {alertCount > 0 && (
-            <span className="flex items-center gap-1 text-[8.5px] font-mono px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-              <ShieldAlert className="size-2.5" />
-              <span>{alertCount} 異常</span>
-            </span>
-          )}
-        </div>
+      <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+        <CardHeaderTitle
+          cardId="incidents"
+          title="風險警報與異常事件"
+        />
 
-        {/* 篩選與完整日誌連結 */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center bg-background/60 border border-border/60 rounded p-0.5 gap-0.5">
-            {[
-              { id: "ALL", label: "全部" },
-              { id: "ALERT", label: "告警" },
-              { id: "INFO", label: "資訊" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setFilterSeverity(tab.id)}
-                className={cn(
-                  "px-1.5 py-0.5 text-[9px] font-mono rounded transition-colors cursor-pointer",
-                  filterSeverity === tab.id
-                    ? "bg-secondary text-primary font-semibold border border-border shadow-xs"
-                    : "text-muted-foreground hover:text-foreground border border-transparent"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => alert("日誌系統運行正常：Supervisor & Worker IPC 日誌同步寫入 SQLite WAL。")}
-            className="flex items-center gap-1 text-[10px] font-mono text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer"
-          >
-            <span>完整日誌</span>
-            <span>&rarr;</span>
-          </button>
+        {/* 篩選切換膠囊 */}
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+          {[
+            { id: "ALL", label: "全部" },
+            { id: "ALERT", label: "告警" },
+            { id: "INFO", label: "資訊" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFilterSeverity(tab.id)}
+              className={cn(
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                filterSeverity === tab.id
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 

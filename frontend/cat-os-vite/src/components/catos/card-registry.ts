@@ -3,10 +3,6 @@ import {
   LineChart,
   Bot,
   PieChart,
-  Zap,
-  ShieldAlert,
-  Timer,
-  Target,
   ScrollText,
 } from "lucide-react";
 import type { CardId } from "@/state/layoutStore";
@@ -98,12 +94,12 @@ export const ALL_CARDS: CardMeta[] = [
   },
   {
     id: "activity_deck",
-    nameZh: "全域戰情日誌台",
-    nameEn: "Unified Incident Deck",
+    nameZh: "全域戰情日誌與成交流水",
+    nameEn: "Unified Blotter & Activity Log",
     category: "日誌審計",
-    desc: "極限二字 6 大時序維度：未解除、全部、風控、成交、委託與系統生命週期",
+    desc: "全時序合流：未解除判定、風控告警、逐筆成交流水、在途委託與系統心跳",
     icon: ScrollText,
-    badge: "二字定案",
+    badge: "全時序合流",
     spec: {
       dataFeed: "Local SQLite (WAL)",
       latency: "逐筆寫入",
@@ -112,85 +108,19 @@ export const ALL_CARDS: CardMeta[] = [
       codeId: "ACTIVITY_DECK_V2",
     },
   },
-  {
-    id: "fills",
-    nameZh: "即時成交流水",
-    nameEn: "Recent Fills Stream",
-    category: "交易執行",
-    desc: "OKX SWAP 實時逐筆成交回報、S3 費用帳務、買賣單向與損益即時跳動",
-    icon: Zap,
-    badge: "S3 逐筆撮合",
-    spec: {
-      dataFeed: "OKX WS / Fills",
-      latency: "即時推播",
-      engine: "USDT 費用重放",
-      tier: "委託執行",
-      codeId: "FILLS_STREAM_S3",
-    },
-  },
-  {
-    id: "market_watch",
-    nameZh: "標的行情與資金費率",
-    nameEn: "Market Ticker & 8H Rates",
-    category: "策略行情",
-    desc: "BTC/ETH/SOL 實時標記價、8H 永續資金費率結算倒數與收盤倒數時鐘",
-    icon: Timer,
-    badge: "Closed Bar",
-    spec: {
-      dataFeed: "OKX Public Tickers",
-      latency: "200ms Tick",
-      engine: "K 線收盤對齊",
-      tier: "策略情報",
-      codeId: "MARKET_CLOCK_8H",
-    },
-  },
-  {
-    id: "strategy_intents",
-    nameZh: "策略目標與訊號強度",
-    nameEn: "Signals Radar & Intents",
-    category: "策略行情",
-    desc: "Worker 傳出的純資料委託意圖、多空訊號雷達與指標偏離度預警",
-    icon: Target,
-    badge: "純資料訊號",
-    spec: {
-      dataFeed: "Strategy Worker IPC",
-      latency: "Bar 關閉時觸發",
-      engine: "Jesse API Style",
-      tier: "策略情報",
-      codeId: "STRATEGY_RADAR_V1",
-    },
-  },
-  {
-    id: "incidents",
-    nameZh: "風險警報與異常審計",
-    nameEn: "Risk Alarms & Kill Switch",
-    category: "日誌審計",
-    desc: "撮合滑價偏離警報、UNKNOWN 委託熔斷鎖存與帳戶級硬日損防線",
-    icon: ShieldAlert,
-    badge: "熔斷鎖存",
-    spec: {
-      dataFeed: "Guardian 獨立看門狗",
-      latency: "微秒級審計",
-      engine: "Hard Kill-Switch",
-      tier: "核心防線",
-      codeId: "RISK_AUDIT_GUARDIAN",
-    },
-  },
 ];
 
 /**
  * 各卡片預設最小安全閱讀高度 (px)
  * 供使用者隨時根據每張卡片的資料密度與排版需求自訂調整預設值
  */
-export const CARD_DEFAULT_MIN_HEIGHTS: Record<CardId, number> = {
+export const CARD_DEFAULT_MIN_HEIGHTS: Partial<Record<CardId, number>> = {
   equity: 340,           // 權益走勢圖 + 核心 KPI + 台北日切基準
   positions: 340,        // 持倉明細與在途委託雙檢視表 + 底部撤單統計
   bots: 320,             // 4 隻 KOL 機器人監控表格 + 狀態指示
   allocation: 320,       // 槓桿儀表板 + 甜甜圈圓餅圖 + 幣種曝險進度條
   activity_deck: 340,    // 全域戰情日誌時間軸
   fills: 280,            // 即時成交流水表
-  market_watch: 260,     // 標的行情與資金費率
-  strategy_intents: 280, // 策略目標與訊號強度雷達
   incidents: 300,        // 風險警報與異常審計
   bot_inspector: 380,    // 機器人深層檢測 (Master-Detail)
 };

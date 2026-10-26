@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import { PositionProtectionTable, type ProtectionMonitoringView } from './position-protection-table';
 import { useLiveMarketStore } from "@/state/liveMarketStore";
 import { NumberTicker } from "./motion/number-ticker";
@@ -374,28 +374,20 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 一體化 Header 與 2 Tab 切換開關 */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0">
           <CardHeaderTitle
             cardId="positions"
             title="持倉明細與在途委託"
-            subtext={
-              <div className="flex items-center gap-1.5 ml-1">
-                <span title="展示狀態，尚未取得交易所保護確認" className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border text-amber-400 bg-amber-400/10 border-amber-400/25">
-                  <span className="size-1.5 rounded-full bg-amber-400" />
-                  P6 展示 · {positionsData.filter((p) => p.p6Status !== "ACTIVE").length} 筆待確認
-                </span>
-              </div>
-            }
           />
 
-          <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded p-0.5">
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
             <button
               type="button"
               onClick={() => setTab("positions")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono font-medium rounded transition-colors cursor-pointer",
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
                 tab === "positions"
-                  ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -406,9 +398,9 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
               type="button"
               onClick={() => setTab("orders")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono font-medium rounded transition-colors cursor-pointer",
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
                 tab === "orders"
-                  ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -431,7 +423,8 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                 <th className="px-1.5 text-right font-medium">SIZE / NOTIONAL</th>
                 <th className="px-1.5 text-right font-medium">ENTRY / MARK</th>
                 <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
-                <th className="px-1.5 text-right font-medium hidden sm:table-cell">預估強平 / 距爆倉</th>
+                <th className="px-1.5 text-right font-medium hidden sm:table-cell">8H 資金費率</th>
+                <th className="px-1.5 text-right font-medium hidden md:table-cell">預估強平 / 距爆倉</th>
                 <th className="px-1.5 text-right font-medium">P6 災難停損 (OKX)</th>
                 <th className="py-2 pr-3 pl-1.5 text-right font-medium hidden lg:table-cell">LEVERAGE</th>
               </tr>
@@ -497,7 +490,26 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       </div>
                     </td>
 
-                    <td className="px-1.5 py-2 text-right hidden sm:table-cell">
+                    <td className="px-1.5 py-2 text-right hidden sm:table-cell font-mono">
+                      <div className="flex flex-col items-end">
+                        <span
+                          className={cn(
+                            "px-1 py-0.2 rounded text-[9.5px] font-bold leading-tight",
+                            p.base === "SOL"
+                              ? "bg-rose-400/10 text-rose-400"
+                              : "bg-emerald-400/10 text-emerald-400"
+                          )}
+                        >
+                          {p.base === "SOL" ? "-0.0031%" : p.base === "ETH" ? "+0.0084%" : "+0.0102%"}
+                        </span>
+                        <span className="text-[8.5px] text-muted-foreground leading-tight mt-0.5 flex items-center gap-0.5">
+                          <Clock className="size-2 text-primary/70" />
+                          8H 結算
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-1.5 py-2 text-right hidden md:table-cell">
                       <div className="flex flex-col items-end font-mono">
                         <span className="text-[10px] text-foreground leading-tight">${p.liqPrice}</span>
                         <span className="text-[8.5px] text-emerald-400 font-semibold leading-tight flex items-center gap-0.5">

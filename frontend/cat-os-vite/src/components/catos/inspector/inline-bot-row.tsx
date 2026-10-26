@@ -22,7 +22,7 @@ export function InlineBotRow({ botId, colSpan = 6, onCollapse }: InlineBotRowPro
   const live = botsLive[botId];
 
   return (
-    <tr className="bg-secondary/40 border-b-2 border-primary/40 select-none animate-in fade-in duration-150">
+    <tr className="bg-secondary/40 border-b border-border/80 select-none animate-in fade-in duration-150">
       <td colSpan={colSpan} className="p-3">
         <div className="rounded-lg border border-border/80 bg-background/80 p-3 font-mono text-xs shadow-inner">
           {/* 頂部標頭與收合按鈕 */}

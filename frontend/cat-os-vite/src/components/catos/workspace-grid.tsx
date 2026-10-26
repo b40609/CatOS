@@ -8,13 +8,12 @@ import {
   countLeaves,
   moveAndSplit,
   finalizeTree,
-  findNode,
   calculateTreeMinHeight,
 } from "@/lib/layout-tree/tree-ops";
 import { TreeNodeRenderer } from "@/lib/layout-tree/tree-node-renderer";
 import type { LayoutNode, DropPosition } from "@/lib/layout-tree/types";
 import { ALL_CARDS } from "./card-registry";
-import { LayoutGrid, Plus, ArrowRight, Layers, Minimize2 } from "lucide-react";
+import { LayoutGrid, Plus, ArrowRight, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceGridProps {
@@ -114,8 +113,6 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
     setRootNode,
     updateSplitRatio,
     removeLeafNode,
-    maximizedLeafId,
-    restoreMaximizedLeaf,
     showToast,
   } = useLayoutStore();
 
@@ -141,18 +138,6 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
   // 統計目前樹中卡片數
   const totalLeaves = countLeaves(rootNode);
   const canRemove = totalLeaves > 1;
-
-  // 監聽全域 Esc 鍵還原最大化卡片
-  useEffect(() => {
-    if (!maximizedLeafId) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        restoreMaximizedLeaf();
-      }
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [maximizedLeafId, restoreMaximizedLeaf]);
 
   // 120 FPS 自由拉伸比例處理
   const handleRatioChange = (splitId: string, ratio: number, persist: boolean) => {
@@ -327,13 +312,6 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
   // 當前渲染樹：若在預演中則直接渲染預演樹，達成極致直觀的即時版面形態演進 (Live Morphing)
   const displayTree = previewTree || rootNode;
 
-  // 尋找當前最大化卡片節點
-  const maximizedLeaf = useMemo(() => {
-    if (!maximizedLeafId || !displayTree) return null;
-    const node = findNode(displayTree, maximizedLeafId);
-    return node && node.type === "leaf" ? node : null;
-  }, [maximizedLeafId, displayTree]);
-
   // 依據各卡片最小安全閱讀高度計算縱向畫布所需高度 (超出視窗時自動平滑滾動)
   const requiredCanvasHeight = useMemo(() => {
     return calculateTreeMinHeight(displayTree);
@@ -346,49 +324,31 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
         draggingInfo ? "select-none" : "select-text"
       )}
     >
-      {/* 1. 若處於單卡最大化專注模式：100% 填滿視窗，可點擊按鈕或按 Esc 瞬間還原 */}
-      {maximizedLeaf ? (
-        <div className="relative flex flex-col flex-1 min-w-0 h-full overflow-hidden bg-surface/95 backdrop-blur-md rounded-md border border-primary/50 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-          <button
-            type="button"
-            onClick={restoreMaximizedLeaf}
-            className="absolute top-2.5 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded bg-secondary/90 hover:bg-secondary text-foreground text-[11px] font-mono border border-border/80 cursor-pointer shadow-md transition-all group"
-            title="還原平鋪佈局 (Esc)"
-          >
-            <Minimize2 className="size-3 text-primary group-hover:scale-110 transition-transform" />
-            <span>還原平鋪佈局 (Esc)</span>
-          </button>
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden [&_.panel]:border-0 [&_.panel]:rounded-none [&_.panel]:bg-transparent [&_.panel]:backdrop-blur-none [&_.panel]:shadow-none">
-            {renderCard(maximizedLeaf.cardId)}
-          </div>
-        </div>
-      ) : (
-        /* 2. 平鋪樹狀工作區：當卡片過多時依據最小閱讀高度自動向下撐開畫布並支援滾動 */
-        <div
-          ref={containerRef}
-          style={{
-            minHeight: "100%",
-            height: requiredCanvasHeight > 0 ? `max(100%, ${requiredCanvasHeight}px)` : "100%",
-          }}
-          className="relative flex flex-col flex-1 min-w-0 w-full shrink-0"
-        >
-          {displayTree ? (
-            <TreeNodeRenderer
-              node={displayTree}
-              isResizing={isResizing}
-              canRemove={canRemove}
-              draggingLeafId={previewTree ? null : draggingInfo?.sourceLeafId}
-              onStartDrag={handleStartDrag}
-              onRatioChange={handleRatioChange}
-              onResetSplit={handleResetSplit}
-              onRemoveLeaf={removeLeafNode}
-              renderCard={renderCard}
-            />
-          ) : (
-            <EmptyWorkspacePrompt />
-          )}
-        </div>
-      )}
+      {/* 平鋪樹狀工作區：當卡片過多時依據最小閱讀高度自動向下撐開畫布並支援滾動 */}
+      <div
+        ref={containerRef}
+        style={{
+          minHeight: "100%",
+          height: requiredCanvasHeight > 0 ? `max(100%, ${requiredCanvasHeight}px)` : "100%",
+        }}
+        className="relative flex flex-col flex-1 min-w-0 w-full shrink-0"
+      >
+        {displayTree ? (
+          <TreeNodeRenderer
+            node={displayTree}
+            isResizing={isResizing}
+            canRemove={canRemove}
+            draggingLeafId={previewTree ? null : draggingInfo?.sourceLeafId}
+            onStartDrag={handleStartDrag}
+            onRatioChange={handleRatioChange}
+            onResetSplit={handleResetSplit}
+            onRemoveLeaf={removeLeafNode}
+            renderCard={renderCard}
+          />
+        ) : (
+          <EmptyWorkspacePrompt />
+        )}
+      </div>
     </div>
   );
 }

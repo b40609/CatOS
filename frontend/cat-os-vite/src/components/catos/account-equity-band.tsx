@@ -34,6 +34,8 @@ export function AccountEquityBand({
   const [chartWidth, setChartWidth] = useState(600);
   const [chartHeight, setChartHeight] = useState(240);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const bandRef = useRef<HTMLDivElement>(null);
+  const [bandDimensions, setBandDimensions] = useState({ width: 600, height: 240 });
 
   // 1. 取得即時市場撮合與帳戶波動 Store
   const {
@@ -48,7 +50,22 @@ export function AccountEquityBand({
   const totalSeries = useMemo(() => accountSeries(INITIAL_BOTS), []);
   const periodSum = useMemo(() => summarize(totalSeries, period), [totalSeries, period]);
 
-  // 2. 自適應容器寬高 ResizeObserver (雙向響應式，根除高度硬編碼)
+  // 2. 自適應容器寬高 ResizeObserver (雙向響應式，監聽整體卡片與圖表區)
+  useEffect(() => {
+    const el = bandRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setBandDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const el = chartContainerRef.current;
     if (!el) return;
@@ -63,9 +80,14 @@ export function AccountEquityBand({
     return () => ro.disconnect();
   }, []);
 
-  // 3. 幾何座標與軸長運算 (動態自適應容器高度)
+  const isNarrow = bandDimensions.width < 460;
+  const isSuperNarrow = bandDimensions.width < 340;
+  const isShort = bandDimensions.height < 170;
+  const isCompact = isNarrow || isShort;
+
+  // 3. 幾何座標與軸長運算 (動態自適應容器高度與寬度)
   const height = Math.max(120, chartHeight);
-  const axisW = 54;
+  const axisW = isNarrow ? 40 : 54;
   const xAxisH = 20;
   const plotW = Math.max(1, chartWidth - axisW);
   const plotH = Math.max(1, height - xAxisH);
@@ -151,34 +173,32 @@ export function AccountEquityBand({
   }, [hoverIdx, periodSum]);
 
   return (
-    <div className={cn("flex flex-col h-full w-full select-none overflow-hidden", className)}>
-      {/* 1. Header 列：一體化標題 + 排版切換 + 週期快捷鍵 (單層結構，杜絕雙重標題) */}
+    <div ref={bandRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden", className)}>
+      {/* 1. Header 列：一體化標題 + 排版切換 + 週期快捷鍵 (窄版自動過濾為核心 3 週期) */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <CardHeaderTitle
             cardId="equity"
             title="帳戶權益與損益"
           />
 
-          <div className="flex items-center gap-2">
-            {/* 週期切換按鈕 */}
-            <div className="flex bg-background/60 border border-border/60 rounded p-0.5 gap-0.5">
-              {PERIODS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPeriod(p)}
-                  className={cn(
-                    "px-2 py-0.5 text-[11px] font-mono font-semibold rounded transition-colors cursor-pointer",
-                    period === p
-                      ? "bg-secondary text-primary border border-border"
-                      : "text-muted-foreground hover:text-foreground border border-transparent"
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+          {/* 週期切換按鈕 (窄版自動切換為核心週期，防止標題截字) */}
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+            {(isSuperNarrow ? (["24H", "7D"] as Period[]) : isNarrow ? (["24H", "7D", "30D"] as Period[]) : PERIODS).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                  period === p
+                    ? "bg-secondary text-foreground font-semibold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {p}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -188,63 +208,97 @@ export function AccountEquityBand({
           {/* 邊界微光流動 (Magic UI Border Beam) */}
           <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
 
-          {/* 左側緊湊 KPI 欄位 (移除 justify-between 撕裂，改為頂部自然緊湊對齊) */}
-          <div className="w-[195px] shrink-0 p-2.5 border-r border-border/80 flex flex-col gap-2 overflow-y-auto bg-surface/30">
+          {/* 左側緊湊 KPI 欄位 (自適應寬度與緊湊態，窄版縮至 130px 讓出圖表空間) */}
+          <div className={cn(
+            "shrink-0 border-r border-border/80 flex flex-col overflow-y-auto bg-surface/30",
+            isNarrow ? "w-[130px] p-2 gap-1.5" : "w-[195px] p-2.5 gap-2"
+          )}>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
                 <span>帳戶權益</span>
-                <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  即時撮合中
-                </span>
+                {!isNarrow && (
+                  <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    即時
+                  </span>
+                )}
               </span>
-              <div className="font-mono text-2xl font-bold text-foreground tracking-tight">
+              <div className={cn(
+                "font-mono font-bold text-foreground tracking-tight",
+                isNarrow ? "text-lg" : "text-2xl"
+              )}>
                 <NumberTicker value={equity} prefix="$" decimals={2} />
               </div>
-              <div className={cn("font-mono text-[11px] font-semibold", toneOf(todayPnl))}>
+              <div className={cn("font-mono font-semibold", isNarrow ? "text-[10px]" : "text-[11px]", toneOf(todayPnl))}>
                 <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} /> ({todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`})
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">今日損益</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(todayPnl))}>
-                  <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} />
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
+            {/* 次要 KPI 指標 */}
+            {isNarrow ? (
+              // 窄版精緻單欄速覽
+              <div className="flex flex-col gap-1.5 pt-1.5 border-t border-border/60 text-[10px] font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">今日</span>
+                  <span className={cn("font-semibold", toneOf(todayPnl))}>
+                    {todayPnl >= 0 ? "+" : ""}{formatUsd(todayPnl, false)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{period}</span>
+                  <span className={cn("font-semibold", toneOf(periodSum.pnl))}>
+                    {periodSum.pnl >= 0 ? "+" : ""}{formatUsd(periodSum.pnl, false)}
+                  </span>
+                </div>
+                {!isShort && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">未結</span>
+                    <span className={cn("font-semibold", toneOf(totalUpnl))}>
+                      {totalUpnl >= 0 ? "+" : ""}{formatUsd(totalUpnl, false)}
+                    </span>
+                  </div>
+                )}
               </div>
+            ) : (
+              // 寬版 2x2 矩陣
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">今日損益</span>
+                  <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(todayPnl))}>
+                    <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} />
+                  </span>
+                  <span className="text-[9.5px] text-muted-foreground font-mono">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
+                </div>
 
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">{period} 損益</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(periodSum.pnl))}>
-                  {formatUsd(periodSum.pnl, true)}
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{formatPct(periodSum.ret)}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">{period} 損益</span>
+                  <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(periodSum.pnl))}>
+                    {formatUsd(periodSum.pnl, true)}
+                  </span>
+                  <span className="text-[9.5px] text-muted-foreground font-mono">{formatPct(periodSum.ret)}</span>
+                </div>
+
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">未實現</span>
+                  <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(totalUpnl))}>
+                    <NumberTicker value={Math.abs(totalUpnl)} prefix={totalUpnl >= 0 ? "+$" : "-$"} decimals={2} />
+                  </span>
+                  <span className="text-[9.5px] text-muted-foreground font-mono">3 筆持倉聯動</span>
+                </div>
+
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">已實現</span>
+                  <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(realized))}>
+                    {formatUsd(realized, true)}
+                  </span>
+                  <span className="text-[9.5px] text-muted-foreground font-mono">OKX-SWAP</span>
+                </div>
               </div>
-
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">未實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(totalUpnl))}>
-                  <NumberTicker value={Math.abs(totalUpnl)} prefix={totalUpnl >= 0 ? "+$" : "-$"} decimals={2} />
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">3 筆持倉聯動</span>
-              </div>
-
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">已實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(realized))}>
-                  {formatUsd(realized, true)}
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">OKX-SWAP</span>
-              </div>
-            </div>
-
-
+            )}
           </div>
 
           {/* 右側 SVG 走勢圖 (100% 響應垂直拉伸) */}
-          <div className="flex-1 flex flex-col min-w-0 p-2.5">
+          <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-1.5" : "p-2.5")}>
             <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground h-5 shrink-0 px-1">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-[2px] bg-primary inline-block" />

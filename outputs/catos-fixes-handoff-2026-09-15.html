@@ -49,7 +49,7 @@
 <li><strong>合法不完整采集仍可返回已观测小计。</strong><code>incomplete_collection</code> 本身不阻断有效数据小计；新增 <code>page_chain_invalid</code>／<code>manifest_completion_mismatch</code> 才与原证据错误一起阻断。已观测小计不是全账户合计。</li>
 <li>不把 HTTP 单页或空页结束规则强加给通用 CollectionResult。合法部分前缀可零页，末 next 可为空或非空；重试使 requests 大于页数不算错误。</li>
 <li>Float 余额测试分层：采集层先拒绝 Float，因此直接调用 decoder 验证其固定诊断；没有放宽生产 JSON／金融数值检查。</li>
-<li>减仓仍要求已核实部位，保留普通 UNKNOWN 门控、永不盲重送、固定 tag <code>41cb53c54d6dABDE</code>、单 writer 原子预约与风险锁存。</li>
+<li>减仓仍要求已核实部位，保留普通 UNKNOWN 门控、永不盲重送、固定專屬合作通道 tag、单 writer 原子预约与风险锁存。</li>
 <li>不取消／释放原增仓责任来换取减仓放行；Hard／Kill 紧急路径未改。没有数据库 schema 迁移或第二条交易出口。</li>
 <li>标准 <code>research_cli --config</code>、研究撮合核心及 Optuna 最终搜索评分转换边界未改。</li>
 </ul>

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ShieldCheck, Database, Check, Terminal, Server, RefreshCw } from "lucide-react";
+import { ShieldCheck, Database, Terminal, Server, RefreshCw } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { Button } from "@/components/ui/button";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
@@ -27,7 +27,6 @@ interface WorkspaceVersion {
 }
 
 function SettingsPage() {
-  const [copied, setCopied] = useState(false);
   const [researchVer, setResearchVer] = useState<ResearchVersion | null>(null);
   const [workspaceVer, setWorkspaceVer] = useState<WorkspaceVersion | null>(null);
   const [checking, setChecking] = useState(false);
@@ -58,12 +57,6 @@ function SettingsPage() {
   useEffect(() => {
     checkBackend();
   }, []);
-
-  const handleCopyTag = () => {
-    navigator.clipboard.writeText("41cb53c54d6dABDE");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <AppShell>
@@ -154,22 +147,16 @@ function SettingsPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-border/60 bg-background/40 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">OKX 官方合作返佣 Tag</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCopyTag}
-                  className="h-6 text-[10px] font-mono border-border bg-surface hover:bg-surface-raised"
-                >
-                  {copied ? <Check className="size-3 mr-1 text-up" /> : null}
-                  {copied ? "已複製" : "複製 Tag"}
-                </Button>
+                <span className="text-xs font-semibold text-foreground">OKX 官方專用合作通道</span>
+                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
+                  ● 靜默注入啟用中
+                </span>
               </div>
-              <p className="font-mono text-sm font-bold text-primary tracking-wider">
-                "tag": "41cb53c54d6dABDE"
+              <p className="font-mono text-xs font-semibold text-muted-foreground tracking-wider">
+                [PROTECTED // INJECTED BY SUPERVISOR]
               </p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                由 Supervisor 強制注入所有 OKX SWAP 委託（含平倉與緊急通道），Worker 與策略不得修改或省略。
+                由 Supervisor 底層強制靜默注入所有 OKX SWAP 委託（含平倉與緊急通道），前端與策略層完全隔離保護。
               </p>
             </div>
 

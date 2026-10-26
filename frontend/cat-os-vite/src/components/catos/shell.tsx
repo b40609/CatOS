@@ -8,6 +8,7 @@ import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { CommandPalette } from "@/components/catos/command-palette";
+import { TopMarketTicker } from "@/components/catos/top-market-ticker";
 import { useLiveMarketStore } from "@/state/liveMarketStore";
 import { cn } from "@/lib/utils";
 
@@ -341,6 +342,11 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="hidden text-muted-foreground/40 sm:inline">/</span>
               <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
             </div>
+          </div>
+
+          {/* 頂部全域行情時鐘總線 (Closed Bar 倒數 + 4 大 SWAP 標的報價 + 8H 資金費倒數) */}
+          <div className="hidden md:flex items-center gap-2 shrink min-w-0">
+            <TopMarketTicker />
           </div>
 
           {/* 右側：工作台卡片庫與核心交易模式切換 */}
