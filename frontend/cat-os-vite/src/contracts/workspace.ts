@@ -7,7 +7,7 @@ export interface TelemetryState {
   connected: boolean;
   supervisor_pid: number;
   latency_ms: number;
-  fixed_tag: '41cb53c54d6dABDE';
+  fixed_tag_active: boolean;
   settlement_mode: 'cross_net_mode';
   core_arithmetic: 'Decimal_SQLite_TEXT';
   last_heartbeat: string;

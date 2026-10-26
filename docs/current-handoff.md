@@ -1,52 +1,35 @@
-# CatOS 目前接續入口
-
-## 2026-10-25 GitHub 倉庫收斂
-
-- 使用者明確排除 `CatOS_Yaozi`：該模組維持獨立，本輪範圍僅 `b40609/CatOS` 與 `b40609/catOS_v1`；CatOS 維持公開。
-- 舊版完整 Git 歷史已保存至 `b40609/CatOS` 的 `archive/catos-v1` 分支，提交 `d9e137d32c46f3ac2b5456962e76b5f44ef0ab2a`；來源倉庫 `b40609/catOS_v1` 已封存，可還原，未刪除。
-- 專案外備份：`C:/Users/user/Desktop/CatOS-repository-backup-20261025-202058/catOS_v1.bundle`；`git fsck --full --strict`、bundle 完整歷史驗證及遠端提交雜湊核對通過。詳細收據見同目錄 `consolidation-receipt.json`。
-- 本輪僅集中舊版歷史，未將舊下單、憑證加密或狀態機程式移入主線。倉庫收斂時的遠端基線：`main` 為 `fffed2e`，`feature/catos-react-vite` 為 `113ed09`。另一台 PC 繼續 Antigravity 前端開發；前後端對接延後。
-- 使用者另核准將 9 個名稱與交接相關檔案獨立提交並推送；兩份歷史紀錄還原原始路徑，正式 React 前端原始碼未變更。另一台 PC 應先保存並提交當地前端修改，再拉取本次提交。以下為先前清理工作紀錄。
-
-更新：2026-10-24（Asia/Taipei）。目前工作包：依核准清單備份、刪除 A＋B、正式前端開發自測及指定 GPT-6 Sol 清理差異獨立驗收已完成，限定範圍 PASS。本入口隨核准的整合基線與清理提交交付；主目錄已於 2026-10-25 更名為 `CatOS`。
+更新：2026-10-26（Asia/Taipei）。目前工作包：純前端 UI/UX 打磨與視覺階層重構已完成，型別檢查、打包建置與狀態適配測試全數通過（PASS）。依使用者指示提交並推送至 Git，供明日於公司電腦接續開發。
 
 ## 目前基線
 
-- 主目錄已於 2026-10-25 由 `C:/Users/user/Desktop/CatOS_Astra` 更名為 `C:/Users/user/Desktop/CatOS`；產品名稱為 CatOS。活躍原始碼、文件與設定中的舊路徑引用已同步替換，`outputs/`、`reports/` 下歷史產物維持原樣。
-- 分支 `feature/catos-react-vite`，清理前基線 `149f9fcbf2a2c5d741aa696750ab1ed62ae14460`。使用者已授權清理差異獨立驗收，通過後依白名單 commit／push；遠端已 fetch，與清理前基線一致。
-- stash `0206ef0110df18d7b77e6880202a95d35215285e` 與 `9087a92fa3df199b1f9dcfbc60fd326f6dc78358` 保留，未套用／刪除。核准清單外的原有未追蹤內容保留。
+- 分支 `feature/catos-react-vite`，產品名稱為 CatOS。
+- 執行與儲存底座僅 Python 3.11+、SQLite（WAL）；FastAPI 綁定 127.0.0.1。
+- 2026-10-25 遠端倉庫已收斂至 `b40609/CatOS`，舊版歷史封存於 `archive/catos-v1`。
 - `CatOS_Yaozi` 維持獨立工作目錄，不跨目錄 import、不整包覆蓋。
 
-## 已完成／實際驗證
+## 已完成／實際驗證（2026-10-26 前端進度）
 
-- 主頁／模式明示展示；P6 依示例狀態呈現待確認／異常，不再固定宣稱 100% 錨定。Bot 動作不冒稱控制後端。
-- 優化頁恢復輪詢、追蹤跨 kind 共用槽、等待後端釋放、隔離過期結果與重複提交；既有概念視圖仍明示展示。
-- 8890 strictPort、固定 loopback proxy；改寫上游前驗證前端 Host／Origin。launcher 核對 checkout 身分、HTML 就緒與未知 owner。
-- HTTP 依賴明列 `requirements-http.txt`；前輪新環境安裝、pip check、import 通過。主頁共享 store 已移到 state，本輪移除退役 preview 及相容轉匯出。
-- 首輪獨驗因 REV-01／P1 模式切換污染而 BLOCKED；修正模式投影清空、自動重載與舊世代回應隔離後，由同一 GPT-6 Sol 獨驗者重驗 8 項 store／adapter、10 項隔離 HTTP／Vite／React 互動及 typecheck／build 全數通過，阻擋解除。詳細證據見[驗收報告](integration-baseline-acceptance-20261024.md)；後端 56 項保留前輪歷史結果，非本輪重跑。
-- B 的 1,027 檔已備份至 `C:/Users/user/Desktop/CatOS-cleanup-backup-20261024.zip`，ZIP 完整性、逐檔 SHA-256 與刪除前來源校驗通過。A＋B 共移除 37,147 檔、767.20 MiB；564 份為 Git 追蹤檔案。
-- 本輪 typecheck、隔離輸出 build、8 項 store／adapter 測試通過。build 有既有大型 chunk 警告，Node 有 localStorage 實驗功能警告。306 份保留來源雜湊一致，workspace 必要資產與 research 入口存在。
-- 8890 本輪唯讀核對 checkout 身分、首頁及主模組 HTTP 200，未啟停既有服務。未恢復後端或執行正式控制案例；前端 ready 不代表後端 ready。
-- 截斷的歷史入口已從原始備份完整恢復；README 失效連結已修正。提交清單為整合基線 28 份＋退役刪除 564 份，取代原 29＋3；備份、原始輸出及白名單外未追蹤內容不納入。
-- 本輪 GPT-6 Sol 獨驗 PASS：1,027 份 ZIP payload 雜湊／大小一致，34 個原始候選路徑均不存在（合併為 30 個不重疊頂層刪除目標），564 份追蹤刪除符合備份及白名單；306 份正式來源與前輪 18 份整合程式／設定無漂移，248 份程式與啟動設定的退役引用掃描 0 命中。核對後沿用清理後 typecheck／build／8 項測試證據，未重跑歷史整合測試。詳見[盤點末節](project-inventory-audit-20261024.md)與本機 `outputs/cleanup-acceptance-20261024/acceptance.json`。
+1. **槓桿與資產曝險圓環（AllocationDonutCard）UI/UX 重構**：
+   - **視覺硬傷根治**：移除刺眼粗笨的飽和亮橘與 `drop-shadow` 模糊霓虹光暈，軌道厚度自 13.5px 降至優雅的 9.5px，內徑自 134px 擴至 140.5px，徹底消除文字與內環碰撞問題。
+   - **金錢直觀 HUD（Money-First）**：針對交易員對實質資本高度敏感的特性，將中央大數據設為「總名目持倉價值（如 `$105.0k`）」，搭配 3px 微型進度刻度槽（71.9% 水位）與底部「3x 上限 $146.1k · 餘 $41.1k (2.16x)」，雙錨定金錢實質與槓桿倍數。頂部支援 `[ 焦點: $ 金額 (推薦) | x 倍數 ]` 即時切換。
+   - **新增【策略機器人】歸因維度**：Tab 擴充為 5 大維度（`幣種配置` | `策略機器人` | `多空敞口` | `保證金佔用` | `盈虧分佈`），點選機器人可依 Tabby（BTC）、Calico（ETH）、Machi（SOL）直觀拆解總預算消耗與可用緩衝。
+2. **工作區卡片佈局與微型組件庫**：
+   - 整合 `TopMarketTicker` 即時頂部行情走馬燈、`MicroWidgetStore` 微型組件狀態管理與 `WidgetGalleryDrawer` 抽屜。
+   - 樹狀佈局分割器（`tree-splitter`）與自由拖曳佈局狀態正常。
+3. **驗證與構建證據**：
+   - `npm run typecheck` (`tsc --noEmit`)：0 錯誤。
+   - `npm run build` (`vite build`)：0 錯誤打包通過。
+   - `npm run test` (`node --test tests/state_adapter_test.mjs`)：8 項測試全數通過（PASS）。
+   - Vite 8890 開發伺服器正常運行（`http://127.0.0.1:8890/#/`）。
 
 ## 尚未完成／邊界
 
-- 完整 Bot／策略管理 HTTP、R1 HTTP／主頁帳戶風控串接未實作。研究合成結果不是帳戶／交易就緒證明。
-- validation／HTML report 尚未接 React；回測未做本輪全面互動驗收；情報未逐卡驗證資料與新鮮度。
-- 歷史 DCM 缺檔與研究來源 hash 漂移未關閉；本輪已移除核准的舊預覽／原型，其他歷史資料未擴大清理。新修正不回寫歷史 PASS 或 hash。
-- 不讀產品 DB／憑證，不改 schema／金融政策；不解除 recovery／unavailable，不恢復暫停 W8；Demo／Live／新採集未授權。
-- 前輪 PASS 僅限整合基線；不代表完整 Bot／帳戶／交易就緒。自測不能稱獨驗；指定角色仍為 GPT-6 Sol。本輪清理獨驗通過後提交／推送已獲授權。
+- 完整 Bot／策略管理 HTTP、R1 HTTP／主頁帳戶風控串接尚未實作，待前端版面完全定案後推進。
+- 不接觸真實金鑰環境變數、不讀取真實憑證、不對外發出實盤交易請求。
 
-## 下一步與索引
+## 明日接續建議
 
-本輪清理完成；正式 React、仍被後端使用的 workspace／research、gitlink、產品資料與其他工作目錄保留。結果見[盤點報告末節](project-inventory-audit-20261024.md)及[本輪驗證紀錄](../outputs/cleanup-review-20261024/post-cleanup-verification.json)。逐檔備份清單、雜湊及實際刪除路徑保存在同目錄 execution.json／deletion-result.json，備份 ZIP 內亦有 manifest。
+- 在公司電腦拉取最新代碼（`git pull`）後，執行 `.\scripts\start-laptop-dev.ps1` 或 `npm run dev` 啟動前端。
+- 檢視頂部行情列、卡片佈局及 AllocationDonutCard 金錢焦點與機器人維度，繼續進行各卡片細節微調或進入下一階段功能規劃。
 
-使用者已明確授權本清單備份、刪除、前端驗證與獨驗通過後提交／推送；獨驗已 PASS，本入口隨該次提交保存，實際提交識別與遠端狀態以 Git 為準。另一台 PC 接續前先同步此分支；若有未提交修改，先保存差異再同步，不覆蓋其他工作。下一個建議成果為最小 Bot 狀態唯讀 HTTP 契約與主頁串接，尚未開工。舊文件雜湊不代表目前文件內容；備份 ZIP 與原始驗證輸出仍僅保存在本機，不會隨 Git 自動傳遞。
-
-- [本輪交付與證據](integration-baseline-20261024.md)
-- [前輪獨立驗收與限制](integration-baseline-acceptance-20261024.md)、[更新後提交白名單](integration-baseline-submission-20261024.json)
-- [後端與前端串接表](backend-frontend-integration-map.md)
-- [總盤點與問題分級](project-inventory-audit-20261024.md)
-- [改名前完整舊入口快照](archive/current-handoff-before-integration-20261024.md)：歷史政策／切片／證據入口，不能取代使用者當前授權。
 

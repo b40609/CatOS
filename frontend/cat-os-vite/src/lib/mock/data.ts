@@ -400,7 +400,7 @@ export const logSeeds: LogLine[] = [
     time: "09:41:20.902",
     level: "TRADE",
     source: "exec",
-    message: "FILL BTC-USDT-SWAP BUY 0.35 @ 64,182.5 slippage=1.2bps tag=41cb53c54d6dABDE bot=CAT-01",
+    message: "FILL BTC-USDT-SWAP BUY 0.35 @ 64,182.5 slippage=1.2bps bot=CAT-01",
   },
   {
     id: "l3",
@@ -421,24 +421,24 @@ export const logSeeds: LogLine[] = [
     time: "09:41:05.120",
     level: "INFO",
     source: "router",
-    message: "order routed venue=okx tag=41cb53c54d6dABDE latency=18ms queue_depth=1",
+    message: "order routed venue=okx latency=18ms queue_depth=1",
   },
 ];
 
 const LOG_POOL: { level: LogLevel; source: string; message: string }[] = [
   { level: "INFO", source: "engine", message: "tick loop ok latency=6ms open_orders=12" },
-  { level: "INFO", source: "router", message: "order routed venue=okx tag=41cb53c54d6dABDE latency=14ms" },
+  { level: "INFO", source: "router", message: "order routed venue=okx latency=14ms" },
   { level: "INFO", source: "feed", message: "websocket okx subscribed channel=books5 symbol=ETH-USDT-SWAP" },
   { level: "INFO", source: "catnet", message: "inference batch=128 latency=39ms conf_mean=0.74" },
   { level: "INFO", source: "engine", message: "rebalance check complete drift=0.8% within band" },
   { level: "WARN", source: "risk", message: "exposure SOL-USDT-SWAP 42.8% approaching budget limit 50.0%" },
   { level: "WARN", source: "feed", message: "market data gap detected symbol=SOL-USDT-SWAP recovered=2 ticks" },
-  { level: "WARN", source: "exec", message: "partial fill BTC-USDT-SWAP 0.45/0.85 tag=41cb53c54d6dABDE — retrying" },
+  { level: "WARN", source: "exec", message: "partial fill BTC-USDT-SWAP 0.45/0.85 — retrying" },
   { level: "ERROR", source: "feed", message: "websocket okx: heartbeat timeout after 5000ms, reconnecting (attempt 2)" },
   { level: "ERROR", source: "exec", message: "order rejected reason=insufficient_margin bot=CAT-04" },
-  { level: "TRADE", source: "exec", message: "FILL ETH-USDT-SWAP SELL 2.5000 @ 3,412.80 tag=41cb53c54d6dABDE bot=CAT-02" },
-  { level: "TRADE", source: "exec", message: "FILL SOL-USDT-SWAP BUY 14.0000 @ 142.38 tag=41cb53c54d6dABDE bot=CAT-05" },
-  { level: "TRADE", source: "exec", message: "FILL BTC-USDT-SWAP BUY 0.2000 @ 64,540.00 tag=41cb53c54d6dABDE bot=CAT-01" },
+  { level: "TRADE", source: "exec", message: "FILL ETH-USDT-SWAP SELL 2.5000 @ 3,412.80 bot=CAT-02" },
+  { level: "TRADE", source: "exec", message: "FILL SOL-USDT-SWAP BUY 14.0000 @ 142.38 bot=CAT-05" },
+  { level: "TRADE", source: "exec", message: "FILL BTC-USDT-SWAP BUY 0.2000 @ 64,540.00 bot=CAT-01" },
 ];
 
 export function nextLog(): LogLine {

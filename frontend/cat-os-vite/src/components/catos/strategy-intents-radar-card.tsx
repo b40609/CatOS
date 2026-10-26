@@ -147,6 +147,10 @@ interface StrategyIntentsRadarCardProps {
 export function StrategyIntentsRadarCard({ className }: StrategyIntentsRadarCardProps) {
   const [intents] = useState<StrategyIntent[]>(DEFAULT_INTENTS);
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>("worker_tabby_01");
+  const [intentFilter, setIntentFilter] = useState<"all" | "active" | "idle">("all");
+
+  const activeCount = intents.filter((i) => i.intentAction !== "觀望").length;
+  const idleCount = intents.filter((i) => i.intentAction === "觀望").length;
 
   const getActionBadge = (action: StrategyIntent["intentAction"]) => {
     switch (action) {
@@ -166,36 +170,45 @@ export function StrategyIntentsRadarCard({ className }: StrategyIntentsRadarCard
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. Header 標題列 (Zero-Waste: 整合標題、IPC 狀態與即時微光) */}
-      <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+      {/* 1. Header 標題列 (Zero-Waste 統一規格) */}
+      <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0">
         <CardHeaderTitle
           cardId="strategy_intents"
           title="策略目標與訊號強度"
-          subtext={
-            <div className="flex items-center gap-1.5 ml-1">
-              <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.2 rounded border border-emerald-400/25">
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                IPC JSON v2
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
-                4 Workers OK
-              </span>
-            </div>
-          }
         />
 
-        {/* 核心架構約束微徽章 */}
-        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-muted-foreground">
-          <span className="text-primary font-semibold hidden md:inline">Supervisor 獨佔交易</span>
-          <span className="px-1.5 py-0.5 rounded bg-background/80 border border-border/70 text-foreground font-mono">
-            純資料意圖
-          </span>
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+          {[
+            { id: "all", label: `全部 (${intents.length})` },
+            { id: "active", label: `持倉 (${activeCount})` },
+            { id: "idle", label: `觀望 (${idleCount})` },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setIntentFilter(f.id as any)}
+              className={cn(
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                intentFilter === f.id
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* 2. Worker 策略大腦意圖清單 */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-2">
-        {intents.map((item) => {
+        {intents
+          .filter((item) => {
+            if (intentFilter === "active") return item.intentAction !== "觀望";
+            if (intentFilter === "idle") return item.intentAction === "觀望";
+            return true;
+          })
+          .map((item) => {
           const isSelected = item.workerId === selectedWorkerId;
           const isReady = item.status === "INTENT_READY";
 

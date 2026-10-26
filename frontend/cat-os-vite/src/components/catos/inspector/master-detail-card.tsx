@@ -26,7 +26,7 @@ export function MasterDetailCard({ className }: { className?: string }) {
       <BorderBeam size={160} duration={6} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
 
       {/* 卡片標頭 */}
-      <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+      <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="activity_deck"
           title={`即時詳情偵測 · ${bot.name}`}
@@ -37,8 +37,8 @@ export function MasterDetailCard({ className }: { className?: string }) {
           }
         />
         <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-muted-foreground">
-          <span className="px-1.5 py-0.2 rounded bg-background/80 border border-border/60">
-            方案 C · Bloomberg 聯動
+          <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60">
+            即時連動
           </span>
         </div>
       </div>

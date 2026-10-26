@@ -1,20 +1,22 @@
 import { useState, useEffect } from "react";
-import { Cpu } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { useLayoutStore } from "@/state/layoutStore";
-import { WorkspaceProfileSelector } from "./workspace-profile-selector";
 import { WidgetGalleryDrawer } from "./widget-gallery-drawer";
-import { ALL_CARDS } from "./card-registry";
-import { getAllLeaves } from "@/lib/layout-tree/tree-ops";
 import { cn } from "@/lib/utils";
 
+/**
+ * CatOS 頂部控制列 - macOS / iOS Control Center 風格純 ICON 按鈕
+ * - 徹底剔除「幾卡幾頂部」冗餘標籤，螢幕每一像素皆服務於即時交易數據
+ * - 28x28px 高密度磨砂微型按鈕，100% 對齊 macOS Menu Bar 控制中心直覺
+ * - 支援全域快捷鍵 Alt + M / Alt + W (Mac: Option + M / W)
+ */
 export function LayoutModeToolbar() {
-  const { rootNode } = useLayoutStore();
+  const { profiles, currentProfileId } = useLayoutStore();
   const [isHubOpen, setIsHubOpen] = useState(false);
 
-  const currentLeaves = getAllLeaves(rootNode);
-  const activeCount = currentLeaves.length;
+  const activeProfile = profiles.find((p) => p.id === currentProfileId) || profiles[0];
 
-  // 支援全域快捷鍵 Alt + M 快速開啟 / 關閉模組工坊
+  // 支援全域快捷鍵 Alt + M 或 Alt + W 快速開啟 / 關閉控制中心
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey && (e.key.toLowerCase() === "m" || e.key.toLowerCase() === "w")) {
@@ -28,31 +30,25 @@ export function LayoutModeToolbar() {
 
   return (
     <>
-      <div className="flex items-center gap-1.5 shrink-0 select-none font-mono">
-        {/* 1. 工作區設定檔選擇器 */}
-        <WorkspaceProfileSelector />
-
-        {/* 2. CatOS 模組工坊開關 (Module Hub) */}
+      <div className="flex items-center shrink-0 select-none">
+        {/* macOS Menu Bar 控制中心微型按鈕 */}
         <button
           type="button"
-          onClick={() => setIsHubOpen(true)}
+          onClick={() => setIsHubOpen((prev) => !prev)}
           className={cn(
-            "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-mono transition-all cursor-pointer border shadow-xs select-none",
+            "size-7 rounded-[7px] transition-all grid place-items-center cursor-pointer border select-none",
             isHubOpen
               ? "bg-primary text-primary-foreground border-primary shadow-[0_0_12px_rgba(232,180,94,0.35)]"
-              : "bg-surface-raised/80 hover:bg-secondary text-foreground hover:text-primary border-border/80 hover:border-primary/40"
+              : "bg-surface-raised/80 hover:bg-white/[0.08] text-muted-foreground hover:text-foreground border-border/80 hover:border-white/[0.16]"
           )}
-          title="開啟 catOS 模組工坊"
+          title={`控制中心 · 目前：${activeProfile?.shortName || activeProfile?.name || "預設排版"} (Alt+M / Alt+W)`}
+          aria-label="控制中心"
         >
-          <Cpu className="size-3.5 text-primary" />
-          <span className="font-sans font-semibold tracking-tight hidden sm:inline">模組工坊</span>
-          <span className="px-1 py-0.1 rounded text-[9.5px] font-mono bg-background/60 text-muted-foreground border border-border/60">
-            {activeCount}/{ALL_CARDS.length}
-          </span>
+          <SlidersHorizontal className="size-3.5" />
         </button>
       </div>
 
-      {/* CatOS 專屬工作區模組工坊 */}
+      {/* CatOS 專屬 iOS/macOS 磨砂控制中心面板 */}
       <WidgetGalleryDrawer
         isOpen={isHubOpen}
         onClose={() => setIsHubOpen(false)}

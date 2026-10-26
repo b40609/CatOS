@@ -168,36 +168,25 @@ export function MarketWatchCard({ className }: MarketWatchCardProps) {
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. Header 標題列 (Zero-Waste: 整合標題、週期切換與即時微光標籤) */}
-      <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+      {/* 1. Header 標題列 (Zero-Waste 統一規格) */}
+      <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0">
         <CardHeaderTitle
           cardId="market_watch"
           title="標的行情與資金費率"
-          subtext={
-            <div className="flex items-center gap-1.5 ml-1">
-              <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-400/10 px-1.5 py-0.2 rounded border border-emerald-400/25">
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Closed Bar
-              </span>
-              <span className="text-[9px] font-mono text-muted-foreground hidden sm:inline">
-                OKX SWAP
-              </span>
-            </div>
-          }
         />
 
-        {/* 週期切換膠囊 (15m / 1H / 4H) */}
-        <div className="flex items-center gap-1 bg-background/70 p-0.5 rounded-md border border-border/70">
+        {/* 週期切換膠囊 (15m / 1H / 4H) - 統一微膠囊風格 */}
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
           {(["15m", "1H", "4H"] as BarTimeframe[]).map((tf) => (
             <button
               key={tf}
               type="button"
               onClick={() => setTimeframe(tf)}
               className={cn(
-                "px-2 py-0.5 text-[10px] font-mono font-medium rounded transition-all cursor-pointer",
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
                 timeframe === tf
-                  ? "bg-primary text-primary-foreground font-bold shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               {tf}

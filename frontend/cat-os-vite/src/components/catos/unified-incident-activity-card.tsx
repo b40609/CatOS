@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  ShieldAlert,
   Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,6 +16,7 @@ export type EventCategoryFilter = string;
 export interface CategoryTabItem {
   id: string;
   label: string;
+  shortLabel: string;
   badgeCount: number;
   isAlert?: boolean;
   filterFn: (ev: PreviewEvent) => boolean;
@@ -68,10 +68,31 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const [expandedId, setExpandedId] = useState<string | null>('evt_unknown_calico');
   const [category, setCategory] = useState<string>('ALL');
 
-
   // DOM 容器與節點座標引用
+  const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // 雙向物理尺寸監聽 (ResizeObserver 自適應 Header 與標籤)
+  const [dimensions, setDimensions] = useState({ width: 600, height: 240 });
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setDimensions({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const isNarrow = dimensions.width < 500;
+  const isSuperNarrow = dimensions.width < 380;
 
   // 時序湧動：量測各節點真實 offsetTop 相對於底部的延遲 (秒)
   const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
@@ -90,12 +111,12 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     const countSystem = events.filter((e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e))).length;
 
     return [
-      { id: 'OPEN', label: `未解除 (${openCount})`, badgeCount: openCount, isAlert: openCount > 0, filterFn: isOpen },
-      { id: 'ALL', label: `全部 (${events.length})`, badgeCount: events.length, filterFn: () => true },
-      { id: 'RISK_P6', label: `風控 (${countRisk})`, badgeCount: countRisk, filterFn: (e) => ['RISK', 'P6'].includes(getEventDomain(e)) },
-      { id: 'FILLS_CASH', label: `成交 (${countFills})`, badgeCount: countFills, filterFn: (e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e)) },
-      { id: 'ORDERS_EXEC', label: `委託 (${countOrders})`, badgeCount: countOrders, filterFn: (e) => ['ORDERS'].includes(getEventDomain(e)) },
-      { id: 'SYSTEM_RECON', label: `系統 (${countSystem})`, badgeCount: countSystem, filterFn: (e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e)) },
+      { id: 'OPEN', label: `未解除 (${openCount})`, shortLabel: openCount > 0 ? `待解 (${openCount})` : '待解', badgeCount: openCount, isAlert: openCount > 0, filterFn: isOpen },
+      { id: 'ALL', label: `全部 (${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
+      { id: 'RISK_P6', label: `風控 (${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => ['RISK', 'P6'].includes(getEventDomain(e)) },
+      { id: 'FILLS_CASH', label: `成交 (${countFills})`, shortLabel: '成交', badgeCount: countFills, filterFn: (e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e)) },
+      { id: 'ORDERS_EXEC', label: `委託 (${countOrders})`, shortLabel: '委託', badgeCount: countOrders, filterFn: (e) => ['ORDERS'].includes(getEventDomain(e)) },
+      { id: 'SYSTEM_RECON', label: `系統 (${countSystem})`, shortLabel: '系統', badgeCount: countSystem, filterFn: (e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e)) },
     ];
   }, [events, openCount]);
 
@@ -186,70 +207,55 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     if (isSystemHeartbeat) {
       return {
         label: 'OK',
-        badgeClass: 'bg-slate-500/15 text-slate-300 border border-slate-500/25 rounded-full px-2 font-medium backdrop-blur-xs',
-        coreClass: 'bg-slate-500/70 shadow-[0_0_5px_rgba(100,116,139,0.3)] ring-1 ring-slate-600/40',
-        sonarClass: 'bg-slate-500/15',
-        bloomAnimation: 'crystal-optical-bloom-neutral',
+        badgeClass: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
+        coreClass: 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)] ring-1 ring-emerald-400/30',
+        sonarClass: 'bg-emerald-500/20',
+        bloomAnimation: 'crystal-optical-bloom-emerald',
       };
     }
     return {
       label: 'INFO',
-      badgeClass: 'bg-white/[0.04] text-zinc-400 border border-white/[0.05] rounded-full px-2 font-medium backdrop-blur-xs',
-      coreClass: 'bg-zinc-600/60 ring-1 ring-zinc-700/30',
-      sonarClass: 'bg-zinc-600/10',
+      badgeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
+      coreClass: 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.5)] ring-1 ring-sky-400/40',
+      sonarClass: 'bg-sky-500/20',
       bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   };
 
   return (
-    <div className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
-      {/* 1. Header 區域：整合卡片標題 + 異常膠囊 (定案方案 C 固化) */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
-        <div className="flex items-center gap-2">
-          <CardHeaderTitle
-            cardId="activity_deck"
-            title="風險警報與交易日誌"
-            subtext=""
-          />
-          {openCount > 0 ? (
-            <span className="flex items-center gap-1 text-[8.5px] px-1.5 py-0.5 rounded-[3px] bg-amber-500/12 text-amber-200 border border-amber-500/30 animate-pulse font-medium">
-              <ShieldAlert className="size-2.5" />
-              <span>{openCount} 異常</span>
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-[8.5px] px-1.5 py-0.5 rounded-[3px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-medium">
-              <CheckCircle2 className="size-2.5" />
-              <span>系統正常</span>
-            </span>
-          )}
-        </div>
+    <div ref={cardRef} className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
+      {/* 1. Header 區域：整合卡片標題 + 右上角統一微膠囊 (窄版自適應簡短標籤，杜絕標題截字) */}
+      <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+        <CardHeaderTitle
+          cardId="activity_deck"
+          title="全域戰情日誌與成交流水"
+          subtext={
+            !isNarrow ? (
+              <span className="text-[10px] font-mono text-muted-foreground ml-1">
+                {filteredEvents.length} 筆
+              </span>
+            ) : undefined
+          }
+        />
 
-
-      </div>
-
-      {/* 2. 類別過濾工具列 + 分類架構對照切換 */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-secondary/30 border-b border-border/60 text-[9.5px] shrink-0 gap-1.5">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          <span className="text-zinc-500 mr-0.5 text-[8.5px]">分類：</span>
-          {availableTabs.map((tab) => (
+        {/* 右上角切換膠囊：完全統一規格 (窄版自動切換為 2 字簡稱，超窄只顯示核心 4 標籤) */}
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 overflow-x-auto max-w-[65%] custom-scrollbar">
+          {(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setCategory(tab.id)}
               className={cn(
-                'px-1.5 py-0.2 rounded transition-colors cursor-pointer text-[8.5px] whitespace-nowrap',
+                "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 category === tab.id
-                  ? 'bg-white/[0.08] text-zinc-100 font-medium shadow-xs border border-white/10'
-                  : tab.isAlert
-                  ? 'text-amber-300/90 hover:text-amber-200 font-medium'
-                  : 'text-zinc-400 hover:text-zinc-200 font-normal'
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {tab.label}
+              {isNarrow ? tab.shortLabel : tab.label}
             </button>
           ))}
         </div>
-
       </div>
 
       {/* 3. 核心時間軸內容區 */}
@@ -365,7 +371,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         : 'hover:bg-white/[0.025]'
                     )}
                   >
-                    {/* 表頭一行：時間 + 標籤 + 關聯 Bot + 標題 + 右側 PnL/狀態 + 箭頭 */}
+                    {/* 表頭一行：時間 + 標籤 + 買賣方向 + 關聯 Bot + 標題 + 右側 PnL/狀態 + 箭頭 */}
                     <div className="flex items-center justify-between gap-2 text-[10px]">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {/* 時間戳 */}
@@ -375,6 +381,20 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         <span className={cn('px-1.5 py-0.2 rounded text-[8px] shrink-0', meta.badgeClass)}>
                           {meta.label}
                         </span>
+
+                        {/* 買賣方向專屬微徽章 (僅成交流水/委託顯示) */}
+                        {ev.side && (
+                          <span
+                            className={cn(
+                              'px-1.5 py-0.2 rounded text-[8px] font-mono shrink-0 font-semibold border',
+                              ev.side.toLowerCase() === 'buy'
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            )}
+                          >
+                            {ev.side.toLowerCase() === 'buy' ? '買入' : '賣出'}
+                          </span>
+                        )}
 
                         {/* 關聯 Bot 或來源 */}
                         {(ev.botName || ev.source) && (
@@ -430,6 +450,30 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         <p className="leading-relaxed text-zinc-300 font-normal pl-0.5">
                           {ev.detail}
                         </p>
+
+                        {/* 成交專屬數據卡 (純金融業務數據，高密度四聯欄位) */}
+                        {isFill && (ev.qty || ev.price || ev.notional || ev.fee) && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-[9.5px] font-mono">
+                            <div>
+                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交數量</span>
+                              <span className="font-semibold text-foreground">{ev.qty ?? '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交均價</span>
+                              <span className="font-semibold text-foreground">${ev.price ?? '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交金額</span>
+                              <span className="font-semibold text-foreground">{ev.notional ?? '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">手續費 / 角色</span>
+                              <span className="font-semibold text-foreground">
+                                {ev.fee ?? '0.00 USDT'} · <span className="text-muted-foreground">{ev.role ?? 'Taker'}</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* 事故衝擊與風控判定 (定案方案 C：macOS 晶透黑曜石微膠囊卡片) */}
                         {ev.impact && (

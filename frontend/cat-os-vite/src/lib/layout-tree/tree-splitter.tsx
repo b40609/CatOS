@@ -48,13 +48,19 @@ export function TreeSplitter({
     let rafId: number | null = null;
     let latestRatio = startRatio;
 
+    // 業界標準安全底線 (VS Code / Bloomberg / TradingView 規格)：
+    // 橫向寬度至少 260px，縱向高度至少 120px，防止被拉出畸形死角
+    const minPixel = isRow ? 260 : 120;
+    const minRatio = Math.max(0.12, Math.min(0.42, minPixel / containerSize));
+    const maxRatio = 1 - minRatio;
+
     const onPointerMove = (moveEvt: PointerEvent) => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         const currentCoord = isRow ? moveEvt.clientX : moveEvt.clientY;
         const delta = currentCoord - startCoord;
         const deltaRatio = delta / containerSize;
-        const nextRatio = Math.min(0.85, Math.max(0.15, Number((startRatio + deltaRatio).toFixed(4))));
+        const nextRatio = Math.min(maxRatio, Math.max(minRatio, Number((startRatio + deltaRatio).toFixed(4))));
         latestRatio = nextRatio;
         onRatioChange(nextRatio, false); // 拖曳中 120 FPS rAF，不呼叫持久化，0 I/O 阻塞
       });

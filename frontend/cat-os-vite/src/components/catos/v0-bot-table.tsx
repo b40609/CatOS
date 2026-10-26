@@ -33,6 +33,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
   const [localBots, setLocalBots] = useState<Bot[]>(INITIAL_BOTS);
   const [focusedBotId, setFocusedBotId] = useState<string | null>(null);
   const [flashBotId, setFlashBotId] = useState<Record<string, "up" | "down">>({});
+  const [botFilter, setBotFilter] = useState<"all" | "running" | "paused">("all");
 
   // 定案 B：行內展開 Accordion 狀態綁定
   const {
@@ -166,21 +167,32 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 一體化 Header */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0">
           <CardHeaderTitle
             cardId="bots"
             title="策略機器人矩陣"
-            subtext={
-              <span className="text-[10px] font-mono text-muted-foreground ml-1">
-                {runningCount} 運作 · {bots.length - runningCount} 暫停
-              </span>
-            }
           />
 
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-            <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60">
-              1 Bot : 1 SWAP 獨佔
-            </span>
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+            {[
+              { id: "all", label: `全部 (${bots.length})` },
+              { id: "running", label: `運作 (${runningCount})` },
+              { id: "paused", label: `暫停 (${bots.length - runningCount})` },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setBotFilter(f.id as any)}
+                className={cn(
+                  "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                  botFilter === f.id
+                    ? "bg-secondary text-foreground font-semibold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -199,7 +211,9 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40 text-xs">
-            {bots.map((bot) => {
+            {bots
+              .filter((b) => (botFilter === "all" ? true : b.status === botFilter))
+              .map((bot) => {
               const pos = getPosMeta(bot);
               const spark = getSparkline(bot);
               const isPaused = bot.status === "paused";
@@ -216,7 +230,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                     className={cn(
                       "hover:bg-secondary/40 transition-all group cursor-pointer",
                       focusedBotId === bot.id && "bg-secondary/50",
-                      isSelected && "bg-primary/10 border-l-2 border-primary shadow-[inset_2px_0_0_var(--color-primary)]",
+                      isSelected && "bg-secondary/50",
                       isPaused && "opacity-60 bg-background/20",
                       flashBotId[bot.id] === "up" && "flash-up",
                       flashBotId[bot.id] === "down" && "flash-down"

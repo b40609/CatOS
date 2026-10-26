@@ -1,6 +1,6 @@
 /**
  * Risk Control and Invariants contract
- * Fixed Tag: 41cb53c54d6dABDE
+ * Protected Invariant: OKX Broker Tag Injected Silently by Supervisor
  * Strict Decimal string handling
  */
 
@@ -8,7 +8,7 @@ export type RiskStatus = 'normal' | 'soft_latch' | 'hard_latch' | 'missing';
 
 export interface RiskState {
   status: RiskStatus;
-  fixed_tag: '41cb53c54d6dABDE';
+  fixed_tag_active: boolean;
   effective_leverage: string; // e.g. "1.85"
   leverage_limit: string;     // e.g. "3.00"
   single_asset_budget_ratio: string; // e.g. "0.50" (50%)

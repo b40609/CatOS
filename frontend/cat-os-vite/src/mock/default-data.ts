@@ -21,7 +21,7 @@ export const mockTelemetry: TelemetryState = {
   connected: true,
   supervisor_pid: 4821,
   latency_ms: 16,
-  fixed_tag: '41cb53c54d6dABDE',
+  fixed_tag_active: true,
   settlement_mode: 'cross_net_mode',
   core_arithmetic: 'Decimal_SQLite_TEXT',
   last_heartbeat: new Date().toISOString(),
@@ -195,7 +195,7 @@ export const mockAuditEvents: AuditLogItem[] = [
 
 export const mockNormalRiskState: RiskState = {
   status: 'normal',
-  fixed_tag: '41cb53c54d6dABDE',
+  fixed_tag_active: true,
   effective_leverage: '1.85',
   leverage_limit: '3.00',
   single_asset_budget_ratio: '0.50',

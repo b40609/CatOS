@@ -55,34 +55,21 @@ export function UnifiedActivityDeckCard({
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 一體化 Header 與快速過濾列 */}
       {showHeader && (
-        <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <div className="flex items-center gap-2">
             <CardHeaderTitle
               cardId="activity_deck"
               title="交易日誌與風險事件"
               subtext={
-                <div className="flex items-center gap-1.5 ml-1">
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    共 {stats.total} 筆事件
-                  </span>
-                  {stats.open > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/25 animate-pulse font-semibold">
-                      <ShieldAlert className="size-2.5" />
-                      {stats.open} 未解除
-                    </span>
-                  ) : stats.alerts > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/25">
-                      <ShieldAlert className="size-2.5" />
-                      {stats.alerts} 異常告警
-                    </span>
-                  ) : null}
-                </div>
+                <span className="text-[10px] font-mono text-muted-foreground ml-1">
+                  共 {stats.total} 筆事件
+                </span>
               }
             />
           </div>
 
           {/* 5 大類別篩選標籤 (含未解除獨立篩選與數量) */}
-          <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded p-0.5">
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5">
             {[
               { id: 'OPEN', label: `未解除 (${stats.open})` },
               { id: "ALL", label: `全部 (${stats.total})` },
@@ -96,9 +83,9 @@ export function UnifiedActivityDeckCard({
                 onClick={() => setCategory(tab.id as EventCategory | 'OPEN')}
                 aria-pressed={category === tab.id}
                 className={cn(
-                  "px-2 py-0.5 text-[10px] font-mono font-medium rounded transition-colors cursor-pointer",
+                  "px-2 py-0.5 text-[10px] font-mono rounded transition-colors cursor-pointer",
                   category === tab.id
-                    ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
+                    ? "bg-secondary text-foreground font-semibold shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >

@@ -120,7 +120,7 @@ CatOS 前端採用現代化 React 19 + TypeScript + Vite + Tailwind CSS 構建�
 ### 3. 機構級風控三重保障
 - **R1 固定風控期間基準（Risk Period Benchmark）**：依 Asia/Taipei 每日 00:00 切日建立固定 E0 權益基準，精確計算日損；Soft 止增倉 (-10%) 與 Hard 清倉 (-20%) 一旦觸發立即鎖存（Latch），反彈或入金絕不自動解除，僅限人工核驗後 re-arm。
 - **P6 交易所端整倉災難停損防線**：OKX 伺服器原生條件單託管，向上/向下取整（Ceil/Floor）以確保提早觸發，作為主機離線或斷網時的最後一道物理保險。
-- **專用子帳戶與強制標籤**：所有 OKX SWAP 委託強制注入 `"tag": "41cb53c54d6dABDE"`，專用子帳戶嚴禁與手動交易混用。
+- **專用子帳戶與專用合作通道**：所有 OKX SWAP 委託由 Supervisor 強制靜默注入專屬通道標籤，專用子帳戶嚴禁與手動交易混用。
 
 ### 4. 虛擬批次與逐筆帳務（Virtual Lots & Ledger）
 - S3–S10 逐筆帳務流水支援單筆訂單精確歸屬至 Virtual Lot，具備完整 USDT 手續費核算與成交更正重放證明（Correction Replay Proof）。
