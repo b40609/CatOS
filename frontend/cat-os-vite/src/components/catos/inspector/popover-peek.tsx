@@ -49,7 +49,7 @@ export function PopoverPeek({ botId, type, children, className }: PopoverPeekPro
             <span className="text-[10px] font-bold text-primary flex items-center gap-1">
               {type === "intent" && <Layers className="size-3" />}
               {type === "p6" && <ShieldCheck className="size-3" />}
-              <span>方案 D · {type === "intent" ? "策略意圖速覽" : type === "p6" ? "P6 防線雷達" : "盈虧深度"}</span>
+              <span>方案 D · {type === "intent" ? "策略意圖速覽" : type === "p6" ? "交易所停損監控" : "盈虧深度"}</span>
             </span>
             <span className="text-[9px] text-muted-foreground">{bot.symbol}</span>
           </div>
@@ -245,12 +245,12 @@ export function BotAnchorPopoverCard({
         </div>
       </div>
 
-      {/* 3. P6 災難停損防線 (Disaster Stop Loss) */}
+      {/* 3. 交易所停損保護 (Disaster Stop Loss) */}
       <div className="p-2 rounded-lg border border-border/80 bg-secondary/30 mb-2">
         <div className="flex items-center justify-between text-[9.5px] mb-1">
           <span className="font-bold text-foreground flex items-center gap-1">
             <ShieldCheck className="size-3 text-primary" />
-            <span>P6 災難停損防線</span>
+            <span>交易所停損保護</span>
           </span>
           <span className={cn(
             "px-1.5 py-0.2 rounded text-[8.5px] font-bold border",

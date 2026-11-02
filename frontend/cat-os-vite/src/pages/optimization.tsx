@@ -3,11 +3,9 @@ import { useState } from "react";
 import {
   Award,
   Sparkles,
-  Download,
-  Loader2,
+Loader2,
   RefreshCw,
   AlertCircle,
-  HelpCircle,
 } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { Button } from "@/components/ui/button";
@@ -22,7 +20,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { ParetoScatterChart, type TrialPoint } from "@/components/catos/pareto-scatter-chart";
 import type { OptimizationRequest } from "@/adapters/research-api-adapter";
 import { useOptimizationResearch } from "@/hooks/use-optimization-research";
 
@@ -36,25 +33,6 @@ export const Route = createFileRoute("/optimization")({
   component: OptimizationPage,
 });
 
-interface OptTrial {
-  trialNumber: number;
-  fastPeriod: number;
-  slowPeriod: number;
-  atrMultiplier: number;
-  sharpe: string;
-  totalReturn: string;
-  maxDrawdown: string;
-  isBest: boolean;
-}
-
-const DEMO_TRIALS: OptTrial[] = [
-  { trialNumber: 42, fastPeriod: 12, slowPeriod: 34, atrMultiplier: 2.5, sharpe: "2.45", totalReturn: "+26.8%", maxDrawdown: "-3.8%", isBest: true },
-  { trialNumber: 28, fastPeriod: 10, slowPeriod: 30, atrMultiplier: 2.0, sharpe: "2.21", totalReturn: "+22.4%", maxDrawdown: "-4.2%", isBest: false },
-  { trialNumber: 65, fastPeriod: 14, slowPeriod: 38, atrMultiplier: 3.0, sharpe: "2.08", totalReturn: "+19.6%", maxDrawdown: "-3.5%", isBest: false },
-  { trialNumber: 15, fastPeriod: 8, slowPeriod: 25, atrMultiplier: 1.8, sharpe: "1.92", totalReturn: "+17.3%", maxDrawdown: "-5.1%", isBest: false },
-  { trialNumber: 84, fastPeriod: 16, slowPeriod: 45, atrMultiplier: 2.8, sharpe: "1.75", totalReturn: "+14.1%", maxDrawdown: "-4.6%", isBest: false },
-  { trialNumber: 91, fastPeriod: 11, slowPeriod: 32, atrMultiplier: 2.2, sharpe: "1.68", totalReturn: "+13.5%", maxDrawdown: "-4.9%", isBest: false },
-];
 
 function formatUtc(msOrIso: string | number | null | undefined): string {
   if (!msOrIso) return "--";
@@ -69,11 +47,6 @@ function formatUtc(msOrIso: string | number | null | undefined): string {
 }
 
 function OptimizationPage() {
-  const [viewMode, setViewMode] = useState<"real" | "demo">("real");
-
-  // Demo view states
-  const [selectedDemoTrial, setSelectedDemoTrial] = useState<OptTrial>(DEMO_TRIALS[0]);
-  const [exported, setExported] = useState(false);
 
   const {
     version, catalog, optRuns, selectedRun, realResult, loading, resultLoading,
@@ -100,24 +73,6 @@ function OptimizationPage() {
     if (await submit(req)) setOpenDialog(false);
   };
 
-  const handleSelectParetoTrial = (point: TrialPoint) => {
-    const found = DEMO_TRIALS.find((t) => t.trialNumber === point.trialNumber);
-    if (found) {
-      setSelectedDemoTrial(found);
-    } else {
-      setSelectedDemoTrial({
-        trialNumber: point.trialNumber,
-        fastPeriod: point.fastPeriod,
-        slowPeriod: point.slowPeriod,
-        atrMultiplier: point.atrMultiplier,
-        sharpe: point.sharpe.toFixed(2),
-        totalReturn: `+${point.totalReturn}%`,
-        maxDrawdown: `-${point.maxDrawdown}%`,
-        isBest: point.isBest || false,
-      });
-    }
-  };
-
   return (
     <AppShell>
       <PageHead
@@ -126,43 +81,18 @@ function OptimizationPage() {
         desc="Optuna 貝氏最佳化引擎 · 樣本內搜尋 · 嚴格 Decimal 績效核心"
         right={
           <div className="flex items-center gap-2">
-            {/* 視圖切換器：真實研究契約 vs 概念展示 */}
-            <div className="flex items-center rounded-lg bg-secondary/80 p-0.5 border border-border/60">
-              <button
-                onClick={() => setViewMode("real")}
-                className={cn(
-                  "px-2.5 py-1 text-xs font-mono rounded transition-colors",
-                  viewMode === "real"
-                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                真實研究契約 (SMA Optuna)
-              </button>
-              <button
-                onClick={() => setViewMode("demo")}
-                className={cn(
-                  "px-2.5 py-1 text-xs font-mono rounded transition-colors",
-                  viewMode === "demo"
-                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                展示資料 (多目標概念)
-              </button>
-            </div>
+            {/* 頂部操作按鈕 */}
+            
 
-            {viewMode === "real" && (
-              <Button
-                size="sm"
-                disabled={!version || loading || isBusy || version.restart_required}
-                onClick={() => setOpenDialog(true)}
-                className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              >
-                {isBusy ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Sparkles className="size-3.5 mr-1" />}
-                {isBusy ? "後端計算中..." : "發起 SMA 優化任務"}
-              </Button>
-            )}
+            <Button
+              size="sm"
+              disabled={!version || loading || isBusy || version.restart_required}
+              onClick={() => setOpenDialog(true)}
+              className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer"
+            >
+              {isBusy ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Sparkles className="size-3.5 mr-1" />}
+              {isBusy ? "後端計算中..." : "發起 SMA 優化任務"}
+            </Button>
           </div>
         }
       />
@@ -172,9 +102,7 @@ function OptimizationPage() {
         <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md">
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground">
-              目前模式: <strong className={cn(viewMode === "real" ? "text-primary" : "text-amber-400")}>
-                {viewMode === "real" ? "真實研究後端 (POST /api/research/optimizations)" : "展示資料模式 (EMA-ATR 多維探索)"}
-              </strong>
+              引擎核心: <strong className="text-primary font-semibold">Optuna TPE · 樣本內回測評估</strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
@@ -208,7 +136,7 @@ function OptimizationPage() {
         )}
 
         {/* ==================== 視圖 A：真實研究契約 (SMA Optuna) ==================== */}
-        {viewMode === "real" && (
+        <>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 items-start">
             {/* 左欄：歷史優化任務列表 (4 欄) */}
             <div className="lg:col-span-4 space-y-3">
@@ -433,131 +361,7 @@ function OptimizationPage() {
               )}
             </div>
           </div>
-        )}
-
-        {/* ==================== 視圖 B：展示資料模式 (EMA-ATR 多目標概念) ==================== */}
-        {viewMode === "demo" && (
-          <div className="space-y-3">
-            {/* 概念橫幅 */}
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3.5 py-2 text-xs text-amber-400 font-mono flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <HelpCircle className="size-3.5" />
-                <span>此面板為多參數概念展示（EMA+ATR 帕累托尋優），非目前後端正式執行的單參數 SMA 搜尋。</span>
-              </span>
-              <span>展示資料 · 示範概念</span>
-            </div>
-
-            {/* 帕累托散佈圖 */}
-            <ParetoScatterChart
-              selectedTrialNumber={selectedDemoTrial.trialNumber}
-              onSelectTrial={handleSelectParetoTrial}
-            />
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-              {/* 左欄：搜尋空間 (5 欄) */}
-              <div className="lg:col-span-5 space-y-3">
-                <Panel
-                  title="搜尋空間定義 (Search Space · 示範)"
-                  meta={<span className="text-[10px] font-mono text-muted-foreground">3 個超參數維度</span>}
-                >
-                  <div className="space-y-2.5">
-                    <div className="rounded-lg border border-border/60 bg-background/40 p-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-semibold text-foreground">fast_ema_period</span>
-                        <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">最佳值: 12</span>
-                      </div>
-                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        IntRange(min=5, max=25, step=1)
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 bg-background/40 p-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-semibold text-foreground">slow_ema_period</span>
-                        <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">最佳值: 34</span>
-                      </div>
-                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        IntRange(min=20, max=60, step=2)
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 bg-background/40 p-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-semibold text-foreground">atr_stop_multiplier</span>
-                        <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">最佳值: 2.5</span>
-                      </div>
-                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        FloatRange(min=1.5, max=4.0, step=0.5)
-                      </p>
-                    </div>
-
-                    <div className="pt-2">
-                      <Button
-                        onClick={() => {
-                          setExported(true);
-                          setTimeout(() => setExported(false), 2500);
-                        }}
-                        className="w-full text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 h-8"
-                      >
-                        <Download className="size-3.5 mr-1.5" />
-                        {exported ? "已導出策略製品" : "導出 Trial #42 參數製品"}
-                      </Button>
-                    </div>
-                  </div>
-                </Panel>
-              </div>
-
-              {/* 右欄：排行榜表格 (7 欄) */}
-              <div className="lg:col-span-7">
-                <Panel
-                  title="試驗排行榜 (Top Trials · 帕累托前沿示範)"
-                  meta={<span className="text-[10px] font-mono text-primary font-medium flex items-center gap-1"><Award className="size-3" />帕累托前沿</span>}
-                >
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead className="border-b border-border text-[10px] font-mono text-muted-foreground bg-background/30">
-                        <tr>
-                          <th className="py-2 px-3 font-normal">Trial #</th>
-                          <th className="py-2 px-3 font-normal">Fast / Slow</th>
-                          <th className="py-2 px-3 font-normal">ATR Multi</th>
-                          <th className="py-2 px-3 text-right font-normal">夏普評分</th>
-                          <th className="py-2 px-3 text-right font-normal">總收益</th>
-                          <th className="py-2 px-3 text-right font-normal">最大回撤</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/40 font-mono">
-                        {DEMO_TRIALS.map((t) => {
-                          const isSelected = selectedDemoTrial.trialNumber === t.trialNumber;
-                          return (
-                            <tr
-                              key={t.trialNumber}
-                              onClick={() => setSelectedDemoTrial(t)}
-                              className={cn(
-                                "cursor-pointer transition-colors",
-                                isSelected ? "bg-primary/10" : "hover:bg-secondary/30"
-                              )}
-                            >
-                              <td className="py-2.5 px-3">
-                                <span className={cn("inline-flex items-center gap-1 font-semibold", t.isBest ? "text-primary" : "text-foreground")}>
-                                  #{t.trialNumber} {t.isBest && <span className="text-[9px] bg-primary text-primary-foreground px-1 rounded">BEST</span>}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3 text-muted-foreground">{t.fastPeriod} / {t.slowPeriod}</td>
-                              <td className="py-2.5 px-3 text-muted-foreground">{t.atrMultiplier.toFixed(1)}x</td>
-                              <td className="py-2.5 px-3 text-right font-bold text-foreground">{t.sharpe}</td>
-                              <td className="py-2.5 px-3 text-right text-up font-medium">{t.totalReturn}</td>
-                              <td className="py-2.5 px-3 text-right text-down font-medium">{t.maxDrawdown}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </Panel>
-              </div>
-            </div>
-          </div>
-        )}
+        </>
       </div>
 
       {/* ==================== 發起新優化任務彈窗 (符合後端研究契約) ==================== */}

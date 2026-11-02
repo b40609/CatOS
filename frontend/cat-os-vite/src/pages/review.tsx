@@ -145,7 +145,7 @@ function StrategyReviewPage() {
         {/* ==================== 頂部 4 大量化績效與風控指標卡 ==================== */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {/* 1. 策略累計收益 */}
-          <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
+          <div className="rounded border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 {language === "zh-TW" ? "策略累計淨收益" : "Cumulative Net Return"}
@@ -164,7 +164,7 @@ function StrategyReviewPage() {
           </div>
 
           {/* 2. 最大回撤 (Max Drawdown - 交易員核心關注重點) */}
-          <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
+          <div className="rounded border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 {language === "zh-TW" ? "最大回撤深度 (Max DD)" : "Max Drawdown"}
@@ -185,7 +185,7 @@ function StrategyReviewPage() {
           </div>
 
           {/* 3. 夏普比率 (Sharpe Ratio) */}
-          <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
+          <div className="rounded border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 {language === "zh-TW" ? "年化夏普比率 (Sharpe)" : "Sharpe Ratio"}
@@ -204,7 +204,7 @@ function StrategyReviewPage() {
           </div>
 
           {/* 4. 卡瑪比率 (Calmar Ratio - 收益/回撤比) */}
-          <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
+          <div className="rounded border border-border/70 bg-secondary/35 p-4 shadow-sm backdrop-blur-md">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
                 {language === "zh-TW" ? "卡瑪比率 (Calmar)" : "Calmar Ratio"}
@@ -215,7 +215,7 @@ function StrategyReviewPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold tracking-tight text-foreground">3.26</span>
-              <span className="text-[11px] font-mono text-muted-foreground">盈虧比 2.18</span>
+              <span className="text-[11px] font-mono text-muted-foreground">損益比 2.18</span>
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground/80">
               勝率：68.4% · 平均修復週期 3.5 天

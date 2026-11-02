@@ -1,26 +1,23 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { INITIAL_BOTS, equitySeries, summarize, formatPct, toneOf, type Bot } from "@/lib/v0-engine";
 import { CardHeaderTitle } from "./card-header-title";
 import { BotMonitorTable, type BotMonitoringView } from "./bot-monitor-table";
 import { useInspectorStore } from "@/state/inspectorStore";
-import { InlineBotRow } from "./inspector/inline-bot-row";
 import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { useBotLensStore } from "@/state/botLensStore";
 import { NumberTicker } from "./motion/number-ticker";
-import { ChevronRight } from "lucide-react";
+import { useRouter } from "@/lib/router";
+import { ArrowUpRight } from "lucide-react";
 
-interface BotPosMeta {
-  side: "long" | "short" | "idle";
-  qtyText: string;
-  notional: number;
-  upnl: number;
-  upnlPct: number;
-  dd: number;
-  p6StopPrice: string;
-  p6DistPct: string;
-  p6Status: "ACTIVE" | "STANDBY" | "ALERT" | "UPDATING";
-  p6Rounding: string;
-  p6BudgetPct: number;
+interface BotFleetMeta {
+  strategyName: string;
+  budgetUsageText: string;
+  todayPnl: number;
+  todayPnlPct: number;
+  sevenDayRet: string;
+  riskStatusText: string;
+  riskStatusTone: "safe" | "warn" | "idle";
 }
 
 interface V0BotTableProps {
@@ -35,13 +32,9 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
   const [flashBotId, setFlashBotId] = useState<Record<string, "up" | "down">>({});
   const [botFilter, setBotFilter] = useState<"all" | "running" | "paused">("all");
 
-  // 定案 B：行內展開 Accordion 狀態綁定
-  const {
-    selectedBotId,
-    selectBot,
-    expandedInlineBotIds,
-    toggleInlineExpand,
-  } = useInspectorStore();
+  const { selectedBotId, selectBot } = useInspectorStore();
+  const { activeLens, setActiveLens } = useBotLensStore();
+  const { navigate } = useRouter();
 
   // 即時市場撮合心跳 Store
   const { botsLive } = useLiveMarketStore();
@@ -87,8 +80,8 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
     const lo = Math.min(...pts);
     const hi = Math.max(...pts);
     const span = hi - lo || 1;
-    const w = 64;
-    const h = 18;
+    const w = 56;
+    const h = 16;
     const n = pts.length;
     let d = "";
     pts.forEach((pt, k) => {
@@ -99,66 +92,50 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
     return { path: d, isGain: sum.ret >= 0 };
   };
 
-  const getPosMeta = (bot: Bot): BotPosMeta => {
+  const getFleetMeta = (bot: Bot): BotFleetMeta => {
     const live = botsLive[bot.id];
 
     switch (bot.id) {
       case "tabby":
         return {
-          side: "long" as const,
-          qtyText: "0.85 BTC",
-          notional: live?.notional ?? 52820,
-          upnl: live?.upnl ?? 561.43,
-          upnlPct: live?.upnlPct ?? 1.07,
-          dd: -1.24,
-          p6StopPrice: "$59,500.00",
-          p6DistPct: live?.p6DistPct ?? "-4.25%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
+          strategyName: "突破唐奇安",
+          budgetUsageText: `$${(live?.notional ?? 74535).toLocaleString()} (預算 35.6%)`,
+          todayPnl: 1285.50 + ((live?.upnl ?? 759.36) - 759.36),
+          todayPnlPct: 1.72,
+          sevenDayRet: "+8.12%",
+          riskStatusText: "正常 (槓桿 2.1x)",
+          riskStatusTone: "safe",
         };
       case "calico":
         return {
-          side: "long" as const,
-          qtyText: "9.50 ETH",
-          notional: live?.notional ?? 32060,
-          upnl: live?.upnl ?? 524.40,
-          upnlPct: live?.upnlPct ?? 1.66,
-          dd: -2.15,
-          p6StopPrice: "$3,210.00",
-          p6DistPct: live?.p6DistPct ?? "-4.89%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
+          strategyName: "趨勢追蹤",
+          budgetUsageText: `$${(live?.notional ?? 45515).toLocaleString()} (預算 21.7%)`,
+          todayPnl: 1120.20 + ((live?.upnl ?? 695.25) - 695.25),
+          todayPnlPct: 2.50,
+          sevenDayRet: "+12.45%",
+          riskStatusText: "正常 (槓桿 1.3x)",
+          riskStatusTone: "safe",
         };
       case "mochi":
         return {
-          side: "long" as const,
-          qtyText: "95.0 SOL",
-          notional: live?.notional ?? 14516,
-          upnl: live?.upnl ?? 437.00,
-          upnlPct: live?.upnlPct ?? 3.10,
-          dd: -0.85,
-          p6StopPrice: "$142.00",
-          p6DistPct: live?.p6DistPct ?? "-7.07%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
+          strategyName: "自適應網格",
+          budgetUsageText: `$${(live?.notional ?? 20574).toLocaleString()} (預算 9.8%)`,
+          todayPnl: 845.00 + ((live?.upnl ?? 567.00) - 567.00),
+          todayPnlPct: 4.16,
+          sevenDayRet: "+6.30%",
+          riskStatusText: "正常 (槓桿 0.6x)",
+          riskStatusTone: "safe",
         };
       case "shiro":
       default:
         return {
-          side: "idle" as const,
-          qtyText: "0.00",
-          notional: 0,
-          upnl: 0,
-          upnlPct: 0,
-          dd: -3.42,
-          p6StopPrice: "—",
-          p6DistPct: "無持倉",
-          p6Status: "STANDBY",
-          p6Rounding: "待命",
-          p6BudgetPct: 0,
+          strategyName: "跨所統計套利",
+          budgetUsageText: "無持倉 (待命)",
+          todayPnl: 0,
+          todayPnlPct: 0,
+          sevenDayRet: "0.00%",
+          riskStatusText: "待命 (無曝險)",
+          riskStatusTone: "idle",
         };
     }
   };
@@ -167,24 +144,24 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {/* 1. 一體化 Header */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <CardHeaderTitle
             cardId="bots"
-            title="策略機器人矩陣"
+            title="策略實例監控矩陣"
           />
 
-          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 whitespace-nowrap flex-nowrap">
             {[
-              { id: "all", label: `全部 (${bots.length})` },
-              { id: "running", label: `運作 (${runningCount})` },
-              { id: "paused", label: `暫停 (${bots.length - runningCount})` },
+              { id: "all", label: `全部(${bots.length})` },
+              { id: "running", label: `運作(${runningCount})` },
+              { id: "paused", label: `暫停(${bots.length - runningCount})` },
             ].map((f) => (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => setBotFilter(f.id as any)}
                 className={cn(
-                  "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                  "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                   botFilter === f.id
                     ? "bg-secondary text-foreground font-semibold shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -197,199 +174,178 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
         </div>
       )}
 
-      {/* 2. 雙層高階版 (Dual-Layer) 矩陣表格 */}
-      {monitoring ? <BotMonitorTable {...monitoring} /> : <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto min-w-0 max-w-full">
-        <table className="w-full text-left border-collapse table-auto min-w-[520px]">
-          <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
-            <tr>
-              <th className="py-2 pl-3 pr-1.5 font-medium">BOT / STRATEGY</th>
-              <th className="px-1.5 font-medium">POSITION / NOTIONAL</th>
-              <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
-              <th className="px-1.5 text-right font-medium hidden sm:table-cell">DAILY / 7D</th>
-              <th className="px-1.5 font-medium hidden md:table-cell">MAX DD / 停損錨定</th>
-              <th className="py-2 pr-3 pl-1.5 text-right font-medium">TREND & ACT</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40 text-xs">
-            {bots
-              .filter((b) => (botFilter === "all" ? true : b.status === botFilter))
-              .map((bot) => {
-              const pos = getPosMeta(bot);
-              const spark = getSparkline(bot);
-              const isPaused = bot.status === "paused";
-              const isSelected = selectedBotId === bot.id;
-              const isInlineExpanded = expandedInlineBotIds.includes(bot.id);
+      {/* 2. 方案 A：策略資產管理視角 (零合約微觀冗餘 · 100% 職責分離) */}
+      {monitoring ? (
+        <BotMonitorTable {...monitoring} />
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto min-w-0 max-w-full">
+          <table className="w-full text-left border-collapse table-auto min-w-[540px]">
+            <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+              <tr>
+                <th className="py-2.5 pl-3 pr-2 font-medium">實例 / 標的</th>
+                <th className="px-2 font-medium">策略模型 / 曝險</th>
+                <th className="px-2 text-right font-medium">今日總損益</th>
+                <th className="px-2 text-right font-medium hidden sm:table-cell">7日報酬率</th>
+                <th className="px-2 font-medium hidden md:table-cell">風控狀態</th>
+                <th className="py-2.5 pr-3 pl-2 text-right font-medium">走勢與操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40 text-xs">
+              {bots
+                .filter((b) => (botFilter === "all" ? true : b.status === botFilter))
+                .map((bot) => {
+                  const meta = getFleetMeta(bot);
+                  const spark = getSparkline(bot);
+                  const isPaused = bot.status === "paused";
+                  const isSelected = selectedBotId === bot.id;
 
-              return (
-                <Fragment key={bot.id}>
-                  <tr
-                    onClick={() => {
-                      selectBot(bot.id);
-                      toggleInlineExpand(bot.id);
-                    }}
-                    className={cn(
-                      "hover:bg-secondary/40 transition-all group cursor-pointer",
-                      focusedBotId === bot.id && "bg-secondary/50",
-                      isSelected && "bg-secondary/50",
-                      isPaused && "opacity-60 bg-background/20",
-                      flashBotId[bot.id] === "up" && "flash-up",
-                      flashBotId[bot.id] === "down" && "flash-down"
-                    )}
-                    onMouseEnter={() => setFocusedBotId(bot.id)}
-                    onMouseLeave={() => setFocusedBotId(null)}
-                  >
-                    {/* 1. 機器人與策略 */}
-                    <td className="py-2.5 pl-3 pr-2">
-                      <div className="flex items-center gap-2">
-                        {/* 展開/收合箭頭指示 */}
-                        <div
-                          className="size-4 -ml-1 rounded flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors shrink-0"
-                          title={isInlineExpanded ? "點擊收合詳情" : "點擊展開策略執行鏈與防線"}
-                        >
-                          <ChevronRight className={cn("size-3 transition-transform duration-200", isInlineExpanded && "rotate-90 text-primary")} />
-                        </div>
-                        <span
-                          className={cn(
-                            "w-2 h-2 rounded-full shrink-0",
-                            isPaused ? "bg-muted-foreground/50" : "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
-                          )}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[12px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
-                              {bot.name}
-                            </span>
-                            {isInlineExpanded && (
-                              <span className="text-[9px] text-primary font-mono font-bold">
-                                [已展開]
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-[9.5px] font-mono text-muted-foreground leading-tight">
-                            <span className="text-primary font-semibold">{bot.symbol}</span>
-                            <span>{bot.timeframe}</span>
-                            <span>· {bot.strategyId}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 2. 持倉規模與態勢 */}
-                    <td className="px-2 py-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
+                  const isLensActive = activeLens === bot.id;
+                  return (
+                    <tr
+                      key={bot.id}
+                      onClick={() => {
+                        selectBot(bot.id);
+                        setActiveLens(activeLens === bot.id ? "ALL" : (bot.id as any));
+                      }}
+                      className={cn(
+                        "hover:bg-secondary/30 transition-all group cursor-pointer",
+                        focusedBotId === bot.id && "bg-secondary/40",
+                        isLensActive && "bg-primary/[0.08] ring-1 ring-primary/40",
+                        isSelected && !isLensActive && "bg-secondary/40",
+                        isPaused && "opacity-60 bg-background/20",
+                        flashBotId[bot.id] === "up" && "flash-up",
+                        flashBotId[bot.id] === "down" && "flash-down"
+                      )}
+                      onMouseEnter={() => setFocusedBotId(bot.id)}
+                      onMouseLeave={() => setFocusedBotId(null)}
+                      title="點擊切換上方權益卡為此策略專屬視角"
+                    >
+                      {/* 1. 策略實例與合約標的 */}
+                      <td className="py-2.5 pl-3 pr-2">
+                        <div className="flex items-center gap-2">
                           <span
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-[3px] border px-1.5 py-0.2 num text-[9px] font-mono font-bold tracking-tight",
-                              pos.side === "long"
-                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
-                                : pos.side === "short"
-                                ? "border-rose-400/30 bg-rose-400/10 text-rose-400"
-                                : "border-border bg-background/50 text-muted-foreground"
+                              "w-2 h-2 rounded-full shrink-0",
+                              isPaused ? "bg-muted-foreground/50" : "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
+                            )}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[12px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
+                                {bot.name}
+                              </span>
+                              {isLensActive && (
+                                <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-primary/20 text-primary border border-primary/30 shrink-0">
+                                  聚焦中 ↑
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-[9.5px] font-mono text-muted-foreground leading-tight">
+                              <span className="text-primary font-semibold">{bot.symbol}</span>
+                              <span>{bot.timeframe}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. 策略模型與曝險占比 */}
+                      <td className="px-2 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[11.5px] font-semibold text-foreground leading-tight">
+                            {meta.strategyName}
+                          </span>
+                          <span className="text-[9.5px] font-mono text-muted-foreground leading-tight">
+                            {meta.budgetUsageText}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 3. 今日總損益 (策略層級淨損益 · 醒目大字) */}
+                      <td className="px-2 py-2.5 text-right font-mono">
+                        <div className="flex flex-col items-end">
+                          <NumberTicker
+                            value={Math.abs(meta.todayPnl)}
+                            prefix={meta.todayPnl >= 0 ? "+$" : "-$"}
+                            decimals={2}
+                            duration={400}
+                            className={cn("text-[12.5px] font-bold leading-tight", toneOf(meta.todayPnl))}
+                          />
+                          <span className={cn("text-[9.5px] leading-tight font-semibold", toneOf(meta.todayPnl))}>
+                            {formatPct(meta.todayPnlPct)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 4. 7日報酬率 */}
+                      <td className="px-2 py-2.5 text-right font-mono hidden sm:table-cell">
+                        <span className={cn("text-[11px] font-bold leading-tight", meta.sevenDayRet.startsWith("+") ? "text-emerald-400" : "text-muted-foreground")}>
+                          {meta.sevenDayRet}
+                        </span>
+                      </td>
+
+                      {/* 5. 策略級風控健康狀態 */}
+                      <td className="px-2 py-2.5 font-mono hidden md:table-cell">
+                        {meta.riskStatusTone === "safe" ? (
+                          <div className="flex items-center gap-1.5 leading-tight">
+                            <span className="px-1.5 py-0.2 rounded bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 text-[9px] font-semibold">
+                              {meta.riskStatusText}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">{meta.riskStatusText}</span>
+                        )}
+                      </td>
+
+                      {/* 6. Sparkline 走勢微圖與操作/詳情按鈕 */}
+                      <td className="py-2.5 pr-3 pl-2 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {spark.path ? (
+                            <svg width={56} height={16} className="overflow-visible shrink-0 hidden xl:block">
+                              <path
+                                d={spark.path}
+                                fill="none"
+                                stroke={spark.isGain ? "var(--primary)" : "#f43f5e"}
+                                strokeWidth={1.5}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={(e) => togglePause(bot.id, e)}
+                            title="切換展示運作/暫停狀態"
+                            className={cn(
+                              "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer",
+                              isPaused
+                                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                : "border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
                             )}
                           >
-                            {pos.side === "long" ? "▲ LONG" : pos.side === "short" ? "▼ SHORT" : "○ FLAT"}
-                          </span>
-                          <span className="font-mono text-[11px] font-bold text-foreground">{pos.qtyText}</span>
+                            {isPaused ? "重啟" : "暫停"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectBot(bot.id);
+                              navigate("/bots");
+                            }}
+                            title="開啟策略專屬監控與五階段管線審計"
+                            className="px-2 py-0.5 rounded text-[10px] font-mono border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer flex items-center gap-0.5"
+                          >
+                            <span>詳情</span>
+                            <ArrowUpRight className="size-2.5" />
+                          </button>
                         </div>
-                        <span className="text-[9.5px] font-mono text-muted-foreground">
-                          {pos.notional > 0 ? `$${pos.notional.toLocaleString()} · 3x Cross` : "無部位"}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 3. 未實現損益 (雙層棧 + 動態 NumberTicker 滾動) */}
-                    <td className="px-2 py-2.5 text-right font-mono">
-                      <div className="flex flex-col items-end">
-                        <NumberTicker
-                          value={Math.abs(pos.upnl)}
-                          prefix={pos.upnl >= 0 ? "+$" : "-$"}
-                          decimals={2}
-                          duration={400}
-                          className={cn("text-[11px] font-bold leading-tight", toneOf(pos.upnl))}
-                        />
-                        <span className={cn("text-[9.5px] leading-tight", toneOf(pos.upnl))}>
-                          {formatPct(pos.upnlPct)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 4. 今日損益與週期報酬 */}
-                    <td className="px-1.5 py-2 text-right font-mono hidden sm:table-cell">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10.5px] font-bold text-foreground leading-tight">+2.45%</span>
-                        <span className="text-[9px] text-emerald-400 leading-tight">+8.12% 7D</span>
-                      </div>
-                    </td>
-
-                    {/* 5. 最大回撤與停損錨定 */}
-                    <td className="px-1.5 py-2 font-mono hidden md:table-cell">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[9.5px] text-muted-foreground leading-tight">
-                            DD: <span className="text-rose-400 font-semibold">{pos.dd.toFixed(2)}%</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[8.5px] text-muted-foreground leading-tight">
-                          <span className="text-primary font-semibold">
-                            停損: {pos.p6StopPrice}
-                          </span>
-                          {pos.p6Status === "ACTIVE" && (
-                            <span className="text-emerald-400">({pos.p6DistPct})</span>
-                          )}
-                          {pos.p6Status === "UPDATING" && (
-                            <span className="text-amber-400 font-semibold">(待確認)</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 6. Sparkline 走勢微圖與暫停/重啟按鈕 */}
-                    <td className="py-2.5 pr-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {spark.path ? (
-                          <svg width={64} height={18} className="overflow-visible shrink-0">
-                            <path
-                              d={spark.path}
-                              fill="none"
-                              stroke={spark.isGain ? "var(--primary)" : "#f43f5e"}
-                              strokeWidth={1.5}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={(e) => togglePause(bot.id, e)}
-                          title="只切換展示狀態，不發送策略控制命令"
-                          className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
-                            isPaused
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                              : "border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                          )}
-                        >
-                          <span>{isPaused ? "重啟" : "暫停"}</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* 方案 B：行內展開 Accordion 巢狀列 (定案固化) */}
-                  {isInlineExpanded && (
-                    <InlineBotRow
-                      botId={bot.id}
-                      colSpan={6}
-                      onCollapse={() => toggleInlineExpand(bot.id)}
-                    />
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

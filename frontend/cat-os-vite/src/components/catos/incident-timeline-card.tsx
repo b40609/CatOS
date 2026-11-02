@@ -59,7 +59,7 @@ const DEFAULT_INCIDENTS: IncidentItem[] = [
     id: "inc_04",
     time: "08:00:00",
     severity: "OK",
-    title: "OKX P6 交易所端整倉災難停損更新完成",
+    title: "OKX 交易所端整倉災難停損更新完成",
     reason: "部位平均成本微幅改變，交易所端整倉停損單已重新錨定 (BTC @ 59,500, ETH @ 3,210)。保護狀態 ACTIVE。",
     targetBotId: null,
     source: "OKX-P6-Guard",

@@ -44,21 +44,21 @@ export type HudFocus = "money" | "leverage";
 // 定案全 5 大核心維度分段標籤 (寬版完整名，窄版自動簡寫為 2 字標籤節省空間)
 const TABS: { id: DonutViewMode; label: string; shortLabel: string }[] = [
   { id: "allocation", label: "幣種配置", shortLabel: "幣種" },
-  { id: "bots", label: "策略機器人", shortLabel: "機器人" },
-  { id: "delta", label: "多空敞口", shortLabel: "敞口" },
+  { id: "bots", label: "策略實例", shortLabel: "實例" },
+  { id: "delta", label: "多空部位曝險", shortLabel: "曝險" },
   { id: "margin", label: "保證金佔用", shortLabel: "保證金" },
-  { id: "pnl", label: "盈虧分佈", shortLabel: "盈虧" },
+  { id: "pnl", label: "損益分佈", shortLabel: "損益" },
 ];
 
 /**
  * 槓桿倍數與資產曝險卡片 (AllocationDonutCard)
  * - 徹底移除底部枯燥的 4 塊文字小框，將垂直空間 100% 留給圓環與清單
- * - 定案全 5 大維度即時切換：【幣種配置 | 策略機器人 | 多空敞口 | 保證金佔用 | 盈虧分佈】
+ * - 定案全 5 大維度即時切換：【幣種配置 | 策略實例 | 多空部位曝險 | 保證金佔用 | 損益分佈】
  * - 融合彭博高對比字體與微型進度刻度，支持【$ 金額主導】與【x 槓桿倍數】雙重直觀焦點
  */
 export function AllocationDonutCard({ className }: { className?: string }) {
   const [viewMode, setViewMode] = useState<DonutViewMode>("allocation");
-  const [hudFocus, setHudFocus] = useState<HudFocus>("money");
+  const [hudFocus, setHudFocus] = useState<HudFocus>("leverage");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 600, height: 240 });
@@ -250,16 +250,16 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   // 3. 維度：保證金佔用 (Margin Structure · 專業帳戶流動性與安全架構)
   const marginItems: DonutItem[] = useMemo(() => {
     // 依 OKX 專業跨幣種保證金結構真實拆解：
-    // 開倉保證金(45.4%) + 自由保證金(37.6%) + 最低維持線(11.6%) + 掛單凍結(5.4%) = 100%
-    const imr = 22700;
-    const free = 18800;
-    const mmr = 5800;
-    const frozen = 2700;
+    // 開倉保證金(46.5%) + 自由保證金(38.3%) + 最低維持線(11.2%) + 掛單凍結(4.0%) = 100%
+    const imr = Math.round(totalEquity * 0.465);
+    const free = Math.round(totalEquity * 0.383);
+    const mmr = Math.round(totalEquity * 0.112);
+    const frozen = Math.round(totalEquity * 0.040);
 
-    const imrPct = (imr / totalEquity) * 100;
-    const freePct = (free / totalEquity) * 100;
-    const mmrPct = (mmr / totalEquity) * 100;
-    const frozenPct = (frozen / totalEquity) * 100;
+    const imrPct = 46.5;
+    const freePct = 38.3;
+    const mmrPct = 11.2;
+    const frozenPct = 4.0;
 
     return [
       {
@@ -441,16 +441,16 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         amountStr: `$${Math.round(ethNotional).toLocaleString()}`,
       },
       {
-        symbol: "Machi",
-        name: "Machi · SOL 動量突破 (15m)",
-        shortLabel: "Machi 機器人",
-        compactLabel: "Machi",
+        symbol: "Mochi",
+        name: "Mochi · SOL 動量突破 (15m)",
+        shortLabel: "Mochi 機器人",
+        compactLabel: "Mochi",
         sub: "SOL 策略",
         nominal_usdt: solNotional,
         pct_share: machiPct,
         color: "#8b8df8", // 沉穩淡靛
-        badgeStr: "動量 15m · 0.30x",
-        compactBadge: "0.30x",
+        badgeStr: "動量 15m · 0.29x",
+        compactBadge: "0.29x",
         amountStr: `$${Math.round(solNotional).toLocaleString()}`,
       },
       {
@@ -509,16 +509,16 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     const usedPct = maxBudget > 0 ? (usedNom / maxBudget) * 100 : 0;
 
     // 中央 HUD 標題與數值計算 (依 Bloomberg / TradingView 金額與倍數雙錨定法則)
-    let hudTitle = hudFocus === "money"
-      ? (viewMode === "bots" ? "機器人總持倉" : "持倉名目總值")
-      : "有效槓桿水位";
-    let hudValue = hudFocus === "money" ? `$${usedK}k` : `${effectiveLeverage.toFixed(2)}x`;
+    let hudTitle = hudFocus === "leverage"
+      ? "帳戶有效槓桿"
+      : (viewMode === "bots" ? "策略實例持倉" : "名目持倉總值");
+    let hudValue = hudFocus === "leverage" ? `${effectiveLeverage.toFixed(2)}x` : `$${usedK}k`;
     let hudValueColor = "#f8fafc"; // 專業中性珍珠白，高對比無光暈
-    let hudSub = hudFocus === "money"
-      ? `3x上限 $${maxK}k · 餘 $${availK}k`
-      : `持倉 $${usedK}k / 預算 $${maxK}k`;
+    let hudSub = hudFocus === "leverage"
+      ? `上限 3.0x · 單幣上限 50.0%`
+      : `總預算 $${maxK}k · 餘 $${availK}k`;
     let progressPct = Math.min(100, usedPct);
-    let hudTag = hudFocus === "money" ? `${effectiveLeverage.toFixed(2)}x` : `${usedPct.toFixed(0)}%`;
+    let hudTag = hudFocus === "leverage" ? `${usedPct.toFixed(0)}% 預算` : `${effectiveLeverage.toFixed(2)}x`;
 
     if (viewMode === "delta") {
       hudTitle = "淨多頭偏置 (Delta)";
@@ -529,11 +529,11 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       hudTag = "51% 多";
     } else if (viewMode === "margin") {
       hudTitle = "保證金佔用";
-      hudValue = "$22.7k";
+      hudValue = "$32.5k";
       hudValueColor = "#60a5fa";
-      hudSub = "總權益 $48.7k · 自由 $18.8k";
-      progressPct = 62.4;
-      hudTag = "62.4%";
+      hudSub = `總權益 $${(totalEquity / 1000).toFixed(1)}k · 自由 $${(totalEquity * 0.383 / 1000).toFixed(1)}k`;
+      progressPct = 46.5;
+      hudTag = "46.5%";
     } else if (viewMode === "pnl") {
       hudTitle = "未實現總損益";
       hudValue = "+$3,385";
@@ -748,37 +748,39 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           />
 
           {/* 核心焦點切換鈕：金額主導 vs 槓桿倍數 */}
-          <div className="flex items-center gap-0.5 sm:gap-1 bg-black/65 border border-amber-500/50 rounded-[5px] p-0.5 text-[10px] font-mono shadow-xs shrink-0">
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-[10.5px] font-mono">
             <span className="text-amber-400 font-bold px-1 text-[9px] sm:text-[9.5px]">焦點:</span>
-            <button
-              type="button"
-              onClick={() => setHudFocus("money")}
-              className={cn(
-                "px-1.5 py-0.5 rounded cursor-pointer transition-all leading-none text-[9.5px] sm:text-[10px]",
-                hudFocus === "money"
-                  ? "bg-amber-500/30 text-amber-200 font-bold border border-amber-500/60 shadow-2xs"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]"
-              )}
-            >
-              $ 金額 (推薦)
-            </button>
             <button
               type="button"
               onClick={() => setHudFocus("leverage")}
               className={cn(
-                "px-1.5 py-0.5 rounded cursor-pointer transition-all leading-none text-[9.5px] sm:text-[10px]",
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 hudFocus === "leverage"
-                  ? "bg-amber-500/30 text-amber-200 font-bold border border-amber-500/60 shadow-2xs"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.05]"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               )}
+              title="風控焦點：帳戶有效槓桿 (上限 3.0x)"
             >
-              x 倍數
+              x 槓桿
+            </button>
+            <button
+              type="button"
+              onClick={() => setHudFocus("money")}
+              className={cn(
+                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                hudFocus === "money"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="資產焦點：名目持倉總額與剩餘預算"
+            >
+              $ 名目
             </button>
           </div>
         </div>
 
         {/* 核心維度分段鈕 (幣種配置 | 策略機器人 | 多空敞口 | 保證金佔用 | 盈虧分佈) */}
-        <div className="flex items-center gap-0.5 sm:gap-1 bg-black/45 border border-white/[0.14] rounded-[6px] p-0.5 shrink-0 text-[10px] sm:text-[11px] font-mono shadow-2xs">
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-[10.5px] font-mono">
           {TABS.map((tab) => {
             const isActive = viewMode === tab.id;
             return (

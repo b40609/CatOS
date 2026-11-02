@@ -32,8 +32,8 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const AVATAR_OPTIONS = ["🚀", "₿", "Ξ", "◎", "🐱", "⚡", "🦁", "🐋"];
-const BADGE_OPTIONS = ["OKX VIP", "KOL Partner", "Quant Fund", "Alpha Trader"];
+const AVATAR_OPTIONS = ["⚡", "₿", "Ξ", "◎", "◈", "◆", "▲", "●"];
+const BADGE_OPTIONS = ["PRO TRADER", "QUANT FUND", "SUB-ACCOUNT", "ALPHA"];
 
 export function PersonalOsModal({
   isOpen,
@@ -113,7 +113,7 @@ export function PersonalOsModal({
             </span>
             <div>
               <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                <span>{language === "zh-TW" ? "catOS 專屬量化交易作業系統設定" : "catOS Personal Trading OS"}</span>
+                <span>{language === "zh-TW" ? "系統外觀與交易環境偏好設定" : "catOS Personal Trading OS"}</span>
                 <span className="rounded bg-primary/15 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-primary">
                   PRO
                 </span>

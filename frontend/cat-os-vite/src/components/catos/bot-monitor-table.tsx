@@ -32,7 +32,7 @@ export function BotMonitorTable({ mode, rows }: BotMonitoringView) {
     <div className="min-h-0 flex-1 overflow-auto">
       <table className="w-full border-collapse text-left text-[11px]">
         <thead className="sticky top-0 z-10 border-b border-border/80 bg-surface font-mono text-[9.5px] text-muted-foreground">
-          <tr><th className="py-2 pl-3 font-medium">BOT / STRATEGY</th><th className="px-2 font-medium">部位 / 未實現損益</th>
+          <tr><th className="py-2 pl-3 font-medium">實例 / 標的</th><th className="px-2 font-medium">部位 / 未實現損益</th>
             <th className="px-2 font-medium">執行狀態</th><th className="pr-3 text-right font-medium">詳情</th></tr>
         </thead>
         <tbody>{rows.map(row => <Fragment key={row.id}>

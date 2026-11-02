@@ -89,11 +89,11 @@ export function InspectorDrawer() {
             }}
           />
 
-          {/* P6 災難防線圖示 */}
+          {/* 交易所停損保護圖示 */}
           <RailButton
             active={isOpen && activeTab === 'p6'}
             icon={<ShieldAlert className="size-4" />}
-            label="P6 災難防線 (Ctrl+2)"
+            label="交易所停損保護 (Ctrl+2)"
             badgeDot="bg-amber-400"
             onClick={() => {
               if (isOpen && activeTab === 'p6') toggleOpen();
@@ -149,7 +149,7 @@ export function InspectorDrawer() {
               </span>
               <span className="text-xs font-bold text-foreground">
                 {activeTab === 'bot' && '策略意圖與五階段鏈'}
-                {activeTab === 'p6' && 'P6 災難停損防線審查'}
+                {activeTab === 'p6' && '交易所停損保護審查'}
                 {activeTab === 'r1' && 'R1 風控期間審計 (00:00)'}
                 {activeTab === 'fill' && '撮合滑價與手續費剖析'}
               </span>
@@ -217,7 +217,7 @@ export function InspectorDrawer() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-surface/40'
               )}
             >
-              🛡️ P6 防線
+              🛡️ 交易所停損
             </button>
             <button
               type="button"
@@ -360,7 +360,7 @@ export function InspectorDrawer() {
               </>
             )}
 
-            {/* ==================== TAB 2: P6 災難停損防線 ==================== */}
+            {/* ==================== TAB 2: 交易所強制停損 ==================== */}
             {activeTab === 'p6' && (
               <>
                 <div className="p-2.5 rounded-lg border border-primary/30 bg-primary/5 space-y-1">
@@ -369,7 +369,7 @@ export function InspectorDrawer() {
                     <span className="text-[10px] font-mono">觸發源: Mark 價格</span>
                   </div>
                   <p className="text-[10.5px] text-muted-foreground leading-relaxed">
-                    災難停損係主機離線或斷網時最後保險。向上/向下依提早觸發方向取整（多倉 CEIL 向上、空倉 FLOOR 向下）。
+                    交易所強制停損係主機離線或斷網時最後保險。向上/向下依提早觸發方向取整（多倉 CEIL 向上、空倉 FLOOR 向下）。
                   </p>
                 </div>
 

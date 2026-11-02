@@ -54,7 +54,7 @@ export interface LayoutProfile {
 
 export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string }> = {
   equity: { zh: "帳戶權益與損益", en: "Equity & Drawdown", icon: "📈" },
-  positions: { zh: "持倉明細與在途委託", en: "Positions & Orders", icon: "📊" },
+  positions: { zh: "持倉明細與交易所風控", en: "Positions & Orders", icon: "📊" },
   bots: { zh: "策略機器人矩陣", en: "Bots Matrix", icon: "🤖" },
   allocation: { zh: "槓桿倍數與資產曝險", en: "Leverage & Allocation", icon: "🪙" },
   fills: { zh: "即時成交流水", en: "Recent Fills", icon: "⚡" },
@@ -134,7 +134,7 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
     shortName: "部位全螢幕",
     tag: "單卡專注",
     cardCount: 1,
-    desc: "100% 滿版展示多空持倉、在途掛單撤單與 P6 災難停損防線",
+    desc: "100% 滿版展示多空持倉、在途掛單撤單與交易所停損防線",
   },
   {
     id: "empty",

@@ -5,7 +5,6 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ShieldCheck, RefreshCw, Lock, Unlock, HelpCircle, CheckCircle2 } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
-import { DerivativesMetrics } from "@/components/catos/derivatives-metrics";
 import { riskAlerts, riskRules as SEED } from "@/lib/mock/data";
 import { useLiveNumber } from "@/hooks/use-live";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
@@ -227,7 +226,7 @@ function RiskManagement() {
         <Gauge label="風控期間虧損 (Drawdown vs E0)" seed={3.42} vol={0.005} max={10.0} suffix="%" danger={8.0} />
       </div>
 
-      <div className="mt-3"><DerivativesMetrics /></div>
+      
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.5fr_1fr]">
         <Panel title="risk rules · 風控規則設定 (示範)">

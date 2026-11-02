@@ -61,6 +61,7 @@ Desktop.ini
 
 # Local editor, AI assistant caches, and temporary prototypes
 .codex/
+.agents/
 .workbuddy-ai/
 /frontend/outputs/
 /frontend/prototypes/

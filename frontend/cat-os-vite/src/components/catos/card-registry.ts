@@ -62,18 +62,18 @@ export const ALL_CARDS: CardMeta[] = [
   },
   {
     id: "positions",
-    nameZh: "持倉明細與在途防線",
-    nameEn: "Positions & P6 Protection",
+    nameZh: "持倉明細與交易所風控",
+    nameEn: "Positions & OKX Stop Guard",
     category: "交易執行",
-    desc: "多空持倉明細、P6 災難停損防線覆蓋、在途掛單撤單與即時凍結保證金",
+    desc: "多空持倉明細、交易所條件單防線覆蓋、在途掛單撤單與即時凍結保證金",
     icon: LineChart,
-    badge: "P6 交易所防線",
+    badge: "交易所條件單防線",
     spec: {
       dataFeed: "OKX 專用子帳戶",
       latency: "事件驅動",
       engine: "Mark 取整停損",
       tier: "委託執行",
-      codeId: "POSITIONS_P6_DECK",
+      codeId: "POSITIONS_GUARD_DECK",
     },
   },
   {

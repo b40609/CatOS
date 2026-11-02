@@ -57,7 +57,7 @@ const GROUPS: NavigationGroup[] = [
     titleEn: "EXECUTION & RISK",
     titleMono: "EXECUTION",
     items: [
-      { to: "/bots", name: "機器人管理", sub: "BOT MANAGER", icon: Bot, hasPulse: true },
+      { to: "/bots", name: "實例監控", sub: "FLEET MONITOR", icon: Bot, hasPulse: true },
       { to: "/risk", name: "風控中心", sub: "RISK CONTROL", icon: ShieldCheck },
     ],
   },
@@ -344,7 +344,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
             </div>
           </div>
 
-          {/* 頂部全域行情時鐘總線 (Closed Bar 倒數 + 4 大 SWAP 標的報價 + 8H 資金費倒數) */}
+          {/* 頂部全域行情總線 (Closed Bar 決策倒數 + SWAP 標的即時報價) */}
           <div className="hidden md:flex items-center gap-2 shrink min-w-0">
             <TopMarketTicker />
           </div>
