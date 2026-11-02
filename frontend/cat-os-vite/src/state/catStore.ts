@@ -1,119 +1,114 @@
 import { create } from 'zustand';
 import type {
-  DashboardKPIs,
-  EquityPoint,
-  ResearchTask,
-  YaoziAlert,
-  ScenarioType,
-} from '@/adapters/types';
-import type {
-  Bot,
-  StrategyEntry,
-  RiskState,
-  TelemetryState,
-  AuditLogItem,
-  PendingCommand,
-  CommandRecord,
   BotMode,
+  BotViewDTO,
+  CommandRecord,
+  EventDTO,
+  PendingCommand,
+  PositionDTO,
+  RegisteredStrategyDTO,
+  RiskSnapshotDTO,
+  SummaryDTO,
+  VersionDTO,
 } from '@/contracts';
 
 export type Language = 'zh-TW' | 'en';
+
+export type ConnectionStatus = 'idle' | 'loading' | 'ok' | 'error' | 'unavailable' | 'mode_not_open';
+
+export interface ConnectionState {
+  status: ConnectionStatus;
+  detail: string | null;      // backend error code or network_error
+  http_status: number | null;
+  last_ok_ms: number | null;
+  polling: boolean;
+}
+
+export const MAX_STORED_EVENTS = 400;
+
+const IDLE_CONNECTION: ConnectionState = { status: 'idle', detail: null, http_status: null, last_ok_ms: null, polling: false };
 
 export interface CatState {
   // Navigation & Mode
   activeTab: 'dashboard' | 'bots' | 'risk' | 'strategies' | 'logs' | 'settings';
   mode: BotMode;
   modeGeneration: number;
-  activeScenario: ScenarioType;
   language: Language;
-  
-  // Authoritative State Projections
-  kpis: DashboardKPIs | null;
-  bots: Bot[];
-  strategies: StrategyEntry[];
-  risk: RiskState | null;
-  telemetry: TelemetryState | null;
-  equitySeries: EquityPoint[];
-  researchTasks: ResearchTask[];
-  yaoziAlerts: YaoziAlert[];
-  auditLogs: AuditLogItem[];
-  pendingCommands: PendingCommand[];
+
+  // Authoritative projections (GET /state domains)
+  instanceId: string | null;
+  service: VersionDTO | null;
+  strategies: RegisteredStrategyDTO[];
+  bots: BotViewDTO[];
+  risk: RiskSnapshotDTO | null;
+  positions: PositionDTO[];
+  summary: SummaryDTO | null;
+  events: EventDTO[];          // ascending by seq, capped at MAX_STORED_EVENTS
+  eventsNextSince: number;     // highest seq held
+  eventsOmitted: number;       // backend ring-buffer losses, reported not hidden
+
+  connection: ConnectionState;
+  pendingCommand: PendingCommand | null;
   commandHistory: CommandRecord[];
 
-  // Anti-Race Condition: Monotonic Version Tracking per domain
+  // Anti-race: monotonic version per domain ("global" tracks state_version)
   versionMap: Record<string, number>;
 
-  // Actions
   setActiveTab: (tab: CatState['activeTab']) => void;
   setMode: (mode: BotMode) => void;
-  setScenario: (scenario: ScenarioType) => void;
   setLanguage: (lang: Language) => void;
-  
-  // Safe State Updates with Version Guard
-  applyAuthoritativeUpdate: (domain: string, version: number, updateFn: (state: CatState) => Partial<CatState>) => boolean;
-  
-  // Bulk hydration
-  hydrateAll: (payload: {
-    kpis?: DashboardKPIs;
-    bots?: Bot[];
-    strategies?: StrategyEntry[];
-    risk?: RiskState;
-    telemetry?: TelemetryState;
-    equitySeries?: EquityPoint[];
-    auditLogs?: AuditLogItem[];
-    version?: number;
-  }) => void;
 
-  setPendingCommands: (commands: PendingCommand[]) => void;
+  /** Apply an update only when `version` is not older than the domain's current version. */
+  applyAuthoritativeUpdate: (domain: string, version: number, updateFn: (state: CatState) => Partial<CatState>) => boolean;
+  /** A new backend instance invalidates every version; projections are rebuilt from its first state. */
+  resetInstance: (instanceId: string) => void;
+  /** Merge an events page (dedup by seq, ascending, capped). */
+  mergeEvents: (items: EventDTO[], omitted?: number) => void;
+  setConnection: (patch: Partial<ConnectionState>) => void;
+  setPendingCommand: (command: PendingCommand | null) => void;
   addCommandRecord: (record: CommandRecord) => void;
+}
+
+function cleared(): Pick<CatState, 'instanceId' | 'service' | 'strategies' | 'bots' | 'risk' | 'positions' | 'summary'
+  | 'events' | 'eventsNextSince' | 'eventsOmitted' | 'pendingCommand' | 'commandHistory' | 'versionMap'> {
+  return {
+    instanceId: null, service: null, strategies: [], bots: [], risk: null, positions: [], summary: null,
+    events: [], eventsNextSince: 0, eventsOmitted: 0, pendingCommand: null, commandHistory: [], versionMap: {},
+  };
 }
 
 export const useCatStore = create<CatState>((set, get) => ({
   activeTab: 'dashboard',
   mode: 'local',
   modeGeneration: 0,
-  activeScenario: 'normal',
   language: (() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('catos_language');
-      if (saved === 'en' || saved === 'zh-TW') return saved;
+      try {
+        const saved = localStorage.getItem('catos_language');
+        if (saved === 'en' || saved === 'zh-TW') return saved;
+      } catch {
+        // storage unavailable
+      }
     }
     return 'zh-TW';
   })(),
-  kpis: null,
-  bots: [],
-  strategies: [],
-  risk: null,
-  telemetry: null,
-  equitySeries: [],
-  researchTasks: [],
-  yaoziAlerts: [],
-  auditLogs: [],
-  pendingCommands: [],
-  commandHistory: [],
-  versionMap: {},
+  ...cleared(),
+  connection: IDLE_CONNECTION,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   setMode: (mode) => set((state) => state.mode === mode ? {} : {
     mode,
     modeGeneration: state.modeGeneration + 1,
-    kpis: null,
-    bots: [],
-    strategies: [],
-    risk: null,
-    telemetry: null,
-    equitySeries: [],
-    researchTasks: [],
-    yaoziAlerts: [],
-    auditLogs: [],
-    pendingCommands: [],
-    commandHistory: [],
-    versionMap: {},
+    connection: IDLE_CONNECTION,
+    ...cleared(),
   }),
-  setScenario: (scenario) => set({ activeScenario: scenario }),
   setLanguage: (lang) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('catos_language', lang);
+      try {
+        localStorage.setItem('catos_language', lang);
+      } catch {
+        // storage unavailable
+      }
     }
     set({ language: lang });
   },
@@ -127,30 +122,35 @@ export const useCatStore = create<CatState>((set, get) => ({
     }
     set((state) => ({
       ...updateFn(state),
-      versionMap: {
-        ...state.versionMap,
-        [domain]: version,
-      },
+      versionMap: { ...state.versionMap, [domain]: version },
     }));
     return true;
   },
 
-  hydrateAll: (payload) => {
-    const v = payload.version ?? Date.now();
-    if (!Number.isSafeInteger(v) || v < 0) return;
-    set((state) => {
-      const update: Partial<CatState> = {};
-      const versionMap: Record<string, number> = { ...state.versionMap, global: Math.max(state.versionMap.global ?? 0, v) };
-      for (const domain of ['kpis', 'bots', 'strategies', 'risk', 'telemetry', 'equitySeries', 'auditLogs'] as const) {
-        if (payload[domain] !== undefined && v >= (state.versionMap[domain] ?? 0)) {
-          Object.assign(update, { [domain]: payload[domain] });
-          versionMap[domain] = v;
-        }
-      }
-      return { ...update, versionMap };
-    });
-  },
+  resetInstance: (instanceId) => set((state) => ({
+    ...cleared(),
+    instanceId,
+    connection: state.connection,
+  })),
 
-  setPendingCommands: (pendingCommands) => set({ pendingCommands }),
-  addCommandRecord: (record) => set((s) => ({ commandHistory: [record, ...s.commandHistory] })),
+  mergeEvents: (items, omitted) => set((state) => {
+    if (items.length === 0 && omitted === undefined) return {};
+    const bySeq = new Map<number, EventDTO>();
+    for (const event of state.events) bySeq.set(event.seq, event);
+    for (const event of items) {
+      if (Number.isSafeInteger(event.seq) && event.seq > 0) bySeq.set(event.seq, event);
+    }
+    const merged = [...bySeq.values()].sort((a, b) => a.seq - b.seq).slice(-MAX_STORED_EVENTS);
+    return {
+      events: merged,
+      eventsNextSince: merged.length ? merged[merged.length - 1].seq : state.eventsNextSince,
+      eventsOmitted: omitted ?? state.eventsOmitted,
+    };
+  }),
+
+  setConnection: (patch) => set((state) => ({ connection: { ...state.connection, ...patch } })),
+  setPendingCommand: (pendingCommand) => set({ pendingCommand }),
+  addCommandRecord: (record) => set((s) => ({
+    commandHistory: [record, ...s.commandHistory.filter((r) => r.request_id !== record.request_id)].slice(0, 50),
+  })),
 }));
