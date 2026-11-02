@@ -99,7 +99,8 @@ async def run_case(directory, run_id, stop, emit, update, source_ok):
             emit("signal", seq=seq, synthetic_time_ms=now_ms,
                 target=None if receipt.target_position is None else str(receipt.target_position),
                 disposition=receipt.disposition, reason=receipt.reason,
-                account=ipc.account_to_wire(view), intent_key=receipt.intent_key)
+                account=ipc.account_to_wire(view), intent_key=receipt.intent_key,
+                mark=str(bar.close), risk_state=supervisor.risk_state.to_wire())
             if receipt.disposition not in ("NO_INTENT", "NO_CHANGE", "RESERVED_SIMULATION"):
                 raise RuntimeError("unexpected_simulation_verdict")
             if receipt.disposition == "RESERVED_SIMULATION":
