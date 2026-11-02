@@ -8,8 +8,7 @@ import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { CommandPalette } from "@/components/catos/command-palette";
-import { TopMarketTicker } from "@/components/catos/top-market-ticker";
-import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { SimulationStatusStrip } from "@/components/catos/simulation-status-strip";
 import { cn } from "@/lib/utils";
 
 
@@ -97,22 +96,6 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
   const { t, language } = useI18n();
 
   const [isResizing, setIsResizing] = useState(false);
-
-  // 啟動全域撮合心跳與資金費率倒數 (1 秒 1 Tick 驅動 10 分鐘真實微觀行情循環帶)
-  const { triggerManualTick, decrementCountdown, isRunning } = useLiveMarketStore();
-  useEffect(() => {
-    if (!isRunning) return;
-    const tickTimer = setInterval(() => {
-      triggerManualTick();
-    }, 1000);
-    const countdownTimer = setInterval(() => {
-      decrementCountdown();
-    }, 1000);
-    return () => {
-      clearInterval(tickTimer);
-      clearInterval(countdownTimer);
-    };
-  }, [isRunning, triggerManualTick, decrementCountdown]);
 
   // 使用 Refs 杜絕閉包陳舊問題，確保拖曳過程中有精確的段落感吸附與切換
   const collapsedRef = useRef(collapsed);
@@ -344,9 +327,9 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
             </div>
           </div>
 
-          {/* 頂部全域行情總線 (Closed Bar 決策倒數 + SWAP 標的即時報價) */}
-          <div className="hidden md:flex items-center gap-2 shrink min-w-0">
-            <TopMarketTicker />
+          {/* 頂部模擬服務狀態列 (v1 無行情來源；輪詢計時器由 stateAdapter 單一持有) */}
+          <div className="hidden md:flex items-center gap-2 shrink min-w-0 overflow-hidden">
+            <SimulationStatusStrip />
           </div>
 
           {/* 右側：工作台卡片庫與核心交易模式切換 */}

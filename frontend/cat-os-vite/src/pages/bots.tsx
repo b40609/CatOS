@@ -1,56 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import {
-  Pause,
-  Play,
-  Plus,
-  RotateCw,
-  Cpu,
-  Layers,
-  ShieldCheck,
-  CheckCircle2,
-  ArrowRight,
-  Clock,
-  Server,
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useEffect } from "react";
+import { Pause, Play, Cpu, Layers, ShieldCheck, Clock, Server } from "lucide-react";
 import { AppShell } from "@/components/catos/shell";
-import { strategies, type Bot } from "@/lib/mock/data";
-import { fmtSigned } from "@/hooks/use-live";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
-import { INSPECTOR_BOTS, useInspectorStore } from "@/state/inspectorStore";
+import { useInspectorStore } from "@/state/inspectorStore";
+import { useCatStore } from "@/state/catStore";
+import { ACTIVE_STATES, type BotViewDTO } from "@/contracts";
+import { ACCOUNT_SOURCE_LABEL, BOT_STATE_LABEL, RISK_STATUS_META, useBotControls } from "@/components/catos/v0-bot-table";
+import { formatClock, formatDateTime, formatDecimal, formatRatioPct, formatTimeframe, shortId, toneOf } from "@/lib/format";
 
 export const Route = createFileRoute("/bots")({
   head: () => ({
     meta: [
       { title: "實例監控 (Fleet) — catOS Quant Terminal" },
-      {
-        name: "description",
-        content: "catOS 實例監控：監控各量化策略實例之運行狀態、合約持倉、延遲與即時損益，一鍵啟停重啟。",
-      },
+      { name: "description", content: "catOS 實例監控：本機模擬 Bot 的 run 狀態、合約持倉、風控期間損益與控制面事件。" },
       { property: "og:title", content: "實例監控 (Fleet) — catOS Quant Terminal" },
-      {
-        property: "og:description",
-        content: "監控各量化策略實例之運行狀態、合約持倉、延遲與即時損益，一鍵啟停重啟。",
-      },
+      { property: "og:description", content: "監控本機模擬策略實例的 run 狀態、合約持倉與風控期間損益。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -58,322 +24,153 @@ export const Route = createFileRoute("/bots")({
   component: BotManagement,
 });
 
-const STATUS_META: Record<Bot["status"], { text: string; dot: string; label: string }> = {
-  running: { text: "text-up", dot: "bg-up", label: "RUNNING" },
-  paused: { text: "text-muted-foreground", dot: "bg-muted-foreground", label: "PAUSED" },
-  error: { text: "text-down", dot: "bg-down", label: "ERROR" },
-};
+type StatusKind = "running" | "stopped" | "error";
 
-const BOT_FLEET: Bot[] = [
-  {
-    id: "tabby",
-    name: "BOT-BTC-15M",
-    strategy: "突破唐奇安 (breakout_v22)",
-    market: "BTC-USDT-SWAP",
-    status: "running",
-    position: "LONG 1.20 BTC",
-    pnlToday: 850.56,
-    uptimeHours: 412,
-    latencyMs: 18,
-  },
-  {
-    id: "calico",
-    name: "BOT-ETH-1H",
-    strategy: "趨勢追蹤 (trend_follow)",
-    market: "ETH-USDT-SWAP",
-    status: "running",
-    position: "LONG 13.50 ETH",
-    pnlToday: 749.25,
-    uptimeHours: 189,
-    latencyMs: 24,
-  },
-  {
-    id: "mochi",
-    name: "BOT-SOL-5M",
-    strategy: "自適應網格 (grid_mm)",
-    market: "SOL-USDT-SWAP",
-    status: "running",
-    position: "LONG 135.0 SOL",
-    pnlToday: 553.50,
-    uptimeHours: 64,
-    latencyMs: 12,
-  },
-  {
-    id: "shiro",
-    name: "BOT-ARB-1H",
-    strategy: "跨所統計套利 (pairs)",
-    market: "ARB-USDT-SWAP",
-    status: "paused",
-    position: "FLAT 0.00",
-    pnlToday: 0.0,
-    uptimeHours: 0,
-    latencyMs: 0,
-  },
-];
-
-function useLiveBots(seed: Bot[]) {
-  const [rows, setRows] = useState(seed);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setRows((prev) =>
-        prev.map((b) =>
-          b.status === "running"
-            ? {
-                ...b,
-                pnlToday: Number((b.pnlToday + (Math.random() - 0.44) * 26).toFixed(2)),
-                latencyMs: Math.max(6, Math.round(b.latencyMs + (Math.random() - 0.5) * 4)),
-              }
-            : b,
-        ),
-      );
-    }, 2400);
-    return () => clearInterval(id);
-  }, []);
-  return [rows, setRows] as const;
+function statusKind(bot: BotViewDTO): StatusKind {
+  if (ACTIVE_STATES.has(bot.state)) return "running";
+  if (bot.state === "failed" || bot.state === "recovery_required") return "error";
+  return "stopped";
 }
 
-function NewBotDialog({ onDeploy }: { onDeploy: (bot: Bot) => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("BOT-AVAX-15M");
-  const [strategyId, setStrategyId] = useState(strategies[0]?.id || "s1");
-  const [market, setMarket] = useState("AVAX-USDT-SWAP");
-  const [budget, setBudget] = useState("50,000 USDT");
+const STATUS_META: Record<StatusKind, { text: string; dot: string }> = {
+  running: { text: "text-up", dot: "bg-up" },
+  stopped: { text: "text-muted-foreground", dot: "bg-muted-foreground" },
+  error: { text: "text-down", dot: "bg-down" },
+};
 
-  const handleDeploy = () => {
-    const selectedStrat = strategies.find((s) => s.id === strategyId) || strategies[0];
-    const newBot: Bot = {
-      id: `bot-${Date.now().toString(36)}`,
-      name,
-      strategy: selectedStrat?.name || "SMA 趨勢追蹤",
-      market,
-      status: "running",
-      position: `0.00 ${market.split("-")[0]}`,
-      pnlToday: 0.0,
-      latencyMs: 18,
-      uptimeHours: 0,
-    };
-    onDeploy(newBot);
-    setOpen(false);
-  };
+function positionText(bot: BotViewDTO) {
+  if (bot.position === null) return "無帳戶觀測";
+  if (/^-?0+(\.0*)?$/.test(bot.position)) return "FLAT 0";
+  const side = bot.position.startsWith("-") ? "SHORT" : "LONG";
+  return `${side} ${formatDecimal(bot.position.replace(/^-/, ""), { digits: 0 })} 張`;
+}
 
+function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button className="num flex items-center gap-1.5 border border-primary/60 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground rounded cursor-pointer">
-          <Plus className="size-3.5" /> 部署新策略實例
-        </button>
-      </DialogTrigger>
-      <DialogContent className="border-border bg-surface max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-mono text-primary text-sm flex items-center gap-2">
-            <Server className="size-4 text-primary" />
-            部署新策略實例 (1 Bot : 1 SWAP)
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            catOS 嚴格規範：單一合約由單一 Bot 獨佔，OKX 專用子帳戶隔離。
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-1">
-          <div className="space-y-1">
-            <Label className="text-t3 font-mono text-muted-foreground">實例代號 (Worker ID)</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="BOT-AVAX-15M"
-              className="font-mono text-xs bg-background h-8"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-t3 font-mono text-muted-foreground">綁定策略模型</Label>
-            <Select value={strategyId} onValueChange={setStrategyId}>
-              <SelectTrigger className="bg-background text-xs h-8 font-mono">
-                <SelectValue placeholder="選擇策略" />
-              </SelectTrigger>
-              <SelectContent className="border-border bg-surface">
-                {strategies.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-xs font-mono">
-                    {s.name} · {s.code} ({s.kind})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-t3 font-mono text-muted-foreground">OKX SWAP 合約代碼</Label>
-              <Input
-                value={market}
-                onChange={(e) => setMarket(e.target.value)}
-                className="font-mono text-xs bg-background h-8"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-t3 font-mono text-muted-foreground">初始保證金預算</Label>
-              <Input
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                className="font-mono text-xs bg-background h-8"
-              />
-            </div>
-          </div>
-          <div className="rounded border border-primary/25 bg-primary/5 p-2.5 text-t3 space-y-1">
-            <div className="flex items-center gap-1.5 text-primary font-medium">
-              <CheckCircle2 className="size-3.5" />
-              <span>Supervisor 強制注入參數</span>
-            </div>
-            <p className="text-muted-foreground font-mono text-t2 pl-5">
-              margin: cross · posMode: net_mode · 唯讀 Worker 無金鑰連線
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <button
-            onClick={handleDeploy}
-            className="w-full border border-primary bg-primary text-primary-foreground font-semibold px-3 py-1.5 text-xs rounded hover:opacity-90 transition-opacity font-mono cursor-pointer"
-          >
-            確認部署並分配獨佔 Worker (本地模擬)
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center justify-between">
+      <span>{label}</span>
+      <span className={cn("font-semibold", tone ?? "text-foreground")}>{value}</span>
+    </div>
   );
 }
 
 function BotManagement() {
-  const [rows, setRows] = useLiveBots(BOT_FLEET);
-  const { selectedBotId: globalSelectedId, selectBot } = useInspectorStore();
-  const [selectedBotId, setSelectedBotId] = useState<string>(globalSelectedId || "tabby");
+  const bots = useCatStore((s) => s.bots);
+  const risk = useCatStore((s) => s.risk);
+  const summary = useCatStore((s) => s.summary);
+  const strategies = useCatStore((s) => s.strategies);
+  const connection = useCatStore((s) => s.connection);
+  const mode = useCatStore((s) => s.mode);
+  const { selectedBotId, selectBot } = useInspectorStore();
+  const controls = useBotControls();
 
-  const handleSelect = (id: string) => {
-    setSelectedBotId(id);
-    selectBot(id);
-  };
+  useEffect(() => {
+    if (bots.length > 0 && !bots.some((b) => b.bot_id === selectedBotId)) selectBot(bots[0].bot_id);
+  }, [bots, selectedBotId, selectBot]);
 
-  const set = (id: string, status: Bot["status"]) =>
-    setRows((prev) =>
-      prev.map((b) =>
-        b.id === id
-          ? { ...b, status, uptimeHours: status === "running" ? b.uptimeHours : 0 }
-          : b,
-      ),
-    );
+  const totalBots = bots.length;
+  const runningBots = bots.filter((b) => statusKind(b) === "running").length;
+  const stoppedBots = bots.filter((b) => statusKind(b) === "stopped").length;
+  const errorBots = bots.filter((b) => statusKind(b) === "error").length;
 
-  const totalBots = rows.length;
-  const runningBots = rows.filter((b) => b.status === "running").length;
-  const pausedBots = rows.filter((b) => b.status === "paused").length;
-  const errorBots = rows.filter((b) => b.status === "error").length;
-  const totalPnl = rows.reduce((acc, b) => acc + b.pnlToday, 0);
-  const avgLatency = Math.round(rows.reduce((acc, b) => acc + b.latencyMs, 0) / (totalBots || 1));
+  const selectedBot = bots.find((b) => b.bot_id === selectedBotId) ?? bots[0] ?? null;
+  const botRisk = selectedBot && risk && risk.bot_id === selectedBot.bot_id ? risk : null;
+  const strategy = selectedBot ? strategies.find((s) => s.strategy_id === selectedBot.strategy_id) ?? null : null;
+  const statusMeta = botRisk ? RISK_STATUS_META[botRisk.derived.status] : null;
 
-  const selectedBot = rows.find((b) => b.id === selectedBotId) || rows[0];
-  const inspector = INSPECTOR_BOTS[selectedBot?.id || "tabby"] || INSPECTOR_BOTS.tabby;
+  const emptyText =
+    connection.status === "mode_not_open" ? "此模式未開放（demo/live 不在 v1 範圍）"
+    : connection.status === "unavailable" ? `模擬服務不可用：${connection.detail ?? "unknown"}`
+    : connection.status === "error" ? `無法連線：${connection.detail ?? "network_error"}`
+    : "等待模擬服務…";
 
   return (
     <AppShell>
-      {/* 頂部架構規範與狀態摘要條 */}
+      {/* 頂部摘要條 */}
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded border border-border/80 bg-surface/90 px-3 py-1.5 text-xs font-mono shadow-xs backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <span className="font-mono text-t1 font-bold text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 uppercase tracking-wider">
-            FLEET
-          </span>
+          <span className="font-mono text-t1 font-bold text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.5 uppercase tracking-wider">FLEET</span>
           <span className="text-muted-foreground">總數: <strong className="text-foreground">{totalBots}</strong></span>
           <span className="text-border">|</span>
-          <span className="text-up font-bold flex items-center gap-1"><PulseBeacon size={3.5} variant="up" /> 在線: {runningBots}</span>
+          <span className="text-up font-bold flex items-center gap-1"><PulseBeacon size={3.5} variant="up" /> 運行: {runningBots}</span>
           <span className="text-border">|</span>
-          <span className="text-muted-foreground">暫停: <strong className="text-foreground">{pausedBots}</strong></span>
+          <span className="text-muted-foreground">停止: <strong className="text-foreground">{stoppedBots}</strong></span>
           <span className="text-border">|</span>
           <span className={cn("font-bold", errorBots > 0 ? "text-down" : "text-muted-foreground")}>異常: {errorBots}</span>
           <span className="text-border">|</span>
-          <span className="text-muted-foreground">平均延遲: <strong className="text-primary font-bold">{avgLatency}ms</strong></span>
-          <span className="text-border">|</span>
-          <span className="text-muted-foreground">今日損益: <strong className={cn("font-bold", totalPnl >= 0 ? "text-up" : "text-down")}>{fmtSigned(totalPnl)}</strong></span>
+          <span className="text-muted-foreground">風控期間損益: <strong className={cn("font-bold", toneOf(summary?.period_pnl))}>
+            {formatDecimal(summary?.period_pnl, { sign: true, prefix: "$" })}</strong></span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-t2 text-muted-foreground font-mono hidden md:inline">1 Bot : 1 SWAP (展示資料 · 本地模擬)</span>
-          <NewBotDialog onDeploy={(b) => { setRows((prev) => [b, ...prev]); handleSelect(b.id); }} />
+          <span className="text-t2 text-muted-foreground font-mono hidden md:inline">
+            v1 固定 1 個登錄策略 · 1 Bot : 1 SWAP · {mode === "local" ? "本機模擬" : mode.toUpperCase()}
+          </span>
         </div>
       </div>
 
-      {/* 主體：左側機器人表格 + 右側深層審計面板 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-        {/* 左側：機器人表格 (佔 7 欄) */}
+        {/* 左側：實例陣列 */}
         <div className="lg:col-span-7 rounded-xl border border-border/80 bg-surface/90 overflow-hidden shadow-sm">
           <div className="flex items-center justify-between border-b border-border/80 px-3.5 py-2.5 bg-secondary/30">
             <div className="flex items-center gap-2">
               <Server className="size-4 text-primary" />
               <span className="text-xs font-semibold text-foreground">策略實例陣列 (Strategy Bot Fleet)</span>
             </div>
-            <span className="text-t2 font-mono text-muted-foreground">點選實例檢視完整審計鏈條</span>
+            <span className="text-t2 font-mono text-muted-foreground">點選實例檢視 run 與風控投影</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-border/70 bg-secondary/10">
-                  {["狀態", "實例代號", "綁定策略", "獨佔合約", "當前部位", "今日損益", "延遲", "操作"].map(
-                    (h) => (
-                      <th key={h} className={cn("py-2 text-t2 font-mono uppercase text-muted-foreground font-medium whitespace-nowrap", h === "今日損益" || h === "延遲" ? "px-2" : "px-3")}>
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  {["狀態", "實例代號", "綁定策略", "獨佔合約", "當前部位", "期間損益", "權益", "操作"].map((h) => (
+                    <th key={h} className={cn("py-2 text-t2 font-mono uppercase text-muted-foreground font-medium whitespace-nowrap",
+                      h === "期間損益" || h === "權益" ? "px-2" : "px-3")}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {rows.map((b) => {
-                  const m = STATUS_META[b.status];
-                  const isSelected = b.id === selectedBot?.id;
+                {bots.length === 0 && (
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground font-mono">{emptyText}</td></tr>
+                )}
+                {bots.map((b) => {
+                  const kind = statusKind(b);
+                  const m = STATUS_META[kind];
+                  const isSelected = b.bot_id === selectedBot?.bot_id;
+                  const r = risk && risk.bot_id === b.bot_id ? risk : null;
                   return (
-                    <tr
-                      key={b.id}
-                      onClick={() => handleSelect(b.id)}
-                      className={cn(
-                        "cursor-pointer transition-colors",
-                        isSelected
-                          ? "bg-secondary/60"
-                          : "hover:bg-secondary/40",
-                      )}
-                    >
+                    <tr key={b.bot_id} onClick={() => selectBot(b.bot_id)}
+                        className={cn("cursor-pointer transition-colors", isSelected ? "bg-secondary/60" : "hover:bg-secondary/40")}>
                       <td className="px-3 py-2.5">
                         <span className="flex items-center gap-1.5">
-                          {b.status === "running" ? (
-                            <PulseBeacon size={4} variant="up" />
-                          ) : (
-                            <span className={cn("size-1.5 rounded-full", m.dot)} />
-                          )}
-                          <span className={cn("font-mono text-t2 font-bold", m.text)}>{m.label}</span>
+                          {kind === "running" ? <PulseBeacon size={4} variant="up" /> : <span className={cn("size-1.5 rounded-full", m.dot)} />}
+                          <span className={cn("font-mono text-t2 font-bold uppercase whitespace-nowrap", m.text)}>{b.state}</span>
                         </span>
                       </td>
-                      <td className="font-mono px-3 py-2.5 text-foreground font-bold whitespace-nowrap">{b.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground text-t3">{b.strategy}</td>
-                      <td className="font-mono px-3 py-2.5 text-primary text-t3 font-semibold whitespace-nowrap">{b.market}</td>
-                      <td className="font-mono px-3 py-2.5 text-foreground/90 text-t3 font-medium">{b.position}</td>
-                      <td className={cn("font-mono px-2 py-2.5 font-bold text-t3", b.pnlToday >= 0 ? "text-up" : "text-down")}>
-                        {fmtSigned(b.pnlToday)}
+                      <td className="font-mono px-3 py-2.5 text-foreground font-bold whitespace-nowrap">{b.bot_id}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground text-t3 whitespace-nowrap" title={`${b.strategy_id}@${b.strategy_version}`}>
+                        <span className="block leading-tight">{b.strategy_name}</span>
+                        <span className="block text-t1 font-mono leading-tight">{b.strategy_version}</span>
                       </td>
-                      <td className="font-mono px-2 py-2.5 text-muted-foreground text-t3">{b.latencyMs}ms</td>
+                      <td className="font-mono px-3 py-2.5 text-primary text-t3 font-semibold whitespace-nowrap">{b.inst_id ?? "不適用"} · {formatTimeframe(b.timeframe_ms)}</td>
+                      <td className="font-mono px-3 py-2.5 text-foreground/90 text-t3 font-medium whitespace-nowrap">{positionText(b)}</td>
+                      <td className={cn("font-mono px-2 py-2.5 font-bold text-t3 whitespace-nowrap", toneOf(r?.derived.period_pnl))}>
+                        {formatDecimal(r?.derived.period_pnl, { sign: true, prefix: "$" })}
+                      </td>
+                      <td className="font-mono px-2 py-2.5 text-foreground text-t3 whitespace-nowrap">{formatDecimal(b.equity, { prefix: "$" }, "未啟動")}</td>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <span className="flex items-center gap-1">
-                          <button
-                            title="啟動 Worker"
-                            onClick={() => set(b.id, "running")}
-                            className="rounded border border-border p-1 text-up hover:border-up/60 hover:bg-up/10 transition-colors cursor-pointer"
-                          >
+                          <button title={controls.canStart ? "啟動新 run (POST /bots/start)" : "目前不可啟動"}
+                                  disabled={!controls.canStart || kind === "running" || controls.busy !== null}
+                                  onClick={() => void controls.start(b)}
+                                  className="rounded border border-border p-1 text-up hover:border-up/60 hover:bg-up/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                             <Play className="size-2.5" />
                           </button>
-                          <button
-                            title="暫停決策"
-                            onClick={() => set(b.id, "paused")}
-                            className="rounded border border-border p-1 text-muted-foreground hover:border-primary/60 hover:bg-primary/10 transition-colors cursor-pointer"
-                          >
+                          <button title={controls.canStop ? "完成當前事件後停止 run" : "目前不可停止"}
+                                  disabled={!controls.canStop || kind !== "running" || controls.busy !== null}
+                                  onClick={() => void controls.stop(b)}
+                                  className="rounded border border-border p-1 text-muted-foreground hover:border-primary/60 hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
                             <Pause className="size-2.5" />
-                          </button>
-                          <button
-                            title="重啟進程"
-                            onClick={() => set(b.id, "running")}
-                            className="rounded border border-border p-1 text-primary hover:border-primary/60 hover:bg-primary/10 transition-colors cursor-pointer"
-                          >
-                            <RotateCw className="size-2.5" />
                           </button>
                         </span>
                       </td>
@@ -383,155 +180,139 @@ function BotManagement() {
               </tbody>
             </table>
           </div>
+          {controls.error && (
+            <div className="px-3 py-1.5 text-t1 font-mono text-rose-400 border-t border-border/60">命令失敗：{controls.error}</div>
+          )}
         </div>
 
-        {/* 右側：選中實例之深度管線與審計面板 (佔 5 欄) */}
+        {/* 右側：選中實例之 run、風控與保護投影 */}
         {selectedBot && (
           <div className="lg:col-span-5 rounded-xl border border-border/80 bg-surface/90 p-3.5 space-y-3 shadow-sm">
-            
-            {/* 1. 實例標頭與即時狀態 */}
             <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
               <div className="flex items-center gap-2">
                 <Cpu className="size-4 text-primary" />
                 <div>
-                  <h3 className="text-xs font-bold font-mono text-foreground">{selectedBot.name}</h3>
-                  <p className="text-t2 text-muted-foreground font-mono">{selectedBot.market} · {selectedBot.strategy}</p>
+                  <h3 className="text-xs font-bold font-mono text-foreground">{selectedBot.bot_id}</h3>
+                  <p className="text-t2 text-muted-foreground font-mono">{selectedBot.inst_id ?? "不適用"} · {selectedBot.strategy_name}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className={cn("px-2 py-0.5 rounded text-t2 font-mono font-bold uppercase", STATUS_META[selectedBot.status].text, "bg-secondary")}>
-                  {selectedBot.status}
-                </span>
-              </div>
+              <span className={cn("px-2 py-0.5 rounded text-t2 font-mono font-bold uppercase bg-secondary", STATUS_META[statusKind(selectedBot)].text)}>
+                {BOT_STATE_LABEL[selectedBot.state] ?? selectedBot.state}
+              </span>
             </div>
 
-            {/* 2. 即時策略意圖與觸發標尺 */}
+            {/* 最近決策 */}
             <div className="rounded border border-border/70 bg-secondary/40 p-2.5 space-y-1.5 font-mono text-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.2 rounded bg-primary/15 text-primary text-t1 font-bold border border-primary/25">
-                    即時意圖
-                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-primary/15 text-primary text-t1 font-bold border border-primary/25">最近決策</span>
                   <span className="font-bold text-foreground text-t3">
-                    {inspector.intentSummary}
+                    {selectedBot.last_disposition ?? "尚無 signal"}{selectedBot.last_reason ? ` · ${selectedBot.last_reason}` : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-t1 text-muted-foreground">
                   <Clock className="size-3 text-primary/80" />
-                  <span>下次評估:</span>
-                  <span className="text-foreground font-semibold">{inspector.nextEvalCountdown ?? "15m 收盤"}</span>
+                  <span>合成時間:</span>
+                  <span className="text-foreground font-semibold">{formatClock(selectedBot.last_synthetic_time_ms)}</span>
                 </div>
               </div>
-
-              {inspector.lowerExitPrice && inspector.lowerExitPrice !== "—" && (
-                <div className="flex items-center gap-1.5 text-t1 text-muted-foreground pt-0.5">
-                  <span className="text-rose-400 font-semibold">[平倉下軌 {inspector.lowerExitPrice}]</span>
-                  <span className="text-border">──────</span>
-                  <span className="text-primary font-bold">(現價 {inspector.markPrice} · 續抱)</span>
-                  <span className="text-border">──────</span>
-                  <span className="text-emerald-400 font-semibold">[加倉上軌 {inspector.upperAddPrice}]</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3 text-t1 text-muted-foreground pt-0.5">
+                <span>bars <strong className="text-foreground">{selectedBot.bars}</strong> / 預熱 <strong className="text-foreground">{selectedBot.warmup_bars}</strong></span>
+                <span>成交 <strong className="text-foreground">{selectedBot.fills}</strong></span>
+                <span>部位 <strong className="text-foreground">{positionText(selectedBot)}</strong></span>
+                <span>mark <strong className="text-foreground">{formatDecimal(selectedBot.mark, { prefix: "$" })}</strong></span>
+              </div>
             </div>
 
-            {/* 3. 五階段執行鏈條 (Pipeline Trace) */}
+            {/* run 資訊 */}
             <div className="rounded border border-border/70 bg-secondary/30 p-2.5 space-y-2">
               <div className="flex items-center justify-between text-t2 font-bold text-muted-foreground uppercase">
-                <div className="flex items-center gap-1.5">
-                  <Layers className="size-3.5 text-primary" />
-                  <span>五階段執行鏈條 (Pipeline Trace)</span>
-                </div>
-                <span className="text-t1 font-mono text-primary font-semibold">
-                  {inspector.traceLatency ?? "總延遲 48ms (OKX 28ms · 本地 20ms)"}
+                <div className="flex items-center gap-1.5"><Layers className="size-3.5 text-primary" /><span>本次 run</span></div>
+                <span className="text-t1 font-mono text-primary font-semibold" title={selectedBot.current_run_id ?? undefined}>
+                  {selectedBot.current_run_id ? `run ${shortId(selectedBot.current_run_id)}` : "無 run"} · 共 {selectedBot.run_count} 次
                 </span>
               </div>
-
-              {/* 橫向緊湊流向指示器 */}
-              <div className="flex items-center justify-between gap-1 p-1.5 rounded bg-background/50 border border-border/60 overflow-x-auto">
-                {inspector.stages.map((stage, idx) => (
-                  <div key={stage.name} className="flex items-center gap-1 shrink-0">
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-t1 font-mono font-medium bg-emerald-400/10 border border-emerald-400/25 text-emerald-300">
-                      <span>0{idx + 1}</span>
-                      <span>{stage.name}</span>
-                      <CheckCircle2 className="size-2.5 text-emerald-400" />
-                    </div>
-                    {idx < inspector.stages.length - 1 && (
-                      <ArrowRight className="size-2.5 text-muted-foreground/60 shrink-0" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* 五階段具體依據清單 */}
-              <div className="space-y-1.5 text-t2 font-mono leading-tight pt-1">
-                {inspector.stages.map((stage, idx) => (
-                  <div key={stage.name} className="flex items-baseline justify-between border-b border-border/30 pb-1">
-                    <span className="text-muted-foreground shrink-0 w-24">0{idx + 1} {stage.name}</span>
-                    <span className="text-foreground/90 font-medium text-right truncate">
-                      {stage.detail}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-1 text-t1 text-muted-foreground font-mono">
+                <Row label="建立" value={formatDateTime(selectedBot.run_created_at_ms)} />
+                <Row label="結束" value={formatDateTime(selectedBot.finished_at_ms)} />
+                <Row label="Worker PID" value={selectedBot.worker_pid === null ? "不適用" : String(selectedBot.worker_pid)} />
+                <Row label="帳戶來源" value={selectedBot.account_source ? ACCOUNT_SOURCE_LABEL[selectedBot.account_source] : "無帳戶觀測"} />
+                <Row label="權益" value={formatDecimal(selectedBot.equity, { prefix: "$" }, "未啟動")} />
+                <Row label="已實現 / 未實現" value={`${formatDecimal(selectedBot.realized_pnl, { sign: true }, "不適用")} / ${formatDecimal(selectedBot.unrealized_pnl, { sign: true }, "不適用")}`} />
+                <Row label="手續費" value={formatDecimal(selectedBot.fees, { digits: 4 }, "不適用")} />
+                <Row label="終態帶倉 (僅顯示)" value={selectedBot.ownership_retained ? "是" : "否"} tone={selectedBot.ownership_retained ? "text-amber-400" : undefined} />
+                <Row label="錯誤" value={selectedBot.error ?? "無"} tone={selectedBot.error ? "text-rose-400" : undefined} />
+                <Row label="製品雜湊" value={shortId(selectedBot.artifact_hash, 12)} />
+                {strategy && <Row label="參數" value={JSON.stringify(selectedBot.parameters)} />}
               </div>
             </div>
 
-            {/* 4. 交易所停損保護與 OKX 委託憑證 */}
+            {/* 風控投影 */}
             <div className="rounded border border-border/70 bg-secondary/30 p-2.5 space-y-2 font-mono">
               <div className="flex items-center justify-between text-t2 font-bold text-muted-foreground uppercase">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="size-3.5 text-primary" />
-                  <span>交易所端硬停損 (OKX 條件單)</span>
-                </div>
-                <span className="px-1.5 py-0.2 rounded text-t1 font-bold bg-emerald-400/10 text-emerald-400 border border-emerald-400/30">
-                  生效防護中
-                </span>
+                <div className="flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-primary" /><span>帳戶風控 (R1 合成基準)</span></div>
+                {statusMeta ? (
+                  <span className={cn("px-1.5 py-0.2 rounded text-t1 font-bold border", statusMeta.className)}>
+                    {statusMeta.label} · {botRisk?.derived.can_increase ? "可增倉" : "禁增倉"}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.2 rounded text-t1 font-bold bg-zinc-400/10 text-zinc-300 border border-zinc-400/30">尚無觀測</span>
+                )}
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-t2">
-                <div className="p-2 rounded bg-background/60 border border-border/60">
-                  <span className="text-t1 text-muted-foreground block">觸發停損價</span>
-                  <span className="text-t4 font-bold text-foreground block">{inspector.p6StopPrice}</span>
-                  <span className="text-t1 text-emerald-400 block">{inspector.p6DistPct} (距 Mark 價)</span>
-                </div>
-                <div className="p-2 rounded bg-background/60 border border-border/60">
-                  <span className="text-t1 text-muted-foreground block">交易所委託憑證</span>
-                  <span className="text-t2 font-semibold text-primary block truncate">{inspector.algoOrderId ?? "algo_41cb_948201"}</span>
-                  <span className="text-t1 text-muted-foreground block">成本: {inspector.costBasis ?? inspector.entryPrice}</span>
-                </div>
+              {botRisk ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-t2">
+                    <div className="p-2 rounded bg-background/60 border border-border/60">
+                      <span className="text-t1 text-muted-foreground block">風控期間損益</span>
+                      <span className={cn("text-t4 font-bold block", toneOf(botRisk.derived.period_pnl))}>{formatDecimal(botRisk.derived.period_pnl, { sign: true, prefix: "$" })}</span>
+                      <span className="text-t1 text-muted-foreground block">{formatRatioPct(botRisk.derived.period_pnl_ratio)} · 基準 {formatDecimal(botRisk.basis?.equity, { prefix: "$" })}</span>
+                    </div>
+                    <div className="p-2 rounded bg-background/60 border border-border/60">
+                      <span className="text-t1 text-muted-foreground block">有效槓桿</span>
+                      <span className="text-t4 font-bold text-foreground block">{formatDecimal(botRisk.derived.effective_leverage, { digits: 2 })}x</span>
+                      <span className="text-t1 text-muted-foreground block">上限 {formatDecimal(botRisk.limits.leverage, { digits: 1 })}x · 單幣 {formatRatioPct(botRisk.limits.symbol_share, { sign: false })}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-t1 text-muted-foreground border-t border-border/40 pt-1.5">
+                    <Row label="名目曝險 / 總預算" value={`${formatDecimal(botRisk.derived.notional, { prefix: "$" })} / ${formatDecimal(botRisk.derived.exposure_budget, { prefix: "$" })}`} />
+                    <Row label="單幣預算上限" value={formatDecimal(botRisk.derived.symbol_budget, { prefix: "$" })} />
+                    <Row label="mode / health / phase" value={`${botRisk.mode} / ${botRisk.health} / ${botRisk.phase}`} />
+                    <Row label="鎖存原因" value={botRisk.reasons.length ? botRisk.reasons.join(", ") : "無"} tone={botRisk.reasons.length ? "text-amber-400" : undefined} />
+                    <Row label="Soft / Hard 日損門檻" value={`${formatRatioPct(botRisk.limits.soft_loss, { sign: false })} / ${formatRatioPct(botRisk.limits.hard_loss, { sign: false })}`} />
+                    <Row label="基準起算 (合成)" value={botRisk.basis ? formatDateTime(botRisk.basis.period_start_ms) : "尚無基準"} />
+                    <Row label="觀測時點" value={`seq ${botRisk.seq} · ${formatClock(botRisk.time_ms)}`} />
+                  </div>
+                </>
+              ) : (
+                <p className="text-t2 text-muted-foreground">啟動模擬 run 後，此處顯示每根已收盤 K 線的風控觀測。</p>
+              )}
+              <div className="flex items-center justify-between text-t1 text-muted-foreground border-t border-border/40 pt-1.5">
+                <span>交易所端停損 (P6)</span>
+                <span className="text-zinc-300 font-semibold" title="protection = null：v1 local-sim 未配置 P6 保護">未啟用</span>
               </div>
-
-              <div className="space-y-1 text-t1 text-muted-foreground border-t border-border/40 pt-1.5">
-                <div className="flex items-center justify-between">
-                  <span>單幣預算占用:</span>
-                  <span className="text-foreground font-semibold">{inspector.p6BudgetPct}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>剩餘加倉額度:</span>
-                  <span className="text-emerald-400 font-semibold">{inspector.remainingQuota ?? "$30,205 USDT"}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>日損鎖存狀態:</span>
-                  <span className="text-up font-semibold">NORMAL (未觸發 10% 軟鎖存)</span>
-                </div>
+              <div className="flex items-center justify-between text-t1 text-muted-foreground">
+                <span>Kill Switch / 人工 re-arm</span>
+                <span className="text-zinc-300 font-semibold" title="v1 不暴露 kill-switch / re-arm / 門檻修改 HTTP">未接線</span>
               </div>
             </div>
 
-            {/* 5. 快速控制按鈕 */}
             <div className="flex gap-2 pt-1 font-mono">
-              <button
-                onClick={() => set(selectedBot.id, selectedBot.status === "running" ? "paused" : "running")}
-                className="flex-1 rounded border border-border/80 bg-secondary/60 hover:bg-secondary py-1.5 text-xs font-semibold text-foreground transition-colors cursor-pointer"
-              >
-                {selectedBot.status === "running" ? "暫停決策" : "恢復運行"}
-              </button>
-              <button
-                onClick={() => set(selectedBot.id, "running")}
-                className="flex-1 rounded border border-primary/50 bg-primary/10 hover:bg-primary/20 py-1.5 text-xs font-semibold text-primary transition-colors cursor-pointer"
-              >
-                重啟 Worker
+              {statusKind(selectedBot) === "running" ? (
+                <button disabled={!controls.canStop || controls.busy !== null} onClick={() => void controls.stop(selectedBot)}
+                        className="flex-1 rounded border border-border/80 bg-secondary/60 hover:bg-secondary py-1.5 text-xs font-semibold text-foreground transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                  {controls.busy ? "送出中…" : "暫停 (完成當前事件後停止)"}
+                </button>
+              ) : (
+                <button disabled={!controls.canStart || controls.busy !== null} onClick={() => void controls.start(selectedBot)}
+                        className="flex-1 rounded border border-primary/50 bg-primary/10 hover:bg-primary/20 py-1.5 text-xs font-semibold text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                  {controls.busy ? "送出中…" : "恢復運行 (啟動新 run)"}
+                </button>
+              )}
+              <button disabled title="v1 無重啟端點；停止後再啟動即為新 run"
+                      className="flex-1 rounded border border-border/60 bg-secondary/30 py-1.5 text-xs font-semibold text-muted-foreground cursor-not-allowed">
+                重啟 Worker · 未接線
               </button>
             </div>
-
           </div>
         )}
       </div>

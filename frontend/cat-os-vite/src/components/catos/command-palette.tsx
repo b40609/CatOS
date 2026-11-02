@@ -25,6 +25,10 @@ import {
 } from "lucide-react";
 import { useLayoutStore, type LayoutPresetId } from "@/state/layoutStore";
 import { useInspectorStore } from "@/state/inspectorStore";
+import { useCatStore } from "@/state/catStore";
+import { ACTIVE_STATES } from "@/contracts";
+import { formatTimeframe } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export function CommandPalette() {
@@ -32,6 +36,7 @@ export function CommandPalette() {
   const { navigate } = useRouter();
   const { applyLayoutPreset } = useLayoutStore();
   const { selectBot } = useInspectorStore();
+  const bots = useCatStore((s) => s.bots);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -129,22 +134,18 @@ export function CommandPalette() {
 
         {/* 4. 機器人聚焦 */}
         <CommandGroup heading="策略機器人目標聚焦 (Bots)">
-          <CommandItem onSelect={() => handleSelectBot("tabby")} className="cursor-pointer">
-            <Bot className="mr-2 size-4 text-emerald-400" />
-            <span>tabby-btc-trend (BTC-USDT-SWAP · 1h)</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleSelectBot("calico")} className="cursor-pointer">
-            <Bot className="mr-2 size-4 text-emerald-400" />
-            <span>calico-eth-pullback (ETH-USDT-SWAP · 15m)</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleSelectBot("mochi")} className="cursor-pointer">
-            <Bot className="mr-2 size-4 text-amber-400" />
-            <span>mochi-sol-breakout (SOL-USDT-SWAP · 5m · 停損更新待確認)</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleSelectBot("shiro")} className="cursor-pointer">
-            <Bot className="mr-2 size-4 text-muted-foreground" />
-            <span>shiro-arbitrage (BTC-USDT-SWAP · 1m · 已暫停)</span>
-          </CommandItem>
+          {bots.length === 0 && (
+            <CommandItem disabled className="text-muted-foreground">
+              <Bot className="mr-2 size-4 text-muted-foreground" />
+              <span>尚未取得模擬服務的 Bot 清單</span>
+            </CommandItem>
+          )}
+          {bots.map((bot) => (
+            <CommandItem key={bot.bot_id} onSelect={() => handleSelectBot(bot.bot_id)} className="cursor-pointer">
+              <Bot className={cn("mr-2 size-4", ACTIVE_STATES.has(bot.state) ? "text-emerald-400" : "text-muted-foreground")} />
+              <span>{bot.bot_id} ({bot.inst_id ?? "不適用"} · {formatTimeframe(bot.timeframe_ms)} · {bot.state})</span>
+            </CommandItem>
+          ))}
         </CommandGroup>
 
         <CommandSeparator />
