@@ -1,6 +1,6 @@
 # v1 模擬工作區 HTTP 契約草案（Simulation Workspace API）
 
-狀態：**已核准（2026-11-03，作者對第 6 節 Q1–Q11 全部採「建議」欄定案）；第 3 步後端端點已實作，見第 8 節；第 4 步前端未開始。** 草案日期 2026-11-02（分支 `feat/v1-simulation-api`），實作分支 `feat/v1-simulation-endpoints`。第 1～7 節保留草案原文作為定案依據；實作與草案不一致處以第 8 節為準。
+狀態：**已核准（2026-11-03，作者對第 6 節 Q1–Q11 全部採「建議」欄定案）；第 3 步後端端點已實作，見第 8 節；第 4 步前端 real adapter 與元件接線已實作（分支 `feat/v1-simulation-frontend`），見第 9 節。** 草案日期 2026-11-02（分支 `feat/v1-simulation-api`），實作分支 `feat/v1-simulation-endpoints`。第 1～7 節保留草案原文作為定案依據；實作與草案不一致處以第 8 節為準。
 
 目的：讓前端主工作區（戰情台 KPI、Bot 表、風控卡、持倉表、事件流水、bots 頁）從 `mock-adapter` 換成真資料。v1 只接本機模擬（local-sim），不接 Demo／Live，不碰憑證，不新增交易出口。本文件只定契約；端點與 adapter 程式分別屬第 3、4 步。
 
@@ -383,3 +383,13 @@ v1 規則：
 ### 8.2 自測
 
 隔離 `tempfile` 資料根，不碰正式 8770／`outputs/local-sim-control`：`tests/test_simulation_workspace_api.py`（14 個：投影、游標分頁、重啟序號接續、舊記錄相容、unavailable、真 runner 完整案例核對 Q5 欄位與最終帳戶、TestClient 守門／冪等／409／422／503／既有路由契約）與既有 `tests/test_local_sim_control.py`（28 個）。注意：本機 `core.autocrlf=true` 會讓 `examples/closed_bar_demo.py`／`catos/research_strategy.py` 以 CRLF 簽出，`APPROVED_STRATEGY_SHA256` 不符而使所有真 runner 案例失敗；本輪在此 checkout 以 repo-local `core.autocrlf=false` 重新簽出兩檔後才取得綠燈，建議另案加 `.gitattributes` 固定 LF。
+
+## 9. 第 4 步實作紀錄（2026-11-03，分支 `feat/v1-simulation-frontend`）
+
+前端目錄 `frontend/cat-os-vite`。新增 `src/adapters/simulation-api-adapter.ts`（沿用 research adapter 的 `ResearchApiError`／`handleResponse` 語義與四條不變量；補 `X-CatOS-Instance`、`request_id`、送出前存 sessionStorage 的 `PendingCommand`；demo／live 不發請求，讀回 `{available:false, reason:"mode_not_open"}`，寫拒 403 `mode_not_available`）、`src/lib/format.ts`（Decimal 字串以字串算術格式化；`toPlotNumber` 為唯一的浮點轉換，只供圖表幾何）、`src/components/catos/simulation-status-strip.tsx`（取代頂部行情帶）。`catStore` slice 改為 `service/strategies/bots/risk/positions/summary/events`，`stateAdapter` 以 `/state?since_version` 輪詢（active 1 s、idle 5 s、`document.hidden` 暫停，單一計時器），依 `domains` 逐 slice 套用版本守門，`instance_id` 改變即清空。六個戰情台元件、`pages/bots.tsx`、`command-palette` 改讀 store；刪除 `mock-adapter`、`liveMarketStore`、`market-tape-10m`、`v0-engine`、`dashboard-demo-store`、`top-market-ticker`、`botLensStore`、`validator`、`unified-events`、`default-data`、`bot-monitor-table`、`position-protection-table`、`number-ticker`、`ui/select` 與 `@radix-ui/react-select`。
+
+與第 2／5／7 節不同之處：
+- 權益卡的 BTC／ETH／SOL 策略焦點與多策略對比（bot lens）整組移除：v1 固定單一 Bot，鏡頭無對象；週期切換（24H／7D／30D）亦移除，曲線固定為本次 run 的 `signal.account.equity` 序列（合成時間軸）。
+- 甜甜圈「佔預算 x%」與進度條比例、權益曲線座標、sparkline 由 `toPlotNumber` 以浮點計算（幾何／標註），金額文字一律來自後端字串；後端未提供曝險占比欄位，若要避免前端換算需另加 `exposure_ratio`。
+- 「保證金佔用」分頁標示不適用（無保證金模型），僅顯示 `margin_ok` 布林事實；持倉表的 ROE／資金費率／強平／P6 欄顯示「不適用／未啟用」，平倉與重啟按鈕停用並標「未接線」。
+- 自測：`npm test`（check:tokens＋10 個單元測試）、`tsc --noEmit`、`npm run build` 零錯誤；新增 `tests/simulation_integration_test.mjs`（隔離 18870 真 runner＋18890 Vite proxy＋headless Chrome DOM 檢查與截圖；`tests/integration_http_fixture.py` 加第三個參數 `real`）。既有 `tests/integration_baseline_test.mjs` 需要 playwright（本機未安裝），且其最後兩個戰情台檢查在本輪前即引用不存在的 `展示環境模式切換` 選擇器，本輪未改。
