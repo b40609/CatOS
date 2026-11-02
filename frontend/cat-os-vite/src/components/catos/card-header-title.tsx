@@ -21,7 +21,7 @@ export function CardHeaderTitle({
 }: CardHeaderTitleProps) {
   return (
     <div className={cn("flex items-center gap-1.5 py-0.5 min-w-0 shrink-0 select-none whitespace-nowrap", className)}>
-      <span className="text-[12px] font-semibold text-foreground tracking-tight select-none truncate whitespace-nowrap">
+      <span className="text-t4 font-semibold text-foreground tracking-tight select-none truncate whitespace-nowrap">
         {title}
       </span>
       {subtext}

@@ -156,9 +156,9 @@ function StrategyReviewPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold tracking-tight text-up">+34.80%</span>
-              <span className="text-[11px] font-mono text-muted-foreground">年化 42.15%</span>
+              <span className="text-t3 font-mono text-muted-foreground">年化 42.15%</span>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">
+            <p className="mt-1 text-t2 text-muted-foreground/80">
               實盤淨值：12,483,920.00 USDT
             </p>
           </div>
@@ -175,11 +175,11 @@ function StrategyReviewPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold tracking-tight text-down">-3.82%</span>
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-400">
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-t2 font-mono font-medium text-emerald-400">
                 低風險
               </span>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">
+            <p className="mt-1 text-t2 text-muted-foreground/80">
               風控警戒線：-10.00% · 距閾值 6.18%
             </p>
           </div>
@@ -196,9 +196,9 @@ function StrategyReviewPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold tracking-tight text-foreground">2.45</span>
-              <span className="text-[11px] font-mono text-primary font-medium">優於 92% 策略</span>
+              <span className="text-t3 font-mono text-primary font-medium">優於 92% 策略</span>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">
+            <p className="mt-1 text-t2 text-muted-foreground/80">
               基準無風險利率：4.25% (USDT)
             </p>
           </div>
@@ -215,9 +215,9 @@ function StrategyReviewPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-2xl font-bold tracking-tight text-foreground">3.26</span>
-              <span className="text-[11px] font-mono text-muted-foreground">損益比 2.18</span>
+              <span className="text-t3 font-mono text-muted-foreground">損益比 2.18</span>
             </div>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">
+            <p className="mt-1 text-t2 text-muted-foreground/80">
               勝率：68.4% · 平均修復週期 3.5 天
             </p>
           </div>
@@ -233,7 +233,7 @@ function StrategyReviewPage() {
                   {language === "zh-TW" ? "策略累積淨值與水下回撤分析 (Underwater Analysis)" : "Equity & Underwater Drawdown"}
                 </span>
               </span>
-              <span className="text-[11px] font-normal text-muted-foreground/75 hidden md:inline">
+              <span className="text-t3 font-normal text-muted-foreground/75 hidden md:inline">
                 {language === "zh-TW" ? "上軸為策略收益率，下軸為回撤深度與修復水線" : "Top: Cumulative Return; Bottom: Underwater Drawdown"}
               </span>
             </div>
@@ -248,7 +248,7 @@ function StrategyReviewPage() {
                   aria-pressed={range === r}
                   onClick={() => setRange(r)}
                   className={cn(
-                    "h-6 rounded px-2.5 num text-[10.5px] transition-all",
+                    "h-6 rounded px-2.5 num text-t2 transition-all",
                     range === r ? "bg-secondary text-foreground font-semibold shadow-xs" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -270,7 +270,7 @@ function StrategyReviewPage() {
                 <span className="text-down">{language === "zh-TW" ? "水下回撤深度 (Underwater DD %)" : "Drawdown %"}</span>
               </span>
             </div>
-            <div className="font-mono text-[11px] text-muted-foreground">
+            <div className="font-mono text-t3 text-muted-foreground">
               最大回撤閾值: <span className="text-down font-bold">-10.00%</span>
             </div>
           </div>
@@ -344,7 +344,7 @@ function StrategyReviewPage() {
                     const d = payload[0].payload;
                     return (
                       <div className="rounded-xl border border-border/80 bg-popover/95 p-3 shadow-2xl backdrop-blur-xl space-y-1">
-                        <p className="font-mono text-[10px] text-muted-foreground">{d.dateStr}</p>
+                        <p className="font-mono text-t2 text-muted-foreground">{d.dateStr}</p>
                         <div className="flex items-center justify-between gap-4 font-mono text-xs">
                           <span className="text-muted-foreground">{language === "zh-TW" ? "累積收益" : "Return"}:</span>
                           <span className="font-bold text-up">+{d.returnPct}%</span>
@@ -353,7 +353,7 @@ function StrategyReviewPage() {
                           <span className="text-muted-foreground">{language === "zh-TW" ? "水下回撤" : "Drawdown"}:</span>
                           <span className="font-bold text-down">{d.drawdown}%</span>
                         </div>
-                        <div className="flex items-center justify-between gap-4 font-mono text-[11px] pt-1 border-t border-border/40">
+                        <div className="flex items-center justify-between gap-4 font-mono text-t3 pt-1 border-t border-border/40">
                           <span className="text-muted-foreground">淨值:</span>
                           <span className="text-foreground">{fmtMoney(d.equity)} USDT</span>
                         </div>
@@ -403,7 +403,7 @@ function StrategyReviewPage() {
           >
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="border-b border-border/60 text-[10px] text-muted-foreground font-mono">
+                <thead className="border-b border-border/60 text-t2 text-muted-foreground font-mono">
                   <tr>
                     <th className="py-2 pl-1">回撤區間</th>
                     <th className="py-2 text-right">最大深度</th>
@@ -412,7 +412,7 @@ function StrategyReviewPage() {
                     <th className="py-2 pr-1 text-right">狀態</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40 font-mono text-[11px]">
+                <tbody className="divide-y divide-border/40 font-mono text-t3">
                   {DRAWDOWN_EVENTS.map((ev) => (
                     <tr key={ev.id} className="hover:bg-secondary/20 transition-colors">
                       <td className="py-2.5 pl-1 text-foreground/90 font-medium">
@@ -428,7 +428,7 @@ function StrategyReviewPage() {
                         {ev.recoveryDays} 天
                       </td>
                       <td className="py-2.5 pr-1 text-right">
-                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-emerald-400">
+                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-t1 font-medium text-emerald-400">
                           已修復
                         </span>
                       </td>
@@ -454,7 +454,7 @@ function StrategyReviewPage() {
                   key={m.month}
                   className="rounded-xl border border-border/60 bg-secondary/30 p-2.5 text-center transition-all hover:bg-secondary/60"
                 >
-                  <span className="text-[10px] text-muted-foreground block font-sans">{m.month}</span>
+                  <span className="text-t2 text-muted-foreground block font-sans">{m.month}</span>
                   <span
                     className={cn(
                       "text-xs font-bold mt-1 block",
@@ -467,7 +467,7 @@ function StrategyReviewPage() {
               ))}
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-3 text-[11px] text-muted-foreground font-mono">
+            <div className="mt-4 flex items-center justify-between border-t border-border/40 pt-3 text-t3 text-muted-foreground font-mono">
               <span>正收益月份: <strong className="text-up">9 / 10 個月</strong> (90%)</span>
               <span>平均月度回報: <strong className="text-foreground">+3.48%</strong></span>
             </div>

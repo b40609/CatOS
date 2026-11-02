@@ -252,7 +252,7 @@ export function AccountEquityBand({
           <CardHeaderTitle cardId="equity" title="帳戶權益與損益" />
 
           {/* 策略焦點工具列 (Strategy Focus Toolbar) */}
-          <div className="flex items-center gap-0.5 bg-background/70 border border-border/70 rounded p-0.5 text-[9.5px] font-mono shrink-0">
+          <div className="flex items-center gap-0.5 bg-background/70 border border-border/70 rounded p-0.5 text-t1 font-mono shrink-0">
             <button
               type="button"
               onClick={() => setActiveLens("ALL")}
@@ -332,7 +332,7 @@ export function AccountEquityBand({
                   type="button"
                   onClick={() => setPeriod(p)}
                   className={cn(
-                    "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+                    "px-1.5 sm:px-2 py-0.5 text-t2 sm:text-t2 font-mono rounded transition-colors cursor-pointer",
                     period === p
                       ? "bg-secondary text-foreground font-semibold shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
@@ -361,10 +361,10 @@ export function AccountEquityBand({
           {activeLens === "ALL" && (
             <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
+                <span className="text-t2 text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
                   <span>帳戶總權益</span>
                   {!isNarrow && (
-                    <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
+                    <span className="text-t1 text-emerald-400 font-mono flex items-center gap-1">
                       <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
                       即時
                     </span>
@@ -373,7 +373,7 @@ export function AccountEquityBand({
                 <div className={cn("font-mono font-bold text-foreground tracking-tight", isNarrow ? "text-lg" : "text-2xl")}>
                   <NumberTicker value={equity} prefix="$" decimals={2} />
                 </div>
-                <div className={cn("font-mono font-semibold", isNarrow ? "text-[10px]" : "text-[11px]", toneOf(todayPnl))}>
+                <div className={cn("font-mono font-semibold", isNarrow ? "text-t2" : "text-t3", toneOf(todayPnl))}>
                   <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} /> ({todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`})
                 </div>
               </div>
@@ -381,33 +381,33 @@ export function AccountEquityBand({
               {/* 寬版 2x2 矩陣 */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 font-mono">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">今日損益</span>
+                  <span className="text-t2 text-muted-foreground">今日損益</span>
                   <span className={cn("text-xs font-semibold leading-tight", toneOf(todayPnl))}>
                     <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} />
                   </span>
-                  <span className="text-[9.5px] text-muted-foreground">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
+                  <span className="text-t1 text-muted-foreground">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">{period} 損益</span>
+                  <span className="text-t2 text-muted-foreground">{period} 損益</span>
                   <span className={cn("text-xs font-semibold leading-tight", toneOf(periodSum.pnl))}>
                     {formatUsd(periodSum.pnl, true)}
                   </span>
-                  <span className="text-[9.5px] text-muted-foreground">{formatPct(periodSum.ret)}</span>
+                  <span className="text-t1 text-muted-foreground">{formatPct(periodSum.ret)}</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">台北日切 (R1)</span>
+                  <span className="text-t2 text-muted-foreground">台北日切 (R1)</span>
                   <span className="text-xs font-semibold leading-tight text-emerald-400">+$3,092.64</span>
-                  <span className="text-[9.5px] text-muted-foreground">00:00:15 起算</span>
+                  <span className="text-t1 text-muted-foreground">00:00:15 起算</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">已實現損益</span>
+                  <span className="text-t2 text-muted-foreground">已實現損益</span>
                   <span className={cn("text-xs font-semibold leading-tight", toneOf(realized))}>
                     {formatUsd(realized, true)}
                   </span>
-                  <span className="text-[9.5px] text-muted-foreground">OKX 專用子帳戶</span>
+                  <span className="text-t1 text-muted-foreground">OKX 專用子帳戶</span>
                 </div>
               </div>
             </div>
@@ -419,17 +419,17 @@ export function AccountEquityBand({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center justify-between">
                   <span
-                    className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded"
+                    className="text-t1 font-mono font-bold px-1.5 py-0.2 rounded"
                     style={{ backgroundColor: `${selectedBotMeta.color}20`, color: selectedBotMeta.color }}
                   >
                     {selectedBotMeta.name}
                   </span>
-                  <span className="text-[9.5px] text-muted-foreground font-mono">{selectedBotMeta.strat}</span>
+                  <span className="text-t1 text-muted-foreground font-mono">{selectedBotMeta.strat}</span>
                 </div>
                 <div className="font-mono font-bold text-foreground tracking-tight text-xl mt-1">
                   {formatUsd(selectedBotMeta.todayPnl, true)}
                 </div>
-                <div className="font-mono text-[10.5px] text-emerald-400 font-semibold flex items-center gap-1">
+                <div className="font-mono text-t2 text-emerald-400 font-semibold flex items-center gap-1">
                   <span>Alpha 超額:</span>
                   <span>{formatPct(selectedBotMeta.alpha)}</span>
                 </div>
@@ -438,36 +438,36 @@ export function AccountEquityBand({
               {/* 專屬 Bot 2x2 矩陣 */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 font-mono">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">單幣預算佔用</span>
+                  <span className="text-t2 text-muted-foreground">單幣預算佔用</span>
                   <span className="text-xs font-semibold text-foreground leading-tight">{selectedBotMeta.budgetPct}</span>
-                  <span className="text-[9.5px] text-muted-foreground">上限 50.0%</span>
+                  <span className="text-t1 text-muted-foreground">上限 50.0%</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">{period} 報酬率</span>
+                  <span className="text-t2 text-muted-foreground">{period} 報酬率</span>
                   <span className={cn("text-xs font-bold leading-tight", toneOf(selectedBotMeta.periodRet))}>
                     {formatPct(selectedBotMeta.periodRet)}
                   </span>
-                  <span className="text-[9.5px] text-muted-foreground">歸一化回報</span>
+                  <span className="text-t1 text-muted-foreground">歸一化回報</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">名目持倉</span>
+                  <span className="text-t2 text-muted-foreground">名目持倉</span>
                   <span className="text-xs font-semibold text-foreground leading-tight">{selectedBotMeta.notional}</span>
-                  <span className="text-[9.5px] text-muted-foreground">1 Bot : 1 SWAP</span>
+                  <span className="text-t1 text-muted-foreground">1 Bot : 1 SWAP</span>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">交易所強制停損</span>
-                  <span className="text-[10.5px] font-bold text-primary leading-tight">{selectedBotMeta.stopPrice}</span>
-                  <span className="text-[9.5px] text-emerald-400">生效防護中</span>
+                  <span className="text-t2 text-muted-foreground">交易所強制停損</span>
+                  <span className="text-t2 font-bold text-primary leading-tight">{selectedBotMeta.stopPrice}</span>
+                  <span className="text-t1 text-emerald-400">生效防護中</span>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={resetLens}
-                className="mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded bg-secondary/70 hover:bg-secondary text-[10px] font-mono text-muted-foreground hover:text-foreground border border-border/60 transition-colors cursor-pointer"
+                className="mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded bg-secondary/70 hover:bg-secondary text-t2 font-mono text-muted-foreground hover:text-foreground border border-border/60 transition-colors cursor-pointer"
               >
                 <RotateCcw className="size-2.5" />
                 <span>返回帳戶總覽</span>
@@ -479,36 +479,36 @@ export function AccountEquityBand({
           {activeLens === "COMPARE_ALL" && (
             <div className="flex flex-col gap-2">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-primary uppercase font-mono tracking-wider font-bold">
+                <span className="text-t2 text-primary uppercase font-mono tracking-wider font-bold">
                   多策略疊加 · 基準歸一化
                 </span>
                 <div className="font-mono font-bold text-foreground tracking-tight text-lg">3 策略同軸對比</div>
-                <div className="font-mono text-[10px] text-muted-foreground">起算點強制歸零 (0.00%)</div>
+                <div className="font-mono text-t2 text-muted-foreground">起算點強制歸零 (0.00%)</div>
               </div>
 
               <div className="flex flex-col gap-1.5 pt-1.5 border-t border-border/60 font-mono text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[11px]">
+                  <span className="flex items-center gap-1 text-t3">
                     <span className="size-1.5 rounded-full bg-[#7faee2]" />
                     <span className="font-bold text-foreground">BOT-ETH</span>
                   </span>
-                  <span className="text-emerald-400 font-bold text-[11px]">{formatPct(sumETH.ret)}</span>
+                  <span className="text-emerald-400 font-bold text-t3">{formatPct(sumETH.ret)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[11px]">
+                  <span className="flex items-center gap-1 text-t3">
                     <span className="size-1.5 rounded-full bg-[#e8b45e]" />
                     <span className="font-bold text-foreground">BOT-BTC</span>
                   </span>
-                  <span className="text-emerald-400 font-bold text-[11px]">{formatPct(sumBTC.ret)}</span>
+                  <span className="text-emerald-400 font-bold text-t3">{formatPct(sumBTC.ret)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[11px]">
+                  <span className="flex items-center gap-1 text-t3">
                     <span className="size-1.5 rounded-full bg-[#8b8df8]" />
                     <span className="font-bold text-foreground">BOT-SOL</span>
                   </span>
-                  <span className="text-emerald-400 font-bold text-[11px]">{formatPct(sumSOL.ret)}</span>
+                  <span className="text-emerald-400 font-bold text-t3">{formatPct(sumSOL.ret)}</span>
                 </div>
-                <div className="flex items-center justify-between pt-1 border-t border-border/40 text-muted-foreground text-[10px]">
+                <div className="flex items-center justify-between pt-1 border-t border-border/40 text-muted-foreground text-t2">
                   <span>帳戶基準線</span>
                   <span>{formatPct(periodSum.ret)}</span>
                 </div>
@@ -517,7 +517,7 @@ export function AccountEquityBand({
               <button
                 type="button"
                 onClick={resetLens}
-                className="mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded bg-secondary/70 hover:bg-secondary text-[10px] font-mono text-muted-foreground hover:text-foreground border border-border/60 transition-colors cursor-pointer"
+                className="mt-1 flex items-center justify-center gap-1 px-2 py-1 rounded bg-secondary/70 hover:bg-secondary text-t2 font-mono text-muted-foreground hover:text-foreground border border-border/60 transition-colors cursor-pointer"
               >
                 <RotateCcw className="size-2.5" />
                 <span>返回帳戶總覽</span>
@@ -529,7 +529,7 @@ export function AccountEquityBand({
         {/* 右側 SVG 走勢圖 */}
         <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-1.5" : "p-2.5")}>
           {/* 圖表微型 Header / 狀態與圖例 */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground h-5 shrink-0 px-1">
+          <div className="flex items-center justify-between text-t3 font-mono text-muted-foreground h-5 shrink-0 px-1">
             <div className="flex items-center gap-3">
               {activeLens === "ALL" && (
                 <div className="flex items-center gap-1.5">
@@ -574,7 +574,7 @@ export function AccountEquityBand({
                 </div>
               )}
               {activeLens === "COMPARE_ALL" && (
-                <div className="flex items-center gap-2.5 text-[10px]">
+                <div className="flex items-center gap-2.5 text-t2">
                   <span className="text-[#e8b45e] font-semibold flex items-center gap-1">
                     <span className="size-1.5 rounded-full bg-[#e8b45e]" /> BTC
                   </span>
@@ -594,7 +594,7 @@ export function AccountEquityBand({
             {/* 右側懸停動態反饋 */}
             <div>
               {hoverData ? (
-                <span className="text-foreground font-mono text-[10.5px]">
+                <span className="text-foreground font-mono text-t2">
                   [{hoverData.timeStr}]{" "}
                   {activeLens === "ALL" && (
                     <span className="text-primary font-bold">累計報酬: {formatPct(hoverData.accVal)}</span>
@@ -626,7 +626,7 @@ export function AccountEquityBand({
                   )}
                 </span>
               ) : (
-                <span className="text-muted-foreground/60 text-[10px]">游標懸停檢視各時間節點即時收益與 Alpha</span>
+                <span className="text-muted-foreground/60 text-t2">游標懸停檢視各時間節點即時收益與 Alpha</span>
               )}
             </div>
           </div>
@@ -663,7 +663,7 @@ export function AccountEquityBand({
                       x={plotW + 6}
                       y={getY(t) + 3}
                       fill="currentColor"
-                      className={cn("text-[9px] font-mono", t === 0 ? "text-primary font-bold" : "text-muted-foreground/60")}
+                      className={cn("text-t1 font-mono", t === 0 ? "text-primary font-bold" : "text-muted-foreground/60")}
                     >
                       {t > 0 ? `+${t.toFixed(1)}%` : `${t.toFixed(1)}%`}
                     </text>
@@ -682,7 +682,7 @@ export function AccountEquityBand({
                       y={plotH + 13}
                       textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
                       fill="currentColor"
-                      className="text-[9px] font-mono text-muted-foreground/60"
+                      className="text-t1 font-mono text-muted-foreground/60"
                     >
                       {label}
                     </text>

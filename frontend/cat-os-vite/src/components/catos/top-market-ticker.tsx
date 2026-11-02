@@ -104,7 +104,7 @@ export function TopMarketTicker() {
       {klineClockMounted && (
         <div
           className={cn(
-            "group relative flex items-center gap-1.5 h-7 px-2 rounded-md border text-[11px] transition-all bg-surface/80 shadow-2xs",
+            "group relative flex items-center gap-1.5 h-7 px-2 rounded-md border text-t3 transition-all bg-surface/80 shadow-2xs",
             barCountdown.isClosingSoon
               ? "border-amber-500/50 bg-amber-500/10 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)] animate-pulse"
               : "border-border/70 text-foreground"
@@ -125,7 +125,7 @@ export function TopMarketTicker() {
                 type="button"
                 onClick={() => setKlineTimeframe(tf)}
                 className={cn(
-                  "px-1 py-0.2 rounded text-[9.5px] cursor-pointer transition-colors",
+                  "px-1 py-0.2 rounded text-t1 cursor-pointer transition-colors",
                   klineTimeframe === tf
                     ? "bg-secondary text-primary font-bold"
                     : "text-muted-foreground hover:text-foreground"
@@ -138,7 +138,7 @@ export function TopMarketTicker() {
 
           <span
             className={cn(
-              "font-bold tracking-tight text-[11.5px]",
+              "font-bold tracking-tight text-t3",
               barCountdown.isClosingSoon ? "text-amber-400 font-extrabold" : "text-foreground"
             )}
           >
@@ -173,10 +173,10 @@ export function TopMarketTicker() {
           return (
             <div
               key={code}
-              className="group relative flex items-center gap-1.5 h-7 px-2 rounded-md border border-border/60 bg-surface-raised/40 hover:bg-secondary/40 transition-colors text-[10.5px]"
+              className="group relative flex items-center gap-1.5 h-7 px-2 rounded-md border border-border/60 bg-surface-raised/40 hover:bg-secondary/40 transition-colors text-t2"
               title={`${code}-USDT-SWAP 實時標記價 (懸停點擊 × 可快速隱藏)`}
             >
-              <span className="font-bold text-foreground text-[10.5px]">{code}</span>
+              <span className="font-bold text-foreground text-t2 whitespace-nowrap">{code}</span>
               <NumberTicker
                 value={price}
                 decimals={decimals}
@@ -190,7 +190,7 @@ export function TopMarketTicker() {
               />
               <span
                 className={cn(
-                  "inline-flex items-center gap-0.5 text-[9.5px] font-semibold px-1 py-0.1 rounded",
+                  "inline-flex items-center gap-0.5 text-t1 font-semibold px-1 py-0.1 rounded",
                   isUp ? "text-emerald-400 bg-emerald-400/10" : "text-rose-400 bg-rose-400/10"
                 )}
               >

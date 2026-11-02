@@ -86,7 +86,7 @@ function Gauge({
           {suffix}
         </span>
       </div>
-      <p className="num text-[0.65rem] text-muted-foreground font-mono">
+      <p className="num text-t2 text-muted-foreground font-mono">
         限額 {max}
         {suffix}
       </p>
@@ -121,7 +121,7 @@ function RiskManagement() {
         desc="E_risk = E_verified · Asia/Taipei 00:00 風控期間基準 · Soft 10% / Hard 20% 鎖存"
         right={
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground bg-secondary/80 border border-border/80 rounded px-2.5 py-1">
+            <span className="flex items-center gap-1.5 text-t3 font-mono text-muted-foreground bg-secondary/80 border border-border/80 rounded px-2.5 py-1">
               <PulseBeacon size={4} />
               <span>展示資料 · 本地風控模擬</span>
             </span>
@@ -132,7 +132,7 @@ function RiskManagement() {
       {/* 風控架構條款橫幅 (Scheme B 滿版純淨視野) */}
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[9px] uppercase font-bold text-primary bg-primary/15 border border-primary/30 rounded px-1.5 py-0.2">
+          <span className="font-mono text-t1 uppercase font-bold text-primary bg-primary/15 border border-primary/30 rounded px-1.5 py-0.2">
             GUARDIAN CORE
           </span>
           <span className="text-muted-foreground">
@@ -141,7 +141,7 @@ function RiskManagement() {
           <span className="text-border">|</span>
           <span className="text-muted-foreground">Asia/Taipei 00:00 切日 · 僅人工恢復</span>
         </div>
-        <div className="flex items-center gap-2 text-[10.5px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-t2 text-muted-foreground">
           <span>R1 本地 Python PASS</span>
           <span className="text-border">|</span>
           <span>HTTP 控制路由未掛載 (前端示範模式)</span>
@@ -159,7 +159,7 @@ function RiskManagement() {
         meta={
           <div className="flex items-center gap-2">
             {rearmSuccess && (
-              <span className="text-up font-mono text-[10.5px] flex items-center gap-1">
+              <span className="text-up font-mono text-t2 flex items-center gap-1">
                 <CheckCircle2 className="size-3.5" /> 已完成人工 Re-arm (本地模擬)
               </span>
             )}
@@ -167,7 +167,7 @@ function RiskManagement() {
               variant="outline"
               size="sm"
               onClick={() => setOpenRearmDialog(true)}
-              className="h-6 text-[10.5px] font-mono border-border bg-surface hover:bg-surface-raised"
+              className="h-6 text-t2 font-mono border-border bg-surface hover:bg-surface-raised"
             >
               <RefreshCw className="size-3 mr-1" /> 人工核准 Re-arm
             </Button>
@@ -176,25 +176,25 @@ function RiskManagement() {
       >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
           <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1">
-            <span className="text-[10px] text-muted-foreground block">起算時間 (Asia/Taipei)</span>
+            <span className="text-t2 text-muted-foreground block">起算時間 (Asia/Taipei)</span>
             <span className="text-sm font-bold text-foreground block">2026-10-20 00:00:15</span>
-            <span className="text-[9.5px] text-muted-foreground">首次合格觀測原子建立</span>
+            <span className="text-t1 text-muted-foreground">首次合格觀測原子建立</span>
           </div>
 
           <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1">
-            <span className="text-[10px] text-muted-foreground block">風控期間基準權益 (E0)</span>
+            <span className="text-t2 text-muted-foreground block">風控期間基準權益 (E0)</span>
             <span className="text-sm font-bold text-primary block">12,500.00000000 USDT</span>
-            <span className="text-[9.5px] text-muted-foreground">同日基準鎖定 · 不因虧損替換</span>
+            <span className="text-t1 text-muted-foreground">同日基準鎖定 · 不因虧損替換</span>
           </div>
 
           <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1">
-            <span className="text-[10px] text-muted-foreground block">風控期間損益 (ΔEquity)</span>
+            <span className="text-t2 text-muted-foreground block">風控期間損益 (ΔEquity)</span>
             <span className="text-sm font-bold text-down block">-427.50000000 USDT</span>
-            <span className="text-[9.5px] text-down font-medium">虧損 -3.42% (距 Soft 6.58%)</span>
+            <span className="text-t1 text-down font-medium">虧損 -3.42% (距 Soft 6.58%)</span>
           </div>
 
           <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1">
-            <span className="text-[10px] text-muted-foreground block">鎖存狀態 (Latch Status)</span>
+            <span className="text-t2 text-muted-foreground block">鎖存狀態 (Latch Status)</span>
             <span className={cn(
               "text-sm font-bold block flex items-center gap-1",
               latchState === "NORMAL" ? "text-up" : "text-down"
@@ -202,13 +202,13 @@ function RiskManagement() {
               {latchState === "NORMAL" ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
               {latchState}
             </span>
-            <span className="text-[9.5px] text-muted-foreground">
+            <span className="text-t1 text-muted-foreground">
               {latchState === "NORMAL" ? "未觸發 · 允許正常增倉" : "已鎖存 · 禁增倉"}
             </span>
           </div>
         </div>
 
-        <div className="mt-3 pt-2.5 border-t border-border/40 text-[10.5px] font-mono text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+        <div className="mt-3 pt-2.5 border-t border-border/40 text-t2 font-mono text-muted-foreground flex flex-wrap items-center justify-between gap-2">
           <span>
             門檻: <strong className="text-foreground">Soft 10% (-1,250.00 USDT)</strong> · <strong className="text-foreground">Hard 20% (-2,500.00 USDT)</strong>
           </span>
@@ -236,7 +236,7 @@ function RiskManagement() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm text-foreground/90">{r.name}</p>
-                    <p className="text-[0.7rem] text-muted-foreground">{r.desc}</p>
+                    <p className="text-t3 text-muted-foreground">{r.desc}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="num text-sm text-gold-bright font-mono font-semibold">
@@ -286,10 +286,10 @@ function RiskManagement() {
                   )}
                 />
                 <div className="flex items-center gap-2">
-                  <span className="num text-[0.7rem] text-muted-foreground font-mono">{a.time}</span>
+                  <span className="num text-t3 text-muted-foreground font-mono">{a.time}</span>
                   <span
                     className={cn(
-                      "num border px-1.5 py-0.5 text-[0.6rem] uppercase font-mono font-semibold",
+                      "num border px-1.5 py-0.5 text-t2 uppercase font-mono font-semibold",
                       ALERT_TONE[a.level],
                     )}
                   >
@@ -316,7 +316,7 @@ function RiskManagement() {
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs font-mono">
-            <div className="rounded border border-primary/25 bg-primary/5 p-3 space-y-1.5 text-[11px]">
+            <div className="rounded border border-primary/25 bg-primary/5 p-3 space-y-1.5 text-t3">
               <span className="text-primary font-semibold flex items-center gap-1.5">
                 <HelpCircle className="size-3.5" /> 系統執行邊界提醒
               </span>
@@ -325,7 +325,7 @@ function RiskManagement() {
               </p>
             </div>
 
-            <div className="rounded border border-border/60 bg-background/50 p-2.5 space-y-1 text-[10.5px]">
+            <div className="rounded border border-border/60 bg-background/50 p-2.5 space-y-1 text-t2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">目前鎖存狀態:</span>
                 <span className="text-foreground font-bold">{latchState}</span>

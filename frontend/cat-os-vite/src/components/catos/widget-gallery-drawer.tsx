@@ -178,11 +178,11 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                 <span className="font-bold text-sm tracking-tight text-foreground font-sans">
                   控制中心
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30 font-semibold">
+                <span className="text-t2 font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30 font-semibold">
                   {activeProfile?.shortName || activeProfile?.name || "預設排版"}
                 </span>
               </div>
-              <span className="text-[9.5px] font-mono text-muted-foreground/75 leading-tight mt-0.5">
+              <span className="text-t1 font-mono text-muted-foreground/75 leading-tight mt-0.5">
                 {totalMountedCount}/{totalAvailableModules} 組件運行中
               </span>
             </div>
@@ -200,7 +200,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
 
         {/* 2. iOS 膠囊分段控制器 (Segmented Control) */}
         <div className="p-3 pb-2 shrink-0">
-          <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/[0.08] text-[11px] font-sans font-medium gap-1">
+          <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/[0.08] text-t3 font-sans font-medium gap-1">
             <button
               type="button"
               onClick={() => setActiveTab("profiles")}
@@ -213,7 +213,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
             >
               <FolderKanban className="size-3 text-primary" />
               <span>工作區設定</span>
-              <span className="text-[9.5px] font-mono px-1 rounded bg-black/30 text-primary">
+              <span className="text-t1 font-mono px-1 rounded bg-black/30 text-primary">
                 {profiles.length}
               </span>
             </button>
@@ -230,7 +230,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
             >
               <LayoutGrid className="size-3 text-emerald-400" />
               <span>版面大卡</span>
-              <span className="text-[9.5px] font-mono px-1 rounded bg-black/30 text-emerald-400">
+              <span className="text-t1 font-mono px-1 rounded bg-black/30 text-emerald-400">
                 {currentLeaves.length}/5
               </span>
             </button>
@@ -247,7 +247,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
             >
               <Timer className="size-3 text-amber-400" />
               <span>頂部狀態列</span>
-              <span className="text-[9.5px] font-mono px-1 rounded bg-black/30 text-amber-400">
+              <span className="text-t1 font-mono px-1 rounded bg-black/30 text-amber-400">
                 {mountedHeaderCount}/3
               </span>
             </button>
@@ -263,12 +263,12 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
             <div className="space-y-3">
               {/* 自訂工作區清單與另存 */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between px-1 text-[10.5px] font-mono text-muted-foreground/80">
+                <div className="flex items-center justify-between px-1 text-t2 font-mono text-muted-foreground/80">
                   <span className="flex items-center gap-1 font-semibold text-foreground/90 font-sans">
                     <Sparkles className="size-3 text-amber-400" />
                     我的自訂工作區
                   </span>
-                  <span className="text-primary font-mono text-[10px]">
+                  <span className="text-primary font-mono text-t2">
                     {customProfiles.length} 個配置
                   </span>
                 </div>
@@ -301,7 +301,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isCurrent && (
-                              <span className="flex items-center gap-1 text-[10px] font-mono text-primary font-bold">
+                              <span className="flex items-center gap-1 text-t2 font-mono text-primary font-bold">
                                 <Check className="size-3" /> 當前
                               </span>
                             )}
@@ -322,7 +322,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                     })}
                   </div>
                 ) : (
-                  <div className="p-2.5 rounded-xl border border-dashed border-white/[0.1] bg-white/[0.01] text-center text-[10.5px] text-muted-foreground font-mono">
+                  <div className="p-2.5 rounded-xl border border-dashed border-white/[0.1] bg-white/[0.01] text-center text-t2 text-muted-foreground font-mono">
                     尚未保存自訂工作區，點擊下方「另存當前排版」即可持久化目前視窗。
                   </div>
                 )}
@@ -342,7 +342,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                         placeholder="輸入新工作區名稱 (例如: 趨勢波段 3螢幕)..."
                         className="w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-xs font-mono focus:outline-none focus:border-primary text-foreground"
                       />
-                      <div className="flex items-center justify-end gap-1.5 font-mono text-[10.5px]">
+                      <div className="flex items-center justify-end gap-1.5 font-mono text-t2">
                         <button
                           type="button"
                           onClick={() => setIsSavingNew(false)}
@@ -363,7 +363,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                     <button
                       type="button"
                       onClick={() => setIsSavingNew(true)}
-                      className="w-full py-1.5 px-2.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary hover:border-primary text-[11px] font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-1.5 px-2.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary hover:border-primary text-t3 font-mono font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Plus className="size-3.5" />
                       <span>另存當前排版為自訂工作區...</span>
@@ -374,12 +374,12 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
 
               {/* 系統標準配置佈局 */}
               <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
-                <div className="flex items-center justify-between px-1 text-[10.5px] font-mono text-muted-foreground/80">
+                <div className="flex items-center justify-between px-1 text-t2 font-mono text-muted-foreground/80">
                   <span className="flex items-center gap-1 font-semibold text-foreground/90 font-sans">
                     <Layers className="size-3 text-primary" />
                     系統內建佈局
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-mono">一鍵套用</span>
+                  <span className="text-t2 text-muted-foreground font-mono">一鍵套用</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -404,27 +404,27 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                             <span className="text-xs font-bold tracking-tight group-hover:text-primary transition-colors">
                               {p.name}
                             </span>
-                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30">
+                            <span className="text-t1 font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30">
                               {p.tag}
                             </span>
-                            <span className="text-[9.5px] font-mono text-muted-foreground">
+                            <span className="text-t1 font-mono text-muted-foreground">
                               {p.cardsCount} 卡
                             </span>
                           </div>
-                          <p className="text-[10.5px] text-muted-foreground leading-tight font-sans mt-0.5">
+                          <p className="text-t2 text-muted-foreground leading-tight font-sans mt-0.5">
                             {p.desc}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
                           {isSelected ? (
-                            <span className="flex items-center gap-1 text-[10.5px] font-mono text-primary font-bold px-2 py-1 rounded-lg bg-primary/20 border border-primary/30">
+                            <span className="flex items-center gap-1 text-t2 font-mono text-primary font-bold px-2 py-1 rounded-lg bg-primary/20 border border-primary/30">
                               <Check className="size-3" /> 使用中
                             </span>
                           ) : (
                             <button
                               type="button"
-                              className="px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-semibold bg-white/[0.08] text-foreground border border-white/[0.1] group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all"
+                              className="px-2.5 py-1 rounded-lg text-t2 font-mono font-semibold bg-white/[0.08] text-foreground border border-white/[0.1] group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all"
                             >
                               套用
                             </button>
@@ -443,7 +443,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
           {/* ================================================= */}
           {activeTab === "workspace" && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between px-1 text-[10.5px] font-mono text-muted-foreground/75">
+              <div className="flex items-center justify-between px-1 text-t2 font-mono text-muted-foreground/75">
                 <span>點擊切換開關 · 左側儀表板即時響應</span>
                 <span>{currentLeaves.length} 張開啟</span>
               </div>
@@ -481,11 +481,11 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                             <span className="text-xs font-semibold text-foreground tracking-tight truncate">
                               {card.nameZh}
                             </span>
-                            <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-muted-foreground/80 border border-white/[0.06]">
+                            <span className="text-t1 font-mono px-1 rounded bg-black/40 text-muted-foreground/80 border border-white/[0.06]">
                               {card.category}
                             </span>
                           </div>
-                          <p className="text-[10px] text-muted-foreground/80 leading-tight truncate mt-0.5 font-sans">
+                          <p className="text-t2 text-muted-foreground/80 leading-tight truncate mt-0.5 font-sans">
                             {card.desc}
                           </p>
                         </div>
@@ -516,7 +516,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
               </div>
 
               {/* 底部輔助說明 */}
-              <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[10px] text-muted-foreground leading-relaxed font-sans">
+              <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] text-t2 text-muted-foreground leading-relaxed font-sans">
                 💡 採用無縫 T-Split 佈局樹，卡片增減時背景畫面將保持 120 FPS 彈性重排，關閉任何卡片皆不影響底層策略與風控運作。
               </div>
             </div>
@@ -553,11 +553,11 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                         <span className="text-xs font-semibold text-foreground">
                           K 線收盤倒數時鐘
                         </span>
-                        <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-primary border border-primary/30">
+                        <span className="text-t1 font-mono px-1 rounded bg-black/40 text-primary border border-primary/30">
                           閉合信號
                         </span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      <p className="text-t2 text-muted-foreground leading-tight mt-0.5">
                         分鐘／小時級收盤倒數與呼吸進度條
                       </p>
                     </div>
@@ -585,8 +585,8 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
 
                 {/* 週期切換 (iOS 膠囊樣式) */}
                 {klineClockMounted && (
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/[0.06] text-[10.5px]">
-                    <span className="text-muted-foreground font-mono text-[10px]">倒數基準週期:</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/[0.06] text-t2">
+                    <span className="text-muted-foreground font-mono text-t2">倒數基準週期:</span>
                     <div className="flex items-center gap-1">
                       {(["15m", "1H", "4H"] as BarTimeframe[]).map((tf) => (
                         <button
@@ -594,7 +594,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                           type="button"
                           onClick={() => setKlineTimeframe(tf)}
                           className={cn(
-                            "px-2.5 py-0.5 rounded-md text-[10px] font-mono cursor-pointer transition-colors border",
+                            "px-2.5 py-0.5 rounded-md text-t2 font-mono cursor-pointer transition-colors border",
                             klineTimeframe === tf
                               ? "bg-primary text-primary-foreground font-bold border-primary shadow-xs"
                               : "border-transparent bg-white/[0.06] text-muted-foreground hover:text-foreground"
@@ -633,11 +633,11 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                       <span className="text-xs font-semibold text-foreground">
                         8H 資金費結算時鐘
                       </span>
-                      <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-muted-foreground border border-white/[0.06]">
+                      <span className="text-t1 font-mono px-1 rounded bg-black/40 text-muted-foreground border border-white/[0.06]">
                         UTC 切日
                       </span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                    <p className="text-t2 text-muted-foreground leading-tight mt-0.5">
                       OKX 永續 8H 費率結算倒數 (00/08/16 UTC)
                     </p>
                   </div>
@@ -689,11 +689,11 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                         <span className="text-xs font-semibold text-foreground">
                           自選標的行情總線
                         </span>
-                        <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-primary border border-primary/30">
+                        <span className="text-t1 font-mono px-1 rounded bg-black/40 text-primary border border-primary/30">
                           動態標的池
                         </span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      <p className="text-t2 text-muted-foreground leading-tight mt-0.5">
                         頂部標記價格、跳動指示與 24H 漲跌總線
                       </p>
                     </div>
@@ -722,14 +722,14 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                 {/* 模式切換與自選幣種管理 */}
                 {marketTapeMounted && (
                   <div className="p-2.5 rounded-xl bg-black/35 border border-white/[0.06] flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-[10.5px] font-mono">
+                    <div className="flex items-center justify-between text-t2 font-mono">
                       <span className="text-muted-foreground">行情投影來源:</span>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => setMarketTapeMode("auto")}
                           className={cn(
-                            "px-2 py-0.5 rounded-md text-[10px] font-mono cursor-pointer transition-colors border",
+                            "px-2 py-0.5 rounded-md text-t2 font-mono cursor-pointer transition-colors border",
                             marketTapeMode === "auto"
                               ? "bg-primary text-primary-foreground font-bold border-primary shadow-xs"
                               : "border-transparent bg-white/[0.06] text-muted-foreground hover:text-foreground"
@@ -741,7 +741,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                           type="button"
                           onClick={() => setMarketTapeMode("custom")}
                           className={cn(
-                            "px-2 py-0.5 rounded-md text-[10px] font-mono cursor-pointer transition-colors border",
+                            "px-2 py-0.5 rounded-md text-t2 font-mono cursor-pointer transition-colors border",
                             marketTapeMode === "custom"
                               ? "bg-primary text-primary-foreground font-bold border-primary shadow-xs"
                               : "border-transparent bg-white/[0.06] text-muted-foreground hover:text-foreground"
@@ -754,12 +754,12 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
 
                     {/* 標的標籤列表 */}
                     <div className="flex flex-col gap-1.5 pt-1 border-t border-white/[0.06]">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                      <div className="flex items-center justify-between text-t2 font-mono text-muted-foreground">
                         <span>
                           {marketTapeMode === "auto" ? "當前活躍 Bot 標的:" : "自選監控標的 (點擊 × 移除):"}
                         </span>
                         {marketTapeMode === "auto" && (
-                          <span className="text-[9px] text-primary/80">跟隨運作中策略</span>
+                          <span className="text-t1 text-primary/80">跟隨運作中策略</span>
                         )}
                       </div>
 
@@ -767,7 +767,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                         {getActiveSymbols().map((sym) => (
                           <span
                             key={sym}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/[0.08] border border-white/[0.1] text-[10.5px] font-mono text-foreground font-bold"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/[0.08] border border-white/[0.1] text-t2 font-mono text-foreground font-bold"
                           >
                             <span>{sym}</span>
                             {marketTapeMode === "custom" && (
@@ -795,19 +795,19 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                               if (e.key === "Enter") handleAddCustomSymbol();
                             }}
                             placeholder="輸入幣種代碼 (如 SUI)..."
-                            className="w-32 px-2 py-0.8 rounded-md bg-white/[0.06] border border-white/[0.1] text-[10.5px] font-mono text-foreground focus:outline-none focus:border-primary uppercase"
+                            className="w-32 px-2 py-0.8 rounded-md bg-white/[0.06] border border-white/[0.1] text-t2 font-mono text-foreground focus:outline-none focus:border-primary uppercase"
                           />
                           <button
                             type="button"
                             onClick={handleAddCustomSymbol}
-                            className="px-2 py-0.8 rounded-md bg-primary/20 text-primary border border-primary/40 hover:bg-primary hover:text-primary-foreground text-[10px] font-mono font-semibold transition-colors cursor-pointer"
+                            className="px-2 py-0.8 rounded-md bg-primary/20 text-primary border border-primary/40 hover:bg-primary hover:text-primary-foreground text-t2 font-mono font-semibold transition-colors cursor-pointer"
                           >
                             + 新增
                           </button>
                         </div>
 
                         {/* 熱門標的快速選取 */}
-                        <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/80">
+                        <div className="flex items-center gap-1 text-t1 font-mono text-muted-foreground/80">
                           <span>熱門:</span>
                           {POPULAR_SWAP_SYMBOLS.slice(4).map((p) => (
                             <button
@@ -830,8 +830,8 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
         </div>
 
         {/* 4. 底部定案標準重置按鈕列 */}
-        <div className="p-3 border-t border-white/[0.08] bg-white/[0.02] flex items-center justify-between text-[10.5px] shrink-0 font-mono">
-          <div className="flex items-center gap-1.5 text-muted-foreground text-[10.5px] truncate max-w-[200px]">
+        <div className="p-3 border-t border-white/[0.08] bg-white/[0.02] flex items-center justify-between text-t2 shrink-0 font-mono">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-t2 truncate max-w-[200px]">
             <span className="text-primary/80">●</span>
             <span className="truncate">
               {activeTab === "profiles"
@@ -846,7 +846,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
             onClick={() => {
               applyLayoutPreset("tsplit");
             }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-medium bg-white/[0.08] text-foreground hover:bg-primary hover:text-primary-foreground border border-white/[0.1] transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-t2 font-medium bg-white/[0.08] text-foreground hover:bg-primary hover:text-primary-foreground border border-white/[0.1] transition-all cursor-pointer"
             title="將工作區大卡重置為定案之 標準交易視圖 (5-Split)佈局"
           >
             <RotateCcw className="size-3" />

@@ -164,10 +164,10 @@ function LeafCardPane({
         )}
       >
         <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
-          <span className="text-[12px] font-semibold text-primary">
+          <span className="text-t4 font-semibold text-primary">
             {CARD_TITLES[leaf.cardId]?.zh || leaf.cardId}
           </span>
-          <span className="text-[10px] font-mono text-primary/80">⊞ 就位</span>
+          <span className="text-t2 font-mono text-primary/80">⊞ 就位</span>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="w-16 h-1 bg-primary/20 rounded-full" />

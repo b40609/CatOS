@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/state_adapter_test.mjs"
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "test": "npm run check:tokens && node --test tests/state_adapter_test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

@@ -748,13 +748,13 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           />
 
           {/* 核心焦點切換鈕：金額主導 vs 槓桿倍數 */}
-          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-[10.5px] font-mono">
-            <span className="text-amber-400 font-bold px-1 text-[9px] sm:text-[9.5px]">焦點:</span>
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-t2 font-mono">
+            <span className="text-amber-400 font-bold px-1 text-t1 sm:text-t1">焦點:</span>
             <button
               type="button"
               onClick={() => setHudFocus("leverage")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 hudFocus === "leverage"
                   ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -767,7 +767,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
               type="button"
               onClick={() => setHudFocus("money")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 hudFocus === "money"
                   ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -780,7 +780,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         </div>
 
         {/* 核心維度分段鈕 (幣種配置 | 策略機器人 | 多空敞口 | 保證金佔用 | 盈虧分佈) */}
-        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-[10.5px] font-mono">
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-t2 font-mono">
           {TABS.map((tab) => {
             const isActive = viewMode === tab.id;
             return (
@@ -792,7 +792,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   setHoveredIndex(null);
                 }}
                 className={cn(
-                  "px-1.5 sm:px-2 py-0.5 rounded transition-all cursor-pointer font-medium select-none text-[10px] sm:text-[11px]",
+                  "px-1.5 sm:px-2 py-0.5 rounded transition-all cursor-pointer font-medium select-none text-t2 sm:text-t3",
                   isActive
                     ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.16]"
                     : "text-zinc-300 hover:text-white hover:bg-white/[0.08]"
@@ -860,10 +860,10 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     {/* 首行內容：左側幣種 + 標籤 */}
                     <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 min-w-0">
                       <span className="size-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-foreground text-[11px] tracking-tight truncate shrink-0">{displayLabel}</span>
+                      <span className="font-bold text-foreground text-t3 tracking-tight truncate shrink-0">{displayLabel}</span>
                       {displayBadge && (
                         <span className={cn(
-                          "px-1 py-0.2 rounded border text-[8.5px] font-mono shrink-0 leading-none",
+                          "px-1 py-0.2 rounded border text-t1 font-mono shrink-0 leading-none",
                           item.isLoss
                             ? "bg-rose-500/15 border-rose-500/30 text-rose-400 font-semibold"
                             : "bg-white/[0.06] border-white/[0.10] text-zinc-300"
@@ -876,16 +876,16 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     {/* 右側：金額與佔比 */}
                     <div className="relative z-10 flex items-center gap-1.5 shrink-0 ml-1">
                       <span className={cn(
-                        "font-mono text-[11px] font-medium tracking-tight",
+                        "font-mono text-t3 font-medium tracking-tight",
                         item.isLoss ? "text-rose-400 font-semibold" : "text-foreground"
                       )}>
                         {item.amountStr}
                       </span>
-                      <span className="font-bold text-foreground text-[11px] min-w-[34px] text-right font-mono">
+                      <span className="font-bold text-foreground text-t3 min-w-[34px] text-right font-mono">
                         {item.pct_share.toFixed(1)}%
                       </span>
                       {isNearLimit && !isNarrow && (
-                        <span className="px-1 py-0.2 rounded text-[7.5px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
+                        <span className="px-1 py-0.2 rounded text-t1 font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
                           逼近50%
                         </span>
                       )}
@@ -911,9 +911,9 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   <div className="flex items-center justify-between gap-1.5 leading-none">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="size-2 sm:size-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-foreground text-[11px] sm:text-xs tracking-tight truncate">{item.shortLabel}</span>
+                      <span className="font-bold text-foreground text-t3 sm:text-xs tracking-tight truncate">{item.shortLabel}</span>
                       <span className={cn(
-                        "px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded border text-[8.5px] sm:text-[9.5px] font-mono shrink-0 leading-none",
+                        "px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded border text-t1 sm:text-t1 font-mono shrink-0 leading-none",
                         item.isLoss
                           ? "bg-rose-500/15 border-rose-500/30 text-rose-400 font-semibold"
                           : "bg-white/[0.06] border-white/[0.10] text-zinc-300"
@@ -924,17 +924,17 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={cn(
-                        "font-mono text-[11px] sm:text-xs font-medium tracking-tight",
+                        "font-mono text-t3 sm:text-xs font-medium tracking-tight",
                         item.isLoss ? "text-rose-400 font-semibold" : "text-foreground"
                       )}>
                         {item.amountStr}
                       </span>
-                      <span className="font-bold text-foreground text-[11px] sm:text-xs min-w-[38px] text-right font-mono">
+                      <span className="font-bold text-foreground text-t3 sm:text-xs min-w-[38px] text-right font-mono">
                         {item.pct_share.toFixed(1)}%
                       </span>
                       {/* 僅當接近上限時靜默提醒 */}
                       {isNearLimit && (
-                        <span className="px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded text-[8px] sm:text-[8.5px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
+                        <span className="px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded text-t1 sm:text-t1 font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
                           逼近50%
                         </span>
                       )}

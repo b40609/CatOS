@@ -74,7 +74,7 @@ function StrategyCard({
         <div>
           <p className="label-xs">{s.code}</p>
           <h3 className="mt-0.5 text-base text-gold-bright">{s.name}</h3>
-          <p className="mt-0.5 text-[0.7rem] text-muted-foreground">
+          <p className="mt-0.5 text-t3 text-muted-foreground">
             {s.kind} · {s.market}
           </p>
         </div>
@@ -107,7 +107,7 @@ function StrategyCenter() {
         title="策略中心"
         desc="現貨、永續、跨所套利與鏈上訊號策略 · 模擬數據"
         right={
-          <div className="num text-right text-[0.7rem] text-muted-foreground">
+          <div className="num text-right text-t3 text-muted-foreground">
             <p>
               啟用中 <span className="text-gold-bright">{list.filter((s) => s.enabled).length}</span>{" "}
               / {list.length}
@@ -136,7 +136,7 @@ function StrategyCenter() {
           <Panel
             title={`backtest · ${active.code}`}
             meta={
-              <span className="num text-[0.7rem] text-muted-foreground">
+              <span className="num text-t3 text-muted-foreground">
                 {active.trades.toLocaleString()} trades
               </span>
             }

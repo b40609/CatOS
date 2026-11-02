@@ -432,7 +432,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
               type="button"
               onClick={() => setTab("positions")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 tab === "positions"
                   ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -444,7 +444,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
               type="button"
               onClick={() => setTab("orders")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0",
                 tab === "orders"
                   ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -465,7 +465,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
         {/* ================= Tab 1: 持倉明細 (方案 1 · 各合約獨立資金費率週期與倒數) ================= */}
         {tab === "positions" && (
           <table className="w-full text-left border-collapse table-auto min-w-[540px]">
-            <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+            <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
               <tr>
                 <th className="py-2.5 pl-3 pr-2 font-medium">合約 / 部位</th>
                 <th className="px-2 text-right font-medium">開倉 / 標記價</th>
@@ -513,15 +513,15 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                           <div className="flex items-center gap-1.5">
                             <span
                               className={cn(
-                                "px-1 py-0.2 rounded text-[8.5px] font-bold font-mono inline-flex items-center",
+                                "px-1 py-0.2 rounded text-t1 font-bold font-mono inline-flex items-center",
                                 p.side === "long" ? "bg-emerald-400/10 text-emerald-400 border border-emerald-400/25" : "bg-rose-400/10 text-rose-400 border border-rose-400/25"
                               )}
                             >
                               {p.side === "long" ? "▲ 多" : "▼ 空"}
                             </span>
-                            <span className="text-[12px] font-bold text-foreground leading-tight">{p.symbol}</span>
+                            <span className="text-t4 font-bold text-foreground leading-tight whitespace-nowrap">{p.symbol}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-muted-foreground leading-tight pl-0.5 mt-0.5">
+                          <span className="text-t2 font-mono text-muted-foreground leading-tight pl-0.5 mt-0.5">
                             {p.qty} {p.base}
                           </span>
                         </div>
@@ -530,8 +530,8 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       {/* 2. 開倉均價與最新標記價 */}
                       <td className="px-2 py-2.5 text-right font-mono">
                         <div className="flex flex-col items-end">
-                          <span className="text-[11px] font-medium text-foreground leading-tight">${p.entry}</span>
-                          <span className="text-[9.5px] text-muted-foreground leading-tight mt-0.5">
+                          <span className="text-t3 font-medium text-foreground leading-tight">${p.entry}</span>
+                          <span className="text-t1 text-muted-foreground leading-tight mt-0.5">
                             $<NumberTicker value={Number(p.mark.replace(/,/g, ""))} decimals={2} />
                           </span>
                         </div>
@@ -540,10 +540,10 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       {/* 3. 未實現損益 (金額 + ROE) */}
                       <td className="px-2 py-2.5 text-right font-mono">
                         <div className="flex flex-col items-end">
-                          <span className={cn("text-[12px] font-bold leading-tight flex items-center", isPositive ? "text-emerald-400" : "text-rose-400")}>
+                          <span className={cn("text-t4 font-bold leading-tight flex items-center", isPositive ? "text-emerald-400" : "text-rose-400")}>
                             {isPositive ? "+" : ""}<NumberTicker value={p.upnl} decimals={2} prefix="$" />
                           </span>
-                          <span className={cn("text-[9.5px] font-bold leading-tight mt-0.5", isPositive ? "text-emerald-400" : "text-rose-400")}>
+                          <span className={cn("text-t1 font-bold leading-tight mt-0.5", isPositive ? "text-emerald-400" : "text-rose-400")}>
                             +{roePct.toFixed(2)}% ROE
                           </span>
                         </div>
@@ -554,7 +554,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                         <div className="flex flex-col items-end">
                           <span
                             className={cn(
-                              "px-1.5 py-0.2 rounded text-[9.5px] font-bold leading-tight inline-block",
+                              "px-1.5 py-0.2 rounded text-t1 font-bold leading-tight inline-block",
                               p.base === "SOL"
                                 ? "bg-rose-400/10 text-rose-400 border border-rose-400/25"
                                 : "bg-emerald-400/10 text-emerald-400 border border-emerald-400/25"
@@ -563,7 +563,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                             {p.base === "SOL" ? "-0.0031%" : p.base === "ETH" ? "+0.0084%" : "+0.0102%"}
                           </span>
                           <span className={cn(
-                            "text-[8.5px] leading-tight mt-0.5 font-mono inline-flex items-center gap-1",
+                            "text-t1 leading-tight mt-0.5 font-mono inline-flex items-center gap-1",
                             p.fundingIntervalHours === 4 ? "text-amber-400 font-semibold" : "text-muted-foreground"
                           )}>
                             <Clock className="size-2 text-primary/70 shrink-0" />
@@ -575,8 +575,8 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       {/* 5. 強平安全墊 (價格 + 距離) */}
                       <td className="px-2 py-2.5 text-right hidden md:table-cell font-mono">
                         <div className="flex flex-col items-end">
-                          <span className="text-[11px] text-foreground font-semibold leading-tight">${p.liqPrice}</span>
-                          <span className="text-[9.5px] text-emerald-400 font-semibold leading-tight mt-0.5">
+                          <span className="text-t3 text-foreground font-semibold leading-tight">${p.liqPrice}</span>
+                          <span className="text-t1 text-emerald-400 font-semibold leading-tight mt-0.5">
                             安全 ({p.distLiqPct})
                           </span>
                         </div>
@@ -585,10 +585,10 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       {/* 6. 交易所停損 (純淨價格 + 距離標籤) */}
                       <td className="px-2 py-2.5 text-right font-mono">
                         <div className="flex flex-col items-end">
-                          <span className="text-[11px] text-foreground font-bold leading-tight">
+                          <span className="text-t3 text-foreground font-bold leading-tight">
                             ${p.p6StopPrice}
                           </span>
-                          <span className={cn("text-[9.5px] font-semibold mt-0.5", p.p6Status === "ACTIVE" ? "text-emerald-400" : "text-amber-400")}>
+                          <span className={cn("text-t1 font-semibold mt-0.5", p.p6Status === "ACTIVE" ? "text-emerald-400" : "text-amber-400")}>
                             {p.p6Status === "ACTIVE" ? `已掛載 (${p.p6DistPct})` : "更新待確認"}
                           </span>
                         </div>
@@ -600,7 +600,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                           <button
                             type="button"
                             onClick={(e) => handleClosePosition(p, e)}
-                            className="px-2.5 py-0.5 rounded text-[10px] font-mono border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/50 transition-all cursor-pointer"
+                            className="px-2.5 py-0.5 rounded text-t2 font-mono border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/50 transition-all cursor-pointer"
                             title="以市價緊急平倉此合約部位 (注入 OKX tag: 41cb53c54d6dABDE)"
                           >
                             平倉
@@ -620,11 +620,11 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
           ordersData.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <span className="text-xs font-mono">當前無任何在途掛單</span>
-              <span className="text-[10px] font-mono text-muted-foreground/60 mt-1">所有限價單均已成交或取消</span>
+              <span className="text-t2 font-mono text-muted-foreground/60 mt-1">所有限價單均已成交或取消</span>
             </div>
           ) : (
             <table className="w-full text-left border-collapse table-auto min-w-[540px]">
-              <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+              <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
                 <tr>
                   <th className="py-2.5 pl-3 pr-1.5 font-medium">合約標的</th>
                   <th className="px-1.5 font-medium">方向 / 類型</th>
@@ -646,8 +646,8 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                   >
                     <td className="py-2 pl-3 pr-1.5">
                       <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-foreground leading-tight">{o.symbol}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight">{o.clientOrderId}</span>
+                        <span className="text-t3 font-bold text-foreground leading-tight whitespace-nowrap">{o.symbol}</span>
+                        <span className="text-t1 text-muted-foreground leading-tight">{o.clientOrderId}</span>
                       </div>
                     </td>
 
@@ -655,41 +655,41 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                       <div className="flex items-center gap-1">
                         <span
                           className={cn(
-                            "px-1 py-0.2 rounded text-[8.5px] font-bold",
+                            "px-1 py-0.2 rounded text-t1 font-bold",
                             o.side === "buy" ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400"
                           )}
                         >
                           {o.side === "buy" ? "買入" : "賣出"}
                         </span>
-                        <span className="text-[9.5px] text-muted-foreground">{o.type}</span>
+                        <span className="text-t1 text-muted-foreground">{o.type}</span>
                       </div>
                     </td>
 
                     <td className="px-1.5 py-2 text-right">
-                      <span className="text-[10.5px] font-bold text-foreground">${o.price}</span>
+                      <span className="text-t2 font-bold text-foreground">${o.price}</span>
                     </td>
 
                     <td className="px-1.5 py-2 text-right">
-                      <span className="text-[10.5px] font-bold text-foreground">{o.qty}</span>
+                      <span className="text-t2 font-bold text-foreground">{o.qty}</span>
                     </td>
 
                     <td className="px-1.5 py-2 text-right">
                       <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-primary font-bold leading-tight">{o.distPct}</span>
-                        <span className="text-[8.5px] text-muted-foreground leading-tight">{o.distTicks}</span>
+                        <span className="text-t2 text-primary font-bold leading-tight">{o.distPct}</span>
+                        <span className="text-t1 text-muted-foreground leading-tight">{o.distTicks}</span>
                       </div>
                     </td>
 
                     <td className="px-1.5 py-2 text-right hidden sm:table-cell">
                       <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-foreground font-semibold leading-tight">{o.frozenMargin}</span>
-                        <span className="text-[8.5px] text-muted-foreground leading-tight">{o.notionalUsd}</span>
+                        <span className="text-t2 text-foreground font-semibold leading-tight">{o.frozenMargin}</span>
+                        <span className="text-t1 text-muted-foreground leading-tight">{o.notionalUsd}</span>
                       </div>
                     </td>
 
                     <td className="py-2 pr-3 pl-1.5 text-right">
                       {o.isUnknown ? (
-                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold text-amber-300">
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-t1 font-bold text-amber-300">
                           <AlertTriangle className="size-2.5" />
                           <span>待對帳 (禁撤)</span>
                         </div>
@@ -697,7 +697,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
                         <button
                           type="button"
                           onClick={(e) => handleCancelOrder(o.id, e)}
-                          className="px-2 py-0.5 rounded text-[9.5px] font-mono border border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                          className="px-2 py-0.5 rounded text-t1 font-mono border border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
                         >
                           撤單
                         </button>
@@ -712,7 +712,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
         </>}
 
         {/* 底部摘要與模式說明條 */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/80 bg-secondary/30 text-[10px] font-mono text-muted-foreground shrink-0">
+        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/80 bg-secondary/30 text-t2 font-mono text-muted-foreground shrink-0">
           {tab === "positions" ? (
             <div className="flex items-center gap-3">
               <span>持倉筆數: <strong className="text-foreground">{positionsData.length}</strong></span>
@@ -734,7 +734,7 @@ export function ActivityPanel({ className, showHeader = true, monitoring }: Acti
               <button
                 type="button"
                 onClick={handleCancelAll}
-                className="px-2 py-0.5 rounded text-[9.5px] border border-border/80 bg-background/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded text-t1 border border-border/80 bg-background/80 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 撤銷常規掛單 (保留待對帳)
               </button>
