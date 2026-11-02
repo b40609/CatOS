@@ -36,7 +36,7 @@ function RouterView() {
 
   // Initialize CatOS authoritative state once
   useEffect(() => {
-    stateAdapter.init('normal').catch(console.error);
+    stateAdapter.init().catch(console.error);
   }, []);
 
   return <Component />;
