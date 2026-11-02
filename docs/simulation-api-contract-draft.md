@@ -1,6 +1,6 @@
 # v1 模擬工作區 HTTP 契約草案（Simulation Workspace API）
 
-狀態：**草案，未核准、未實作**。日期：2026-11-02。分支 `feat/v1-simulation-api`。
+狀態：**已核准（2026-11-03，作者對第 6 節 Q1–Q11 全部採「建議」欄定案）；第 3 步後端端點已實作，見第 8 節；第 4 步前端未開始。** 草案日期 2026-11-02（分支 `feat/v1-simulation-api`），實作分支 `feat/v1-simulation-endpoints`。第 1～7 節保留草案原文作為定案依據；實作與草案不一致處以第 8 節為準。
 
 目的：讓前端主工作區（戰情台 KPI、Bot 表、風控卡、持倉表、事件流水、bots 頁）從 `mock-adapter` 換成真資料。v1 只接本機模擬（local-sim），不接 Demo／Live，不碰憑證，不新增交易出口。本文件只定契約；端點與 adapter 程式分別屬第 3、4 步。
 
@@ -302,9 +302,11 @@ v1 規則：
 3. 切換時 `store.setMode` 既有的清空行為保留；另外 real adapter 切回 local 時必須重新 `GET /version`，若 `instance_id` 改變，視同全新基線。
 4. `ScenarioType`（`normal`／`soft_loss`／`hold_stopped_409`／`empty`／`service_unavailable`／`demo_live_locked`）是 mock 專用，real adapter 忽略；第 4 步從 `WorkspaceAdapter` 介面移除 `scenario`／`setScenario`／`resetStorage`，或保留在 mock 實作但不列入介面（Q9）。
 
-## 6. 未決問題（需作者決定）
+## 6. 未決問題（2026-11-03 已定案）
 
-| # | 問題 | 建議 | 理由 |
+作者 2026-11-03 定案：Q1–Q11 全部照「建議」欄。摘要：Q1 (a) 固定一個登錄 SMA＋固定 Bot `sim-control-sma`，唯讀清單，不接 `strategy_library`／上傳；Q2 顯示名稱／說明放後端常數 `catos/simulation_catalog.py`，不改 manifest；Q3 (a) 風控／持倉全部由控制面事件投影，不開第二個 SQLite reader；Q4 `ownership_retained` 只做顯示，start 不加 409；Q5 runner 的 `signal` 事件加 `mark`（= bar.close）與 `risk_state`（`State.to_wire()`）；Q6 新欄位一律 epoch ms 整數 `*_ms`，既有 ISO 欄位原樣保留；Q7 local-sim 的 `basis.period_start_ms` 回台北日起點；Q8 不暴露 kill-switch／re-arm／set_loss_limits HTTP；Q9／Q10／Q11 屬第 4 步前端，第 3 步不碰 `src/`。
+
+| # | 問題 | 建議（＝定案） | 理由 |
 | --- | --- | --- | --- |
 | Q1 | 策略／Bot 資料模型：(a) v1 固定一個登錄 SMA 策略＋一個固定 Bot（唯讀清單，start 走既有模板）；(b) 接通 `strategy_library.py` 的上傳製品／`allocate` 流程（補 `service.library`、`WorkerConfig.python_strategy`、`worker_host` 執行 Python 製品） | **(a)** | 作者 v1 路線「只放行 SMA」；(b) 等於把一個從未提交、8 個測試全 ERROR 的工作包納入 v1，且涉及受信策略邊界與 Worker 執行任意 Python，不是前端串接的範圍。(b) 保留為 v2 候選，端點路徑已預留（`POST /strategies`、`POST /bots`） |
 | Q2 | 登錄策略的顯示名稱與說明從哪來（manifest 無 `name`／`description`） | 後端在 `research_catalog.catalog()` 旁加固定中文名／說明常數 | 不在前端寫死字串，也不改 manifest schema |
@@ -351,3 +353,33 @@ v1 規則：
 | `tests/state_adapter_test.mjs` | 改為對 `simulation-api-adapter` 的版本守門與 demo／live 不可用測試；加 fixture HTTP（沿用 `integration_baseline_test.mjs` 的隔離埠做法） |
 
 驗證界線：第 3 步只跑隔離 TestClient 與既有 `test_local_sim_control.py`；第 4 步在隔離埠起後端 fixture 資料根，不碰正式 8770／`outputs/local-sim-control`。
+
+## 8. 第 3 步實作紀錄（2026-11-03，分支 `feat/v1-simulation-endpoints`）
+
+改動檔案：`catos/local_sim_control.py`（版本計數、全域事件序號、生命週期事件、投影方法）、`catos/local_sim_control_runner.py`（只加 Q5 兩欄）、`catos/local_sim_control_api.py`（八條新路由與守門）、新 `catos/simulation_catalog.py`（顯示常數、事件分級對映、純 Decimal 投影函式，已加入 `BUILD_FILES`）、新 `tests/test_simulation_workspace_api.py`。未動 `supervisor.py`、`journal.py`、`execution.py`、`risk.py`、`python_strategy.py`、`strategy_library.py`、任何 schema 與 `src/`。
+
+實際掛載（前綴 `/api/workspace/simulation`）：既有 `GET /version`、`GET /runs`、`GET /runs/{run_id}`、`POST /start`、`POST /runs/{run_id}/stop` 行為與回應欄位不變（run 快照多一個額外的 `lifecycle` 陣列）；新增 `GET /state[?since_version=N]`、`GET /strategies`、`GET /bots`、`GET /bots/{bot_id}`、`GET /risk`、`GET /positions`、`GET /events[?since=N&limit=1..200]`、`POST /bots/start`。
+
+### 8.1 與第 1～5 節不同、以實作為準的地方
+
+| 項目 | 草案 | 實作 | 原因 |
+| --- | --- | --- | --- |
+| Bot／持倉的合約欄位 | `contract_id`＋`symbol`（`ContractSpec.inst_id` 待核對） | `inst_id`（＝`ContractSpec.inst_id`，`"BTC-USDT-SWAP"`）、`symbol`（同值）與完整 `contract{inst_id, base_per_contract, tick_size, lot_size, min_size}` Decimal 字串 | `ContractSpec` 只有 `inst_id`，沒有獨立的 contract id |
+| 控制面事件的存放 | `_update` 的狀態轉換「產生事件」 | `run_state`／`stop_requested` 存在 run 記錄的獨立 `lifecycle` 陣列（上限 32），不混入 runner 的 `events` | 既有 `/runs/{id}` 的 `events` 數量與測試（`len(events) == 1`）不變；`/events` 投影時兩者合併排序 |
+| 全域序號欄位 | `seq` | 原始事件信封用 `event_seq`（runner 的 `seq` 是 bar 序，保留在 `payload.seq`）；`EventDTO.seq` 對外仍是全域序號 | 避免與 runner 既有 `seq` 衝突 |
+| 全域序號重啟 | 歸零並由 `instance_id` 區分 | `open()` 以既有記錄最大 `event_seq` 接續，不歸零 | 同一資料根的 `/events` 游標在重啟後仍單調；`instance_id` 仍會改變 |
+| 無 `event_seq` 的舊事件 | 未定 | `/events` 不回傳，計入 `omitted` | 舊記錄無法排序；原始事件仍在 `/runs/{id}` |
+| `omitted` 計算 | 各 run 的 `events_omitted` | 同上＋舊事件數；`/events` 另回 `more`（是否還有更新的事件） | 前端可知道何時停止翻頁 |
+| Bot 帳戶欄位來源 | 最新 `signal.account`／`final_account` | 同上，另加 `account_source ∈ {final_account, signal, signal_fill}`：同一根 bar 內 `fill` 晚於 `signal` 時，以 `last_fill` 的 `position/fees/equity` 覆蓋，其他欄位沿用 `signal` 的決策前視圖 | runner 只加 Q5 兩欄，`fill` 事件沒有完整帳戶視圖 |
+| 風控快照與帳戶的時序 | 未提 | `/risk.snapshot.equity` 是最後一次 `observe()`（決策前），完成的 run 會比 `final_account.equity` 落後最後一筆成交；DTO 以 `seq`／`time_ms` 標示觀測時點，不補算 | 不在投影層自行做帳務推算 |
+| 基準權益 | 固定 `"1000"` 範例 | 合成案例從台北 22:00 起跑、跨午夜時會以午夜權益重建新日基準；`basis.day`／`equity` 依事件原值 | `local_sim_r4.observe` 既有行為 |
+| `/bots/start` body／回應 | 未定 | body 精確欄位 `{request_id, bot_id}` 可選 `mode`；`mode` 存在且 ≠ `"local"` → 403 `mode_not_available`；`bot_id` 非 token → 422 `invalid_bot_id`，非固定 Bot → 404 `bot_not_found`；成功 202 回 `{run: RunDTO, bot: BotViewDTO, version}`；與 `POST /start` 共用同一 `request_id` 綁定 | 冪等重放可能對應較早的 run，故同時回 run 與目前 Bot 視圖 |
+| unavailable 時的 GET | `/state`、`/risk`、`/positions` 503 | 同草案；`/strategies`、`/bots`、`/bots/{id}`、`/events` 仍 200（如 `/runs`） | 不可用時前端仍需顯示靜態 Bot／策略與既有事件 |
+| 查詢參數錯誤碼 | `invalid_since`／`invalid_limit` | 同上，另加 `invalid_since_version`；非十進位整數一律 422 | — |
+| `domains` | `bots/risk/positions/events` | 另加 `service`（build 漂移、unavailable、closing 時遞增） | 讓 `restart_required` 變化也能打破 `unchanged` |
+| 風控 DTO 的 `snapshot.basis` | 原樣 | 移除（與同層 `basis` 重複） | 減少重複 |
+| `BotViewDTO` 額外欄位 | — | `strategy_name`、`active`、`run_count`、`run_created_at_ms`、`finished_at_ms`、`mark` | 前端表格直接需要 |
+
+### 8.2 自測
+
+隔離 `tempfile` 資料根，不碰正式 8770／`outputs/local-sim-control`：`tests/test_simulation_workspace_api.py`（14 個：投影、游標分頁、重啟序號接續、舊記錄相容、unavailable、真 runner 完整案例核對 Q5 欄位與最終帳戶、TestClient 守門／冪等／409／422／503／既有路由契約）與既有 `tests/test_local_sim_control.py`（28 個）。注意：本機 `core.autocrlf=true` 會讓 `examples/closed_bar_demo.py`／`catos/research_strategy.py` 以 CRLF 簽出，`APPROVED_STRATEGY_SHA256` 不符而使所有真 runner 案例失敗；本輪在此 checkout 以 repo-local `core.autocrlf=false` 重新簽出兩檔後才取得綠燈，建議另案加 `.gitattributes` 固定 LF。

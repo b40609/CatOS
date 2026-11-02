@@ -303,6 +303,22 @@ start 回應的最小辨識欄位節錄（實際排程可能已前進）：
 
 模板只有 8 根合成資料、2 根預熱；不是任意策略、長期即時行情或實盤。此路徑包含於既有 `/api/workspace` 代理；正式 8890 → 8770 不能作為隔離 fixture。
 
+### v1 工作區投影路由（2026-11-03 掛載，分支 `feat/v1-simulation-endpoints`）
+
+契約與定案見 [simulation-api-contract-draft.md](simulation-api-contract-draft.md)（第 2 節 DTO、第 3 節錯誤碼、第 8 節實作紀錄）。全部唯讀投影自控制面記憶體與 `control.json`，不讀 SQLite、不建立基準、不解除 latch；金額一律 Decimal 字串，新時間欄位一律 epoch ms 整數 `*_ms`。
+
+| 方法 | 路徑 | 用途 |
+| --- | --- | --- |
+| GET | `/api/workspace/simulation/state[?since_version=N]` | 聚合：`version`、`service`（同 /version）、`strategies`、`bots`、`risk`、`positions`、`summary`、最近 40 筆 `events`、各 domain 最後變更版本 `domains`；`since_version` 等於目前版本時回 `{"unchanged": true, "version": N}` |
+| GET | `/api/workspace/simulation/strategies` | v1 唯一登錄 SMA（常數，不含原始碼） |
+| GET | `/api/workspace/simulation/bots`、`/bots/{bot_id}` | 固定 Bot `sim-control-sma` 靜態欄位＋最近一次 run 的執行投影（`state`、`current_run_id`、帳戶欄位、`account_source`、`ownership_retained` 僅顯示） |
+| GET | `/api/workspace/simulation/risk` | 最新 `risk_state` 投影（`limits`、`basis.period_start_ms`、`snapshot`、`derived.status/period_pnl/notional/effective_leverage/exposure_budget`）；無觀測時 `null` |
+| GET | `/api/workspace/simulation/positions` | 單合約 0 或 1 筆；P6 保護、資金費、強平、保證金一律 `null` |
+| GET | `/api/workspace/simulation/events?since=N&limit=1..200` | 全域序號游標分頁：runner 事件（warmup／day_basis／signal／fill／final_account）＋控制面 `run_state`／`stop_requested`，回 `items`、`next_since`、`more`、`omitted` |
+| POST | `/api/workspace/simulation/bots/start` | 202；body `{"request_id","bot_id"}`（可選 `"mode":"local"`），與 `/start` 同一組 header／同源／`request_id` 冪等規則，回 `{run, bot, version}` |
+
+守門：所有 simulation 路由（含 GET）要求 host `127.0.0.1`（403 `simulation_requires_127_0_0_1`）；路徑、query 或 body 帶 `demo`／`live` 回 403 `mode_not_available`。服務 unavailable 時 `/state`、`/risk`、`/positions` 與所有 POST 回 503，`/version`、`/runs`、`/strategies`、`/bots`、`/events` 仍可讀。不提供 kill-switch／re-arm／門檻修改、`POST /strategies`、`POST /bots`、任何 demo／live 或 WebSocket。
+
 ### 舊證據讀取：另一個資料根
 
 來源：[workspace_api.py](../catos/workspace_api.py)、[workspace_snapshot.py](../catos/workspace_snapshot.py)。
@@ -328,13 +344,12 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 
 ## 6. 只有 Python／local-sim、尚不能接成 HTTP 的項目
 
-- **策略／Bot**：[python_strategy.py](../catos/python_strategy.py)、[strategy_library.py](../catos/strategy_library.py) 有製品／策略庫／Bot 資料操作；[strategy_mcp.py](../catos/strategy_mcp.py) 有 HTTP 呼叫包裝。但現行 workspace／simulation 路由沒有掛載下列舊文件路徑：
+- **策略／Bot**：2026-11-03 起已掛載唯讀 GET `/api/workspace/simulation/strategies`、GET `/bots`、GET `/bots/{bot_id}` 與 POST `/bots/start`（固定登錄 SMA＋固定 Bot `sim-control-sma`，見第 5 節）。[python_strategy.py](../catos/python_strategy.py)、[strategy_library.py](../catos/strategy_library.py) 的上傳製品／`allocate` 流程仍未接通：`LocalSimControlService` 沒有 `library`，下列路徑仍不存在，`tests/test_python_strategy_api.py` 對應案例仍是 ERROR：
   - GET `/api/workspace/simulation/strategy-contract`
-  - GET／POST `/api/workspace/simulation/strategies`
-  - GET／POST `/api/workspace/simulation/bots`
-  - POST `/api/workspace/simulation/bots/start`
-  這是具體整合缺口，不提供假想欄位／請求範例。舊 [v1 交接](v1-local-core-handoff-20261002.md) 與 mock 路徑不能當現行 API 文件。
-- **風控／R1**：[risk.py](../catos/risk.py)、[risk_period.py](../catos/risk_period.py)、[supervisor.py](../catos/supervisor.py) 等有 local-sim 能力。R1 按台北日首次合格觀測建立固定基準，顯示語義應為「風控期間損益」與實際起算時間，不涵蓋起算前整日日損；重啟／反彈／跨日不自動解除 latch。沒有前端可呼叫的完整 R1 觀測／基準／re-arm／Kill Switch HTTP 契約。
+  - POST `/api/workspace/simulation/strategies`
+  - POST `/api/workspace/simulation/bots`
+  舊 [v1 交接](v1-local-core-handoff-20261002.md) 與 mock 路徑不能當現行 API 文件。
+- **風控／R1**：2026-11-03 起有唯讀 GET `/risk`、`/positions`、`/state`（投影自 local-sim 控制面事件的 `risk_state`，`basis.period_start_ms` 為台北日起點、UI 應標示「合成基準」）。[risk.py](../catos/risk.py)、[risk_period.py](../catos/risk_period.py)、[supervisor.py](../catos/supervisor.py) 的 R1 首次合格觀測、基準建立、latch／re-arm、Kill Switch 與門檻修改仍沒有 HTTP；顯示語義應為「風控期間損益」與實際起算時間，不涵蓋起算前整日日損；重啟／反彈／跨日不自動解除 latch。
 - **Lot 帳務**：見 [lot-fill-handoff.md](lot-fill-handoff.md)。Python／local-sim 階段與歷史驗證按各切片認定，不提升為現行多 Bot 共用合約、交易、額度預留、內部對沖或完整分攤能力。
 - 模組存在、單元測試通過、MCP 有方法或 mock 有命令，都不等於網站已取得控制能力。要補 HTTP 屬另一個後端工作包，本次只記錄。
 
