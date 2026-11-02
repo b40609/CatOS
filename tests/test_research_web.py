@@ -143,6 +143,54 @@ class ResearchServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ResearchError, "research_output_in_use"):
             other.start()
 
+    def test_thread_launch_failure_is_durable_and_releases_task_slot(self):
+        thread = Mock()
+        thread.start.side_effect = RuntimeError("fixture_thread_launch_failure")
+        thread.is_alive.return_value = False
+        with patch("catos.research_service.threading.Thread", return_value=thread):
+            with self.assertRaisesRegex(ResearchError, "research_task_start_failed") as caught:
+                self.service.submit(request_copy(), "test-build")
+        self.assertEqual(caught.exception.status, 503)
+        self.assertIsNone(self.service.active_run)
+        failed = self.service.list_runs()[0]
+        self.assertEqual(failed["status"], "failed")
+        self.assertIn("fixture_thread_launch_failure", failed["error"])
+        self.assertIsNotNone(failed["finished_at"])
+        with self.assertRaisesRegex(ResearchError, "research_output_in_use"):
+            ResearchService(self.path).start()
+        retry = self.service.submit(request_copy(), "test-build")
+        self.assertEqual(await_task(self.service, retry["run_id"])["status"], "complete")
+        self.service.close()
+        thread.join.assert_not_called()
+        restart = ResearchService(self.path)
+        restart.start()
+        self.addCleanup(restart.close)
+        self.assertEqual(restart.task(failed["run_id"]), failed)
+
+    def test_reader_thread_launch_failure_closes_owned_worker(self):
+        real_start = threading.Thread.start
+        for fail_on in (1, 2):
+            with self.subTest(fail_on=fail_on):
+                process = Mock()
+                process.stdin, process.stdout, process.stderr = BytesIO(), BytesIO(), BytesIO()
+                process.poll.return_value = None
+                started = []
+
+                def start(reader):
+                    if len(started) == fail_on - 1:
+                        raise RuntimeError("fixture_reader_launch_failure")
+                    started.append(reader)
+                    return real_start(reader)
+
+                with patch("catos.research_service.subprocess.Popen", return_value=process), \
+                        patch("catos.research_service.threading.Thread.start", start):
+                    with self.assertRaisesRegex(RuntimeError, "fixture_reader_launch_failure"):
+                        self.service._compute({"request": request_copy(), "provenance": provenance()})
+                process.kill.assert_called_once()
+                process.wait.assert_called_once()
+                self.assertTrue(all(stream.closed for stream in (process.stdin, process.stdout, process.stderr)))
+                self.assertTrue(all(not reader.is_alive() for reader in started))
+
     def test_interrupted_jobs_not_resumed(self):
         self.service.close()
         for index, status in enumerate(("queued", "running")):

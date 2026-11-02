@@ -111,12 +111,12 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     const countSystem = events.filter((e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e))).length;
 
     return [
-      { id: 'OPEN', label: `未解除 (${openCount})`, shortLabel: openCount > 0 ? `待解 (${openCount})` : '待解', badgeCount: openCount, isAlert: openCount > 0, filterFn: isOpen },
-      { id: 'ALL', label: `全部 (${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
-      { id: 'RISK_P6', label: `風控 (${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => ['RISK', 'P6'].includes(getEventDomain(e)) },
-      { id: 'FILLS_CASH', label: `成交 (${countFills})`, shortLabel: '成交', badgeCount: countFills, filterFn: (e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e)) },
-      { id: 'ORDERS_EXEC', label: `委託 (${countOrders})`, shortLabel: '委託', badgeCount: countOrders, filterFn: (e) => ['ORDERS'].includes(getEventDomain(e)) },
-      { id: 'SYSTEM_RECON', label: `系統 (${countSystem})`, shortLabel: '系統', badgeCount: countSystem, filterFn: (e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e)) },
+      { id: 'OPEN', label: `未解除(${openCount})`, shortLabel: openCount > 0 ? `待解(${openCount})` : '待解', badgeCount: openCount, isAlert: openCount > 0, filterFn: isOpen },
+      { id: 'ALL', label: `全部(${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
+      { id: 'RISK_P6', label: `風控(${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => ['RISK', 'P6'].includes(getEventDomain(e)) },
+      { id: 'FILLS_CASH', label: `成交(${countFills})`, shortLabel: '成交', badgeCount: countFills, filterFn: (e) => ['FILLS', 'FUNDING'].includes(getEventDomain(e)) },
+      { id: 'ORDERS_EXEC', label: `委託(${countOrders})`, shortLabel: '委託', badgeCount: countOrders, filterFn: (e) => ['ORDERS'].includes(getEventDomain(e)) },
+      { id: 'SYSTEM_RECON', label: `系統(${countSystem})`, shortLabel: '系統', badgeCount: countSystem, filterFn: (e) => ['SYSTEM', 'RECON'].includes(getEventDomain(e)) },
     ];
   }, [events, openCount]);
 
@@ -134,7 +134,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return [...list].sort((a, b) => {
       const aOpen = Number(a.resolution === 'open' && (a.category === 'ALERT' || a.severity === 'WARN'));
       const bOpen = Number(b.resolution === 'open' && (b.category === 'ALERT' || b.severity === 'WARN'));
-      return bOpen - aOpen;
+      if (bOpen !== aOpen) return bOpen - aOpen;
+      return b.time.localeCompare(a.time);
     });
   }, [events, currentTab]);
 
@@ -228,7 +229,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="activity_deck"
-          title="全域戰情日誌與成交流水"
+          title="事件審計與成交流水"
           subtext={
             !isNarrow ? (
               <span className="text-[10px] font-mono text-muted-foreground ml-1">
@@ -289,10 +290,10 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               {/* 2. 由下往上光子漫射流束 (純白光) */}
               <div
                 className="absolute left-[2px] bottom-0 w-[20px]"
-                style={{ animation: `photon-travel-upward ${DURATION_SEC}s linear infinite` }}
+                style={{ display: "none" }}
               >
                 <div
-                  className="photon-aurora-glow-up"
+                  className="hidden"
                   style={{
                     width: `${GLOW_SPREAD}px`,
                     height: `${Math.round(PHOTON_LENGTH * 1.25)}px`,
@@ -301,7 +302,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                   }}
                 />
                 <div
-                  className="photon-aurora-core-up"
+                  className="hidden"
                   style={{
                     width: `${PHOTON_WIDTH}px`,
                     height: `${PHOTON_LENGTH}px`,

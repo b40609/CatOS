@@ -58,18 +58,18 @@ const YAOZI_ALERTS: YaoziAlert[] = [
     severity: "high",
     trigger: "5 分鐘內單向爆倉額度 > 3,000,000 USDT",
     impact: "短線多單流動性踩踏，盤口滑價可能擴大至 5~10 bps",
-    actionGuide: "維持策略續抱，嚴守 OKX 交易所端 P6 災難停損防線，禁止手動搶反彈加倉。",
+    actionGuide: "維持策略續抱，嚴守 OKX 交易所端 交易所停損保護，禁止手動搶反彈加倉。",
   },
   {
     id: "alert-02",
     symbol: "SOL-USDT-SWAP",
     title: "資金費率顯著偏離 (OKX vs Binance)",
     time: "09:48:30 UTC",
-    summary: "SOL-USDT 永續 8H 資金費率出現偏離，OKX +0.038% vs Binance +0.012%，基差年化達 28.5%，套利窗口開啟。",
+    summary: "SOL-USDT 永續 4h 資金費率出現偏離，OKX +0.038% vs Binance +0.012%，基差年化達 28.5%，套利窗口開啟。",
     tag: "FUNDING_ARB",
     tagLabel: "費率套利",
     severity: "medium",
-    trigger: "跨所 8H 資金費率偏離基差 > 0.020% (年化 > 20%)",
+    trigger: "跨所資金費率偏離基差 > 0.020% (年化 > 20%)",
     impact: "多頭過度擁擠於 OKX，次根結算可能引發部分多頭平倉壓制價格",
     actionGuide: "可作為反轉訊號輔助權重，但策略核心決策仍依據 Closed Bar 訊號，不盲目跨所對沖。",
   },
@@ -100,10 +100,10 @@ interface FundingRateRow {
 }
 
 const FUNDING_RATES: FundingRateRow[] = [
-  { symbol: "BTC-USDT-SWAP", okxRate: "+0.0100%", binanceRate: "+0.0098%", basis: "+0.0002%", apr: "0.22%", signal: "平衡", settleCountdown: "03:42:15", okx8hCostPer10k: "1.00 USDT" },
-  { symbol: "ETH-USDT-SWAP", okxRate: "+0.0150%", binanceRate: "+0.0110%", basis: "+0.0040%", apr: "4.38%", signal: "套利機會", settleCountdown: "03:42:15", okx8hCostPer10k: "1.50 USDT" },
-  { symbol: "SOL-USDT-SWAP", okxRate: "+0.0380%", binanceRate: "+0.0120%", basis: "+0.0260%", apr: "28.47%", signal: "強烈訊號", settleCountdown: "03:42:15", okx8hCostPer10k: "3.80 USDT" },
-  { symbol: "DOGE-USDT-SWAP", okxRate: "-0.0050%", binanceRate: "+0.0020%", basis: "-0.0070%", apr: "7.66%", signal: "空頭擠壓", settleCountdown: "03:42:15", okx8hCostPer10k: "-0.50 USDT" },
+  { symbol: "BTC-USDT-SWAP", okxRate: "+0.0100% (8h)", binanceRate: "+0.0098%", basis: "+0.0002%", apr: "0.22%", signal: "平衡", settleCountdown: "05:08:07", okx8hCostPer10k: "1.00 USDT" },
+  { symbol: "ETH-USDT-SWAP", okxRate: "+0.0150% (8h)", binanceRate: "+0.0110%", basis: "+0.0040%", apr: "4.38%", signal: "套利機會", settleCountdown: "05:08:07", okx8hCostPer10k: "1.50 USDT" },
+  { symbol: "SOL-USDT-SWAP", okxRate: "+0.0380% (4h)", binanceRate: "+0.0120%", basis: "+0.0260%", apr: "28.47%", signal: "強烈訊號", settleCountdown: "01:08:07", okx8hCostPer10k: "3.80 USDT" },
+  { symbol: "DOGE-USDT-SWAP", okxRate: "-0.0050% (8h)", binanceRate: "+0.0020%", basis: "-0.0070%", apr: "7.66%", signal: "空頭擠壓", settleCountdown: "05:08:07", okx8hCostPer10k: "-0.50 USDT" },
 ];
 
 interface RadarMetric {
@@ -313,7 +313,7 @@ function MarketIntelPage() {
           title={
             <div className="flex items-center gap-2">
               <TrendingUp className="size-3.5 text-primary" />
-              <span>資金費率偏離與跨所套利監測 (Funding Rate Matrix · 8H 結算)</span>
+              <span>資金費率與市場情緒監測矩陣 (Funding Rate & Sentiment Matrix)</span>
             </div>
           }
           meta={
@@ -352,8 +352,8 @@ function MarketIntelPage() {
               <thead className="border-b border-border text-[10px] font-mono text-muted-foreground bg-background/30">
                 <tr>
                   <th className="py-2 px-3 font-normal">標的合約</th>
-                  <th className="py-2 px-3 text-right font-normal">OKX 8H 費率</th>
-                  <th className="py-2 px-3 text-right font-normal">Binance 8H 費率</th>
+                  <th className="py-2 px-3 text-right font-normal">OKX 費率 / 週期</th>
+                  <th className="py-2 px-3 text-right font-normal">Binance 費率</th>
                   <th className="py-2 px-3 text-right font-normal">偏離基差 (Basis)</th>
                   <th className="py-2 px-3 text-right font-normal">年化 APR</th>
                   <th className="py-2 px-3 text-right font-normal">每萬 USDT 成本</th>
@@ -570,7 +570,7 @@ function MarketIntelPage() {
             <DialogHeader>
               <DialogTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <span>{selectedFunding.symbol}</span>
-                <span className="text-xs text-primary font-normal">8H 資金費率跨所套利試算</span>
+                <span className="text-xs text-primary font-normal">資金費率與持倉成本試算</span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 OKX 永續 SWAP vs Binance 永續合約基差
@@ -580,11 +580,11 @@ function MarketIntelPage() {
             <div className="space-y-3 py-2 text-xs font-mono">
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded border border-border/60 bg-background/50 p-2.5 text-center">
-                  <span className="text-[10px] text-muted-foreground block">OKX 8H 費率</span>
+                  <span className="text-[10px] text-muted-foreground block">OKX 費率</span>
                   <span className="text-sm font-bold text-foreground mt-0.5 block">{selectedFunding.okxRate}</span>
                 </div>
                 <div className="rounded border border-border/60 bg-background/50 p-2.5 text-center">
-                  <span className="text-[10px] text-muted-foreground block">Binance 8H 費率</span>
+                  <span className="text-[10px] text-muted-foreground block">Binance 費率</span>
                   <span className="text-sm font-bold text-muted-foreground mt-0.5 block">{selectedFunding.binanceRate}</span>
                 </div>
               </div>
@@ -599,7 +599,7 @@ function MarketIntelPage() {
                   <span className="font-bold text-foreground">{selectedFunding.apr}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">每 10,000 USDT 持倉成本:</span>
+                  <span className="text-muted-foreground">每 10,000 USDT 當期成本:</span>
                   <span className="font-bold text-foreground">{selectedFunding.okx8hCostPer10k}</span>
                 </div>
                 <div className="flex justify-between">
@@ -609,7 +609,7 @@ function MarketIntelPage() {
               </div>
 
               <p className="text-[10px] text-muted-foreground leading-relaxed">
-                ※ 資金費率結算週期為 00:00 / 08:00 / 16:00 UTC。CatOS 策略以 Closed Bar 決策為主，跨所費率基差僅作為市場情緒與動態持倉成本參考，不進行未授權之自動雙邊對沖套利。
+                ※ OKX 永續合約依幣種具有獨立結算週期（BTC/ETH 為 8h，SOL 為 4h）。CatOS 策略以 Closed Bar 決策為主，費率基差僅作為市場情緒與動態持倉成本參考，不進行未授權之自動雙邊對沖。
               </p>
             </div>
 

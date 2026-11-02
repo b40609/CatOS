@@ -139,7 +139,7 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => handleSelectBot("mochi")} className="cursor-pointer">
             <Bot className="mr-2 size-4 text-amber-400" />
-            <span>mochi-sol-breakout (SOL-USDT-SWAP · 5m · P6更新待確認)</span>
+            <span>mochi-sol-breakout (SOL-USDT-SWAP · 5m · 停損更新待確認)</span>
           </CommandItem>
           <CommandItem onSelect={() => handleSelectBot("shiro")} className="cursor-pointer">
             <Bot className="mr-2 size-4 text-muted-foreground" />

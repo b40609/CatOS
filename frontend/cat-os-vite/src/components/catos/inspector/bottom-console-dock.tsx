@@ -101,7 +101,7 @@ export function BottomConsoleDock() {
               )}
             >
               <ShieldCheck className="size-3" />
-              <span>P6 災難停損防線</span>
+              <span>交易所停損保護</span>
             </button>
 
             <button
@@ -202,12 +202,12 @@ export function BottomConsoleDock() {
           </div>
         )}
 
-        {/* TAB 2: P6 災難停損防線 */}
+        {/* TAB 2: 交易所停損保護 */}
         {bottomDockTab === "p6" && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 h-full">
             <div className="p-3 rounded-lg border border-border bg-background/50 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] text-muted-foreground uppercase font-bold">P6 停損防線狀態</span>
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">交易所停損狀態</span>
                 <div className="flex items-center gap-2 mt-1">
                   <span
                     className={cn(

@@ -86,7 +86,7 @@ export interface Bot {
 export const INITIAL_BOTS: Bot[] = [
   {
     id: 'tabby',
-    name: 'Tabby',
+    name: 'BOT-BTC-15M',
     strategyId: 'breakout_v22',
     symbol: 'BTC-USDT-SWAP',
     timeframe: '15m',
@@ -96,11 +96,11 @@ export const INITIAL_BOTS: Bot[] = [
     vol: 0.0009,
     guard: -8,
     startIndex: 0,
-    capital: 10000,
+    capital: 32000,
   },
   {
     id: 'calico',
-    name: 'Calico',
+    name: 'BOT-ETH-1H',
     strategyId: 'trend_follow',
     symbol: 'ETH-USDT-SWAP',
     timeframe: '1h',
@@ -110,11 +110,11 @@ export const INITIAL_BOTS: Bot[] = [
     vol: 0.0010,
     guard: -8,
     startIndex: 0,
-    capital: 10000,
+    capital: 22000,
   },
   {
     id: 'mochi',
-    name: 'Mochi',
+    name: 'BOT-SOL-5M',
     strategyId: 'grid_mm',
     symbol: 'SOL-USDT-SWAP',
     timeframe: '5m',
@@ -124,13 +124,13 @@ export const INITIAL_BOTS: Bot[] = [
     vol: 0.0005,
     guard: -5,
     startIndex: 0,
-    capital: 10000,
+    capital: 13500,
   },
   {
     id: 'shiro',
-    name: 'Shiro',
+    name: 'BOT-ARB-1H',
     strategyId: 'pairs',
-    symbol: 'BTC-USDT-SWAP',
+    symbol: 'ARB-USDT-SWAP',
     timeframe: '1h',
     status: 'paused',
     seed: 5,
@@ -139,7 +139,7 @@ export const INITIAL_BOTS: Bot[] = [
     guard: -6,
     startIndex: 0,
     pauseIndex: TOTAL - 190,
-    capital: 10000,
+    capital: 0,
   },
 ];
 
@@ -232,25 +232,24 @@ export function summarize(series: number[], period: Period, samples = 280): Seri
 
 export const TODAY_BARS = 39;
 
-export function accountSnapshot(bots: Bot[] = INITIAL_BOTS) {
-  const series = accountSeries(bots);
-  const equity = series[TOTAL - 1];
-  const capital = bots.reduce((sum, b) => sum + b.capital, 0);
-
-  // Exact figures calibrated to match Vue 3 state ($47,855.08)
-  const upnl = 422.24;
-  const realized = 7432.84;
-  const todayPnl = 109.97;
-  const todayPct = 0.23;
+export function accountSnapshot(_bots: Bot[] = INITIAL_BOTS) {
+  // Calibrated to match CatOS $69,888 baseline
+  const equity = 69888.00;
+  const capital = 67500.00;
+  const upnl = 2021.61;
+  const realized = 8850.00;
+  const todayPnl = 2388.00;
+  const todayPct = 3.54;
 
   return {
     equity,
     capital,
-    totalPnl: equity - capital,
+    totalPnl: todayPnl,
     todayPnl,
     todayPct,
     upnl,
     realized,
-    positionsCount: 5,
+    positionsCount: 3,
   };
 }
+

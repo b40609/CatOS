@@ -14,7 +14,7 @@ export const DICT = {
     total_equity: "帳戶總權益",
     vs_yesterday: "較昨日",
     today_pnl: "今日損益",
-    active_bots: "運行機器人",
+    active_bots: "活躍策略實例",
     running: "運行中",
     paused: "已停止",
     max_drawdown: "歷史最大回撤",
@@ -53,7 +53,7 @@ export const DICT = {
     side_long: "▲ 做多",
     side_short: "▼ 做空",
     positions_summary: "筆當前持倉 · USDT 結算",
-    manage_bots: "管理機器人",
+    manage_bots: "策略實例管理",
 
     // Recent Fills
     recent_fills: "即時成交流水",
@@ -79,7 +79,7 @@ export const DICT = {
     total_equity: "Total equity",
     vs_yesterday: "vs. yesterday",
     today_pnl: "Today's PnL",
-    active_bots: "Active bots",
+    active_bots: "Active Instances",
     running: "running",
     paused: "paused",
     max_drawdown: "Max drawdown",
@@ -118,7 +118,7 @@ export const DICT = {
     side_long: "▲ LONG",
     side_short: "▼ SHORT",
     positions_summary: "open positions · USDT settled",
-    manage_bots: "Manage bots",
+    manage_bots: "Manage Instances",
 
     // Recent Fills
     recent_fills: "Recent Fills",

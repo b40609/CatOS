@@ -626,7 +626,7 @@ function BacktestPage() {
                   <span className="font-mono text-foreground font-medium">{activeRequest?.fee_rate ?? "--"}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                  <span className="text-muted-foreground">滑點模型 (slippage_bps)</span>
+                  <span className="text-muted-foreground">滑價模型 (slippage_bps)</span>
                   <span className="font-mono text-foreground font-medium">{activeRequest?.slippage_bps ?? "--"} bps</span>
                 </div>
                 <div className="flex items-center justify-between">

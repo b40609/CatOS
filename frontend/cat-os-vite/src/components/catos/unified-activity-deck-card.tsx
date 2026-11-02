@@ -101,10 +101,10 @@ export function UnifiedActivityDeckCard({
         <table className="w-full text-left border-collapse table-auto">
           <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
             <tr>
-              <th className="py-2 pl-3 pr-1.5 font-medium">TIME / SOURCE</th>
-              <th className="px-1.5 font-medium">TYPE & BOT</th>
-              <th className="px-1.5 font-medium">TITLE & EVENT DETAILS</th>
-              <th className="py-2 pr-3 pl-1.5 text-right font-medium">PnL / STATUS</th>
+              <th className="py-2 pl-3 pr-1.5 font-medium">時間 / 來源</th>
+              <th className="px-1.5 font-medium">類型與實例</th>
+              <th className="px-1.5 font-medium">事件詳情</th>
+              <th className="py-2 pr-3 pl-1.5 text-right font-medium">損益 / 狀態</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40 text-xs font-mono">

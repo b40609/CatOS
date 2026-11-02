@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Timer,
-  Clock,
   TrendingUp,
   TrendingDown,
-  Flame,
+  
   X,
 } from "lucide-react";
 import { useLiveMarketStore } from "@/state/liveMarketStore";
@@ -22,7 +21,6 @@ export function TopMarketTicker() {
     klineClockMounted,
     klineTimeframe,
     setKlineTimeframe,
-    fundingClockMounted,
     marketTapeMounted,
     dismissSymbolFromBar,
     getActiveSymbols,
@@ -76,21 +74,6 @@ export function TopMarketTicker() {
     };
   }, [now, klineTimeframe]);
 
-  // 3. OKX 8H 資金費結算倒數 (00:00, 08:00, 16:00 UTC)
-  const fundingCountdown = useMemo(() => {
-    const utcHours = now.getUTCHours();
-    const nextFundingUtcHour = (Math.floor(utcHours / 8) + 1) * 8;
-    const targetDate = new Date(now);
-    targetDate.setUTCHours(nextFundingUtcHour, 0, 0, 0);
-
-    const diffMs = targetDate.getTime() - now.getTime();
-    const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-    const h = Math.floor(diffSec / 3600);
-    const m = Math.floor((diffSec % 3600) / 60);
-    const s = diffSec % 60;
-
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }, [now]);
 
   // 4. 動態標的清單 (跟隨活躍 Bot 策略或使用者自選標的池)
   const activeBotSymbols = useMemo(() => {
@@ -111,7 +94,7 @@ export function TopMarketTicker() {
   }, [getActiveSymbols, activeBotSymbols]);
 
   // 若頂部所有組件皆未掛載，徹底留白不佔任何像素
-  if (!klineClockMounted && !fundingClockMounted && (!marketTapeMounted || activeSymbols.length === 0)) {
+  if (!klineClockMounted && (!marketTapeMounted || activeSymbols.length === 0)) {
     return null;
   }
 
@@ -126,10 +109,10 @@ export function TopMarketTicker() {
               ? "border-amber-500/50 bg-amber-500/10 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)] animate-pulse"
               : "border-border/70 text-foreground"
           )}
-          title={`次根 K 線開盤: ${barCountdown.nextBarText} (點擊切換週期，可在模組工坊配置)`}
+          title={`次根 K 線開盤: ${barCountdown.nextBarText} (點擊切換週期)`}
         >
           {barCountdown.isClosingSoon ? (
-            <Flame className="size-3 text-amber-400 animate-bounce" />
+            <Timer className="size-3 text-amber-400" />
           ) : (
             <Timer className="size-3 text-primary" />
           )}
@@ -175,19 +158,8 @@ export function TopMarketTicker() {
         </div>
       )}
 
-      {/* 2. 8H 資金費結算時鐘組件 */}
-      {fundingClockMounted && (
-        <div
-          className="flex items-center gap-1.5 h-7 px-2 rounded-md border border-border/70 bg-surface/60 text-[10.5px] text-muted-foreground shadow-2xs"
-          title="OKX 永續合約 8H 資金費率結算倒數 (00:00 / 08:00 / 16:00 UTC)"
-        >
-          <Clock className="size-2.5 text-primary/80" />
-          <span className="text-[9.5px] hidden sm:inline">8H 費率結算</span>
-          <span className="text-foreground font-semibold">{fundingCountdown}</span>
-        </div>
-      )}
 
-      {/* 3. 動態標的行情總線 (自動跟隨策略或自選標的池，非硬編碼單幣) */}
+      {/* 2. 動態標的行情總線 (自動跟隨策略或自選標的池，非硬編碼單幣) */}
       {marketTapeMounted &&
         activeSymbols.map((code) => {
           const liveQuote = quotes[code];
@@ -202,7 +174,7 @@ export function TopMarketTicker() {
             <div
               key={code}
               className="group relative flex items-center gap-1.5 h-7 px-2 rounded-md border border-border/60 bg-surface-raised/40 hover:bg-secondary/40 transition-colors text-[10.5px]"
-              title={`${code}-USDT-SWAP 實時標記價 (懸停點擊 × 可快速隱藏，可至模組工坊管理標的池)`}
+              title={`${code}-USDT-SWAP 實時標記價 (懸停點擊 × 可快速隱藏)`}
             >
               <span className="font-bold text-foreground text-[10.5px]">{code}</span>
               <NumberTicker
@@ -234,7 +206,7 @@ export function TopMarketTicker() {
                   dismissSymbolFromBar(code);
                 }}
                 className="opacity-0 group-hover:opacity-100 size-3.5 -mr-0.5 rounded grid place-items-center text-muted-foreground/80 hover:text-rose-400 hover:bg-rose-400/10 transition-all cursor-pointer"
-                title={`從頂部總線隱藏 ${code} (可在模組工坊隨時重新加入)`}
+                title={`從頂部總線隱藏 ${code} `}
               >
                 <X className="size-2.5" />
               </button>

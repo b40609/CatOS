@@ -20,13 +20,11 @@ export function CardHeaderTitle({
   className,
 }: CardHeaderTitleProps) {
   return (
-    <div className="flex items-center justify-between w-full min-w-0 select-none">
-      <div className={cn("flex items-center gap-1.5 py-0.5 min-w-0", className)}>
-        <span className="text-[12px] font-semibold text-foreground tracking-tight select-none truncate">
-          {title}
-        </span>
-        {subtext}
-      </div>
+    <div className={cn("flex items-center gap-1.5 py-0.5 min-w-0 shrink-0 select-none whitespace-nowrap", className)}>
+      <span className="text-[12px] font-semibold text-foreground tracking-tight select-none truncate whitespace-nowrap">
+        {title}
+      </span>
+      {subtext}
     </div>
   );
 }

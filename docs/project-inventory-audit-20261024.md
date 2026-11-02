@@ -375,3 +375,85 @@
 提交格式核對：完整 `git diff --cached --check` 僅回報完整舊入口快照第 639 行的檔尾空行。為保留前輪已核對的原文，此處不改寫快照；其餘路徑採預設檢查通過，該快照僅豁免 `blank-at-eof` 後通過，未忽略其他空白錯誤。
 
 本機原始獨驗證據見 [acceptance.json](../outputs/cleanup-acceptance-20261024/acceptance.json)。本節與接續入口隨本次授權提交交付；備份 ZIP、原始日誌、建置輸出與其他未追蹤材料不納入 Git。實際提交識別及推送狀態以 Git 與本輪交付訊息為準。本輪 PASS 不代表完整 Bot／帳戶／交易已就緒。
+
+## 2026-10-25：後端離線健檢與必要修正
+
+本輪使用者授權後端離線檢查、必要修正與開發自測，不含前端、8890、正式資料、交易所、schema、清理或 Git 寫入。實查目錄 `C:/Users/user/Desktop/CatOS`、分支 `feature/catos-react-vite`、HEAD `748713c`；起始無追蹤檔變更，原有未追蹤內容保留。未 fetch／pull，故不宣稱遠端仍停在同一提交。
+
+### 既有問題核對
+
+| 項目 | 本輪核對結果 |
+| --- | --- |
+| INV-01 | 完整 Bot／策略管理、R1 HTTP／主頁帳戶風控仍未完成；設定頁沒有完整設定保存 API。屬尚未實作契約，本輪不新增 API |
+| INV-02、04～06、10 | 前輪已修正代理 Origin、優化輪詢／競態、store 與啟動身分；依現行程式與既有驗收紀錄核對，未重跑前端／8890，保留原驗收界線 |
+| INV-03 | `requirements-http.txt` 已宣告依賴；本輪現有 venv 實查 FastAPI 0.141.1、uvicorn 0.52.4、httpx 0.28.1、Optuna 4.9.0、mcp 1.29.1 可用，未安裝／升級 |
+| INV-07、11 | 交接入口更新為本輪現況；前輪清理已結案，本輪不再清理或搬移舊版功能 |
+| INV-08、09、12 | DCM 歷史缺件、研究歷史 hash 漂移、跨機證據保存政策仍未結案。本輪只驗目前合成研究流程，不重新認證歷史證據 |
+
+回測／最佳化沿用共用研究服務與白名單合成資料；設定解析檢查 JSON 欄位、Decimal 字串與不合法值拒絕；本地模擬沿用單 writer、原子 JSON 狀態、臨時 SQLite 與既有 recovery／stop 契約。本輪沒有重現新的金融精度或既有 schema 問題，不因此宣稱正式帳戶／交易已就緒。
+
+### 已重現並修正
+
+- `catos/research_service.py`：任務執行緒啟動失敗時，原先留下 queued 與 active_run，後續永遠 busy，close 還會 join 未啟動執行緒。現在持久化 failed／finished_at、釋放槽位、回傳 `research_task_start_failed`／503；單 writer 鎖保留，可重新提交，重啟仍能讀到失敗紀錄。
+- 同檔 Worker stdout／stderr 讀取執行緒啟動原在清理區塊外；第一或第二條啟動失敗時，子程序與管線未回收。現在啟動也納入既有 finally，只 join 已啟動執行緒，終止並等待本輪子程序後關閉管線。
+- `tests/test_research_web.py` 新增 2 項回歸測試，覆蓋任務槽位／失敗持久化／重試／owner 鎖與兩個 reader 啟動失敗位置。先在修正前執行，2 項皆失敗，另有 1 個收尾錯誤；修後皆通過。沒有改交易路由、Decimal 計算或資料格式。
+
+### 實際驗證
+
+沿用既有 `outputs/integration-baseline-20261024/http-venv/Scripts/python.exe`（Python 3.14.6），未產生新的測試環境。下列 PowerShell 命令在 CatOS 根目錄執行：
+
+```powershell
+$env:PYTHONPATH = Join-Path (Get-Location).Path 'tests'
+.\outputs\integration-baseline-20261024\http-venv\Scripts\python.exe -B -m unittest tests.test_research tests.test_research_cli tests.test_data_io tests.test_optimization tests.test_research_web tests.test_research_optimization_web tests.test_local_sim_control
+# 修改前：Ran 107 tests in 14.592s / OK
+
+.\outputs\integration-baseline-20261024\http-venv\Scripts\python.exe -B -m unittest tests.test_research_web.ResearchServiceTests.test_thread_launch_failure_is_durable_and_releases_task_slot tests.test_research_web.ResearchServiceTests.test_reader_thread_launch_failure_closes_owned_worker
+# 修正前回歸重現：Ran 2 tests in 0.049s / FAILED (failures=2, errors=1)
+
+.\outputs\integration-baseline-20261024\http-venv\Scripts\python.exe -B -m unittest tests.test_research_web tests.test_research_optimization_web tests.test_research_validation_web
+# 修正後：Ran 34 tests in 7.703s / OK
+```
+
+107 與 34 項有重疊，不相加為不同案例數。核心驗證含 Decimal、設定與 CSV 拒絕不合法輸入、最佳化評分、研究任務封存／復原、HTTP 防護、本地模擬啟停／持久化／恢復；資料與 SQLite 均在臨時目錄，網路依賴使用 Mock，未啟動正式服務或寫入既有使用者資料。Starlette 既有 httpx 棄用提示不影響本輪通過結果，未因此升級依賴。
+
+上列為開發自測，後續指定角色核對另記於下節；未測另一台 PC 的未推送前端、UI 互動、正式前後端對接、真實市場／帳戶、Demo／Live 或歷史封存完整性。validation／HTML report 與 React 的串接仍待前端完成後確認。差異與證據留在既有檔案中，未 commit／push；接續入口見 [current-handoff.md](current-handoff.md)。
+
+## 2026-10-25：前端完成前的後端接續核對
+
+使用者同意接續指定獨驗、R1 證據複核與既有串接契約整理；沿用後端離線邊界，起始承接上一節的 4 個未提交追蹤檔及全部既有未追蹤內容，HEAD／分支未變。不新增管理 API，不操作前端或正式服務。
+
+主代理以同一既有 venv 執行一次性 `python.exe -B -` 契約查核：解析串接表 JSON，對照 `research_catalog` 的三組常數與驗值函式（validation 沿用 `validate_validation_request`）；以 `workspace_api.create_app` 掛載全新臨時資料根，程序內 TestClient 查詢 catalog／version、檢查路由及缺口。preview relay 與外部 socket connect 使用 Mock／攔截；Windows asyncio 內部 loopback 通訊允許。實際結果：
+
+| 查核 | 結果 |
+| --- | --- |
+| 串接表 JSON 與完整請求 | 13 個 JSON 可解析；3 組 defaults 與程式逐欄一致，均通過既有驗值 |
+| 已掛載研究／固定模板模擬路由 | 9＋5＝14 條 method／path 相符；version 的 mode、contract、模板及 8 根／2 根預熱吻合 |
+| 舊策略／Bot 管理缺口及設定／風控探測 | 6 個路徑的 GET／POST 均 404；設定／風控探測網址不代表新 API 已定案 |
+| 隔離與結果 | exit 0；未提交任務、未連線正式服務，指定的缺檔市場 DB 未被建立 |
+
+查核腳本初版曾因函式名稱誤用而 import 失敗；另一版攔截所有 socket connect，連 Windows asyncio 內部 socketpair 也被阻擋。修正查核腳本後取得上述結果，並非產品缺陷，沒有因此改產品網路行為或依賴。
+
+[串接表](backend-frontend-integration-map.md) 第 6 節固定既有 catalog／合成模板與測試來源，列出 Bot／策略、R1 與設定保存的最小待決範圍；已補正代理、優化 adapter／共用槽的過時描述，以及已退役 8887 設定檔的失效連結。另發現 R1 在 10/20 已有指定角色獨驗 PASS，補正 AGENTS 與 R1 開發交付的「待獨驗」狀態；原始歷史報告與政策未改寫。
+
+指定獨驗模型 `chatgpt-web/gpt-6-sol`（Copernicus，`01a17382-c725-7d82-9457-6472e8d9d29e`）本輪唯讀複核原始碼與歷史證據，判定研究服務修正及 R1 隔離 local-sim **PASS**：
+
+- 研究服務 6／6、0 failure／error，0.706 秒：兩項新增回歸、關閉時保留 writer、共用槽／失敗狀態、單 writer、輸出上限終止 owned Worker。確認 failed 持久化、503、可重試、reader 啟動失敗的子程序及管線回收。
+- R1 專屬 21／21、0 failure／error，2.398 秒：固定分母、首次缺證重試、同日不可替換、跨日 latch、基準遺失／損壞、COMMIT 回滾／ACK 遺失、等待期間 latch／caller mutation、外部流邊界／去重、合法減倉及非正權益。未發現新的可重現風控缺陷。
+- 重新計算開發 summary 所列 5 個 R1 核心及 12 個測試檔的 SHA-256，17／17 一致、0 漂移。原始日誌記錄 `Ran 197 tests in 13.812s / OK`，並核對 10/20 指定獨驗的 197＋3 項證據；這些歷史案例未全數重跑，不與本輪 27 項相加。
+
+獨驗者實際命令（同一 venv；下列兩次皆 exit 0）：
+
+```powershell
+$env:PYTHONPATH = Join-Path (Get-Location).Path 'tests'
+$verifyPython = 'outputs/integration-baseline-20261024/http-venv/Scripts/python.exe'
+& $verifyPython -B -m unittest -v `
+  test_research_web.ResearchServiceTests.test_thread_launch_failure_is_durable_and_releases_task_slot `
+  test_research_web.ResearchServiceTests.test_reader_thread_launch_failure_closes_owned_worker `
+  test_research_web.ResearchServiceTests.test_shutdown_keeps_writer_until_active_result_finishes `
+  test_research_web.ResearchServiceTests.test_one_task_busy_and_failed_status `
+  test_research_web.ResearchServiceTests.test_output_single_writer `
+  test_research_web.ResearchServiceTests.test_output_cap_kills_only_owned_worker
+& $verifyPython -B -m unittest discover -s tests -p test_risk_period_r1.py -v
+```
+
+測試全部為假資料／Mock／全新暫存資料；獨驗期間主代理僅整理文件。PASS 不涵蓋正式 HTTP／React 串接、真實 provider、Demo／Live、完整台北日日損或離線期間閾值穿越。前端其他 PC 未推送內容、INV-01 管理／設定／R1 HTTP、INV-08／09／12 歷史證據及政策仍待處理；沒有因此開發新功能或擴大交易授權。

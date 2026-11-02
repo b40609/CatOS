@@ -70,9 +70,9 @@ interface LiveMarketState {
   decrementCountdown: () => void;
 }
 
-const INITIAL_BASE_EQUITY = 48550.00;
-const INITIAL_TODAY_BASE = 1522.80;
-const INITIAL_REALIZED = 7432.84;
+const INITIAL_BASE_EQUITY = 69888.00;
+const INITIAL_TODAY_BASE = 2388.00;
+const INITIAL_REALIZED = 8850.00;
 const P6_STOP_BTC = 59500.0;
 const P6_STOP_ETH = 3210.0;
 const P6_STOP_SOL = 142.0;
@@ -94,17 +94,17 @@ export const useLiveMarketStore = create<LiveMarketState>((set, get) => {
     return { symbol, markPrice: mark, entryPrice: entry, qty, upnl, upnlPct, notional, lastDir: dir, p6DistPct };
   };
 
-  // 依據 CatOS 5 萬刀帳戶標準分配：Tabby (BTC 0.85)、Calico (ETH 9.50)、Mochi (SOL 95.00)
+  // 依據 CatOS 69,888 刀帳戶標準分配：Tabby (BTC 1.20)、Calico (ETH 13.50)、Mochi (SOL 135.00)
   const initialBots: Record<string, BotLiveState> = {
-    tabby: calcBot("BTC-USDT-SWAP", p0.btc, 61480.0, 0.85, P6_STOP_BTC, "up"),
-    calico: calcBot("ETH-USDT-SWAP", p0.eth, 3320.0, 9.50, P6_STOP_ETH, "up"),
-    mochi: calcBot("SOL-USDT-SWAP", p0.sol, 148.2, 95.0, P6_STOP_SOL, "up"),
-    shiro: calcBot("BTC-USDT-SWAP", p0.btc, 0, 0, 0, "up"),
+    tabby: calcBot("BTC-USDT-SWAP", p0.btc, 61480.0, 1.20, P6_STOP_BTC, "up"),
+    calico: calcBot("ETH-USDT-SWAP", p0.eth, 3320.0, 13.50, P6_STOP_ETH, "up"),
+    mochi: calcBot("SOL-USDT-SWAP", p0.sol, 148.2, 135.0, P6_STOP_SOL, "up"),
+    shiro: calcBot("ARB-USDT-SWAP", 0.55, 0, 0, 0, "up"),
   };
 
   const initialUpnl = initialBots.tabby.upnl + initialBots.calico.upnl + initialBots.mochi.upnl;
   const initialNotional = initialBots.tabby.notional + initialBots.calico.notional + initialBots.mochi.notional;
-  const initialInFlight = 5578.0; // 限價委託在途凍結
+  const initialInFlight = 8040.0; // 限價委託在途凍結名目額度
 
   const initialQuotes: Record<string, MarketQuote> = {
     BTC: {
@@ -167,10 +167,10 @@ export const useLiveMarketStore = create<LiveMarketState>((set, get) => {
     const solDir: "up" | "down" = solDelta >= 0 ? "up" : "down";
     const dogeDir: "up" | "down" = dogeDelta >= 0 ? "up" : "down";
 
-    const tabby = calcBot("BTC-USDT-SWAP", point.btc, 61480.0, 0.85, P6_STOP_BTC, btcDir);
-    const calico = calcBot("ETH-USDT-SWAP", point.eth, 3320.0, 9.50, P6_STOP_ETH, ethDir);
-    const mochi = calcBot("SOL-USDT-SWAP", point.sol, 148.2, 95.0, P6_STOP_SOL, solDir);
-    const shiro = calcBot("BTC-USDT-SWAP", point.btc, 0, 0, 0, "up");
+    const tabby = calcBot("BTC-USDT-SWAP", point.btc, 61480.0, 1.20, P6_STOP_BTC, btcDir);
+    const calico = calcBot("ETH-USDT-SWAP", point.eth, 3320.0, 13.50, P6_STOP_ETH, ethDir);
+    const mochi = calcBot("SOL-USDT-SWAP", point.sol, 148.2, 135.0, P6_STOP_SOL, solDir);
+    const shiro = calcBot("ARB-USDT-SWAP", 0.55, 0, 0, 0, "up");
 
     const newTotalUpnl = Number((tabby.upnl + calico.upnl + mochi.upnl).toFixed(2));
     const newTotalNotional = tabby.notional + calico.notional + mochi.notional;
@@ -275,7 +275,7 @@ export const useLiveMarketStore = create<LiveMarketState>((set, get) => {
     equity: INITIAL_BASE_EQUITY,
     totalEquity: INITIAL_BASE_EQUITY,
     todayPnl: INITIAL_TODAY_BASE,
-    todayPct: Number(((INITIAL_TODAY_BASE / INITIAL_BASE_EQUITY) * 100).toFixed(2)),
+    todayPct: Number(((INITIAL_TODAY_BASE / (INITIAL_BASE_EQUITY - INITIAL_TODAY_BASE)) * 100).toFixed(2)),
     totalUpnl: initialUpnl,
     realized: INITIAL_REALIZED,
     effectiveLeverage: Number(((initialNotional + initialInFlight) / INITIAL_BASE_EQUITY).toFixed(2)),

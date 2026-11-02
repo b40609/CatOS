@@ -116,12 +116,12 @@ export function MasterDetailCard({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* 3. P6 災難停損保護防線 */}
+        {/* 3. 交易所強制停損 */}
         <div className="p-2.5 rounded-lg border border-border/70 bg-secondary/30">
           <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase mb-2">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="size-3 text-primary" />
-              <span>P6 災難停損防線 (OKX 條件委託)</span>
+              <span>交易所停損保護 (OKX 條件委託)</span>
             </div>
             <span
               className={cn(

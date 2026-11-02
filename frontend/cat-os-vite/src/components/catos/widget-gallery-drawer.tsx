@@ -39,36 +39,36 @@ const SYSTEM_PRESETS: {
 }[] = [
   {
     id: "tsplit",
-    name: "5 卡標準戰情",
-    tag: "出廠推薦",
+    name: "標準交易視圖 (5-Split)",
+    tag: "標準配置",
     cardsCount: 5,
     desc: "上下 T-Split 佈局，核心策略與持倉並行監控 (經典定案)",
   },
   {
     id: "full9",
-    name: "5 卡全景大盤",
-    tag: "完整大盤",
+    name: "全景監控視圖 (Full Overview)",
+    tag: "全景視圖",
     cardsCount: 5,
     desc: "全景展開版面，極大化可視資訊密度",
   },
   {
     id: "quad",
-    name: "4 卡雙欄象限",
-    tag: "經典對稱",
+    name: "雙欄對稱視圖 (Quad)",
+    tag: "對稱雙欄",
     cardsCount: 4,
     desc: "左右對稱雙欄四象限排版，適合雙螢幕或超寬屏",
   },
   {
     id: "focus_positions",
-    name: "部位防線專注",
+    name: "持倉防線專注 (Focus)",
     tag: "單卡滿版",
     cardsCount: 1,
-    desc: "100% 滿版展示多空持倉、在途掛單撤單與 P6 災難停損防線",
+    desc: "100% 滿版展示多空持倉、在途掛單撤單與 交易所停損保護",
   },
 ];
 
 /**
- * CatOS 統一工作區與模組工坊 (Workspace & Module Hub) - iOS 液態半透明（Frosted Glass）版本
+ * CatOS 工作區面板與視圖配置 (Workspace & Module Hub) - iOS 液態半透明（Frosted Glass）版本
  * - 仿 iOS Control Center / Widget Gallery 半透明磨砂玻璃質感
  * - 螢幕右側非侵入懸浮式滑出，左側儀表板保持 100% 可視與即時重排 (Live WYSIWYG)
  * - 深度整合「工作區設定檔 (Workspaces)」、「版面大卡 (Cards)」與「頂部狀態列 (Header)」
@@ -372,7 +372,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
                 </div>
               </div>
 
-              {/* 系統出廠推薦佈局 */}
+              {/* 系統標準配置佈局 */}
               <div className="space-y-1.5 pt-2 border-t border-white/[0.08]">
                 <div className="flex items-center justify-between px-1 text-[10.5px] font-mono text-muted-foreground/80">
                   <span className="flex items-center gap-1 font-semibold text-foreground/90 font-sans">
@@ -847,7 +847,7 @@ export function WidgetGalleryDrawer({ isOpen, onClose }: WidgetGalleryDrawerProp
               applyLayoutPreset("tsplit");
             }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-medium bg-white/[0.08] text-foreground hover:bg-primary hover:text-primary-foreground border border-white/[0.1] transition-all cursor-pointer"
-            title="將工作區大卡重置為定案之 5 卡標準戰情佈局"
+            title="將工作區大卡重置為定案之 標準交易視圖 (5-Split)佈局"
           >
             <RotateCcw className="size-3" />
             <span>還原出廠 (5卡標準)</span>
