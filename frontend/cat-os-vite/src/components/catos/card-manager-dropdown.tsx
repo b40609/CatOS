@@ -60,7 +60,7 @@ export function CardManagerDropdown() {
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-mono font-medium transition-all cursor-pointer border shadow-xs select-none",
+            "flex items-center gap-1.5 h-7 px-2.5 rounded-md text-t3 font-mono font-medium transition-all cursor-pointer border shadow-xs select-none",
             isOpen
               ? "bg-primary text-primary-foreground border-primary shadow-[0_0_12px_rgba(232,180,94,0.35)]"
               : "bg-surface-raised/80 hover:bg-secondary text-foreground hover:text-primary border-border/80 hover:border-primary/50"
@@ -71,7 +71,7 @@ export function CardManagerDropdown() {
           <span className="font-sans font-semibold tracking-tight">卡片管理</span>
           <span
             className={cn(
-              "ml-0.5 px-1 py-0.2 rounded text-[9.5px] font-mono",
+              "ml-0.5 px-1 py-0.2 rounded text-t1 font-mono",
               isOpen
                 ? "bg-primary-foreground/20 text-primary-foreground"
                 : "bg-background/60 text-muted-foreground border border-border/60"
@@ -91,7 +91,7 @@ export function CardManagerDropdown() {
             <div className="flex items-center justify-between pb-2 border-b border-border/70">
               <div className="flex items-center gap-1.5">
                 <LayoutGrid className="size-3.5 text-primary" />
-                <span className="text-[12px] font-bold text-foreground tracking-tight">
+                <span className="text-t4 font-bold text-foreground tracking-tight">
                   工作區卡片快速增刪
                 </span>
               </div>
@@ -101,7 +101,7 @@ export function CardManagerDropdown() {
                   setIsOpen(false);
                   setIsGalleryOpen(true);
                 }}
-                className="flex items-center gap-1 text-[10px] font-mono text-primary hover:underline cursor-pointer"
+                className="flex items-center gap-1 text-t2 font-mono text-primary hover:underline cursor-pointer"
               >
                 <Cpu className="size-3" />
                 <span>開啟模組工坊</span>
@@ -139,14 +139,14 @@ export function CardManagerDropdown() {
 
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11.5px] font-semibold text-foreground tracking-tight truncate">
+                          <span className="text-t3 font-semibold text-foreground tracking-tight truncate">
                             {card.nameZh}
                           </span>
-                          <span className="text-[9px] font-mono text-muted-foreground/70 hidden sm:inline">
+                          <span className="text-t1 font-mono text-muted-foreground/70 hidden sm:inline">
                             {card.category}
                           </span>
                         </div>
-                        <span className="text-[9.5px] text-muted-foreground/80 leading-tight truncate">
+                        <span className="text-t1 text-muted-foreground/80 leading-tight truncate">
                           {card.desc}
                         </span>
                       </div>
@@ -154,14 +154,14 @@ export function CardManagerDropdown() {
 
                     <div className="ml-2 shrink-0">
                       {isAdded ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 group-hover:bg-rose-400/15 group-hover:text-rose-400 group-hover:border-rose-400/30">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-t2 font-mono text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 group-hover:bg-rose-400/15 group-hover:text-rose-400 group-hover:border-rose-400/30">
                           <Check className="size-2.5 group-hover:hidden" />
                           <X className="size-2.5 hidden group-hover:inline" />
                           <span className="group-hover:hidden">已在主畫面</span>
                           <span className="hidden group-hover:inline">移除卡片</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-mono font-semibold text-primary bg-primary/15 border border-primary/40 group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-t2 font-mono font-semibold text-primary bg-primary/15 border border-primary/40 group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-xs">
                           <Plus className="size-2.5" />
                           加入主畫面
                         </span>
@@ -173,15 +173,15 @@ export function CardManagerDropdown() {
             </div>
 
             {/* 底部重置 */}
-            <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10.5px]">
-              <span className="text-muted-foreground font-mono text-[10px]">定案排版架構</span>
+            <div className="pt-2 border-t border-border/70 flex items-center justify-between text-t2">
+              <span className="text-muted-foreground font-mono text-t2">定案排版架構</span>
               <button
                 type="button"
                 onClick={() => {
                   applyLayoutPreset("tsplit");
                   setIsOpen(false);
                 }}
-                className="px-2.5 py-1 rounded text-[10.5px] font-medium bg-primary/15 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
+                className="px-2.5 py-1 rounded text-t2 font-medium bg-primary/15 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer shadow-xs"
               >
                 重置為 5 卡標準版
               </button>

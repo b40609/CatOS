@@ -448,7 +448,7 @@ function BacktestPage() {
         <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md">
           <div className="flex items-center gap-2.5">
             <span className={cn(
-              "px-1.5 py-0.5 rounded text-[10px] font-bold",
+              "px-1.5 py-0.5 rounded text-t2 font-bold",
               version ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
             )}>
               {version ? "127.0.0.1:8770 ONLINE" : "OFFLINE / DISCONNECTED"}
@@ -462,7 +462,7 @@ function BacktestPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
+          <div className="flex items-center gap-2 text-t3 font-mono text-muted-foreground">
             <span>Build: <strong className="text-primary">{version?.build_id ? version.build_id.slice(0, 8) : "--"}</strong></span>
             {isRestartRequired && (
               <span className="text-amber-400 font-bold bg-amber-400/10 px-1 rounded">
@@ -510,23 +510,23 @@ function BacktestPage() {
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
               成交筆數: <strong className="text-foreground">{perf ? `${perf.trade_count} 筆` : "--"}</strong>
-              <span className="text-[10px] text-muted-foreground/80 ml-1">(單邊撮合)</span>
+              <span className="text-t2 text-muted-foreground/80 ml-1">(單邊撮合)</span>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              夏普 (Sharpe): <span className="text-muted-foreground/60 italic text-[11px]" title="Decimal 核心不包含 Sharpe 或往返勝率">後端尚未提供 (Decimal 核心無此指標)</span>
+              夏普 (Sharpe): <span className="text-muted-foreground/60 italic text-t3" title="Decimal 核心不包含 Sharpe 或往返勝率">後端尚未提供 (Decimal 核心無此指標)</span>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              勝率: <span className="text-muted-foreground/60 italic text-[11px]">後端尚未提供 (無往返勝率)</span>
+              勝率: <span className="text-muted-foreground/60 italic text-t3">後端尚未提供 (無往返勝率)</span>
             </span>
           </div>
-          <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2.5 text-t3 text-muted-foreground">
             <span>初始本金: <strong className="text-foreground">{perf ? `${perf.initial_equity} USDT` : "--"}</strong></span>
             <span className="text-border">|</span>
             <span>期末權益: <strong className="text-primary font-semibold">{perf ? `${perf.final_equity} USDT` : "--"}</strong></span>
             <span className="text-border">|</span>
-            <span className="text-amber-400/90 text-[10px]">期末估值，未強制平倉</span>
+            <span className="text-amber-400/90 text-t2">期末估值，未強制平倉</span>
           </div>
         </div>
 
@@ -547,7 +547,7 @@ function BacktestPage() {
           <div className="lg:col-span-5 space-y-4">
             <Panel
               title="歷史回測清單 (Backtest Runs)"
-              meta={<span className="text-[10px] text-muted-foreground font-mono">{backtestRuns.length} 項紀錄</span>}
+              meta={<span className="text-t2 text-muted-foreground font-mono">{backtestRuns.length} 項紀錄</span>}
             >
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                 {backtestRuns.length === 0 ? (
@@ -584,7 +584,7 @@ function BacktestPage() {
                             </span>
                           </div>
                           <span className={cn(
-                            "font-mono text-[10px] px-1.5 py-0.2 rounded font-semibold",
+                            "font-mono text-t2 px-1.5 py-0.2 rounded font-semibold",
                             run.status === "complete" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30" :
                             run.status === "failed" ? "text-rose-400 bg-rose-500/10 border border-rose-500/30" :
                             "text-amber-400 bg-amber-400/10 border border-amber-400/30"
@@ -592,7 +592,7 @@ function BacktestPage() {
                             {run.status.toUpperCase()}
                           </span>
                         </div>
-                        <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                        <div className="mt-2 flex items-center justify-between text-t2 font-mono text-muted-foreground">
                           <span>{run.request?.dataset_id || "synthetic-btc"} · qty={qtyVal || "?"}</span>
                           <span>{formatUtcTime(run.created_at)}</span>
                         </div>
@@ -642,14 +642,14 @@ function BacktestPage() {
             <Panel
               title={`模擬逐筆成交流 (${activeRequest?.strategy_id || "sma-trend"})`}
               meta={
-                <span className="text-[10px] font-mono text-muted-foreground">
+                <span className="text-t2 font-mono text-muted-foreground">
                   {result?.result?.trades?.length || 0} 筆成交 · Decimal 精準結算
                 </span>
               }
             >
               <div className="overflow-x-auto max-h-[380px]">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="border-b border-border text-[10px] font-mono text-muted-foreground bg-background/30 sticky top-0">
+                  <thead className="border-b border-border text-t2 font-mono text-muted-foreground bg-background/30 sticky top-0">
                     <tr>
                       <th className="py-2 px-3 font-normal">時間 (UTC)</th>
                       <th className="py-2 px-3 font-normal">方向</th>
@@ -693,12 +693,12 @@ function BacktestPage() {
                         const isBuy = !t.quantity.startsWith("-");
                         return (
                           <tr key={idx} className="hover:bg-secondary/30 transition-colors">
-                            <td className="py-2.5 px-3 text-[11px] text-muted-foreground">
+                            <td className="py-2.5 px-3 text-t3 text-muted-foreground">
                               {formatUtcTime(t.time_ms)}
                             </td>
                             <td className="py-2.5 px-3">
                               <span className={cn(
-                                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold",
+                                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-t1 font-semibold",
                                 isBuy ? "bg-up/10 text-up" : "bg-down/10 text-down"
                               )}>
                                 {isBuy ? <ArrowDownLeft className="size-2.5" /> : <ArrowUpRight className="size-2.5" />}
@@ -728,12 +728,12 @@ function BacktestPage() {
 
             {/* 回測底層假設說明 */}
             {result?.result?.assumptions && (
-              <div className="rounded-lg border border-border/60 bg-surface/40 p-3 text-[11px] text-muted-foreground space-y-1">
+              <div className="rounded-lg border border-border/60 bg-surface/40 p-3 text-t3 text-muted-foreground space-y-1">
                 <div className="flex items-center gap-1.5 font-medium text-foreground text-xs mb-1">
                   <Layers className="size-3.5 text-primary" />
                   <span>底層架構假設 (P7 Decimal Research Core)</span>
                 </div>
-                <ul className="list-disc list-inside space-y-0.5 font-mono text-[10.5px]">
+                <ul className="list-disc list-inside space-y-0.5 font-mono text-t2">
                   {result.result.assumptions.slice(0, 4).map((a, i) => (
                     <li key={i}>{a}</li>
                   ))}
@@ -759,23 +759,23 @@ function BacktestPage() {
 
           <div className="space-y-3 py-1">
             <div className="space-y-1">
-              <Label className="text-[11px] font-mono text-muted-foreground">選擇登錄策略</Label>
+              <Label className="text-t3 font-mono text-muted-foreground">選擇登錄策略</Label>
               <div className="px-2.5 py-1.5 rounded border border-border bg-background text-xs font-mono text-foreground">
                 {catalog?.strategies[0]?.name || "SMA 趨勢（Long / Flat）"} ({catalog?.strategies[0]?.id || "sma-trend"})
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px] font-mono text-muted-foreground">標的與資料集</Label>
+              <Label className="text-t3 font-mono text-muted-foreground">標的與資料集</Label>
               <div className="px-2.5 py-1.5 rounded border border-border bg-background text-xs font-mono text-foreground flex items-center justify-between">
                 <span>{catalog?.datasets[0]?.name || "合成 BTC 15m · 96 根 K 線"}</span>
-                <span className="text-[10px] text-primary">BTC-USDT-SWAP</span>
+                <span className="text-t2 text-primary">BTC-USDT-SWAP</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">SMA 週期 (period: 2~32)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">SMA 週期 (period: 2~32)</Label>
                 <Input
                   type="number"
                   min={2}
@@ -787,7 +787,7 @@ function BacktestPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">下單張數 (quantity: 1~1000)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">下單張數 (quantity: 1~1000)</Label>
                 <Input
                   type="text"
                   value={quantity}
@@ -799,7 +799,7 @@ function BacktestPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">初始本金 (USDT)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">初始本金 (USDT)</Label>
                 <Input
                   type="text"
                   value={initialBalance}
@@ -809,7 +809,7 @@ function BacktestPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">預熱根數 (warmup: &gt;= period)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">預熱根數 (warmup: &gt;= period)</Label>
                 <Input
                   type="number"
                   min={period}
@@ -823,7 +823,7 @@ function BacktestPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">手續費率 (fee_rate)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">手續費率 (fee_rate)</Label>
                 <Input
                   type="text"
                   value={feeRate}
@@ -833,7 +833,7 @@ function BacktestPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[11px] font-mono text-muted-foreground">滑價 (slippage_bps)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">滑價 (slippage_bps)</Label>
                 <Input
                   type="text"
                   value={slippageBps}

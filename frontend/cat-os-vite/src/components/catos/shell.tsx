@@ -250,7 +250,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="text-lg font-semibold tracking-tight">
                 catOS<span className="ml-0.5 text-primary">.</span>
               </span>
-              <span className="font-mono text-[10px] text-muted-foreground/60">
+              <span className="font-mono text-t2 text-muted-foreground/60">
                 v2.0
               </span>
             </div>
@@ -262,7 +262,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
           {GROUPS.map((group) => (
             <div key={group.key} className="space-y-0.5">
               {!collapsed && (
-                <p className="mb-1 mt-2.5 px-2.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground/60 truncate">
+                <p className="mb-1 mt-2.5 px-2.5 font-mono text-t1 font-semibold uppercase tracking-wider text-muted-foreground/60 truncate">
                   {group.titleMono}
                 </p>
               )}
@@ -294,10 +294,10 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
                     </span>
                     {!collapsed && (
                       <div className="flex flex-col min-w-0 flex-1 leading-tight">
-                        <span className="text-[13px] font-medium text-foreground tracking-wide truncate">
+                        <span className="text-t4 font-medium text-foreground tracking-wide truncate">
                           {language === "en" ? sub : name}
                         </span>
-                        <span className="text-[9.5px] font-mono font-semibold text-muted-foreground uppercase tracking-wider truncate mt-0.5">
+                        <span className="text-t1 font-mono font-semibold text-muted-foreground uppercase tracking-wider truncate mt-0.5">
                           {language === "en" ? name : sub}
                         </span>
                       </div>
@@ -382,14 +382,14 @@ export function PageHead({
   return (
     <div className="mb-2 flex items-center justify-between gap-2 rounded border border-border/60 bg-secondary/20 px-2.5 py-1 backdrop-blur-xs text-xs">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.2 shrink-0">
+        <span className="font-mono text-t1 font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.2 shrink-0">
           {code}
         </span>
         <span className="font-semibold text-foreground tracking-tight text-xs truncate">
           {title}
         </span>
         {desc && (
-          <span className="text-[10px] text-muted-foreground/75 hidden md:inline truncate">
+          <span className="text-t2 text-muted-foreground/75 hidden md:inline truncate">
             · {desc}
           </span>
         )}

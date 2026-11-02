@@ -115,12 +115,12 @@ function OptimizationPage() {
           </div>
           <div className="flex items-center gap-2">
             {version?.restart_required && (
-              <span className="text-amber-400 font-medium text-[11px] bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded">
+              <span className="text-amber-400 font-medium text-t3 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded">
                 服務源檔案已異動 (restart_required)
               </span>
             )}
             {isBusy && (
-              <span className="text-primary font-medium text-[11px] flex items-center gap-1 bg-primary/10 border border-primary/25 px-2 py-0.5 rounded">
+              <span className="text-primary font-medium text-t3 flex items-center gap-1 bg-primary/10 border border-primary/25 px-2 py-0.5 rounded">
                 <Loader2 className="size-3 animate-spin" /> 後端忙碌中
               </span>
             )}
@@ -147,7 +147,7 @@ function OptimizationPage() {
                     variant="ghost"
                     size="sm"
                     onClick={fetchRealData}
-                    className="h-6 px-2 text-[10px] font-mono text-muted-foreground hover:text-foreground"
+                    className="h-6 px-2 text-t2 font-mono text-muted-foreground hover:text-foreground"
                   >
                     <RefreshCw className={cn("size-3 mr-1", loading && "animate-spin")} /> 刷新
                   </Button>
@@ -178,7 +178,7 @@ function OptimizationPage() {
                             </span>
                             <span
                               className={cn(
-                                "text-[9.5px] px-1.5 py-0.2 rounded font-semibold uppercase",
+                                "text-t1 px-1.5 py-0.2 rounded font-semibold uppercase",
                                 r.status === "complete"
                                   ? "bg-up/15 text-up border border-up/30"
                                   : r.status === "running"
@@ -189,10 +189,10 @@ function OptimizationPage() {
                               {r.status}
                             </span>
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-1">
+                          <p className="text-t2 text-muted-foreground mt-1">
                             建立時間: {formatUtc(r.created_at)}
                           </p>
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-t2 text-muted-foreground">
                             搜尋範圍: SMA period {r.request?.search_space?.period?.low ?? 2}~{r.request?.search_space?.period?.high ?? 8} · {r.request?.n_trials ?? 8} 試驗
                           </p>
                         </div>
@@ -229,39 +229,39 @@ function OptimizationPage() {
                   {/* 結果 HUD 條 */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 font-mono">
                     <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
-                      <span className="text-[10px] text-muted-foreground block">最佳試驗</span>
+                      <span className="text-t2 text-muted-foreground block">最佳試驗</span>
                       <span className="text-base font-bold text-primary mt-0.5 block">
                         Trial #{realResult.best_trial_number ?? "--"}
                       </span>
-                      <span className="text-[9.5px] text-muted-foreground">
+                      <span className="text-t1 text-muted-foreground">
                         最佳週期: {realResult.trials.find((t) => t.number === realResult.best_trial_number)?.params.period ?? "--"}
                       </span>
                     </div>
 
                     <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
-                      <span className="text-[10px] text-muted-foreground block">尋優目標</span>
+                      <span className="text-t2 text-muted-foreground block">尋優目標</span>
                       <span className="text-base font-bold text-foreground mt-0.5 block">
                         {realResult.objective.name}
                       </span>
-                      <span className="text-[9.5px] text-muted-foreground capitalize">
+                      <span className="text-t1 text-muted-foreground capitalize">
                         方向: {realResult.objective.direction}
                       </span>
                     </div>
 
                     <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
-                      <span className="text-[10px] text-muted-foreground block">Optuna 引擎版本</span>
+                      <span className="text-t2 text-muted-foreground block">Optuna 引擎版本</span>
                       <span className="text-base font-bold text-foreground mt-0.5 block">
                         v{realResult.optuna_version}
                       </span>
-                      <span className="text-[9.5px] text-muted-foreground">隨機種子: {realResult.seed}</span>
+                      <span className="text-t1 text-muted-foreground">隨機種子: {realResult.seed}</span>
                     </div>
 
                     <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
-                      <span className="text-[10px] text-muted-foreground block">完成試驗數</span>
+                      <span className="text-t2 text-muted-foreground block">完成試驗數</span>
                       <span className="text-base font-bold text-foreground mt-0.5 block">
                         {realResult.trials.length} 筆
                       </span>
-                      <span className="text-[9.5px] text-muted-foreground">
+                      <span className="text-t1 text-muted-foreground">
                         有效: {realResult.trials.filter((t) => t.state === "COMPLETE").length} 筆
                       </span>
                     </div>
@@ -276,14 +276,14 @@ function OptimizationPage() {
                       </div>
                     }
                     meta={
-                      <span className="text-[10px] font-mono text-muted-foreground">
+                      <span className="text-t2 font-mono text-muted-foreground">
                         Run: {realResult.run_id?.slice(0, 12)}
                       </span>
                     }
                   >
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse text-xs">
-                        <thead className="border-b border-border text-[10px] font-mono text-muted-foreground bg-background/30">
+                        <thead className="border-b border-border text-t2 font-mono text-muted-foreground bg-background/30">
                           <tr>
                             <th className="py-2 px-3 font-normal">Trial #</th>
                             <th className="py-2 px-3 font-normal">狀態</th>
@@ -310,14 +310,14 @@ function OptimizationPage() {
                                   <span className={cn("font-bold flex items-center gap-1", isBest ? "text-primary" : "text-foreground")}>
                                     #{t.number}
                                     {isBest && (
-                                      <span className="bg-primary text-primary-foreground text-[8.5px] px-1 rounded">
+                                      <span className="bg-primary text-primary-foreground text-t1 px-1 rounded">
                                         BEST
                                       </span>
                                     )}
                                   </span>
                                 </td>
                                 <td className="py-2.5 px-3">
-                                  <span className="text-[10px] text-muted-foreground">{t.state}</span>
+                                  <span className="text-t2 text-muted-foreground">{t.state}</span>
                                 </td>
                                 <td className="py-2.5 px-3 text-right font-semibold text-foreground">
                                   {t.params.period}
@@ -345,7 +345,7 @@ function OptimizationPage() {
                     </div>
 
                     {realResult.data_notice && (
-                      <div className="mt-3 pt-2.5 border-t border-border/40 text-[10.5px] font-mono text-muted-foreground flex items-center justify-between">
+                      <div className="mt-3 pt-2.5 border-t border-border/40 text-t2 font-mono text-muted-foreground flex items-center justify-between">
                         <span>聲明: {realResult.data_notice}</span>
                         <span>成交次數為 simulated fills，非往返交易</span>
                       </div>
@@ -377,16 +377,16 @@ function OptimizationPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs font-mono">
-            <div className="rounded border border-primary/25 bg-primary/5 p-2.5 space-y-1 text-[11px]">
+            <div className="rounded border border-primary/25 bg-primary/5 p-2.5 space-y-1 text-t3">
               <span className="text-primary font-semibold">固定登錄模型</span>
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-muted-foreground text-t2">
                 策略: RegisteredSMA (sma-trend) · 資料: synthetic-btc-15m-v1
               </p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Period 最小值</Label>
+                <Label className="text-t2 text-muted-foreground">Period 最小值</Label>
                 <Input
                   type="number"
                   min={2}
@@ -397,7 +397,7 @@ function OptimizationPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Period 最大值</Label>
+                <Label className="text-t2 text-muted-foreground">Period 最大值</Label>
                 <Input
                   type="number"
                   min={2}
@@ -408,7 +408,7 @@ function OptimizationPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">搜尋步進 (Step)</Label>
+                <Label className="text-t2 text-muted-foreground">搜尋步進 (Step)</Label>
                 <Input
                   type="number"
                   min={1}
@@ -422,7 +422,7 @@ function OptimizationPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Optuna 試驗數 (1~{catalog?.optimization?.max_trials || 20})</Label>
+                <Label className="text-t2 text-muted-foreground">Optuna 試驗數 (1~{catalog?.optimization?.max_trials || 20})</Label>
                 <Input
                   type="number"
                   min={1}
@@ -433,7 +433,7 @@ function OptimizationPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">隨機種子 (Seed)</Label>
+                <Label className="text-t2 text-muted-foreground">隨機種子 (Seed)</Label>
                 <Input
                   type="number"
                   value={seed}
@@ -443,7 +443,7 @@ function OptimizationPage() {
               </div>
             </div>
 
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
+            <p className="text-t2 text-muted-foreground leading-relaxed">
               ※ 提交後後端將以獨立 Worker 執行 Optuna TPE 尋優，期間後端鎖定忙碌槽，直到 complete/failed 並釋放。
             </p>
           </div>

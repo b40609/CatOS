@@ -39,7 +39,7 @@ function EmptyWorkspacePrompt() {
     <div className="h-full w-full flex flex-col items-center justify-center p-6 select-none bg-surface/30 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
       <div className="max-w-[820px] w-full flex flex-col items-center text-center gap-5">
         {/* 微型狀態徽章 */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-[11px] font-mono shadow-xs">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-t3 font-mono shadow-xs">
           <span className="size-1.5 rounded-full bg-primary animate-pulse" />
           工作區目前已清空 · 自由自訂模式
         </div>
@@ -65,17 +65,17 @@ function EmptyWorkspacePrompt() {
               className="flex flex-col items-start p-3 rounded-lg border border-border/80 bg-surface/90 hover:border-primary/60 hover:bg-secondary/50 text-left transition-all group cursor-pointer shadow-xs"
             >
               <div className="flex items-center justify-between w-full mb-1.5">
-                <span className="text-[12px] font-bold text-foreground group-hover:text-primary transition-colors">
+                <span className="text-t4 font-bold text-foreground group-hover:text-primary transition-colors">
                   {preset.shortName}
                 </span>
-                <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30 font-semibold">
+                <span className="text-t1 font-mono px-1.5 py-0.2 rounded bg-primary/15 text-primary border border-primary/30 font-semibold">
                   {preset.cardCount} 卡
                 </span>
               </div>
-              <p className="text-[10px] text-muted-foreground leading-tight line-clamp-2">
+              <p className="text-t2 text-muted-foreground leading-tight line-clamp-2">
                 {preset.desc}
               </p>
-              <span className="mt-3 text-[10.5px] font-mono text-primary font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span className="mt-3 text-t2 font-mono text-primary font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
                 套用排版 <ArrowRight className="size-3" />
               </span>
             </button>
@@ -84,7 +84,7 @@ function EmptyWorkspacePrompt() {
 
         {/* 快捷單卡加入區 */}
         <div className="flex flex-col items-center gap-2 mt-2 w-full pt-4 border-t border-border/60">
-          <span className="text-[10.5px] font-mono text-muted-foreground flex items-center gap-1.5">
+          <span className="text-t2 font-mono text-muted-foreground flex items-center gap-1.5">
             <Layers className="size-3.5 text-primary/70" />
             或由零開始自由單點組裝卡片：
           </span>
@@ -94,7 +94,7 @@ function EmptyWorkspacePrompt() {
                 key={card.id}
                 type="button"
                 onClick={() => addNewCard(card.id)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium border border-border/70 bg-secondary/60 hover:bg-primary/15 hover:border-primary/50 hover:text-primary text-foreground transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-t3 font-mono font-medium border border-border/70 bg-secondary/60 hover:bg-primary/15 hover:border-primary/50 hover:text-primary text-foreground transition-all cursor-pointer shadow-2xs"
               >
                 <Plus className="size-3 text-primary" />
                 <span>{card.nameZh}</span>

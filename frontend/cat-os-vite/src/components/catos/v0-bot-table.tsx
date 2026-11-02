@@ -161,7 +161,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                 type="button"
                 onClick={() => setBotFilter(f.id as any)}
                 className={cn(
-                  "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                  "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                   botFilter === f.id
                     ? "bg-secondary text-foreground font-semibold shadow-xs"
                     : "text-muted-foreground hover:text-foreground"
@@ -180,7 +180,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto min-w-0 max-w-full">
           <table className="w-full text-left border-collapse table-auto min-w-[540px]">
-            <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+            <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
               <tr>
                 <th className="py-2.5 pl-3 pr-2 font-medium">實例 / 標的</th>
                 <th className="px-2 font-medium">策略模型 / 曝險</th>
@@ -231,17 +231,17 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                           />
                           <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[12px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
+                              <span className="text-t4 font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
                                 {bot.name}
                               </span>
                               {isLensActive && (
-                                <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-primary/20 text-primary border border-primary/30 shrink-0">
+                                <span className="px-1 py-0.2 rounded text-t1 font-mono font-bold bg-primary/20 text-primary border border-primary/30 shrink-0">
                                   聚焦中 ↑
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 text-[9.5px] font-mono text-muted-foreground leading-tight">
-                              <span className="text-primary font-semibold">{bot.symbol}</span>
+                            <div className="flex items-center gap-1 text-t1 font-mono text-muted-foreground leading-tight">
+                              <span className="text-primary font-semibold whitespace-nowrap">{bot.symbol}</span>
                               <span>{bot.timeframe}</span>
                             </div>
                           </div>
@@ -251,10 +251,10 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                       {/* 2. 策略模型與曝險占比 */}
                       <td className="px-2 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[11.5px] font-semibold text-foreground leading-tight">
+                          <span className="text-t3 font-semibold text-foreground leading-tight">
                             {meta.strategyName}
                           </span>
-                          <span className="text-[9.5px] font-mono text-muted-foreground leading-tight">
+                          <span className="text-t1 font-mono text-muted-foreground leading-tight">
                             {meta.budgetUsageText}
                           </span>
                         </div>
@@ -268,9 +268,9 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                             prefix={meta.todayPnl >= 0 ? "+$" : "-$"}
                             decimals={2}
                             duration={400}
-                            className={cn("text-[12.5px] font-bold leading-tight", toneOf(meta.todayPnl))}
+                            className={cn("text-t4 font-bold leading-tight", toneOf(meta.todayPnl))}
                           />
-                          <span className={cn("text-[9.5px] leading-tight font-semibold", toneOf(meta.todayPnl))}>
+                          <span className={cn("text-t1 leading-tight font-semibold", toneOf(meta.todayPnl))}>
                             {formatPct(meta.todayPnlPct)}
                           </span>
                         </div>
@@ -278,7 +278,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
 
                       {/* 4. 7日報酬率 */}
                       <td className="px-2 py-2.5 text-right font-mono hidden sm:table-cell">
-                        <span className={cn("text-[11px] font-bold leading-tight", meta.sevenDayRet.startsWith("+") ? "text-emerald-400" : "text-muted-foreground")}>
+                        <span className={cn("text-t3 font-bold leading-tight", meta.sevenDayRet.startsWith("+") ? "text-emerald-400" : "text-muted-foreground")}>
                           {meta.sevenDayRet}
                         </span>
                       </td>
@@ -287,12 +287,12 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                       <td className="px-2 py-2.5 font-mono hidden md:table-cell">
                         {meta.riskStatusTone === "safe" ? (
                           <div className="flex items-center gap-1.5 leading-tight">
-                            <span className="px-1.5 py-0.2 rounded bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 text-[9px] font-semibold">
+                            <span className="px-1.5 py-0.2 rounded bg-emerald-400/10 text-emerald-400 border border-emerald-400/30 text-t1 font-semibold">
                               {meta.riskStatusText}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">{meta.riskStatusText}</span>
+                          <span className="text-t2 text-muted-foreground">{meta.riskStatusText}</span>
                         )}
                       </td>
 
@@ -316,7 +316,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                             onClick={(e) => togglePause(bot.id, e)}
                             title="切換展示運作/暫停狀態"
                             className={cn(
-                              "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer",
+                              "px-2 py-0.5 rounded text-t2 font-mono border transition-all cursor-pointer",
                               isPaused
                                 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                                 : "border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -332,7 +332,7 @@ export function V0BotTable({ className, showHeader = true, monitoring }: V0BotTa
                               navigate("/bots");
                             }}
                             title="開啟策略專屬監控與五階段管線審計"
-                            className="px-2 py-0.5 rounded text-[10px] font-mono border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer flex items-center gap-0.5"
+                            className="px-2 py-0.5 rounded text-t2 font-mono border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer flex items-center gap-0.5"
                           >
                             <span>詳情</span>
                             <ArrowUpRight className="size-2.5" />

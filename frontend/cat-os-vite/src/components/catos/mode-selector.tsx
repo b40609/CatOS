@@ -129,9 +129,9 @@ export function ModeSelector({ className }: { className?: string }) {
           onClick={(e) => e.stopPropagation()}
           className="absolute right-0 top-8.5 z-50 w-[240px] rounded-xl bg-[#12141a]/95 backdrop-blur-2xl border border-white/[0.14] shadow-[0_16px_40px_rgba(0,0,0,0.85)] p-2 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150"
         >
-          <div className="px-2 py-1 border-b border-white/[0.08] flex items-center justify-between text-[10px] font-mono text-muted-foreground/80">
+          <div className="px-2 py-1 border-b border-white/[0.08] flex items-center justify-between text-t2 font-mono text-muted-foreground/80">
             <span>交易執行環境 (Environment)</span>
-            <span className="text-[9px] text-primary/80">OKX SWAP</span>
+            <span className="text-t1 text-primary/80">OKX SWAP</span>
           </div>
 
           <div className="flex flex-col gap-1 pt-1">
@@ -166,7 +166,7 @@ export function ModeSelector({ className }: { className?: string }) {
                       <span className="text-xs font-bold tracking-tight">{m.label}</span>
                       {isSelected && <Check className="size-3 text-current" />}
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-tight font-sans mt-0.5 opacity-90">
+                    <p className="text-t2 text-muted-foreground leading-tight font-sans mt-0.5 opacity-90">
                       {m.desc}
                     </p>
                   </div>

@@ -77,7 +77,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               <span className="block text-sm text-foreground font-medium">
                 {language === "zh-TW" ? "登入帳戶" : "Sign In"}
               </span>
-              <span className="text-[10px] text-muted-foreground">guest mode</span>
+              <span className="text-t2 text-muted-foreground">guest mode</span>
             </span>
           )}
         </button>
@@ -106,7 +106,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               <span
                 className={cn(
                   "flex items-center justify-center leading-none select-none text-foreground shrink-0 transition-transform duration-200 group-hover:scale-115",
-                  isFolded ? "size-10 text-[20px]" : "size-7 text-[18px]"
+                  isFolded ? "size-10 text-xl" : "size-7 text-lg"
                 )}
               >
                 {avatar}
@@ -126,14 +126,14 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               <>
                 <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="truncate text-[13px] font-medium text-foreground/90 transition-colors group-hover:text-foreground group-hover:font-semibold">
+                    <span className="truncate text-t4 font-medium text-foreground/90 transition-colors group-hover:text-foreground group-hover:font-semibold">
                       {effectiveName}
                     </span>
-                    <span className="shrink-0 rounded bg-primary/10 px-1 py-0.2 font-mono text-[8.5px] text-primary border border-primary/20">
+                    <span className="shrink-0 rounded bg-primary/10 px-1 py-0.2 font-mono text-t1 text-primary border border-primary/20">
                       {traderBadge}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1 text-[10px] font-mono text-muted-foreground/80 leading-tight">
+                  <div className="mt-0.5 flex items-center gap-1 text-t2 font-mono text-muted-foreground/80 leading-tight">
                     <span className="text-up font-semibold">Engine online</span>
                     <span className="text-muted-foreground/40">·</span>
                     <span className="truncate text-muted-foreground/60">{subAccountAlias || "OKX-SWAP"}</span>
@@ -157,7 +157,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                   type="button"
                   onClick={() => openPreferences("identity")}
                   title={language === "zh-TW" ? "點擊變更頭像與交易員檔案" : "Change avatar & profile"}
-                  className="flex size-9 items-center justify-center text-[22px] leading-none shrink-0 rounded-lg hover:bg-secondary/60 transition-transform active:scale-95"
+                  className="flex size-9 items-center justify-center text-2xl leading-none shrink-0 rounded-lg hover:bg-secondary/60 transition-transform active:scale-95"
                 >
                   <span>{avatar}</span>
                 </button>
@@ -165,12 +165,12 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <p className="truncate text-sm font-semibold text-foreground">{effectiveName}</p>
-                    <span className="shrink-0 rounded bg-secondary px-1.5 py-0.2 font-mono text-[9px] text-muted-foreground/90 border border-border/40">
+                    <span className="shrink-0 rounded bg-secondary px-1.5 py-0.2 font-mono text-t1 text-muted-foreground/90 border border-border/40">
                       {traderBadge}
                     </span>
                   </div>
                   {/* Email 單行帶快速複製按鈕與子帳戶提示 */}
-                  <div className="mt-0.5 flex items-center justify-between text-[11px]">
+                  <div className="mt-0.5 flex items-center justify-between text-t3">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="truncate text-muted-foreground">{displayEmail}</span>
                       <button
@@ -186,9 +186,9 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                       >
                         {copied ? <Check className="size-3 text-up" /> : <Copy className="size-3" />}
                       </button>
-                      {copied && <span className="font-mono text-[9px] text-up font-medium">copied</span>}
+                      {copied && <span className="font-mono text-t1 text-up font-medium">copied</span>}
                     </div>
-                    <span className="font-mono text-[9.5px] text-muted-foreground/70 shrink-0">
+                    <span className="font-mono text-t1 text-muted-foreground/70 shrink-0">
                       {subAccountAlias}
                     </span>
                   </div>
@@ -205,7 +205,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               >
                 <User />
                 <span>{language === "zh-TW" ? "交易員個人身分" : "Trader Identity"}</span>
-                <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                <span className="ml-auto font-mono text-t2 text-muted-foreground">
                   {effectiveName}
                 </span>
               </DropdownMenuItem>
@@ -217,7 +217,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               >
                 <Palette />
                 <span>{language === "zh-TW" ? "作業系統主題與強調色" : "System Theme & Accent"}</span>
-                <span className="ml-auto font-mono text-[10px] text-muted-foreground uppercase">
+                <span className="ml-auto font-mono text-t2 text-muted-foreground uppercase">
                   {surfaceTone} · {accentColor}
                 </span>
               </DropdownMenuItem>
@@ -229,7 +229,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               >
                 <TrendingUp />
                 <span>{language === "zh-TW" ? "看盤色彩與字號密度" : "Trading Colors & Density"}</span>
-                <span className="ml-auto font-mono text-[10px] text-up font-medium">
+                <span className="ml-auto font-mono text-t2 text-up font-medium">
                   {colorConvention === "green-up" ? "綠漲" : colorConvention === "red-up" ? "紅漲" : colorConvention === "blue-up" ? "天藍漲" : "金黃漲"} · {fontScale.split("-")[1] || "100"}%
                 </span>
               </DropdownMenuItem>
@@ -241,7 +241,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               >
                 <KeyRound />
                 <span>{language === "zh-TW" ? "OKX 專用子帳戶 API" : "OKX Sub-Account API"}</span>
-                <span className="ml-auto flex items-center gap-1.5 rounded-full bg-up/10 px-2 py-0.5 font-mono text-[10px] font-medium text-up">
+                <span className="ml-auto flex items-center gap-1.5 rounded-full bg-up/10 px-2 py-0.5 font-mono text-t2 font-medium text-up">
                   <span className="size-1.5 rounded-full bg-up animate-pulse" />
                   3 LIVE · {ping}ms
                 </span>
@@ -260,7 +260,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                     type="button"
                     onClick={() => setLanguage("zh-TW")}
                     className={cn(
-                      "rounded-md px-2.5 py-1 text-[11px] transition-all",
+                      "rounded-md px-2.5 py-1 text-t3 transition-all",
                       language === "zh-TW"
                         ? "bg-secondary text-foreground shadow-xs font-semibold"
                         : "text-muted-foreground hover:text-foreground"
@@ -272,7 +272,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                     type="button"
                     onClick={() => setLanguage("en")}
                     className={cn(
-                      "rounded-md px-2.5 py-1 text-[11px] transition-all",
+                      "rounded-md px-2.5 py-1 text-t3 transition-all",
                       language === "en"
                         ? "bg-secondary text-foreground shadow-xs font-semibold"
                         : "text-muted-foreground hover:text-foreground"

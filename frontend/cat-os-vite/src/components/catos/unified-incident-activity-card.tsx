@@ -232,7 +232,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           title="事件審計與成交流水"
           subtext={
             !isNarrow ? (
-              <span className="text-[10px] font-mono text-muted-foreground ml-1">
+              <span className="text-t2 font-mono text-muted-foreground ml-1">
                 {filteredEvents.length} 筆
               </span>
             ) : undefined
@@ -247,7 +247,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               type="button"
               onClick={() => setCategory(tab.id)}
               className={cn(
-                "px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[10.5px] font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                "px-1.5 sm:px-2 py-0.5 text-t2 sm:text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 category === tab.id
                   ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -277,8 +277,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         {filteredEvents.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-xs gap-1">
             <CheckCircle2 className="size-6 text-emerald-400/80 mb-1" />
-            <span className="font-semibold text-foreground text-[11px]">無符合條件之事件</span>
-            <span className="text-[10px]">系統平穩運行中，所有風控指標正常</span>
+            <span className="font-semibold text-foreground text-t3">無符合條件之事件</span>
+            <span className="text-t2">系統平穩運行中，所有風控指標正常</span>
           </div>
         ) : (
           <div className="relative pl-3 space-y-2.5">
@@ -373,13 +373,13 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                     )}
                   >
                     {/* 表頭一行：時間 + 標籤 + 買賣方向 + 關聯 Bot + 標題 + 右側 PnL/狀態 + 箭頭 */}
-                    <div className="flex items-center justify-between gap-2 text-[10px]">
+                    <div className="flex items-center justify-between gap-2 text-t2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {/* 時間戳 */}
-                        <span className="text-zinc-500 text-[9px] shrink-0 font-mono">{ev.time}</span>
+                        <span className="text-zinc-500 text-t1 shrink-0 font-mono">{ev.time}</span>
 
                         {/* 類型 Badge (依風格即時切換) */}
-                        <span className={cn('px-1.5 py-0.2 rounded text-[8px] shrink-0', meta.badgeClass)}>
+                        <span className={cn('px-1.5 py-0.2 rounded text-t1 shrink-0', meta.badgeClass)}>
                           {meta.label}
                         </span>
 
@@ -387,7 +387,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         {ev.side && (
                           <span
                             className={cn(
-                              'px-1.5 py-0.2 rounded text-[8px] font-mono shrink-0 font-semibold border',
+                              'px-1.5 py-0.2 rounded text-t1 font-mono shrink-0 font-semibold border',
                               ev.side.toLowerCase() === 'buy'
                                 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
                                 : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
@@ -399,7 +399,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         {/* 關聯 Bot 或來源 */}
                         {(ev.botName || ev.source) && (
-                          <span className="text-zinc-500 text-[9px] shrink-0 font-mono hidden sm:inline">
+                          <span className="text-zinc-500 text-t1 shrink-0 font-mono hidden sm:inline">
                             [{ev.botName || ev.source}]
                           </span>
                         )}
@@ -407,7 +407,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         {/* 事件主標題 */}
                         <span className={cn(
                           "truncate leading-tight tracking-tight",
-                          isOpen ? "text-zinc-100 font-medium text-[10.5px]" : "text-zinc-300 font-normal text-[10.5px]"
+                          isOpen ? "text-zinc-100 font-medium text-t2" : "text-zinc-300 font-normal text-t2"
                         )}>
                           {isFill && ev.symbol ? `${ev.symbol} · ${ev.qty} @ $${ev.price}` : ev.title}
                         </span>
@@ -417,18 +417,18 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       <div className="flex items-center gap-2 shrink-0">
                         {isFill ? (
                           ev.pnl && ev.pnl !== 0 ? (
-                            <span className={cn('text-[10px] font-semibold font-mono tracking-tight', toneOf(ev.pnl))}>
+                            <span className={cn('text-t2 font-semibold font-mono tracking-tight', toneOf(ev.pnl))}>
                               {formatUsd(ev.pnl, true)}
                             </span>
                           ) : (
-                            <span className="text-[8.5px] text-zinc-500">撮合</span>
+                            <span className="text-t1 text-zinc-500">撮合</span>
                           )
                         ) : isOpen ? (
-                          <span className="text-[8px] font-medium px-2 py-0.2 rounded-full animate-pulse bg-amber-500/15 border border-amber-500/30 text-amber-200 backdrop-blur-xs">
+                          <span className="text-t1 font-medium px-2 py-0.2 rounded-full animate-pulse bg-amber-500/15 border border-amber-500/30 text-amber-200 backdrop-blur-xs">
                             未解除
                           </span>
                         ) : ev.resolution === 'resolved' ? (
-                          <span className="text-[8px] text-zinc-500 hidden sm:inline">已解除</span>
+                          <span className="text-t1 text-zinc-500 hidden sm:inline">已解除</span>
                         ) : null}
 
                         <button
@@ -445,7 +445,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                     {isExp && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="mt-2 pt-2 border-t border-white/[0.05] text-[9.5px] space-y-2 text-zinc-300 snap-accordion-enter"
+                        className="mt-2 pt-2 border-t border-white/[0.05] text-t1 space-y-2 text-zinc-300 snap-accordion-enter"
                       >
                         {/* 詳細說明 */}
                         <p className="leading-relaxed text-zinc-300 font-normal pl-0.5">
@@ -454,21 +454,21 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         {/* 成交專屬數據卡 (純金融業務數據，高密度四聯欄位) */}
                         {isFill && (ev.qty || ev.price || ev.notional || ev.fee) && (
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-[9.5px] font-mono">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-t1 font-mono">
                             <div>
-                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交數量</span>
+                              <span className="text-muted-foreground block text-t1 uppercase tracking-wider">成交數量</span>
                               <span className="font-semibold text-foreground">{ev.qty ?? '—'}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交均價</span>
+                              <span className="text-muted-foreground block text-t1 uppercase tracking-wider">成交均價</span>
                               <span className="font-semibold text-foreground">${ev.price ?? '—'}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">成交金額</span>
+                              <span className="text-muted-foreground block text-t1 uppercase tracking-wider">成交金額</span>
                               <span className="font-semibold text-foreground">{ev.notional ?? '—'}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground block text-[8px] uppercase tracking-wider">手續費 / 角色</span>
+                              <span className="text-muted-foreground block text-t1 uppercase tracking-wider">手續費 / 角色</span>
                               <span className="font-semibold text-foreground">
                                 {ev.fee ?? '0.00 USDT'} · <span className="text-muted-foreground">{ev.role ?? 'Taker'}</span>
                               </span>
@@ -478,7 +478,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         {/* 事故衝擊與風控判定 (定案方案 C：macOS 晶透黑曜石微膠囊卡片) */}
                         {ev.impact && (
-                          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 backdrop-blur-xs text-[9px] flex items-start gap-2">
+                          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 backdrop-blur-xs text-t1 flex items-start gap-2">
                             <AlertTriangle className="size-3 shrink-0 mt-0.5 text-amber-400" />
                             <div className="leading-relaxed">
                               <span className="font-semibold text-amber-200 mr-1">風控衝擊：</span>
@@ -489,14 +489,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         {/* 下一步處置導引 (Next Step) */}
                         {ev.nextStep && (
-                          <p className="text-[9px] text-zinc-400 leading-relaxed pl-1">
+                          <p className="text-t1 text-zinc-400 leading-relaxed pl-1">
                             <span className="font-medium text-zinc-300 mr-1">下一步處置：</span>
                             <span>{ev.nextStep}</span>
                           </p>
                         )}
 
                         {/* 底部操作按鈕與來源列 */}
-                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-[8.5px] text-zinc-500">
+                        <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-t1 text-zinc-500">
                           <div className="flex items-center gap-1.5">
                             <span>來源:</span>
                             <code className="text-zinc-300 bg-white/[0.04] px-1 py-0.2 rounded border border-white/[0.06] font-mono">
