@@ -172,6 +172,7 @@ class CandidateAlignmentTests(unittest.TestCase):
         db_path = root / "intel.sqlite"
         sample_path = root / "sample.json"
         store = MarketIntelStore(db_path)
+        self.addCleanup(store.close)  # keep the temp DB unlocked even if setup fails
         candidate_value = make_oi_event_candidate({
             "symbol": SYMBOL,
             "observed_at_ms": event_ms() - 4 * 60_000,

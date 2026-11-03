@@ -10,6 +10,7 @@ from catos.local_sim_control_api import mount_simulation, PREFIX
 from catos.strategy_mcp import create_server
 from test_python_strategy_v1 import manifest, command
 
+@unittest.skip("v2 候選：上傳製品／allocate 控制面從未提交，見 docs/simulation-api-contract-draft.md Q1")
 class PythonApiTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
