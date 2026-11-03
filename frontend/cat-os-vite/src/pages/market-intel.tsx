@@ -222,11 +222,11 @@ function MarketIntelPage() {
             </span>
           </div>
           <div className="flex items-center gap-2 text-t2">
-            <span className="rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-primary font-semibold">
-              展示資料 · 本地情境模擬
+            <span className="rounded bg-warn/10 border border-warn/30 px-2 py-0.5 text-warn font-semibold">
+              v1 未啟用
             </span>
             <span className="text-muted-foreground hidden sm:inline">
-              (真實交易請待 market_intel.sqlite 採集掛載)
+              本頁為展示資料；市場情報線在 v1 凍結，無排程器、不主動更新（見 docs/market-intel.md）
             </span>
           </div>
         </div>
