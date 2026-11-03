@@ -129,4 +129,4 @@ FastAPI (127.0.0.1:8770)  catos/workspace_api.py
 
 ## 授權
 
-授權待定；repo 未含 LICENSE，授權型式由作者決定。
+MIT License，見 `LICENSE`。本專案僅供研究與本機模擬，不構成投資建議，使用風險自負。
