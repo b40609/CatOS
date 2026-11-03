@@ -1,3 +1,5 @@
+> 2026-11-03 歸檔：內容落後 v1 實作，以 README 與 docs/simulation-api-contract-draft.md 為準。
+
 # Antigravity 交接：研究版周邊模組
 
 2026-09-11：使用者已同意 Codex 負責精度、Optuna 與關鍵整合審查，Antigravity 負責界線清楚的資料匯入及報告。任務 A、B 均已交付並經 Codex 補強審查；CSV 16 個、報告 12 個專屬測試各於其交付輪次通過，報告測試包含 CSV → 回測 → 報告串接。下方規格保留為交付紀錄，不再派送重做。

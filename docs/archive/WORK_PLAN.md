@@ -1,3 +1,5 @@
+> 2026-11-03 歸檔：內容落後 v1 實作，以 README 與 docs/simulation-api-contract-draft.md 為準。
+
 # catOS 階段與分工規劃
 
 ## 2026-09-21：主線轉回自動策略，Yaozi 限定收尾
