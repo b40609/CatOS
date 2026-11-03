@@ -143,9 +143,13 @@ async def observe(supervisor, view, mark, clock, evidence):
                 evidence_id=baseline.evidence_id, evidence=baseline), evidence=baseline)
         await supervisor.commit_day_basis(basis)
         evidence.event("day_basis", synthetic_time_ms=view.time_ms, basis=basis.to_wire())
+    # Under the local-sim FakeExchange these four facts hold by construction:
+    # the valuation is synthetic (mark == close), there are no external flows,
+    # no margin model exists, and the local ledger is the only position truth.
     state = supervisor.observe_risk(risk.Snapshot(
         supervisor.risk_state.seq + 1, view.time_ms, view.time_ms + config_step(supervisor),
-        view.equity, view.equity, view.position, mark, basis=supervisor.risk_state.basis))
+        view.equity, view.equity, view.position, mark, basis=supervisor.risk_state.basis,
+        valuation_known=True, flows_known=True, margin_ok=True, position_verified=True))
     await supervisor.persist_controls()
     if state.reasons or state.mode != "RUN" or state.health != "HEALTHY":
         raise RuntimeError("synthetic_risk_halt: " + ",".join(sorted(state.reasons)))

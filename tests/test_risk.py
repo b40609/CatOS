@@ -10,10 +10,15 @@ from test_ipc import config
 D = Decimal
 
 
+KNOWN = dict(valuation_known=True, flows_known=True, margin_ok=True, position_verified=True)
+
+
 def snapshot(seq=1, time_ms=0, **changes):
+    # Synthetic facts are asserted explicitly; the dataclass defaults are fail-closed False.
     return replace(risk.Snapshot(seq, time_ms, time_ms + 60_000, D("1000"), D("1000"),
                                 D("0"), D("100"), basis=risk.DayBasis(risk.taipei_day(time_ms),
-                                                                      D("1000"), "synthetic-day")), **changes)
+                                                                      D("1000"), "synthetic-day"),
+                                **KNOWN), **changes)
 
 
 def verdict(s=None, target="2", **kwargs):
