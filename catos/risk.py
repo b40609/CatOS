@@ -350,10 +350,12 @@ class Snapshot:
     other_notional: Decimal = D("0")
     external_net: Decimal = D("0")
     basis: DayBasis | None = None
-    valuation_known: bool = True
-    flows_known: bool = True
-    margin_ok: bool = True
-    position_verified: bool = True
+    # Fail closed: every producer must assert these facts explicitly. An
+    # unset flag means "unknown", which degrades health / blocks increases.
+    valuation_known: bool = False
+    flows_known: bool = False
+    margin_ok: bool = False
+    position_verified: bool = False
     reduction_conflict: bool = False
     flow_basis_id: str | None = None
     flow_start_ms: int | None = None

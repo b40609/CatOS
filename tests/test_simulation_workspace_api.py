@@ -31,7 +31,8 @@ LONG = {**FLAT, "time_ms": T0 + 900_000, "position": "2", "average_entry": "100.
 
 def state(seq, time_ms, equity, position, reasons=()):
     snapshot = risk.Snapshot(seq, time_ms, time_ms + 900_000, Decimal(equity), Decimal(equity),
-                             Decimal(position), Decimal("101.5"), basis=BASIS)
+                             Decimal(position), Decimal("101.5"), basis=BASIS, valuation_known=True,
+                             flows_known=True, margin_ok=True, position_verified=True)
     value = risk.State(seq, time_ms, "RUN", "HEALTHY", "IDLE", basis=BASIS, snapshot=snapshot)
     return risk.halt(value, reasons) if reasons else value
 
