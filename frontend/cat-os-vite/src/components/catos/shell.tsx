@@ -10,6 +10,7 @@ import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { CommandPalette } from "@/components/catos/command-palette";
 import { SimulationStatusStrip } from "@/components/catos/simulation-status-strip";
 import { cn } from "@/lib/utils";
+import pkg from "../../../package.json";
 
 
 interface NavigationItem {
@@ -233,8 +234,8 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="text-lg font-semibold tracking-tight">
                 catOS<span className="ml-0.5 text-primary">.</span>
               </span>
-              <span className="font-mono text-t2 text-muted-foreground/60">
-                v2.0
+              <span className="font-mono text-t2 text-muted-foreground/60" title="frontend package version">
+                v{pkg.version}
               </span>
             </div>
           )}
