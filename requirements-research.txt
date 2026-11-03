@@ -1,3 +1,5 @@
 # Optional R2/R3 research dependencies; core backtest remains standard-library only.
 optuna==4.9.0
+# Asia/Taipei zoneinfo on Windows (no system tz database).
+tzdata==2026.6
 mcp==1.29.1
