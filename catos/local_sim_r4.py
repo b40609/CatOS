@@ -26,7 +26,7 @@ TAIPEI = timezone(timedelta(hours=8))
 PROFILES = {"smoke": (8, 1), "eight-hour": (32, 900)}
 RUNTIME_FILES = (
     "catos/local_sim_r4.py", "catos/ipc.py", "catos/worker.py",
-    "catos/worker_host.py", "examples/sma_state.py", "catos/research.py",
+    "catos/worker_host.py", "catos/strategy_registry.py", "catos/research.py",
     "catos/research_catalog.py", "catos/research_strategy.py",
     "examples/closed_bar_demo.py", "examples/research-web-synthetic.csv",
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",

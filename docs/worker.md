@@ -49,11 +49,11 @@ asyncio.run(main())
 | `catos/ipc.py` | 訊框、嚴格 schema、Decimal 還原、設定／checkpoint／事件／結果驗證；不載入 SMA |
 | `catos/worker_host.py` | 一個 Bot 對應的一組 pipe、啟動及停止、非同步輸出排空、逾時與回覆驗證 |
 | `catos/worker.py` | 子程序入口；唯一載入策略的執行端，依研究時序更新指標及決策 |
-| `examples/sma_state.py` | 對既有 `SMATrend` 提供兩根收盤價的明確狀態轉接，不重寫策略邏輯 |
+| `catos/strategy_registry.py` | 讀取 `catos/research_artifacts/*.json` manifest（僅 `approved`），以 `(strategy_id, version)` 解析 entry；載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略。Worker 由此取得 restore／snapshot |
 
-目前策略識別固定 `sma-trend`／版本 `1`，不接受任意模組路徑、class hook 或 Worker 自報 Bot 身分。版本 1 是目前已檢查製品的契約標記，尚非來源雜湊驗證或 Live 製品啟用機制；修改策略或其狀態契約時必須重新檢查版本與相容性。
+策略識別由 manifest registry 驗證；v1 唯一登錄為 `sma-trend`／`sma-parameters-v1`，IPC 的 `strategy_version` `1` 只是設定區塊的線上契約標記。不接受任意模組路徑、class hook 或 Worker 自報 Bot 身分。版本 1 是目前已檢查製品的契約標記，尚非來源雜湊驗證或 Live 製品啟用機制；修改策略或其狀態契約時必須重新檢查版本與相容性。
 
-R4 新增可選 `WorkerConfig(..., strategy_artifact="sma-parameters-v1")`，只允許這一固定 reviewed 製品，以 R3 source snapshot loader 在 Worker 載入 RegisteredSMA，固定 period=2／quantity=2，逐根前後核對 provenance。未指定時保持上述舊行為；IPC/state adapter 版本仍為 1，製品版本與 digest 另由 config／R4 manifest 綁定。不得將其他 period 的研究結果直接套入此兩根 checkpoint。8 小時執行與驗收狀態見 [R4 handoff](frontend-research-r4-handoff-20260930.md)。
+R4 新增可選 `WorkerConfig(..., strategy_artifact="sma-parameters-v1")`，只允許這一固定 reviewed 製品，以 R3 source snapshot loader 在 Worker 載入 RegisteredSMA，固定 period=2／quantity=2，逐根前後核對 provenance。未指定 `strategy_artifact` 時同樣經 registry 取得該 id 唯一核准版本並核對來源雜湊，不再直接 import `SMATrend`；IPC/state adapter 版本仍為 1，製品版本與 digest 另由 config／R4 manifest 綁定。不得將其他 period 的研究結果直接套入此兩根 checkpoint。8 小時執行與驗收狀態見 [R4 handoff](frontend-research-r4-handoff-20260930.md)。
 
 ## 訊框與資料契約
 
