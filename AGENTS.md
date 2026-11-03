@@ -4,6 +4,7 @@
 
 ## CONTEXT
 
+- 2026-11-03 v1 實況：交付範圍為本機合成模擬（FakeExchange）、單一 manifest 登錄 SMA 策略、單 Bot；前端戰情台／實例監控／側欄狀態列已接 local-sim 控制面投影 HTTP 真資料，不再使用 mock store。v1 不含：python_strategy 上傳製品（v2 候選，測試已 skip）、Demo／Live 下單、Yaozi 市場情報（凍結，程式與測試保留）、多 Bot、Kill-Switch／re-arm HTTP。現況以 README.md 為準，歷史規劃文件已移至 `docs/archive/`。
 - 2026-10-25 使用者確認執行主資料夾更名：`C:/Users/user/Desktop/CatOS_Astra` → `C:/Users/user/Desktop/CatOS`，並同步替換專案內活躍原始碼、文件與設定中的 `CatOS_Astra` 引用。更名理由：`_Astra` 後綴僅反映開發期使用的 ASTRA 模型，不屬於產品命名，產品名稱自始為 CatOS。此決策推翻 2026-10-24 的「取消更名」決定，該日記錄僅保留為歷史沿革。`outputs/`、`reports/` 下歷史驗收證據與執行產物維持原路徑與原內容，作為當時狀態記錄。`CatOS_Yaozi` 維持獨立工作目錄。
 
 - 2026-09-23 使用者已確認：保留 `CatOS`／`CatOS_Yaozi` 分工開發，最終以同一 localhost 網站的「量化交易／Yaozi 情報」分頁交付，切換頁面不控制策略生命週期。目錄分離不是產品分離；整合規則見 `docs/catos-yaozi-integration.md`。不得整包覆蓋另一工作目錄或於執行期跨 worktree import；既有 Git／驗收分工及交易授權限制不變。
@@ -47,7 +48,8 @@
 - 研究核心僅使用指定週期的已收盤 K 線（Closed Bar），不載入 1m 細部資料作盤中重播。回測函式支援 `warmup_bars`；預熱期只更新指標與必要歷史窗口，不執行交易決策、不產生或保留委託意圖，也不計入交易績效。
 - 首個研究切片已確認採單合約、單週期、合成資料；僅市價意圖，本根收盤決策、下一根開盤加明示滑價成交。先交付 Decimal 核心及專屬測試，Optuna、UI、SQLite 與 OKX 連線後續再接；模型假設與未實作能力見 README.md，不把研究算術視為完整帳戶風控或實盤底座。
 - 在應用職責上，Supervisor 獨佔 API 金鑰、連網、交易、風控與 SQLite 寫入，不載入策略。Worker 僅計算並傳遞純資料訊號／目標意圖；Supervisor 不向 Worker 提供憑證、交易 client、簽名器或寫庫介面。策略按契約不主動連網，外部資料由 Supervisor 提供，不設任意 URL 代理。IPC 禁止可執行反序列化。
-- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。
+- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。2026-11-03 起登錄策略由 `catos/strategy_registry.py` 依 `catos/research_artifacts/*.json` manifest 驅動：只接受 `approved`，以 (strategy_id, version) 解析 entry，載入前核對 source_files 的 sha256，不符即 fail-closed，Worker 不寫死策略模組；v1 唯一登錄仍為 `sma-trend`／`sma-parameters-v1`。
+- 2026-11-03 起 `risk.Snapshot` 的 valuation_known／flows_known／margin_ok／position_verified 預設為 False（fail-closed）：每個產生快照的路徑必須明示宣告這些事實，未宣告即視為未知而降級／禁增倉；local-sim FakeExchange 路徑明示傳 True。
 - FastAPI 僅綁定 `127.0.0.1`。回測、Demo、Live 使用同一策略製品；Guardian 獨立監控盤中風險。
 - 曝險採帳戶有效槓桿與單幣曝險預算占比，全面參數化。沿用上限預設數值 3.0x／50%，其中總曝險預算 = 有效槓桿上限 × 風控權益，單幣上限 = 總曝險預算 × 單幣預算占比；不是單幣／當前總持倉。事前檢查包含在途與 UNKNOWN，Worker 不得覆寫帳戶風控參數；P3a 取消 equity buffer，`E_risk = E_verified`；P3b 被動超限只禁止增加曝險，合法減倉始終允許，不做自動去槓桿。
 - 2026-10-20 使用者核准 R1：依 Asia/Taipei（UTC+08:00）每日 00:00 切日，以當日首次合格帳戶觀測建立固定「風控期間基準」，綁定帳戶、環境、台北日、實際起算時間、Decimal 權益與來源證據，經單 writer 持久化後才可使用。首次／新日資料暫缺可重試，成功前禁止增倉；同日既存基準不得因重啟、虧損或入金替換，曾建立或已有本日執行責任卻遺失／損壞時不得當作首次建立。此決策取代精確午夜 E0 與首次暫缺即封鎖整天的 E1 政策；R1 local-sim 已實作、自測並取得 2026-10-20 指定 GPT-6 Sol 歷史獨驗 PASS，適用來源與限制見 reports/risk-period-r1-independent-acceptance-20261020-gpt6sol/acceptance.md，尚未接入 HTTP／UI／Demo／Live。完整契約見 docs/retail-v1-simplification-assessment-20261020.md 第 5 節，交付與限制見 docs/risk-period-r1-local-sim.md。
@@ -89,7 +91,7 @@
 
 ## SESSION HANDOFF
 
-- 新對話先讀 [目前接續入口](docs/current-handoff.md)，再依入口讀取必要規格與證據；不要求使用者重貼完整歷史。入口是狀態摘要，不授予額外權限，也不能覆蓋使用者最新指令。
+- 新對話先讀 [README](README.md) 的 v1 實況與 [模擬契約](docs/simulation-api-contract-draft.md)，再依需要讀取規格與證據；不要求使用者重貼完整歷史。舊的 `docs/current-handoff.md` 已歸檔至 `docs/archive/`，只作歷史。入口是狀態摘要，不授予額外權限，也不能覆蓋使用者最新指令。
 - 工作包交付、真正的政策決策／阻斷、暫停或切換負責角色時更新入口；工作包內的 assessment／spec／修復為內部步驟，不各自新增交接與核准關卡。交付附入口連結與下一個成果；只有需要跨角色或換對話時才附短接續指令。一般小修正或同一缺陷定位留在原對話。
 - 若出現重問已回答事項、混淆政策／分工或重複失敗路徑，先保存當前狀態，建議換對話；不以模型猜測的上下文百分比或固定輪數作主要判準。交接不代表取消已授權工作，也不自動建立新對話。
 - 入口維持約一頁，更新現況而非不斷追加歷史；包含切片／階段／負責者、完成與待辦、已確認與待決政策、授權邊界、基線與驗證證據、相關未提交內容、不可碰的其他工作及下一步。詳細歷史放既有 spec／handoff／WORK_PLAN，以連結引用。

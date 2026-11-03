@@ -1,3 +1,5 @@
+> 2026-11-03 歸檔：內容落後 v1 實作，以 README 與 docs/simulation-api-contract-draft.md 為準。
+
 # catOS 生產級架構評估
 
 2026-09-16 切片更新：S2 已由使用者回報驗收；S3 已依執行指示編寫，待 Sol 質檢。允許同 Journal 內合成逐筆成交的一訂單一 Lot 帳務與原子重放；不接交易所成交適配、實際交易、多 Lot 分配、Gross 或 P6。詳見 [S3 交接](docs/lot-fill-handoff.md)；下文較早階段的延後描述以本段及 AGENTS 最新範圍為準。
