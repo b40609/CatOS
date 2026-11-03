@@ -4,8 +4,6 @@ import {
   Copy,
   Globe,
   KeyRound,
-  LogIn,
-  LogOut,
   Palette,
   TrendingUp,
   User,
@@ -19,19 +17,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { usePersonalOs } from "@/state/personalOsStore";
+import { useCatStore, type ConnectionStatus } from "@/state/catStore";
+import { shortId } from "@/lib/format";
 import { PersonalOsModal } from "@/components/catos/personal-os-modal";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { cn } from "@/lib/utils";
+
+// Engine status line: "Engine online" only when the last /state poll succeeded.
+const ENGINE_LABEL: Record<ConnectionStatus, string> = {
+  idle: "Engine idle",
+  loading: "Engine connecting",
+  ok: "Engine online",
+  error: "Engine error",
+  unavailable: "Engine unavailable",
+  mode_not_open: "Mode not open",
+};
 
 const itemCls =
   "gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground/90 transition-colors hover:bg-secondary/70 focus:bg-accent focus:text-foreground [&_svg]:size-4 [&_svg]:text-muted-foreground focus:[&_svg]:text-primary cursor-pointer";
 
 export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
-  const { user, ready, signOut, signInGoogle } = useAuth();
+  const service = useCatStore((s) => s.service);
+  const connection = useCatStore((s) => s.connection);
   const { language, setLanguage } = useI18n();
+  const engineOnline = connection.status === "ok";
+  const engineLabel = ENGINE_LABEL[connection.status];
+  const instanceId = service?.instance_id ?? null;
+  const instanceShort = instanceId ? shortId(instanceId, 8) : "no instance";
   const [copied, setCopied] = useState(false);
 
   // 個人化作業系統狀態 (Avatar, Name, Badge, Theme, Colors, Density, API)
@@ -44,7 +58,6 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
     accentColor,
     colorConvention,
     fontScale,
-    ping,
   } = usePersonalOs();
 
   // 定案方案 A：macOS 系統偏好設定浮窗 (5 大專業 Tab)
@@ -56,36 +69,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
     setIsModalOpen(true);
   };
 
-  if (!ready) return <div className="h-[3.75rem]" />;
-
-  if (!user)
-    return (
-      <div className="px-2">
-        <button
-          onClick={signInGoogle}
-          className={cn(
-            "flex items-center rounded-xl border border-dashed border-border/80 text-left transition-colors hover:bg-secondary/60",
-            isFolded ? "size-10 justify-center mx-auto" : "w-full gap-3 px-3 py-2.5"
-          )}
-          title={language === "zh-TW" ? "登入帳戶" : "Sign In"}
-        >
-          <span className="grid size-7 place-items-center rounded-full border border-border text-muted-foreground">
-            <LogIn className="size-3.5" />
-          </span>
-          {!isFolded && (
-            <span className="leading-tight">
-              <span className="block text-sm text-foreground font-medium">
-                {language === "zh-TW" ? "登入帳戶" : "Sign In"}
-              </span>
-              <span className="text-t2 text-muted-foreground">guest mode</span>
-            </span>
-          )}
-        </button>
-      </div>
-    );
-
-  const displayEmail = user.email || "trader@gmail.com";
-  const effectiveName = displayName || user.name || "CatOS";
+  const effectiveName = displayName || "CatOS";
 
   return (
     <>
@@ -99,7 +83,7 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                 ? "size-10 justify-center mx-auto"
                 : "w-full gap-2.5 px-2.5 py-1.5"
             )}
-            title={isFolded ? `${effectiveName} (${displayEmail})` : undefined}
+            title={isFolded ? `${effectiveName} · ${engineLabel} · ${instanceShort}` : undefined}
           >
             {/* 頭像 + 執行引擎呼吸燈狀態指示 (4 點鐘方位) */}
             <div className="relative shrink-0 flex items-center justify-center">
@@ -116,9 +100,12 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                   "absolute -bottom-0.5 -right-0.5 rounded-full bg-background p-0.5 shadow-xs flex items-center justify-center",
                   isFolded ? "size-3.5" : "size-3"
                 )}
-                title="本地執行引擎 (Supervisor · 127.0.0.1:8770) 在線運行中"
+                title={`本地執行引擎 (127.0.0.1:8770)：${engineLabel}`}
               >
-                <PulseBeacon size={isFolded ? 4.5 : 3.5} variant="up" />
+                <PulseBeacon
+                  size={isFolded ? 4.5 : 3.5}
+                  variant={engineOnline ? "up" : connection.status === "loading" || connection.status === "idle" ? "warn" : "down"}
+                />
               </span>
             </div>
 
@@ -134,9 +121,9 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                     </span>
                   </div>
                   <div className="mt-0.5 flex items-center gap-1 text-t2 font-mono text-muted-foreground/80 leading-tight">
-                    <span className="text-up font-semibold">Engine online</span>
+                    <span className={cn("font-semibold", engineOnline ? "text-up" : "text-muted-foreground")}>{engineLabel}</span>
                     <span className="text-muted-foreground/40">·</span>
-                    <span className="truncate text-muted-foreground/60">{subAccountAlias || "OKX-SWAP"}</span>
+                    <span className="truncate text-muted-foreground/60">{service ? `slot ${service.slot}` : instanceShort}</span>
                   </div>
                 </div>
                 <ChevronsUpDown className="size-3.5 text-muted-foreground transition-colors group-hover:text-primary shrink-0" />
@@ -169,28 +156,34 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
                       {traderBadge}
                     </span>
                   </div>
-                  {/* Email 單行帶快速複製按鈕與子帳戶提示 */}
+                  {/* 本機實例資訊：instance 前 8 碼（可複製完整 id）、build、slot、連線狀態 */}
                   <div className="mt-0.5 flex items-center justify-between text-t3">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="truncate text-muted-foreground">{displayEmail}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(displayEmail);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1200);
-                        }}
-                        className="flex items-center text-muted-foreground hover:text-foreground transition-colors p-0.5"
-                        title={language === "zh-TW" ? "複製 Email" : "Copy Email"}
-                      >
-                        {copied ? <Check className="size-3 text-up" /> : <Copy className="size-3" />}
-                      </button>
-                      {copied && <span className="font-mono text-t1 text-up font-medium">copied</span>}
+                    <div className="flex items-center gap-1.5 min-w-0 font-mono">
+                      <span className="truncate text-muted-foreground">instance {instanceShort}</span>
+                      {instanceId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(instanceId);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1200);
+                          }}
+                          className="flex items-center text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                          title={language === "zh-TW" ? "複製完整 instance id" : "Copy full instance id"}
+                        >
+                          {copied ? <Check className="size-3 text-up" /> : <Copy className="size-3" />}
+                        </button>
+                      )}
+                      {copied && <span className="text-t1 text-up font-medium">copied</span>}
                     </div>
                     <span className="font-mono text-t1 text-muted-foreground/70 shrink-0">
-                      {subAccountAlias}
+                      {service ? `build ${shortId(service.build_id, 8)}${service.restart_required ? " · drift" : ""}` : subAccountAlias}
                     </span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between font-mono text-t1 text-muted-foreground/70">
+                    <span>{service ? `slot ${service.slot}` : "slot unknown"}</span>
+                    <span className={engineOnline ? "text-up" : ""}>{connection.status}{connection.http_status ? ` · ${connection.http_status}` : ""}</span>
                   </div>
                 </div>
               </div>
@@ -241,9 +234,8 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
               >
                 <KeyRound />
                 <span>{language === "zh-TW" ? "OKX 專用子帳戶 API" : "OKX Sub-Account API"}</span>
-                <span className="ml-auto flex items-center gap-1.5 rounded-full bg-up/10 px-2 py-0.5 font-mono text-t2 font-medium text-up">
-                  <span className="size-1.5 rounded-full bg-up animate-pulse" />
-                  3 LIVE · {ping}ms
+                <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 font-mono text-t2 text-muted-foreground">
+                  {language === "zh-TW" ? "未接線" : "not wired"}
                 </span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -286,16 +278,10 @@ export function AccountMenu({ isFolded = false }: { isFolded?: boolean }) {
 
             <DropdownMenuSeparator className="my-1 bg-border/60" />
 
-            {/* 退出本機終端 */}
-            <div>
-              <DropdownMenuItem
-                onClick={signOut}
-                className={cn(itemCls, "text-down focus:text-down [&_svg]:text-down focus:[&_svg]:text-down")}
-              >
-                <LogOut />
-                <span>{language === "zh-TW" ? "鎖定 / 退出終端" : "Lock / Exit Terminal"}</span>
-              </DropdownMenuItem>
-            </div>
+            {/* v1：本機單人終端，沒有登入／帳號 */}
+            <p className="px-2.5 py-1 font-mono text-t1 text-muted-foreground/70">
+              {language === "zh-TW" ? "本機單人終端 · 無登入" : "Local single-user terminal · no sign-in"}
+            </p>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
