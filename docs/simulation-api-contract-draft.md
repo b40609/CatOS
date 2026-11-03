@@ -14,15 +14,17 @@
 | 前端 | `src/adapters/types.ts`、`src/adapters/mock-adapter.ts`、`src/adapters/research-api-adapter.ts`、`src/contracts/*.ts`、`src/state/catStore.ts`、`src/state/stateAdapter.ts`、`src/state/liveMarketStore.ts`、`src/state/dashboard-demo-store.ts`、六個戰情台元件與 `src/pages/bots.tsx` |
 | 文件 | `docs/backend-frontend-integration-map.md`、`docs/demo-entry-contract.md`、`AGENTS.md` |
 
+> 行號說明（2026-11-03）：本文件引用程式位置時只給檔名與符號，不給行號；草案期（第 3 步前）的 `file:line` 定位在實作後已全部移動，已於第 6 步移除。
+
 ## 0. 盤點結論（寫契約前必須知道的現況）
 
-1. **現有可用的模擬 HTTP 只有五條**（`local_sim_control_api.py:68-88`，前綴 `/api/workspace/simulation`）：`GET /version`、`GET /runs`、`GET /runs/{run_id}`、`POST /start`（body `{request_id, template_id}`）、`POST /runs/{run_id}/stop`（body `{request_id}`）。單槽、固定模板 `sma-synthetic-smoke-v1`（8 根＋2 根預熱，`local_sim_control.py:16-21`）。
+1. **現有可用的模擬 HTTP 只有五條**（`local_sim_control_api.py`，前綴 `/api/workspace/simulation`）：`GET /version`、`GET /runs`、`GET /runs/{run_id}`、`POST /start`（body `{request_id, template_id}`）、`POST /runs/{run_id}/stop`（body `{request_id}`）。單槽、固定模板 `sma-synthetic-smoke-v1`（8 根＋2 根預熱，`local_sim_control.py`）。
 2. **策略／Bot 管理 HTTP 從未掛載過。** `GET/POST /strategies`、`GET/POST /bots`、`POST /bots/start` 只出現在 `tests/test_python_strategy_api.py`、`catos/strategy_mcp.py` 與舊文件；`LocalSimControlService` 沒有 `library` 屬性，`start()` 只收 `template_id`。`git log --all -S'self.library'` 查無任何提交。對應的 8 個測試在目前基線全部 ERROR（`AttributeError: 'LocalSimControlService' object has no attribute 'library'`、`WorkerConfig.__init__() got an unexpected keyword argument 'python_strategy'`）。`python_strategy.py`／`strategy_library.py` 是半套：製品驗證與 JSON 策略庫存在，控制面與 Worker 端整合不存在。
-3. **Supervisor 沒有任何狀態摘要方法**（`supervisor.py` 無 `to_dict`／`snapshot`）。可讀的是 `risk_state: risk.State`（`:66`）、`halt_reasons`、`health`、`revision`、`epoch`、`total_reserved` 等屬性；`journal.Journal.snapshot(bot_id)` 回 `{checkpoint, revision, isolated, health, epoch, halt_reasons, owner, total_reserved, pending, risk_state}`（`journal.py:687-695`）。
-4. **journal 沒有任何帶掛鐘時間戳的稽核表。** `risk_actions`（`journal.py:251-254`）只有 rowid 序；`execution_orders` 有 `deadline`／`epoch` 無建立時間；`execution_fills` 無時間無序號。可當事件流水的現成來源，只有控制面 run 記錄裡的 `events`（`local_sim_control.py:316-326`，每 run 環形上限 `MAX_EVENTS=40`，有 `wall_time` ISO 字串）。
-5. **runner 每根 bar 已經拿到完整帳戶視圖與風控狀態**：`signal` 事件帶 `account=ipc.account_to_wire(view)`（`AccountView`：`time_ms, position, average_entry, balance, realized_pnl, unrealized_pnl, equity, fees, funding_paid`，全 Decimal 字串，`research.py:92-101`），`final_account` 帶 `risk_state=supervisor.risk_state.to_wire()`（`runner:130-131`）。風控／持倉 DTO 可從這裡投影，不必另開 SQLite reader。
-6. **前端現況比「換 adapter」更深。** `catStore` 的 `kpis/bots/risk/telemetry/equitySeries/auditLogs` slice 由 `stateAdapter.init()` 用 mock 餵入，但**戰情台六個元件與 `pages/bots.tsx` 沒有任何一個讀 `catStore`**。它們的資料來自 `liveMarketStore`（1 秒 tick 重播 `MARKET_TAPE_10M` 常數，全是 JS number）、`dashboard-demo-store` 的 `usePreviewStore`（寫死的 `INITIAL_EVENTS_DATA`）、`inspectorStore` 的 `INSPECTOR_BOTS`、`lib/v0-engine` 與元件內常數（例如 `allocation-donut-card.tsx` 的 pnl 視圖全為寫死數字，`activity-panel.tsx` 的資金費率字串寫死）。`catStore` 唯二消費者是 `mode-selector.tsx:66`（`mode`）與 `lib/i18n.ts`（`language`）。`stateAdapter.handleEvent()` 沒有呼叫者。因此第 4 步除了寫 real-adapter，還必須把元件改讀 store（見第 7 節）。
-7. **同源／版本門檻已有兩套可沿用**：research（`research_api.py:90-127`：host 127.0.0.1、Origin 必須等於 base_url、`Content-Type: application/json`、`X-CatOS-Build` 等於 loaded build、body ≤ 8192、拒絕重複鍵與非有限常數）與 simulation（`local_sim_control_api.py:42-66`：同上再加 `X-CatOS-Instance` 必須等於 `service.instance_id`、精確欄位集合、`request_id` 為 32 hex）。錯誤格式皆為 HTTP status ＋ `{"detail": "<snake_case_code>"}`。
+3. **Supervisor 沒有任何狀態摘要方法**（`supervisor.py` 無 `to_dict`／`snapshot`）。可讀的是 `risk_state: risk.State`、`halt_reasons`、`health`、`revision`、`epoch`、`total_reserved` 等屬性；`journal.Journal.snapshot(bot_id)` 回 `{checkpoint, revision, isolated, health, epoch, halt_reasons, owner, total_reserved, pending, risk_state}`（`journal.py`）。
+4. **journal 沒有任何帶掛鐘時間戳的稽核表。** `risk_actions`（`journal.py`）只有 rowid 序；`execution_orders` 有 `deadline`／`epoch` 無建立時間；`execution_fills` 無時間無序號。可當事件流水的現成來源，只有控制面 run 記錄裡的 `events`（`local_sim_control.py`，每 run 環形上限 `MAX_EVENTS=40`，有 `wall_time` ISO 字串）。
+5. **runner 每根 bar 已經拿到完整帳戶視圖與風控狀態**：`signal` 事件帶 `account=ipc.account_to_wire(view)`（`AccountView`：`time_ms, position, average_entry, balance, realized_pnl, unrealized_pnl, equity, fees, funding_paid`，全 Decimal 字串，`research.py`），`final_account` 帶 `risk_state=supervisor.risk_state.to_wire()`（`local_sim_control_runner.py`）。風控／持倉 DTO 可從這裡投影，不必另開 SQLite reader。
+6. **前端現況比「換 adapter」更深。** `catStore` 的 `kpis/bots/risk/telemetry/equitySeries/auditLogs` slice 由 `stateAdapter.init()` 用 mock 餵入，但**戰情台六個元件與 `pages/bots.tsx` 沒有任何一個讀 `catStore`**。它們的資料來自 `liveMarketStore`（1 秒 tick 重播 `MARKET_TAPE_10M` 常數，全是 JS number）、`dashboard-demo-store` 的 `usePreviewStore`（寫死的 `INITIAL_EVENTS_DATA`）、`inspectorStore` 的 `INSPECTOR_BOTS`、`lib/v0-engine` 與元件內常數（例如 `allocation-donut-card.tsx` 的 pnl 視圖全為寫死數字，`activity-panel.tsx` 的資金費率字串寫死）。`catStore` 唯二消費者是 `mode-selector.tsx`（`mode`）與 `lib/i18n.ts`（`language`）。`stateAdapter.handleEvent()` 沒有呼叫者。因此第 4 步除了寫 real-adapter，還必須把元件改讀 store（見第 7 節）。
+7. **同源／版本門檻已有兩套可沿用**：research（`research_api.py`：host 127.0.0.1、Origin 必須等於 base_url、`Content-Type: application/json`、`X-CatOS-Build` 等於 loaded build、body ≤ 8192、拒絕重複鍵與非有限常數）與 simulation（`local_sim_control_api.py`：同上再加 `X-CatOS-Instance` 必須等於 `service.instance_id`、精確欄位集合、`request_id` 為 32 hex）。錯誤格式皆為 HTTP status ＋ `{"detail": "<snake_case_code>"}`。
 8. `research-api-adapter.ts` 的四條不變量（檔頭 12-16 行）：Decimal 字串、真 API 模式絕不回退 fixture、POST 失敗絕不產生假 run_id／假成功／自動重送、保留 403/409/413/415/422/503 的 detail。它目前**不送 Origin、不送 `X-CatOS-Instance`、body 無 `request_id`**；simulation 的 adapter 必須補齊後兩者。
 
 ## 1. 端點清單
@@ -31,16 +33,16 @@
 
 | 方法 | 路徑 | 用途 | 冪等性 | 對應後端 | 狀態 |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/version` | build／instance／slot／capabilities／config | 是 | `LocalSimControlService.version()`（`:204-215`） | **既有** |
+| GET | `/version` | build／instance／slot／capabilities／config | 是 | `LocalSimControlService.version()` | **既有** |
 | GET | `/state` | 聚合快照：version＋strategies＋bots＋risk＋positions＋summary＋最近事件，供 `stateAdapter.init()` 一次拉齊與輪詢 | 是 | 新增 `service.state(since_version=None)`，內部組合下列各節的投影函式 | 新增 |
 | GET | `/strategies` | 可用策略清單；v1 只有登錄的 SMA | 是 | 新增 `service.strategies()`，來源 `research_catalog.STRATEGY_MANIFEST`＋`DEFAULT_REQUEST` | 新增 |
 | GET | `/bots` | Bot 清單（v1 固定一個） | 是 | 新增 `service.bots()` | 新增 |
 | GET | `/bots/{bot_id}` | 單筆 Bot＋最近一次 run 投影 | 是 | 新增 `service.bot(bot_id)`；404 `bot_not_found` | 新增 |
-| POST | `/bots/start` | 啟動 Bot（v1 等於用固定模板開一個 run） | 以 `request_id` 冪等：同 id 同 body 回同一 run；同 id 不同 body 409 `request_id_conflict` | 新增薄包裝 → 既有 `service.start(request_id, template_id=TEMPLATE)`（`:241-282`），回 202 | 新增（包裝既有） |
+| POST | `/bots/start` | 啟動 Bot（v1 等於用固定模板開一個 run） | 以 `request_id` 冪等：同 id 同 body 回同一 run；同 id 不同 body 409 `request_id_conflict` | 新增薄包裝 → 既有 `service.start(request_id, template_id=TEMPLATE)`，回 202 | 新增（包裝既有） |
 | POST | `/start` | 既有固定模板啟動 | 同上 | `service.start` | **既有**，v1 保留給舊頁與測試 |
-| POST | `/runs/{run_id}/stop` | 停止 run（本事件完成後停） | 以 `request_id` 冪等 | `service.stop(run_id, request_id)`（`:284-306`），202 | **既有** |
-| GET | `/runs` | run 清單（新到舊） | 是 | `service.list_runs()`（`:228-231`） | **既有** |
-| GET | `/runs/{run_id}` | 單 run 快照 | 是 | `service.snapshot(run_id)`（`:217-226`） | **既有** |
+| POST | `/runs/{run_id}/stop` | 停止 run（本事件完成後停） | 以 `request_id` 冪等 | `service.stop(run_id, request_id)`，202 | **既有** |
+| GET | `/runs` | run 清單（新到舊） | 是 | `service.list_runs()` | **既有** |
+| GET | `/runs/{run_id}` | 單 run 快照 | 是 | `service.snapshot(run_id)` | **既有** |
 | GET | `/risk` | 帳戶風控快照（active／最近一次 run） | 是 | 新增 `service.risk()`，投影自最新 `signal`／`final_account` 事件的 `account`＋`risk_state` 與 `risk.Limits` | 新增 |
 | GET | `/positions` | 部位清單（v1 單合約，0 或 1 筆） | 是 | 新增 `service.positions()`，投影自同一來源 | 新增 |
 | GET | `/events?since=<seq>&limit=<n>` | 審計流水，游標分頁 | 是 | 新增 `service.events(since, limit)`，來源為控制面事件（run 生命週期＋`warmup`／`signal`／`fill`／`final_account`）加全域序號 | 新增 |
@@ -54,14 +56,14 @@
 通則：
 
 - 金額、價格、數量、比例一律 **Decimal 字串**（沿用 `account_to_wire`／`State.to_wire` 的字串化）；百分比用「比例字串」（`"0.0184"`），不帶 `%`、不帶千分位，格式化在前端。
-- 時間：新增欄位一律 **epoch ms 整數**，欄位名以 `_ms` 結尾。既有 run 記錄的 `created_at`／`finished_at`／`stop_requested_at`／`wall_time` 是 ISO 字串且被現有測試與 `control.json` 契約鎖住（`local_sim_control.py:163-168`），v1 **保留原欄位不改**，另加對應 `*_ms`（見 Q6）。
+- 時間：新增欄位一律 **epoch ms 整數**，欄位名以 `_ms` 結尾。既有 run 記錄的 `created_at`／`finished_at`／`stop_requested_at`／`wall_time` 是 ISO 字串且被現有測試與 `control.json` 契約鎖住（`local_sim_control.py`），v1 **保留原欄位不改**，另加對應 `*_ms`（見 Q6）。
 - 版本：每個 DTO 帶 `version`（整數），來源是服務內單調遞增的 `state_version`，每次 `_save`／`_emit`／`_update` 成功後 +1；重啟歸零但 `instance_id` 改變。前端規則：`instance_id` 與上次不同 → 清空 `versionMap` 再套用（等同現有 `store.setMode` 的清空行為）。
 - 缺值用 `null`，不用 `"--"`、不用 `0`、不用 `"unknown"`（mock 目前三者都有）。
 - 列舉值沿用後端原字串，不在後端做大小寫或語意轉換。
 
 ### 2.1 `VersionDTO`（既有，不改）
 
-`service.version()` 原樣：`contract:"catos.simulation.v1"`, `mode:"local-sim-synthetic"`, `build_id`, `current_build_id`, `restart_required`, `instance_id`, `slot: "idle"|"starting"|"running"|"stopping"|"recovery_required"|"unavailable"`, `active_run_id`, `capabilities:{start,stop}`, `unavailable_reason`, `config`。前端 `contracts/workspace.ts:16-31` 已對齊。
+`service.version()` 原樣：`contract:"catos.simulation.v1"`, `mode:"local-sim-synthetic"`, `build_id`, `current_build_id`, `restart_required`, `instance_id`, `slot: "idle"|"starting"|"running"|"stopping"|"recovery_required"|"unavailable"`, `active_run_id`, `capabilities:{start,stop}`, `unavailable_reason`, `config`。前端 `contracts/workspace.ts` 已對齊。
 
 ### 2.2 `WorkspaceStateDTO`（`GET /state`，新增）
 
@@ -82,7 +84,7 @@
 }
 ```
 
-`domains` 讓前端對各 slice 分別套用 `applyAuthoritativeUpdate`（`catStore.ts:121-136` 接受相等版本、拒絕較舊），與 `hydrateAll` 的逐 domain 門檻（`:138-152`）一致。`since_version` 等於目前 `version` 時回 `{"contract":…, "unchanged": true, "version": N, "instance_id": …}`。
+`domains` 讓前端對各 slice 分別套用 `applyAuthoritativeUpdate`（`catStore.ts` 接受相等版本、拒絕較舊），與 `hydrateAll` 的逐 domain 門檻一致。`since_version` 等於目前 `version` 時回 `{"contract":…, "unchanged": true, "version": N, "instance_id": …}`。
 
 ### 2.3 `StrategyEntryDTO`（`GET /strategies`）
 
@@ -128,7 +130,7 @@ v1 固定一個 Bot，`bot_id = "sim-control-sma"`（runner 已用此 id 建 Sup
 | `current_run_id` | string\|null | `service.active` 或最近 run |
 | `worker_pid` | int\|null | `run.worker_pid`（runner `update(worker_pid=…)`，`:80`） |
 | `bars`／`warmup_bars`／`fills` | int | run 記錄 |
-| `last_synthetic_time_ms` | int\|null | `run.last_synthetic_time_ms`（`:125`） |
+| `last_synthetic_time_ms` | int\|null | `run.last_synthetic_time_ms` |
 | `position` | Decimal str\|null | 最新 `account.position` |
 | `average_entry` | Decimal str\|null | `account.average_entry` |
 | `equity` | Decimal str\|null | `account.equity` |
@@ -161,42 +163,42 @@ v1 固定一個 Bot，`bot_id = "sim-control-sma"`（runner 已用此 id 建 Sup
 
 ### 2.5 `RunDTO`（既有＋擴充）
 
-既有 `service.snapshot(run_id)` 欄位全部保留（`run_id, request_id, config, build_id, instance_id, created_at, control_state, cleanup_confirmed, stop_requested, stop_requested_at, bars, warmup_bars, fills, events, events_omitted, error, finished_at, worker_closed, still_finishing, last_signal?, last_fill?, worker_pid?, last_synthetic_time_ms?`）。前端 `contracts/run.ts:18-52` 的 `RunDTO` 大致對齊，但下列欄位 mock 有、後端沒有：`bot_id`（v1 後端新增，常數）、`template_id`（在 `config.template_id`）、`account`（改由 `last_signal.account`／`final_account` 投影成 `BotViewDTO`，或後端在 `snapshot()` 補 `last_account`，Q5）、`artifact_hash`／`binding`／`symbol`／`period`／`slippage_bps`（在 `config.research_request`，前端自行讀）。
+既有 `service.snapshot(run_id)` 欄位全部保留（`run_id, request_id, config, build_id, instance_id, created_at, control_state, cleanup_confirmed, stop_requested, stop_requested_at, bars, warmup_bars, fills, events, events_omitted, error, finished_at, worker_closed, still_finishing, last_signal?, last_fill?, worker_pid?, last_synthetic_time_ms?`）。前端 `contracts/run.ts` 的 `RunDTO` 大致對齊，但下列欄位 mock 有、後端沒有：`bot_id`（v1 後端新增，常數）、`template_id`（在 `config.template_id`）、`account`（改由 `last_signal.account`／`final_account` 投影成 `BotViewDTO`，或後端在 `snapshot()` 補 `last_account`，Q5）、`artifact_hash`／`binding`／`symbol`／`period`／`slippage_bps`（在 `config.research_request`，前端自行讀）。
 
-`SimulationRun`（`run.ts:63-86`）是 mock 的 view model，含 `total_bars`／`current_bar`（mock 都填 `bars`）、`trade_count`（=`fills`）、`updated_at`；真 adapter 不需要這層，建議第 4 步刪除 `SimulationRun`，頁面直接用 `RunDTO`。
+`SimulationRun`（`run.ts`）是 mock 的 view model，含 `total_bars`／`current_bar`（mock 都填 `bars`）、`trade_count`（=`fills`）、`updated_at`；真 adapter 不需要這層，建議第 4 步刪除 `SimulationRun`，頁面直接用 `RunDTO`。
 
 ### 2.6 `RiskSnapshotDTO`（`GET /risk`）
 
-來源：`risk.State.to_wire()`（`risk.py:422-428`）＋ `risk.Limits.to_wire()`（`:40-41`）＋ 後端 Decimal 計算。v1 取自 active run 的最新觀測；無 run 時 `null`。
+來源：`risk.State.to_wire()`（`risk.py`）＋ `risk.Limits.to_wire()`＋ 後端 Decimal 計算。v1 取自 active run 的最新觀測；無 run 時 `null`。
 
 ```jsonc
 {
   "version": 1280,
   "run_id": "…",
   "seq": 7, "time_ms": 1762092900000,           // State.seq / State.time_ms（合成時間）
-  "mode": "RUN" | "NO_INCREASE" | "FLAT",        // State.mode（risk.py:457）
+  "mode": "RUN" | "NO_INCREASE" | "FLAT",        // State.mode（risk.py）
   "health": "RECONCILING" | "HEALTHY" | "DEGRADED",
   "phase": "IDLE" | "WORKING" | "VERIFY" | "WAIT" | "DONE",
   "reasons": ["soft_loss"],                      // State.reasons ⊆ {soft_loss, hard_loss, manual_kill}
   "epoch": 3,
   "limits": { "leverage": "3.0", "symbol_share": "0.50", "soft_loss": "0.10", "hard_loss": "0.20" },
-  "basis": {                                     // DayBasis.to_wire()（risk.py:220）；null = 尚無基準
+  "basis": {                                     // DayBasis.to_wire()（risk.py）；null = 尚無基準
     "day": 20760, "equity": "1000", "evidence_id": "r4-midnight-20760",
     "source": "…", "account_alias": "sim-control-…", "environment": "local-sim",
     "period_start_ms": null                      // R1 實際起算時間；local-sim 合成午夜基準時與 day 起點相同（Q7）
   },
-  "snapshot": {                                  // risk.Snapshot.to_wire()（risk.py:383）
+  "snapshot": {                                  // risk.Snapshot.to_wire()（risk.py）
     "equity": "1003.21", "risk_equity": "1003.21", "position": "2", "mark": "101.5",
     "pending_buy": "0", "pending_sell": "0", "other_notional": "0", "external_net": "0",
     "valuation_known": true, "flows_known": true, "margin_ok": true,
     "position_verified": true, "reduction_conflict": false, "valid_until_ms": 1762093800000
   },
   "derived": {                                   // 後端 Decimal 算，不給前端算
-    "period_pnl": "3.21",                        // equity - basis.equity - external_net（risk.py:469-471 同式）
+    "period_pnl": "3.21",                        // equity - basis.equity - external_net（risk.py 同式）
     "period_pnl_ratio": "0.00321",
     "notional": "203",                           // worst_notional 或 |position|*base_per_contract*mark
     "effective_leverage": "0.2024",              // risk.effective_leverage((notional,), equity)；equity<=0 → null
-    "exposure_budget": "3009.63",                // limits.leverage * risk_equity（risk.py:613）
+    "exposure_budget": "3009.63",                // limits.leverage * risk_equity（risk.py）
     "symbol_budget": "1504.815",                 // budget * symbol_share
     "can_increase": true,                        // mode == RUN && health == HEALTHY && basis != null
     "status": "normal" | "soft_latch" | "hard_latch" | "missing"
@@ -204,7 +206,7 @@ v1 固定一個 Bot，`bot_id = "sim-control-sma"`（runner 已用此 id 建 Sup
 }
 ```
 
-`derived.status` 對映：`reasons` 含 `hard_loss`／`manual_kill` → `hard_latch`；含 `soft_loss` → `soft_latch`；`basis == null` 或 `health != HEALTHY` → `missing`；否則 `normal`。與 `contracts/risk.ts:7` 的 `RiskStatus` 四值一致，`DashboardKPIs.risk_status` 的 `UNAVAILABLE`／`UNKNOWN` 由前端在 HTTP 失敗時自行標記，不由後端回。
+`derived.status` 對映：`reasons` 含 `hard_loss`／`manual_kill` → `hard_latch`；含 `soft_loss` → `soft_latch`；`basis == null` 或 `health != HEALTHY` → `missing`；否則 `normal`。與 `contracts/risk.ts` 的 `RiskStatus` 四值一致，`DashboardKPIs.risk_status` 的 `UNAVAILABLE`／`UNKNOWN` 由前端在 HTTP 失敗時自行標記，不由後端回。
 
 對照 `contracts/risk.ts` 的 `RiskState`：`day_start_equity_usdt`→`basis.equity`；`current_equity_usdt`→`snapshot.equity`；`daily_pnl_*`→`derived.period_pnl*`（**語義改為「風控期間損益」**，依 R1）；`soft/hard_loss_limit_pct`→`limits`；`current_drawdown_pct`→與 `period_pnl_ratio` 同值，刪；`exposure_nominal_usdt`→`derived.notional`；`exposure_budget_usdt`→`derived.exposure_budget`；`margin_used_usdt`／`margin_available_usdt`→**v1 不提供**（無保證金模型，`margin_ok` 是布林）；`fixed_tag_active`→不是風控狀態，改放 `summary.invariants`；`latched_reasons`→`reasons`。`ExposureAllocationItem{label, nominal_usdt, pct_share, color}`：v1 單合約只有一筆，`color` 不該由後端給，刪。
 
@@ -227,7 +229,7 @@ v1 單合約：`position == "0"` 時空陣列，否則一筆。
 | `funding_interval_ms`／`funding_rate` | null | 合成資料 `funding: "explicit_zero"`；**v1 不提供** |
 | `liquidation_price`／`margin` | null | 無保證金／強平模型；**v1 不提供** |
 
-`activity-panel.tsx` 目前渲染的 `liqPrice`、`distLiqPct`、`mmr`、`fundingIntervalHours`、`p6StopPrice`、`p6Status`、`p6DistPct` 在 v1 都沒有真值，第 4 步要改成「不適用」狀態而不是沿用寫死數字。掛單表（`INITIAL_ORDERS`）在 local-sim 中沒有對應來源（每筆意圖立即以合成 FILLED 終結，`runner:111-115`），v1 固定空陣列。
+`activity-panel.tsx` 目前渲染的 `liqPrice`、`distLiqPct`、`mmr`、`fundingIntervalHours`、`p6StopPrice`、`p6Status`、`p6DistPct` 在 v1 都沒有真值，第 4 步要改成「不適用」狀態而不是沿用寫死數字。掛單表（`INITIAL_ORDERS`）在 local-sim 中沒有對應來源（每筆意圖立即以合成 FILLED 終結，`local_sim_control_runner.py`），v1 固定空陣列。
 
 ### 2.8 `EventDTO`（`GET /events`）
 
@@ -242,7 +244,7 @@ v1 單合約：`position == "0"` 時空陣列，否則一筆。
   "payload": { /* 原事件欄位原樣：signal 的 target/disposition/reason/account/intent_key；fill 的 request/fill/position/fees/equity/state */ } }
 ```
 
-分頁：`?since=<seq>&limit=<1..200>`，回 `{items, next_since, omitted}`；`omitted` 來自各 run 的 `events_omitted`（環形上限 40）。前端 `AuditLogItem{id, timestamp, level, category, message, details}`（`command.ts:40-47`）：`id`=`run_id:seq`、`timestamp`=`wall_time_ms`、`message` 由前端依 `kind` 與 `payload` 組字串（後端不產生中文文案）。`unified-incident-activity-card.tsx` 現在依 `title` 子字串推斷 `domain`（`:26-34`），改讀 `kind`／`category` 後可刪推斷。
+分頁：`?since=<seq>&limit=<1..200>`，回 `{items, next_since, omitted}`；`omitted` 來自各 run 的 `events_omitted`（環形上限 40）。前端 `AuditLogItem{id, timestamp, level, category, message, details}`（`command.ts`）：`id`=`run_id:seq`、`timestamp`=`wall_time_ms`、`message` 由前端依 `kind` 與 `payload` 組字串（後端不產生中文文案）。`unified-incident-activity-card.tsx` 現在依 `title` 子字串推斷 `domain`，改讀 `kind`／`category` 後可刪推斷。
 
 ### 2.9 `SummaryDTO`（戰情台 KPI）
 
@@ -262,7 +264,7 @@ v1 單合約：`position == "0"` 時空陣列，否則一筆。
 
 ## 3. 錯誤契約
 
-沿用現行格式：HTTP 狀態碼 ＋ JSON body `{"detail": "<snake_case_code>"}`（`ControlError` handler `local_sim_control_api.py:29-31`；research 同 `research_api.py:103-105`）。code 是穩定識別字，不是人類文案；前端 `handleResponse` 讀 `detail`（`research-api-adapter.ts:236-250`）可直接沿用。新增 GET 端點用同一格式，不回 `{status, reason}` 巢狀物（那只在 `UnavailableMarketReader` 出現，不採）。
+沿用現行格式：HTTP 狀態碼 ＋ JSON body `{"detail": "<snake_case_code>"}`（`ControlError` handler `local_sim_control_api.py`；research 同 `research_api.py`）。code 是穩定識別字，不是人類文案；前端 `handleResponse` 讀 `detail`（`research-api-adapter.ts`）可直接沿用。新增 GET 端點用同一格式，不回 `{status, reason}` 巢狀物（那只在 `UnavailableMarketReader` 出現，不採）。
 
 | HTTP | code | 何時 |
 | --- | --- | --- |
@@ -279,21 +281,21 @@ v1 單合約：`position == "0"` 時空陣列，否則一筆。
 | 415 | `application_json_required` | POST content-type |
 | 422 | `invalid_json`／`invalid_command_contract`／`invalid_template_id`／`unsupported_template`／`invalid_run_id` | 既有 |
 | 422 | `invalid_bot_id`／`invalid_since`／`invalid_limit` | 新增 GET／POST 參數 |
-| 503 | `not_started`／`simulation_output_in_use`／`simulation_metadata_unavailable`／`simulation_metadata_write_uncertain`／`simulation_run_directory_uncertain`／`simulation_service_closing`／`simulation_source_unavailable` | `ControlError` 預設 503（`local_sim_control.py:45-48`），服務 `unavailable` 時所有 POST 與 `/state`、`/risk`、`/positions` 皆 503；`/version`、`/runs` 仍可回（含 `unavailable_reason`） |
+| 503 | `not_started`／`simulation_output_in_use`／`simulation_metadata_unavailable`／`simulation_metadata_write_uncertain`／`simulation_run_directory_uncertain`／`simulation_service_closing`／`simulation_source_unavailable` | `ControlError` 預設 503（`local_sim_control.py`），服務 `unavailable` 時所有 POST 與 `/state`、`/risk`、`/positions` 皆 503；`/version`、`/runs` 仍可回（含 `unavailable_reason`） |
 
 輪詢無變化：`GET /state?since_version=N` 回 200 `{"unchanged": true, …}`（不用 304，避免 fetch 快取語義與 `no-store` 衝突）。
 
 ## 4. 安全與邊界
 
 - 只回 local-sim：所有 DTO 的 `mode` 固定 `"local"`／`"local-sim-synthetic"`；服務內沒有任何讀取憑證、環境變數或對外連線的路徑（`local_sim_control_runner.py` 使用 `FakeExchange`）。任何含 `demo`／`live` 的請求回 403 `mode_not_available`，不回 404（讓前端能區分「不存在」與「被禁止」）。
-- 同源與版本：POST 維持 `local_sim_control_api.py:42-66` 全套檢查；GET 加 host 檢查。回應維持 `X-CatOS-Build`／`X-CatOS-Instance`／`Cache-Control: no-store`。前端 POST 必帶 `X-CatOS-Build`、`X-CatOS-Instance`（取自 `/version`）、`Content-Type: application/json`、body 僅精確欄位集合、`request_id` 由前端 `crypto.randomUUID()` 去連字號產生並在送出前存入 `sessionStorage`（`PendingCommand` 契約 `command.ts:19-25` 已定義）。
+- 同源與版本：POST 維持 `local_sim_control_api.py` 全套檢查；GET 加 host 檢查。回應維持 `X-CatOS-Build`／`X-CatOS-Instance`／`Cache-Control: no-store`。前端 POST 必帶 `X-CatOS-Build`、`X-CatOS-Instance`（取自 `/version`）、`Content-Type: application/json`、body 僅精確欄位集合、`request_id` 由前端 `crypto.randomUUID()` 去連字號產生並在送出前存入 `sessionStorage`（`PendingCommand` 契約 `command.ts` 已定義）。
 - 不新增寫入面：`/state`、`/risk`、`/positions`、`/events` 不碰 SQLite 寫、不建立基準、不解除 latch、不釋放 ownership。v1 不提供 kill-switch／re-arm／set_loss_limits HTTP（`supervisor.latch`／`rearm`／`set_loss_limits` 存在但未授權接入，見 Q8）。
 - 不讀產品 DB：v1 投影只用控制面記憶體與 `control.json`；若 Q3 選讀 `state.sqlite3`，必須 `mode=ro` 且只在 run 終態後讀。
 - 上限：`/events` `limit ≤ 200`；`/state` 的 `events` 固定最近 40；回應不含 `source` 原始碼。
 
 ## 5. 模式切換（前端 `setMode`）
 
-現況：`stateAdapter.setMode()`（`stateAdapter.ts:107-113`）→ `mockAdapter.setMode` → `store.setMode`（清空所有 slice 與 `versionMap`，`catStore.ts:97-112`）→ `init()`。mock 在 demo／live 回固定「locked」KPI、空陣列、`status:'missing'` 與 `latched_reasons:['MODE_NOT_OPEN']`，mutation 丟 `DEMO_MODE_LOCKED`。
+現況：`stateAdapter.setMode()`（`stateAdapter.ts`）→ `mockAdapter.setMode` → `store.setMode`（清空所有 slice 與 `versionMap`，`catStore.ts`）→ `init()`。mock 在 demo／live 回固定「locked」KPI、空陣列、`status:'missing'` 與 `latched_reasons:['MODE_NOT_OPEN']`，mutation 丟 `DEMO_MODE_LOCKED`。
 
 v1 規則：
 
