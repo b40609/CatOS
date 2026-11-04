@@ -35,18 +35,18 @@
 - 滾動驗證：HTML 報表沒有前端入口；分類規則的預設值沿用合成示範門檻（高波動 250 bps，BTC 15m 幾乎都會分到低波動）；計算量上限 250,000 只在本機量過。
 - 優化的 HTML 報表內文仍寫「合成資料樣本內搜尋」，真實資料集也一樣（報表頁尾已改為依資料來源顯示）。
 
-## 收尾雜項（刪除類要你確認）
+## 收尾雜項（2026-11-04 你同意後已處理）
 
-| 項目 | 建議 |
+| 項目 | 狀態 |
 | --- | --- |
-| 已合併的本機分支：`fix/v1-safety`、`docs/v1-release`、`chore/v1-cleanup`、`chore/v1-type-scale`、`feat/v1-simulation-api`、`feat/v1-simulation-endpoints`、`feat/v1-simulation-frontend` | 刪除 |
-| `feature/catos-react-vite`（本機多一個 `d8c2133`，內容已併入本文件；遠端停在 `5a101d4`，已包含在 `main`） | 刪除本機與遠端 |
-| 遠端 `feature/catos-v1-sim`（已合併進 `main`） | 刪除 |
+| 已合併的本機分支：`fix/v1-safety`、`docs/v1-release`、`chore/v1-cleanup`、`chore/v1-type-scale`、`feat/v1-simulation-api`、`feat/v1-simulation-endpoints`、`feat/v1-simulation-frontend` | 已刪除 |
+| `feature/catos-react-vite`（本機多一個 `d8c2133`，內容已併入本文件；遠端停在 `5a101d4`，已包含在 `main`） | 已刪除本機與遠端 |
+| 遠端 `feature/catos-v1-sim`（已合併進 `main`） | 已刪除 |
 | 遠端 `feature/frontend-redesign-v2`、`archive/catos-v1` | 保留（歷史） |
-| `docs/review-20261102/`（11/02 讀碼筆記，行號以舊版 `fffed2e` 為準） | 你決定：commit 成歷史或刪除 |
-| `.git/worktrees/main-wt` 空資料夾（權限刪不掉，git 會多印一行警告） | 刪除 |
-| `.claude/launch.json`（本機 Vite 預覽設定） | 加進 `.gitignore` |
-| 筆電工作樹仍有舊的 CRLF 檔 | 改寫為 LF。不影響目前測試；全面改寫要跑一次 `git reset --hard`，上次被權限擋下，需你同意 |
+| `docs/review-20261102/`（11/02 讀碼筆記，行號以舊版 `fffed2e` 為準） | 已刪除 |
+| `.git/worktrees/main-wt`、`main-wt2` | 已刪除 |
+| `.claude/launch.json`（本機 Vite 預覽設定） | 改用本機 `.git/info/exclude` 忽略，沒有改 `.gitignore` |
+| 筆電工作樹仍有舊的 CRLF 檔 | 未處理，維持原樣：全面改寫要跑 `git reset --hard`，會影響同一目錄裡進行中的工作 |
 
 ## 兩台機器怎麼分工
 
