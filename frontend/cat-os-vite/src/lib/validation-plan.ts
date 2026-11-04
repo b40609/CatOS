@@ -4,6 +4,7 @@
  * so the dialog can show the bar budget before submitting.
  */
 import type { ResearchCatalog, ResearchDatasetMeta, ValidationRequest } from '@/adapters/research-api-adapter';
+import { compareDecimal, signOf } from '@/lib/format';
 
 export interface ValidationForm {
   datasetId: string;
@@ -29,6 +30,13 @@ export const VALIDATION_BACKTEST = {
 
 const SYNTHETIC_SOURCE = 'synthetic_closed_bars';
 const FETCHED_WINDOWS = 6;
+// Plain positive Decimal text as typed in the dialog; the backend accepts at most 64 characters.
+const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
+
+function positiveDecimal(text: string): boolean {
+  const value = text.trim();
+  return value.length <= 64 && PLAIN_DECIMAL.test(value) && signOf(value) === 'positive';
+}
 
 /** Aligned candidate count of the SMA period grid, or null when the grid is not valid. */
 export function candidateCount(form: Pick<ValidationForm, 'periodLow' | 'periodHigh' | 'periodStep'>): number | null {
@@ -116,8 +124,15 @@ export function validationProblems(
   if (work !== null && limits && work > limits.max_bar_evaluations) {
     problems.push(`計算量 ${work.toLocaleString()} 超過上限 ${limits.max_bar_evaluations.toLocaleString()}（避免超過 30 秒逾時）`);
   }
-  if (!Number.isInteger(form.lookbackBars) || form.lookbackBars < 1) {
-    problems.push('環境回看根數需為正整數');
+  const maxLookback = limits?.max_lookback_bars ?? 512;
+  if (!Number.isInteger(form.lookbackBars) || form.lookbackBars < 1 || form.lookbackBars > maxLookback) {
+    problems.push(`環境回看根數需在 1~${maxLookback}`);
+  }
+  if (!positiveDecimal(form.trendEfficiency) || compareDecimal(form.trendEfficiency.trim(), '1') === 1) {
+    problems.push('趨勢效率門檻需為大於 0、不超過 1 的小數（例如 0.5）');
+  }
+  if (!positiveDecimal(form.highVolatilityBps)) {
+    problems.push('高波動門檻需為大於 0 的數字（bps，例如 25）');
   }
   return problems;
 }

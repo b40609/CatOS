@@ -621,7 +621,9 @@ function ValidationPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-t2 text-muted-foreground">候選 SMA 週期（完整格點，{candidateCount(form) ?? NA} 個候選）</Label>
+                <Label className="text-t2 text-muted-foreground">
+                  候選 SMA 週期（完整格點，{candidateCount(form) === null ? "候選未對齊" : `${candidateCount(form)} 個候選`}）
+                </Label>
                 <div className="grid grid-cols-3 gap-2">
                   <Input type="number" min={2} max={32} aria-label="Period 最小值" value={form.periodLow}
                          onChange={intField("periodLow")} className="h-8 font-mono text-xs bg-background" />
@@ -650,22 +652,26 @@ function ValidationPage() {
                          onChange={intField("windows")} className="h-8 font-mono text-xs bg-background" />
                 </div>
                 <p className="text-t2 text-muted-foreground">
-                  訓練 · 測試 · 視窗數；使用 {barsUsed(form).toLocaleString()} / {dataset?.bars.toLocaleString() ?? NA} 根 ·
-                  需 {requiredRuns(form) ?? NA} 次回測 · 計算量 {barEvaluations(form)?.toLocaleString() ?? NA} / {limits?.max_bar_evaluations.toLocaleString() ?? NA}
+                  訓練 · 測試 · 視窗數；使用 {barsUsed(form).toLocaleString()} / {dataset?.bars.toLocaleString() ?? NA} 根 ·{" "}
+                  {candidateCount(form) === null
+                    ? "候選週期未對齊，無法估算回測次數與計算量"
+                    : `需 ${requiredRuns(form)} 次回測 · 計算量 ${barEvaluations(form)?.toLocaleString()} / ${limits?.max_bar_evaluations.toLocaleString() ?? NA}`}
                 </p>
               </div>
 
               <div className="space-y-1">
                 <Label className="text-t2 text-muted-foreground">環境分類規則（事前明示的示範門檻，不回饋選參）</Label>
                 <div className="grid grid-cols-3 gap-2">
-                  <Input type="number" min={1} aria-label="回看根數" value={form.lookbackBars}
+                  <Input type="number" min={1} max={limits?.max_lookback_bars ?? 512} aria-label="回看根數" value={form.lookbackBars}
                          onChange={intField("lookbackBars")} className="h-8 font-mono text-xs bg-background" />
                   <Input type="text" inputMode="decimal" aria-label="趨勢效率門檻" value={form.trendEfficiency}
                          onChange={(e) => setField("trendEfficiency", e.target.value)} className="h-8 font-mono text-xs bg-background" />
                   <Input type="text" inputMode="decimal" aria-label="高波動門檻 bps" value={form.highVolatilityBps}
                          onChange={(e) => setField("highVolatilityBps", e.target.value)} className="h-8 font-mono text-xs bg-background" />
                 </div>
-                <p className="text-t2 text-muted-foreground">回看根數 · 趨勢效率門檻 (0~1] · 高波動門檻（每根平均真實波幅，bps）</p>
+                <p className="text-t2 text-muted-foreground">
+                  回看根數（1~{limits?.max_lookback_bars ?? 512}）· 趨勢效率門檻 (0~1] · 高波動門檻（每根平均真實波幅，bps）
+                </p>
               </div>
 
               {problems.length > 0 && (

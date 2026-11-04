@@ -14,8 +14,9 @@ import packaging
 from catos.optimization import IntRange
 from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
-    MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_RUNS,
-    MAX_VALIDATION_WINDOWS, ROOT, STRATEGY_FILES, STRATEGY_MANIFEST, decimal_string,
+    MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_LOOKBACK_BARS,
+    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, STRATEGY_FILES, STRATEGY_MANIFEST,
+    decimal_string,
     drawdown_pcts, json_text, load_dataset_bars, load_registered_strategy, provenance,
     resolve_dataset, sample_curve_indices, validate_request,
 )
@@ -24,7 +25,7 @@ from catos.research_regimes import REGIMES, RegimeRule, regime_walk_forward, reg
 from catos.research_validation import WalkForwardPlan
 
 # v2 keeps every v1 figure but not the per-bar detail that grows with the data
-# (13.7 MB on the fetched 8,640-bar dataset in v1): per-bar labels become
+# (14.1 MB on the fetched 8,640-bar dataset in v1): per-bar labels become
 # per-regime bar counts, per-bar interval attribution is left to the per-regime
 # summaries, OOS equity curves are sampled above their share of
 # MAX_VALIDATION_CURVE_POINTS, and fetched data files are referenced by hash.
@@ -76,7 +77,7 @@ def validate_validation_request(value):
         "lookback_bars", "trend_efficiency", "high_volatility_bps",
     }:
         raise ValueError("regime_rule: exact explicit fields required")
-    lookback = _integer(rule["lookback_bars"], "lookback_bars", 1, MAX_BARS - 1)
+    lookback = _integer(rule["lookback_bars"], "lookback_bars", 1, MAX_VALIDATION_LOOKBACK_BARS)
     efficiency = decimal_string(rule["trend_efficiency"], "trend_efficiency", positive=True)
     volatility = decimal_string(rule["high_volatility_bps"], "high_volatility_bps", positive=True)
     if efficiency > 1:

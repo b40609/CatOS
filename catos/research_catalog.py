@@ -60,9 +60,13 @@ MAX_VALIDATION_CANDIDATES = 20
 MAX_VALIDATION_RUNS = 100
 MAX_VALIDATION_WINDOWS = 8
 # Walk-forward cost is the bars every training trial and OOS run replays
-# (~19-27k per second measured locally on the fetched 15m dataset), so a
-# preflight bound keeps a submission well inside TIMEOUT_SECONDS.
+# (~19-54k per second measured locally on the fetched 15m dataset, depending on
+# load), so a preflight bound keeps a submission well inside TIMEOUT_SECONDS.
 MAX_VALIDATION_BAR_EVALUATIONS = 250_000
+# The regime classifier sums its lookback window at every bar: (bars - L) x L
+# steps, ~2.4M per second locally. Capping L bounds it to ~10M steps even at
+# MAX_BARS (1.8 s for L = 512 on the fetched 8,640-bar dataset).
+MAX_VALIDATION_LOOKBACK_BARS = 512
 # Total OOS equity points kept in a validation payload, shared by its windows.
 MAX_VALIDATION_CURVE_POINTS = 1_000
 DEFAULT_OPTIMIZATION = {
@@ -327,6 +331,7 @@ def catalog():
                        "max_candidates": MAX_VALIDATION_CANDIDATES,
                        "max_runs": MAX_VALIDATION_RUNS, "max_windows": MAX_VALIDATION_WINDOWS,
                        "max_bar_evaluations": MAX_VALIDATION_BAR_EVALUATIONS,
+                       "max_lookback_bars": MAX_VALIDATION_LOOKBACK_BARS,
                        "max_curve_points": MAX_VALIDATION_CURVE_POINTS,
                        "score_name": "return_pct", "direction": "maximize",
                        "notice": "穩定區選參後做滾動 OOS 與分環境評估；各 OOS 視窗獨立，不是連續投資組合。分類門檻僅供示範，須明示。"},

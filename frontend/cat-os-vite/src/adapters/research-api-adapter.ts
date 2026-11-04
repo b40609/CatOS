@@ -101,6 +101,8 @@ export interface ResearchCatalog {
     max_windows: number;
     // windows × (candidates × (warmup + train) + warmup + test), checked before execution
     max_bar_evaluations: number;
+    // Upper bound of regime_rule.lookback_bars (the classifier sums its window at every bar)
+    max_lookback_bars: number;
     // OOS equity points kept per payload, shared by its windows
     max_curve_points: number;
     score_name: string;
