@@ -2,6 +2,7 @@ from dataclasses import replace
 from decimal import Decimal
 import json
 from pathlib import Path
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ from catos.market_hyperliquid import (
     issue_batch,
     parse_hyperliquid_trades,
 )
+from catos import market_intel
 from catos.market_intel import MarketIntelError, MarketIntelStore, SCHEMA_VERSION
 
 
@@ -186,25 +188,24 @@ class HyperliquidPersistenceTests(unittest.TestCase):
         self.store.close()
         self.store = None
         legacy = sqlite3.connect(self.path)
-        legacy.execute("DROP TABLE hyperliquid_observation")
-        legacy.execute("DROP TABLE hyperliquid_collector_run")
-        legacy.execute("DROP TABLE dex_swap_observation")
-        legacy.execute("DROP TABLE dex_collector_run")
-        legacy.execute("DROP TABLE capital_flow_event")
-        legacy.execute("DROP TABLE dealer_snapshot")
-        legacy.execute("DROP TABLE onchain_activity")
-        legacy.execute("DROP TABLE public_event_candidate")
-        legacy.execute("DROP TABLE public_context_run")
-        legacy.execute("DROP TABLE narrative_snapshot")
-        legacy.execute("DROP TABLE news_event")
-        legacy.execute("DROP TABLE cross_axis_evaluation")
-        legacy.execute("DROP TABLE status_label_snapshot")
-        legacy.execute("DROP TABLE option_context_run")
-        legacy.execute("DROP TABLE option_summary_snapshot")
-        legacy.execute("DROP TABLE option_open_interest_snapshot")
-        legacy.execute("DROP TABLE onchain_source_run")
-        legacy.execute("DROP TABLE liquidity_snapshot")
-        legacy.execute("DROP TABLE liquidity_source_run")
+        self.addCleanup(legacy.close)
+        # Roll the current schema back to v3 by dropping every table the later
+        # migrations create, read from the module so new versions cannot go stale here.
+        dropped, altered = set(), set()
+        for version in range(4, SCHEMA_VERSION + 1):
+            for statement in getattr(market_intel, f"_SCHEMA_V{version}"):
+                created = re.match(r"\s*CREATE TABLE (\w+)", statement)
+                column = re.match(r"\s*ALTER TABLE (\w+) ADD COLUMN", statement)
+                if created:
+                    dropped.add(created.group(1))
+                elif column:
+                    altered.add(column.group(1))
+                else:
+                    self.fail(f"unsupported migration statement: {statement[:60]}")
+        # Added columns disappear with their tables; a v1-v3 table would need its own rollback.
+        self.assertLessEqual(altered, dropped)
+        for name in sorted(dropped):
+            legacy.execute(f"DROP TABLE {name}")
         legacy.execute("PRAGMA user_version=3")
         legacy.commit()
         legacy.close()

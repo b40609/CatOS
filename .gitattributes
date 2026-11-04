@@ -1,0 +1,22 @@
+# Strategy artifact hashes are computed over raw file bytes, so every text file
+# must be LF in the working tree on every platform (see README 環境需求).
+* text=auto eol=lf
+
+# Binary payloads: never normalize.
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.webp -text
+*.ico -text
+*.woff -text
+*.woff2 -text
+*.ttf -text
+*.otf -text
+*.pdf -text
+*.zip -text
+*.gz -text
+*.wasm -text
+*.sqlite -text
+*.sqlite3 -text
+*.db -text

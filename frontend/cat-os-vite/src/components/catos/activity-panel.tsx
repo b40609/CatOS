@@ -1,479 +1,227 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
-import { AlertTriangle } from "lucide-react";
-import { PositionProtectionTable, type ProtectionMonitoringView } from './position-protection-table';
-import { usePreviewStore } from "@/preview/preview-store";
-import { useLiveMarketStore } from "@/state/liveMarketStore";
-import { NumberTicker } from "./motion/number-ticker";
+import { useCatStore } from "@/state/catStore";
+import type { BotControlState, PositionDTO } from "@/contracts";
+import { formatDecimal, signOf, toneOf } from "@/lib/format";
 
 export type ActivityTab = "positions" | "orders";
-
-export interface PositionRow {
-  id: string;
-  botId: string;
-  botName: string;
-  symbol: string;
-  base: string;
-  side: "long" | "short";
-  qty: string;
-  entry: string;
-  mark: string;
-  notional: string;
-  upnl: number;
-  upnlPct: number;
-  leverage: string;
-  opened: string;
-  liqPrice: string;
-  distLiqPct: string;
-  mmr: string;
-  p6StopPrice: string;
-  p6DistPct: string;
-  p6Status: "ACTIVE" | "UPDATING" | "ALERT";
-  p6Rounding: "向上取整" | "向下取整";
-  protectedNotional: string;
-  p6ActiveStopPrice?: string;
-  p6TargetStopPrice?: string;
-}
-
-export interface OrderRow {
-  id: string;
-  clientOrderId: string;
-  botId: string;
-  botName: string;
-  symbol: string;
-  side: "buy" | "sell";
-  type: string;
-  price: string;
-  qty: string;
-  distPct: string;
-  distTicks: string;
-  frozenMargin: string;
-  notionalUsd: string;
-  placed: string;
-  isUnknown?: boolean;
-  statusText?: string;
-  detail?: string;
-}
 
 interface ActivityPanelProps {
   className?: string;
   showHeader?: boolean;
-  monitoring?: ProtectionMonitoringView;
-  isIntegratedPreview?: boolean;
 }
 
-const DEFAULT_POSITIONS: PositionRow[] = [
-  {
-    id: "p1",
-    botId: "tabby",
-    botName: "Tabby",
-    symbol: "BTC-USDT-SWAP",
-    base: "BTC",
-    side: "long",
-    qty: "0.85",
-    entry: "61,480.00",
-    mark: "62,140.50",
-    notional: "52,820",
-    upnl: 561.43,
-    upnlPct: 1.07,
-    leverage: "3x 全倉 (cross)",
-    opened: "04:30",
-    liqPrice: "54,210.00",
-    distLiqPct: "+12.7%",
-    mmr: "0.40%",
-    p6StopPrice: "59,500.00",
-    p6DistPct: "-4.25%",
-    p6Status: "ACTIVE",
-    p6Rounding: "向上取整",
-    protectedNotional: "$52,820",
-  },
-  {
-    id: "p2",
-    botId: "calico",
-    botName: "Calico",
-    symbol: "ETH-USDT-SWAP",
-    base: "ETH",
-    side: "long",
-    qty: "9.50",
-    entry: "3,320.00",
-    mark: "3,375.20",
-    notional: "32,060",
-    upnl: 524.40,
-    upnlPct: 1.66,
-    leverage: "3x 全倉 (cross)",
-    opened: "10/5 06:00",
-    liqPrice: "2,980.00",
-    distLiqPct: "+11.7%",
-    mmr: "0.40%",
-    p6StopPrice: "3,210.00",
-    p6DistPct: "-4.89%",
-    p6Status: "ACTIVE",
-    p6Rounding: "向上取整",
-    protectedNotional: "$32,060",
-  },
-  {
-    id: "p3",
-    botId: "mochi",
-    botName: "Mochi",
-    symbol: "SOL-USDT-SWAP",
-    base: "SOL",
-    side: "long",
-    qty: "95.00",
-    entry: "148.20",
-    mark: "152.80",
-    notional: "14,516",
-    upnl: 437.00,
-    upnlPct: 3.10,
-    leverage: "3x 全倉 (cross)",
-    opened: "08:15",
-    liqPrice: "131.50",
-    distLiqPct: "+13.9%",
-    mmr: "0.50%",
-    p6StopPrice: "142.00",
-    p6DistPct: "-7.07%",
-    p6Status: "UPDATING",
-    p6Rounding: "向上取整",
-    protectedNotional: "$14,516",
-  },
-];
+const RUN_STATE_LABEL: Record<BotControlState, string> = {
+  starting: "啟動中",
+  running: "執行中",
+  stopping: "停止中",
+  completed: "已完成",
+  stopped: "已停止",
+  failed: "失敗",
+  recovery_required: "待恢復",
+};
 
-const INITIAL_ORDERS: OrderRow[] = [
-  {
-    id: "order_calico_unknown_01",
-    clientOrderId: "cat_calico_unknown_01",
-    botId: "calico",
-    botName: "Calico",
-    symbol: "ETH-USDT-SWAP",
-    side: "buy",
-    type: "限價/市價增倉",
-    price: "3,375.00",
-    qty: "0.60",
-    distPct: "0.00%",
-    distTicks: "0 ticks",
-    frozenMargin: "$474.75",
-    notionalUsd: "$2,025",
-    placed: "11:10:02",
-    isUnknown: true,
-    statusText: "UNKNOWN · 待對帳",
-    detail: "11:10:02 回覆逾時；是否成交尚未確認。額度仍保留，禁止盲目重送。",
-  },
-  {
-    id: "o3",
-    clientOrderId: "cat_mochi_0733",
-    botId: "mochi",
-    botName: "Mochi",
-    symbol: "SOL-USDT-SWAP",
-    side: "sell",
-    type: "限價",
-    price: "155.80",
-    qty: "10.0",
-    distPct: "+1.96%",
-    distTicks: "+30 ticks",
-    frozenMargin: "$145.80",
-    notionalUsd: "$1,558",
-    placed: "09:30",
-  },
-  {
-    id: "o4",
-    clientOrderId: "cat_mochi_0734",
-    botId: "mochi",
-    botName: "Mochi",
-    symbol: "SOL-USDT-SWAP",
-    side: "buy",
-    type: "限價",
-    price: "146.90",
-    qty: "6.0",
-    distPct: "-3.86%",
-    distTicks: "-54 ticks",
-    frozenMargin: "$298.10",
-    notionalUsd: "$881",
-    placed: "09:30",
-  },
-];
+const RUN_STATE_TONE: Record<BotControlState, string> = {
+  starting: "border-amber-400/30 text-amber-400",
+  running: "border-emerald-400/30 text-emerald-400",
+  stopping: "border-amber-400/30 text-amber-400",
+  completed: "border-border/80 text-muted-foreground",
+  stopped: "border-border/80 text-muted-foreground",
+  failed: "border-rose-400/30 text-rose-400",
+  recovery_required: "border-rose-400/30 text-rose-400",
+};
 
-export function ActivityPanel({ className, showHeader = true, monitoring, isIntegratedPreview }: ActivityPanelProps) {
-  const { tickers, botsLive } = useLiveMarketStore();
-  const [localTab, setLocalTab] = useState<ActivityTab>("positions");
-  const [orders, setOrders] = useState<OrderRow[]>(INITIAL_ORDERS);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [flashRows, setFlashRows] = useState<Record<string, "up" | "down">>({});
+const NA_CLASS = "text-t3 text-muted-foreground leading-tight";
+const NA_SUB_CLASS = "text-t1 text-muted-foreground/70 leading-tight mt-0.5";
 
-  // 預覽 Store 綁定
-  const {
-    positions: previewPositions,
-    positionsTab,
-    setPositionsTab,
-    openInspector,
-    highlightTarget,
-  } = usePreviewStore();
+/** Explicit not-applicable cell: primary state text + reason line, tooltip explains why. */
+function NotApplicableCell({ label, reason, title }: { label: string; reason: string; title: string }) {
+  return (
+    <div className="flex flex-col items-end" title={title}>
+      <span className={NA_CLASS}>{label}</span>
+      <span className={NA_SUB_CLASS}>{reason}</span>
+    </div>
+  );
+}
 
-  const tab = isIntegratedPreview ? positionsTab : localTab;
-  const setTab = isIntegratedPreview ? setPositionsTab : setLocalTab;
+function settlementLabel(settlement: string | undefined): string {
+  if (!settlement) return "不適用";
+  if (settlement === "cross_net_mode") return "cross + net_mode";
+  return settlement;
+}
 
-  // 模擬 Tick 波動微光跳動 (已定案固化，預覽模式維持數據嚴格一致)
-  useEffect(() => {
-    if (monitoring || isIntegratedPreview) return;
-    const timer = setInterval(() => {
-      const targetIdx = Math.floor(Math.random() * DEFAULT_POSITIONS.length);
-      const isUp = Math.random() > 0.45;
-      const targetPos = DEFAULT_POSITIONS[targetIdx];
-      if (!targetPos) return;
+function magnitude(value: string): string {
+  return value.trim().replace(/^[+-]/, "");
+}
 
-      setFlashRows((prev) => ({ ...prev, [targetPos.id]: isUp ? "up" : "down" }));
-      setTimeout(() => {
-        setFlashRows((prev) => {
-          const next = { ...prev };
-          delete next[targetPos.id];
-          return next;
-        });
-      }, 700);
-    }, 2400);
-    return () => clearInterval(timer);
-  }, [monitoring, isIntegratedPreview]);
+function PositionRowView({ p }: { p: PositionDTO }) {
+  const sign = signOf(p.position);
+  const isShort = sign === "negative";
+  const sideLabel = isShort ? "▼ 空" : "▲ 多";
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
-  };
+  return (
+    <tr className="hover:bg-secondary/30 transition-colors group">
+      {/* 1. 合約標的 + 方向標籤 + 實質持倉 */}
+      <td className="py-2.5 pl-3 pr-2">
+        <div className="flex flex-col">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                "px-1 py-0.2 rounded text-t1 font-bold font-mono inline-flex items-center",
+                isShort
+                  ? "bg-rose-400/10 text-rose-400 border border-rose-400/25"
+                  : "bg-emerald-400/10 text-emerald-400 border border-emerald-400/25"
+              )}
+            >
+              {sideLabel}
+            </span>
+            <span className="text-t4 font-bold text-foreground leading-tight whitespace-nowrap">
+              {p.inst_id ?? "不適用"}
+            </span>
+            <span
+              className={cn(
+                "px-1 py-0.2 rounded border text-t1 font-mono leading-tight whitespace-nowrap",
+                RUN_STATE_TONE[p.run_state]
+              )}
+              title={`run_state: ${p.run_state}`}
+            >
+              {RUN_STATE_LABEL[p.run_state]}
+            </span>
+          </div>
+          <span className="text-t2 font-mono text-muted-foreground leading-tight pl-0.5 mt-0.5 whitespace-nowrap">
+            {formatDecimal(magnitude(p.position), { digits: 0 })} 張
+            <span className="mx-1 text-border">·</span>
+            名目 {formatDecimal(p.notional, { prefix: "$" })}
+            <span className="mx-1 text-border">·</span>
+            <span
+              className={cn(p.verified ? "text-emerald-400/80" : "text-amber-400/80")}
+              title={p.verified ? "部位已對帳" : "部位尚未對帳或對帳狀態未知"}
+            >
+              {p.verified ? "已對帳" : "未對帳"}
+            </span>
+          </span>
+        </div>
+      </td>
 
-  const handleCancelOrder = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const targetOrder = orders.find((o) => o.id === id);
-    if (targetOrder?.isUnknown) {
-      showToast("此委託處於 UNKNOWN 待對帳中；禁止手動撤銷或重送，須等待終態");
-      return;
-    }
-    setOrders((prev) => prev.filter((o) => o.id !== id));
-    showToast("已成功發出撤單請求");
-  };
+      {/* 2. 開倉均價與最新標記價 */}
+      <td className="px-2 py-2.5 text-right font-mono">
+        <div className="flex flex-col items-end">
+          <span className="text-t3 font-medium text-foreground leading-tight">
+            {formatDecimal(p.average_entry, { prefix: "$" })}
+          </span>
+          <span
+            className={cn("text-t1 leading-tight mt-0.5", p.mark === null ? "text-muted-foreground/70" : "text-muted-foreground")}
+            title={p.mark === null ? "本輪尚無標記價觀測" : "最新標記價"}
+          >
+            {formatDecimal(p.mark, { prefix: "$" })}
+          </span>
+        </div>
+      </td>
 
-  const handleCancelAll = () => {
-    if (orders.length === 0) return;
-    // UNKNOWN 單受保護不隨意取消
-    const remaining = orders.filter((o) => o.isUnknown);
-    setOrders(remaining);
-    showToast("已全撤在途限價委託 · UNKNOWN 待對帳單受保護保留");
-  };
+      {/* 3. 未實現損益 (金額；ROE 無保證金模型) */}
+      <td className="px-2 py-2.5 text-right font-mono">
+        <div className="flex flex-col items-end">
+          <span className={cn("text-t4 font-bold leading-tight", toneOf(p.unrealized_pnl))}>
+            {formatDecimal(p.unrealized_pnl, { sign: true, prefix: "$" })}
+          </span>
+          <span className={NA_SUB_CLASS} title="local-sim 無保證金模型，無法計算 ROE">
+            ROE 不適用
+          </span>
+        </div>
+      </td>
 
-  const totalFrozen = useMemo(() => {
-    return orders.reduce((sum, o) => {
-      const num = Number(o.frozenMargin.replace("$", "").replace(",", ""));
-      return sum + (Number.isNaN(num) ? 0 : num);
-    }, 0);
-  }, [orders]);
+      {/* 4. 資金費率 */}
+      <td className="px-2 py-2.5 text-right hidden sm:table-cell font-mono">
+        <NotApplicableCell
+          label="不適用"
+          reason="合成 funding=0"
+          title="合成資料 funding = explicit_zero，無費率與結算倒數"
+        />
+      </td>
 
-  // 動態盤口掛單距離計算
-  const ordersData = useMemo(() => {
-    return orders.map((o) => {
-      if (o.isUnknown) return o;
-      if (o.symbol === "SOL-USDT-SWAP") {
-        const orderPrice = Number(o.price);
-        const solMark = tickers.SOL.price;
-        const distPctVal = ((orderPrice - solMark) / solMark) * 100;
-        const ticksVal = Math.round((orderPrice - solMark) / 0.1);
-        return {
-          ...o,
-          distPct: `${distPctVal >= 0 ? "+" : ""}${distPctVal.toFixed(2)}%`,
-          distTicks: `${ticksVal >= 0 ? "+" : ""}${ticksVal} ticks`,
-        };
-      }
-      return o;
-    });
-  }, [orders, tickers]);
+      {/* 5. 強平安全墊 */}
+      <td className="px-2 py-2.5 text-right hidden md:table-cell font-mono">
+        <NotApplicableCell
+          label="不適用"
+          reason="無保證金模型"
+          title="local-sim 無保證金模型，無強平價與安全墊"
+        />
+      </td>
 
-  // 動態部位計算（連動即時行情撮合引擎）
-  const liveDefaultPositions: PositionRow[] = useMemo(() => {
-    const btcMark = tickers.BTC.price;
-    const ethMark = tickers.ETH.price;
-    const solMark = tickers.SOL.price;
+      {/* 6. 交易所強制停損 (P6) */}
+      <td className="px-2 py-2.5 text-right font-mono">
+        <NotApplicableCell
+          label="未啟用"
+          reason="P6 未配置"
+          title="P6 交易所端整倉停損保護未配置（protection = null）"
+        />
+      </td>
 
-    const btcNotional = 0.85 * btcMark;
-    const btcUpnl = (btcMark - 61480.00) * 0.85;
-    const btcUpnlPct = ((btcMark - 61480.00) / 61480.00) * 100;
-    const btcDistLiq = ((btcMark - 54210.00) / btcMark) * 100;
-    const btcP6Dist = ((59500.00 - btcMark) / btcMark) * 100;
+      {/* 7. 操作出口：v1 無平倉端點 */}
+      <td className="py-2.5 pr-3 pl-2 text-right font-mono">
+        <div className="flex flex-col items-end gap-0.5">
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="px-2.5 py-0.5 rounded text-t2 font-mono border border-border/80 bg-background/40 text-muted-foreground cursor-not-allowed opacity-60"
+            title="未接線：v1 local-sim 尚無平倉端點"
+          >
+            平倉
+          </button>
+          <span className="text-t1 text-muted-foreground/70 leading-tight">未接線</span>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
-    const ethNotional = 9.50 * ethMark;
-    const ethUpnl = (ethMark - 3320.00) * 9.50;
-    const ethUpnlPct = ((ethMark - 3320.00) / 3320.00) * 100;
-    const ethDistLiq = ((ethMark - 2980.00) / ethMark) * 100;
-    const ethP6Dist = ((3210.00 - ethMark) / ethMark) * 100;
+export function ActivityPanel({ className, showHeader = true }: ActivityPanelProps) {
+  const positions = useCatStore((s) => s.positions);
+  const summary = useCatStore((s) => s.summary);
+  const bots = useCatStore((s) => s.bots);
+  const connection = useCatStore((s) => s.connection);
 
-    const solNotional = 95.00 * solMark;
-    const solUpnl = (solMark - 148.20) * 95.00;
-    const solUpnlPct = ((solMark - 148.20) / 148.20) * 100;
-    const solDistLiq = ((solMark - 131.50) / solMark) * 100;
-    const solP6Dist = ((142.00 - solMark) / solMark) * 100;
+  const [tab, setTab] = useState<ActivityTab>("positions");
 
-    return [
-      {
-        id: "p1",
-        botId: "tabby",
-        botName: "Tabby",
-        symbol: "BTC-USDT-SWAP",
-        base: "BTC",
-        side: "long",
-        qty: "0.85",
-        entry: "61,480.00",
-        mark: btcMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        notional: Math.round(btcNotional).toLocaleString("en-US"),
-        upnl: btcUpnl,
-        upnlPct: btcUpnlPct,
-        leverage: "3x 全倉 (cross)",
-        opened: "04:30",
-        liqPrice: "54,210.00",
-        distLiqPct: `+${btcDistLiq.toFixed(1)}%`,
-        mmr: "0.40%",
-        p6StopPrice: "59,500.00",
-        p6DistPct: `${btcP6Dist.toFixed(2)}%`,
-        p6Status: "ACTIVE",
-        p6Rounding: "向上取整",
-        protectedNotional: `$${Math.round(btcNotional).toLocaleString("en-US")}`,
-      },
-      {
-        id: "p2",
-        botId: "calico",
-        botName: "Calico",
-        symbol: "ETH-USDT-SWAP",
-        base: "ETH",
-        side: "long",
-        qty: "9.50",
-        entry: "3,320.00",
-        mark: ethMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        notional: Math.round(ethNotional).toLocaleString("en-US"),
-        upnl: ethUpnl,
-        upnlPct: ethUpnlPct,
-        leverage: "3x 全倉 (cross)",
-        opened: "10/5 06:00",
-        liqPrice: "2,980.00",
-        distLiqPct: `+${ethDistLiq.toFixed(1)}%`,
-        mmr: "0.40%",
-        p6StopPrice: "3,210.00",
-        p6DistPct: `${ethP6Dist.toFixed(2)}%`,
-        p6Status: "ACTIVE",
-        p6Rounding: "向上取整",
-        protectedNotional: `$${Math.round(ethNotional).toLocaleString("en-US")}`,
-      },
-      {
-        id: "p3",
-        botId: "mochi",
-        botName: "Mochi",
-        symbol: "SOL-USDT-SWAP",
-        base: "SOL",
-        side: "long",
-        qty: "95.00",
-        entry: "148.20",
-        mark: solMark.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        notional: Math.round(solNotional).toLocaleString("en-US"),
-        upnl: solUpnl,
-        upnlPct: solUpnlPct,
-        leverage: "3x 全倉 (cross)",
-        opened: "08:15",
-        liqPrice: "131.50",
-        distLiqPct: `+${solDistLiq.toFixed(1)}%`,
-        mmr: "0.50%",
-        p6StopPrice: "142.00",
-        p6DistPct: `${solP6Dist.toFixed(2)}%`,
-        p6Status: "UPDATING",
-        p6Rounding: "向上取整",
-        protectedNotional: `$${Math.round(solNotional).toLocaleString("en-US")}`,
-      },
-    ];
-  }, [tickers]);
-
-  const positionsData = isIntegratedPreview
-    ? previewPositions.map((pp) => {
-        const liveBot = botsLive[pp.botId];
-        const quote = tickers[pp.base];
-        const currentMark = quote
-          ? quote.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : pp.mark;
-        const currentNotional = liveBot ? liveBot.notional.toLocaleString("en-US") : pp.notional;
-        const currentUpnl = liveBot ? liveBot.upnl : pp.upnl;
-        const currentUpnlPct = liveBot ? liveBot.upnlPct : pp.upnlPct;
-        const currentP6Dist = liveBot?.p6DistPct ?? (pp.p6Status === "CONFIRMED" ? "-4.24%" : "-7.06%");
-
-        return {
-          id: pp.id,
-          botId: pp.botId,
-          botName: pp.botName,
-          symbol: pp.symbol,
-          base: pp.base,
-          side: pp.side,
-          qty: pp.qty,
-          entry: pp.entry,
-          mark: currentMark,
-          notional: currentNotional,
-          upnl: currentUpnl,
-          upnlPct: currentUpnlPct,
-          leverage: pp.leverage,
-          opened: pp.opened,
-          liqPrice: pp.liqPrice,
-          distLiqPct: pp.distLiqPct,
-          mmr: "0.40%",
-          p6StopPrice: pp.p6Status === "CONFIRMED" ? pp.p6ActiveStopPrice.replace("$", "") : pp.p6TargetStopPrice.replace("$", ""),
-          p6DistPct: currentP6Dist,
-          p6Status: (pp.p6Status === "CONFIRMED" ? "ACTIVE" : "UPDATING") as "ACTIVE" | "UPDATING" | "ALERT",
-          p6Rounding: "向上取整" as const,
-          protectedNotional: `$${currentNotional}`,
-          p6ActiveStopPrice: pp.p6ActiveStopPrice,
-          p6TargetStopPrice: pp.p6TargetStopPrice,
-        };
-      })
-    : liveDefaultPositions;
+  const modeNotOpen = connection.status === "mode_not_open";
+  const noRunYet = bots.length === 0 || !summary;
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. 一體化 Header 與 2 Tab 切換開關 */}
+      {/* 1. 一體化 Header 與 Tab 切換 */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <CardHeaderTitle
             cardId="positions"
-            title="持倉明細與在途委託"
-            subtext={
-              <div className="flex items-center gap-1.5 ml-1">
-                <span className={cn(
-                  "flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded border",
-                  isIntegratedPreview
-                    ? "text-amber-400 bg-amber-400/10 border-amber-400/30 font-semibold"
-                    : "text-emerald-400 bg-emerald-400/10 border-emerald-400/25"
-                )}>
-                  <span className={cn(
-                    "size-1.5 rounded-full",
-                    isIntegratedPreview ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-                  )} />
-                  {isIntegratedPreview ? "P6 已確認 2/3 · 1 待確認" : "P6 交易所端 100% 錨定"}
-                </span>
-              </div>
-            }
+            title="持倉明細與交易所風控"
           />
 
-          <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded p-0.5">
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 whitespace-nowrap flex-nowrap">
             <button
               type="button"
               onClick={() => setTab("positions")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono font-medium rounded transition-colors cursor-pointer",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                 tab === "positions"
-                  ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              持倉 ({positionsData.length})
+              持倉({positions.length})
             </button>
-
             <button
               type="button"
               onClick={() => setTab("orders")}
               className={cn(
-                "px-2 py-0.5 text-[10.5px] font-mono font-medium rounded transition-colors cursor-pointer",
+                "px-2 py-0.5 text-t2 font-mono rounded transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0",
                 tab === "orders"
-                  ? "bg-secondary text-primary border border-border font-semibold shadow-xs"
+                  ? "bg-secondary text-foreground font-semibold shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              掛單 ({orders.length})
+              <span className="whitespace-nowrap">掛單(0)</span>
             </button>
           </div>
         </div>
@@ -481,276 +229,69 @@ export function ActivityPanel({ className, showHeader = true, monitoring, isInte
 
       {/* 2. 內容展示區 */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto flex flex-col justify-between min-w-0 max-w-full">
-        {monitoring ? <PositionProtectionTable {...monitoring} tab={tab} /> : <>
-        {/* ================= Tab 1: 持倉明細 (原部位表 + P6 保護確認整合) ================= */}
-        {tab === "positions" && (
-          <table className="w-full text-left border-collapse table-auto min-w-[540px]">
-            <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
-              <tr>
-                <th className="py-2 pl-3 pr-1.5 font-medium">BOT / CONTRACT</th>
-                <th className="px-1.5 font-medium">SIDE</th>
-                <th className="px-1.5 text-right font-medium">SIZE / NOTIONAL</th>
-                <th className="px-1.5 text-right font-medium">ENTRY / MARK</th>
-                <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
-                <th className="px-1.5 text-right font-medium hidden sm:table-cell">預估強平 / 距爆倉</th>
-                <th className="px-1.5 text-right font-medium">P6 災難停損 (OKX)</th>
-                <th className="py-2 pr-3 pl-1.5 text-right font-medium hidden lg:table-cell">LEVERAGE</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40 text-xs">
-              {positionsData.map((p) => {
-                const flash = flashRows[p.id];
-                const isPositive = p.upnl >= 0;
-                const isUpdating = p.p6Status === "UPDATING";
-                const isHighlighted = isIntegratedPreview && highlightTarget.type === 'protection' && (highlightTarget.id === p.id || highlightTarget.id === p.botId);
-
-                return (
-                  <tr
-                    key={p.id}
-                    className={cn(
-                      "hover:bg-secondary/40 transition-all group",
-                      flash === "up" && "flash-up",
-                      flash === "down" && "flash-down",
-                      isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse"
-                    )}
-                  >
-                    <td className="py-2 pl-3 pr-1.5">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-foreground leading-tight">{p.symbol}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight">{p.botName}</span>
-                      </div>
-                    </td>
-
-                    <td className="px-1.5 py-2">
-                      <span
-                        className={cn(
-                          "px-1 py-0.2 rounded text-[8.5px] font-bold",
-                          p.side === "long" ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400"
-                        )}
-                      >
-                        {p.side === "long" ? "多" : "空"}
-                      </span>
-                    </td>
-
-                    <td className="px-1.5 py-2 text-right font-mono">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10.5px] font-bold text-foreground leading-tight">{p.qty} {p.base}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight flex items-center">
-                          <NumberTicker value={Number(p.notional.replace(/,/g, ""))} decimals={0} prefix="$" />
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-1.5 py-2 text-right font-mono">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10.5px] font-medium text-foreground leading-tight">${p.entry}</span>
-                        <span className="text-[9px] text-muted-foreground leading-tight flex items-center">
-                          <NumberTicker value={Number(p.mark.replace(/,/g, ""))} decimals={2} prefix="$" />
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-1.5 py-2 text-right font-mono">
-                      <div className="flex flex-col items-end">
-                        <span className={cn("text-[10.5px] font-bold leading-tight flex items-center", isPositive ? "text-up" : "text-down")}>
-                          {isPositive ? "+" : ""}<NumberTicker value={p.upnl} decimals={2} prefix="$" />
-                        </span>
-                        <span className={cn("text-[9px] leading-tight flex items-center", isPositive ? "text-up" : "text-down")}>
-                          {isPositive ? "+" : ""}<NumberTicker value={p.upnlPct} decimals={2} suffix="%" />
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="px-1.5 py-2 text-right hidden sm:table-cell">
-                      <div className="flex flex-col items-end font-mono">
-                        <span className="text-[10px] text-foreground leading-tight">${p.liqPrice}</span>
-                        <span className="text-[8.5px] text-emerald-400 font-semibold leading-tight flex items-center gap-0.5">
-                          距爆倉 {p.distLiqPct}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 整合 P6 欄位：已確認 / 更新待確認 / 未啟用 */}
-                    <td className="px-1.5 py-2 text-right">
-                      <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-1 font-mono">
-                          {isUpdating ? (
-                            <span className="text-[10px] text-amber-400 font-bold leading-tight" title="更新目標不能冒充生效價；生效價目前未知">
-                              目標 ${p.p6TargetStopPrice ? p.p6TargetStopPrice.replace('$', '') : p.p6StopPrice}
-                            </span>
-                          ) : (
-                            <>
-                              <span className="text-[10.5px] text-primary font-bold leading-tight">
-                                ${p.p6StopPrice}
-                              </span>
-                              <span className="text-[9px] text-amber-400/90 font-semibold">
-                                ({p.p6DistPct})
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {isIntegratedPreview ? (
-                          <button
-                            type="button"
-                            onClick={() => openInspector('protection', p.id)}
-                            className={cn(
-                              "mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8.5px] font-mono border transition-all cursor-pointer",
-                              isUpdating
-                                ? "border-amber-400/40 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25 font-bold animate-pulse"
-                                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20"
-                            )}
-                          >
-                            <span className={cn("size-1 rounded-full", isUpdating ? "bg-amber-400" : "bg-emerald-400")} />
-                            <span>{isUpdating ? "▲ 更新待確認 (詳情 ↗)" : "● 已確認 (詳情 ↗)"}</span>
-                          </button>
-                        ) : (
-                          <span className="text-[8.5px] text-emerald-400 font-mono leading-tight flex items-center gap-1 mt-0.5">
-                            <span className="size-1 rounded-full bg-emerald-400" />
-                            OKX {p.p6Rounding}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-2 pr-3 pl-1.5 text-right hidden lg:table-cell">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9.5px] text-foreground font-semibold leading-tight">{p.leverage}</span>
-                        <span className="text-[8.5px] text-emerald-400 leading-tight">Net Mode</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-
-        {/* ================= Tab 2: 當前掛單 (高密度盤口掛單 + UNKNOWN 待對帳單) ================= */}
-        {tab === "orders" && (
-          <div className="flex flex-col h-full justify-between">
-            {orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground font-mono">
-                <span className="text-sm text-foreground font-bold">目前無在途掛單</span>
-                <span className="text-[10px] text-muted-foreground mt-1">策略次根委託意圖觸發時將即時顯示於此</span>
-              </div>
-            ) : (
-              <table className="w-full text-left border-collapse table-auto min-w-[620px]">
-                <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+        {modeNotOpen ? (
+          <div className="flex-1 flex items-center justify-center py-12 text-center text-muted-foreground">
+            <span className="text-xs font-mono">此模式未開放（demo/live 不在 v1 範圍）</span>
+          </div>
+        ) : (
+          <>
+            {/* ================= Tab 1: 持倉明細 ================= */}
+            {tab === "positions" && (
+              <table className="w-full text-left border-collapse table-auto min-w-[540px]">
+                <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="py-2 pl-3 pr-1.5 font-medium">BOT / CONTRACT</th>
-                    <th className="px-1.5 font-medium">SIDE / TYPE</th>
-                    <th className="px-1.5 text-right font-medium">PRICE</th>
-                    <th className="px-1.5 text-right font-medium">QTY</th>
-                    <th className="px-1.5 text-right font-medium">DIST (TICKS)</th>
-                    <th className="px-1.5 text-right font-medium hidden sm:table-cell">FROZEN MARGIN</th>
-                    <th className="py-2 pr-3 pl-1.5 text-right font-medium">ACTION / STATUS</th>
+                    <th className="py-2.5 pl-3 pr-2 font-medium">合約 / 部位</th>
+                    <th className="px-2 text-right font-medium">開倉 / 標記價</th>
+                    <th className="px-2 text-right font-medium">未實現損益</th>
+                    <th className="px-2 text-right font-medium hidden sm:table-cell">資金費率</th>
+                    <th className="px-2 text-right font-medium hidden md:table-cell">強平安全墊</th>
+                    <th className="px-2 text-right font-medium">交易所強制停損</th>
+                    <th className="py-2.5 pr-3 pl-2 text-right font-medium">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/40 text-xs font-mono">
-                  {ordersData.map((o) => {
-                    const isHighlighted = isIntegratedPreview && highlightTarget.type === 'order' && highlightTarget.id === o.id;
-
-                    return (
-                      <tr
-                        key={o.id}
-                        className={cn(
-                          "hover:bg-secondary/40 transition-all group",
-                          o.isUnknown && "bg-amber-500/[0.04]",
-                          isHighlighted && "ring-1 ring-primary bg-primary/15 shadow-[0_0_12px_rgba(232,180,94,0.35)] animate-pulse"
-                        )}
-                      >
-                        <td className="py-2 pl-3 pr-1.5">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-bold text-foreground leading-tight">{o.symbol}</span>
-                            <span className="text-[9px] text-muted-foreground leading-tight">{o.botName} · {o.clientOrderId}</span>
-                          </div>
-                        </td>
-
-                        <td className="px-1.5 py-2">
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={cn(
-                                "px-1 py-0.2 rounded text-[8.5px] font-bold",
-                                o.side === "buy" ? "bg-emerald-400/10 text-emerald-400" : "bg-rose-400/10 text-rose-400"
-                              )}
-                            >
-                              {o.side === "buy" ? "買" : "賣"}
-                            </span>
-                            <span className="text-[9px] text-muted-foreground">{o.type}</span>
-                          </div>
-                        </td>
-
-                        <td className="px-1.5 py-2 text-right font-bold text-foreground text-[10.5px]">${o.price}</td>
-                        <td className="px-1.5 py-2 text-right text-muted-foreground text-[10px]">{o.qty}</td>
-                        <td className="px-1.5 py-2 text-right text-[10px]">
-                          {o.isUnknown ? (
-                            <span className="text-amber-400 font-semibold">待對帳</span>
-                          ) : (
-                            <>
-                              <span className="text-amber-400 font-semibold">{o.distPct}</span>
-                              <span className="text-[8.5px] text-muted-foreground block">{o.distTicks}</span>
-                            </>
-                          )}
-                        </td>
-                        <td className="px-1.5 py-2 text-right text-[10.5px] font-semibold text-foreground hidden sm:table-cell">
-                          {o.frozenMargin}
-                        </td>
-                        <td className="py-2 pr-3 pl-1.5 text-right">
-                          {o.isUnknown ? (
-                            <span
-                              className="px-2 py-0.5 rounded text-[9px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/40 inline-flex items-center gap-1"
-                              title={o.detail || "11:10:02 回覆逾時；額度保留待對帳"}
-                            >
-                              <AlertTriangle className="size-2.5" />
-                              <span>UNKNOWN 待對帳</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => handleCancelOrder(o.id, e)}
-                              className="px-1.5 py-0.5 rounded text-[9.5px] text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer"
-                            >
-                              撤單
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y divide-border/40 text-xs">
+                  {positions.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-muted-foreground font-mono text-xs">
+                        {noRunYet ? "尚未啟動模擬 run" : "目前無未平倉部位"}
+                      </td>
+                    </tr>
+                  ) : (
+                    positions.map((p) => <PositionRowView key={`${p.run_id}:${p.bot_id}`} p={p} />)
+                  )}
                 </tbody>
               </table>
             )}
 
-            {/* 掛單頁底部統計與控制 */}
-            <div className="px-3 py-1.5 bg-secondary/60 border-t border-border/80 flex items-center justify-between text-[9.5px] font-mono text-muted-foreground shrink-0 mt-auto">
-              <div className="flex items-center gap-2">
-                <span>在途凍結: <strong className="text-foreground">${totalFrozen.toFixed(2)}</strong></span>
-                <span className="text-border">|</span>
-                <span>在途總額: <strong className="text-foreground">$5,464</strong></span>
-                {toastMessage && (
-                  <span className="text-amber-400 font-semibold bg-amber-500/10 px-1 rounded animate-in fade-in">
-                    {toastMessage}
-                  </span>
-                )}
+            {/* ================= Tab 2: 在途掛單 (v1 無資料來源) ================= */}
+            {tab === "orders" && (
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-muted-foreground px-4">
+                <span className="text-xs font-mono">v1 沒有在途掛單</span>
+                <span className="text-t2 font-mono text-muted-foreground/60 mt-1">
+                  local-sim 的策略意圖在同一根 bar 內以合成成交終結，沒有在途掛單
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={handleCancelAll}
-                disabled={orders.filter(o => !o.isUnknown).length === 0}
-                className={cn(
-                  "px-2 py-0.5 rounded text-[9px] font-semibold transition-all cursor-pointer",
-                  orders.filter(o => !o.isUnknown).length > 0
-                    ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30"
-                    : "text-muted-foreground/40 cursor-not-allowed border border-transparent"
-                )}
-              >
-                一鍵全撤在途限價單
-              </button>
-            </div>
-          </div>
+            )}
+          </>
         )}
-        </>}
+
+        {/* 底部摘要與模式說明條 */}
+        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/80 bg-secondary/30 text-t2 font-mono text-muted-foreground shrink-0">
+          <div className="flex items-center gap-3 whitespace-nowrap">
+            <span>持倉筆數: <strong className="text-foreground">{positions.length}</strong></span>
+            <span className="text-border">|</span>
+            <span title={summary ? `invariants.settlement = ${summary.invariants.settlement}` : "尚無 summary，無法得知保證金模式"}>
+              保證金模式:{" "}
+              <strong className={summary ? "text-emerald-400" : "text-muted-foreground"}>
+                {settlementLabel(summary?.invariants.settlement)}
+              </strong>
+            </span>
+            <span className="text-border">|</span>
+            <span title="v1 local-sim 無平倉端點">
+              緊急處置: <strong className="text-muted-foreground">平倉出口 v1 未接線</strong>
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

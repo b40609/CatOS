@@ -40,9 +40,9 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: "cyberpunk",
-    nameZh: "Cyberpunk 賽博霓虹",
+    nameZh: "Cyber Neon 深藍青",
     nameEn: "Cyberpunk Neon",
-    descZh: "深空冷曜底座，賽博青光環，極致未來極客",
+    descZh: "深空冷曜底座，低彩度冷青，專注夜間看盤",
     surfaceTone: "midnight",
     accentColor: "cyan",
     colorConvention: "green-up",
@@ -70,9 +70,9 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
   {
     id: "matrix",
-    nameZh: "Matrix 駭客矩陣",
+    nameZh: "Matrix Terminal 矩陣綠",
     nameEn: "Matrix Terminal",
-    descZh: "墨玉深玄底座，電光駭客綠，華人紅漲綠跌慣例",
+    descZh: "墨玉深玄底座，高對比度等寬字體，華人紅漲綠跌慣例",
     surfaceTone: "emerald-dark",
     accentColor: "emerald",
     colorConvention: "red-up",
@@ -96,12 +96,6 @@ export interface PersonalOsState {
   colorConvention: ColorConvention;
   fontScale: FontScale;
 
-  // 4. Exchange & Local Daemon (交易所 API 與本地連線)
-  apiKey: string;
-  passphrase: string;
-  environment: "live" | "sim";
-  ping: number;
-
   // Actions
   setAvatar: (avatar: string) => void;
   setDisplayName: (name: string) => void;
@@ -113,8 +107,6 @@ export interface PersonalOsState {
   setColorConvention: (conv: ColorConvention) => void;
   setFontScale: (scale: FontScale) => void;
   applyPreset: (presetId: string) => void;
-  setApiCredentials: (apiKey: string, passphrase: string) => void;
-  setEnvironment: (env: "live" | "sim") => void;
 }
 
 const STORAGE_KEY = "catos_personal_os_settings_v3";
@@ -496,21 +488,16 @@ if (typeof document !== "undefined") {
 }
 
 export const usePersonalOs = create<PersonalOsState>((set, get) => ({
-  avatar: initial.avatar || "🚀",
+  avatar: initial.avatar || "⚡",
   displayName: initial.displayName || "CatOS",
   subAccountAlias: initial.subAccountAlias || "OKX-SWAP-01",
-  traderBadge: initial.traderBadge || "OKX VIP",
+  traderBadge: initial.traderBadge || "TRADER",
 
   surfaceTone: defaultTone,
   accentColor: defaultAccent,
   fontFamily: defaultFontFamily,
   colorConvention: defaultColor,
   fontScale: defaultFont,
-
-  apiKey: initial.apiKey || "okx_api_••••••••38f2",
-  passphrase: initial.passphrase || "••••••••",
-  environment: (initial.environment as "live" | "sim") || "live",
-  ping: 18,
 
   setAvatar: (avatar) => {
     set({ avatar });
@@ -580,16 +567,6 @@ export const usePersonalOs = create<PersonalOsState>((set, get) => ({
     applyDomSettings(p.surfaceTone, p.accentColor, p.colorConvention, s.fontScale, p.fontFamily);
     save(s);
   },
-
-  setApiCredentials: (apiKey, passphrase) => {
-    set({ apiKey, passphrase });
-    save(get());
-  },
-
-  setEnvironment: (environment) => {
-    set({ environment });
-    save(get());
-  },
 }));
 
 function save(state: PersonalOsState) {
@@ -605,9 +582,6 @@ function save(state: PersonalOsState) {
       fontFamily: state.fontFamily,
       colorConvention: state.colorConvention,
       fontScale: state.fontScale,
-      apiKey: state.apiKey,
-      passphrase: state.passphrase,
-      environment: state.environment,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {}

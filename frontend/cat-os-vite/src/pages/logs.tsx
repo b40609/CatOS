@@ -81,7 +81,7 @@ function LogsPage() {
             type="button"
             onClick={() => setAutoScroll((v) => !v)}
             className={cn(
-              "flex items-center gap-2 border px-3 py-1.5 font-mono text-[0.7rem] uppercase tracking-[0.12em] transition-colors",
+              "flex items-center gap-2 border px-3 py-1.5 font-mono text-t3 uppercase tracking-[0.12em] transition-colors",
               autoScroll
                 ? "border-gold/50 bg-accent text-gold-bright"
                 : "border-border text-muted-foreground hover:bg-secondary/70",
@@ -109,7 +109,7 @@ function LogsPage() {
               type="button"
               onClick={() => setFilter(lv)}
               className={cn(
-                "border px-2.5 py-1 font-mono text-[0.65rem] tracking-[0.14em] transition-colors",
+                "border px-2.5 py-1 font-mono text-t2 tracking-[0.14em] transition-colors",
                 filter === lv
                   ? "border-gold bg-accent text-gold-bright"
                   : "border-border text-muted-foreground hover:bg-secondary/70",
@@ -124,7 +124,7 @@ function LogsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="search logs..."
-              className="w-44 bg-transparent font-mono text-[0.7rem] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+              className="w-44 bg-transparent font-mono text-t3 text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
             />
           </label>
         </div>
@@ -133,13 +133,13 @@ function LogsPage() {
           ref={bodyRef}
           className="scanlines h-[34rem] overflow-y-auto border border-border bg-background/60 p-3"
         >
-          <div className="font-mono text-[0.72rem] leading-relaxed">
+          <div className="font-mono text-t4 leading-relaxed">
             {visible.map((l) => (
               <div key={l.id} className="slide-in-row flex items-baseline gap-3 py-px">
                 <span className="shrink-0 text-muted-foreground/70">{l.time}</span>
                 <span
                   className={cn(
-                    "shrink-0 border px-1.5 text-[0.6rem] tracking-[0.14em]",
+                    "shrink-0 border px-1.5 text-t2 tracking-[0.14em]",
                     LEVEL_STYLE[l.level],
                   )}
                 >

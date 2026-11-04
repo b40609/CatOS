@@ -158,8 +158,15 @@ class ResearchService:
                       "build_id": build_id}
             self._write_status(status)
             self._active = run_id
-            self._thread = threading.Thread(target=self._execute, args=(envelope, status), daemon=False)
-            self._thread.start()
+            try:
+                self._thread = threading.Thread(target=self._execute, args=(envelope, status), daemon=False)
+                self._thread.start()
+            except Exception as error:
+                self._thread = None
+                self._active = None
+                status.update(status="failed", error=f"{type(error).__name__}: {error}", finished_at=now())
+                self._write_status(status)
+                raise ResearchError("research_task_start_failed", 503) from error
             # A caller must not mutate the live task's request/provenance through
             # nested objects in the submission reply.
             return json.loads(json_text(status))
@@ -198,11 +205,13 @@ class ResearchService:
                         pass
                     return
 
-        readers = [threading.Thread(target=drain, args=(process.stdout, "stdout", MAX_OUTPUT_BYTES)),
-                   threading.Thread(target=drain, args=(process.stderr, "stderr", 65536))]
-        for reader in readers:
-            reader.start()
+        readers = []
         try:
+            for stream, name, limit in ((process.stdout, "stdout", MAX_OUTPUT_BYTES),
+                                        (process.stderr, "stderr", 65536)):
+                reader = threading.Thread(target=drain, args=(stream, name, limit))
+                reader.start()
+                readers.append(reader)
             process.stdin.write(json_text(envelope).encode("utf-8"))
             process.stdin.close()
             try:

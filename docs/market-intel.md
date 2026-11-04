@@ -1,5 +1,7 @@
 # catOS：Market Intelligence P0 / P1
 
+> **v1 凍結（2026-11-03）**：市場情報（Yaozi）線不在 v1 範圍、無排程器、不主動更新；程式（`catos/market_*.py`）與測試保留並維持通過，前端「市場情報」頁僅顯示展示資料並標示「v1 未啟用」。本文件其餘內容為凍結時的狀態紀錄。
+
 狀態：2026-09-19 依現存程式重建：P0 核心、P1 公開觀測／候選證據及本機讀取介面已有實作；私有公式仍為 unknown，不宣稱完整 Yaozi parity。最新續作與待驗收項目見 [Yaozi 恢復交接](../outputs/yaozi-recovery-handoff-2026-09-19.md)。下列既有驗證敘述為歷史紀錄，不代表本輪重跑。
 
 ## 已實作
@@ -14,7 +16,7 @@
   - 補充來源失敗時保留 `None` 與 issue code，不以 `0` 代替 missing。
 
 - `catos.market_intel`
-  - 獨立 `market_intel.sqlite`，目前程式的 schema version 為 13；v10 新增 Alpha+/Alpha cross-axis 與 explicit status-label materialization，v11 新增 OKX public option summary / open-interest tables，v12 新增 `onchain_source_run` provider/source evidence table，v13 新增 `liquidity_source_run` / `liquidity_snapshot`。v12→v13 原地 migration 已有專屬測試；本 Session 嘗試遷移主 `outputs/catos-market-intel.sqlite` 時被 runtime safety review 攔截，因此主 DB 仍以已確認的 v12 狀態看待，不宣稱已升級。
+  - 獨立 `market_intel.sqlite`，目前程式的 schema version 為 14（`catos/market_intel.py` `SCHEMA_VERSION`）；v10 新增 Alpha+/Alpha cross-axis 與 explicit status-label materialization，v11 新增 OKX public option summary / open-interest tables，v12 新增 `onchain_source_run` provider/source evidence table，v13 新增 `liquidity_source_run` / `liquidity_snapshot`，v14 新增 `social_source_run` / `social_metric_snapshot`。v12→v13 原地 migration 已有專屬測試；本 Session 嘗試遷移主 `outputs/catos-market-intel.sqlite` 時被 runtime safety review 攔截，因此主 DB 仍以已確認的 v12 狀態看待，不宣稱已升級。
   - WAL + `synchronous=FULL`。
   - 不修改金融交易 `Journal` schema 7，也不宣稱兩個 DB 跨檔原子一致。
   - 保存 venue-level normalized snapshot，再物化目前 P0 的 consolidated market / derivative snapshot。

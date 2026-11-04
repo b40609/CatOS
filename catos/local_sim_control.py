@@ -3,15 +3,19 @@
 import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
 import re
+import time
 import uuid
 
+from catos import risk
+from catos import simulation_catalog as catalog
 from catos.local_sim_control_runner import run_case
 from catos.local_sim_r4 import RUNTIME_FILES
-from catos.research_catalog import DEFAULT_REQUEST, files_hash
+from catos.research_catalog import DEFAULT_REQUEST, files_hash, validate_request
 
 TEMPLATE = "sma-synthetic-smoke-v1"
 CONFIG = {"template_id": TEMPLATE, "bars": 8, "warmup_bars": 2,
@@ -25,9 +29,11 @@ MAX_RUNS = 100
 MAX_EVENTS = 40
 MAX_STOP_COMMANDS = 100
 MAX_METADATA = 4_000_000
+MAX_LIFECYCLE = 32
+DOMAINS = ("service", "bots", "risk", "positions", "events")
 BUILD_FILES = tuple(RUNTIME_FILES) + (
     "catos/local_sim_control.py", "catos/local_sim_control_runner.py",
-    "catos/local_sim_control_api.py", "catos/workspace_api.py")
+    "catos/local_sim_control_api.py", "catos/simulation_catalog.py", "catos/workspace_api.py")
 
 
 def build_id():
@@ -36,6 +42,10 @@ def build_id():
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def now_ms():
+    return time.time_ns() // 1_000_000
 
 
 def valid_id(value):
@@ -81,10 +91,25 @@ class LocalSimControlService:
         self.active = None
         self.unavailable = "not_started"
         self.closing = False
+        # Read-only projection state: a monotonic version per instance, the version at
+        # which each domain last changed, and one global event sequence across runs.
+        self.state_version = 0
+        self.domains = dict.fromkeys(DOMAINS, 0)
+        self.seq = 0
+        self.started_at_ms = now_ms()
+        self.seen_build = self.loaded_build
+        self.limits = risk.Limits()
+        self._contract = None
+
+    def _bump(self, *domains):
+        self.state_version += 1
+        for domain in domains or DOMAINS:
+            self.domains[domain] = self.state_version
 
     def open(self):
         if self.loaded_build == "source_unavailable":
             self.unavailable = "simulation_source_unavailable"
+            self._bump("service")
             return
         try:
             self.root.mkdir(parents=True, exist_ok=True)
@@ -121,18 +146,24 @@ class LocalSimControlService:
                 raise ValueError("untracked_run_directory")
             if any(not (self.root / run_id).is_dir() for run_id in known):
                 raise ValueError("run_directory_missing")
+            self.seq = max((event.get("event_seq", 0) for run in self.runs.values()
+                            for event in [*run["events"], *run.get("lifecycle", [])]
+                            if type(event.get("event_seq")) is int), default=0)
             recovered = deepcopy(self.runs)
             changed = False
             for run in recovered.values():
                 if run["control_state"] not in TERMINAL or not run["cleanup_confirmed"]:
-                    run.update(control_state="recovery_required", cleanup_confirmed=False,
-                               error="interrupted_or_cleanup_unconfirmed")
+                    self._transition(run, control_state="recovery_required", cleanup_confirmed=False,
+                                     error="interrupted_or_cleanup_unconfirmed")
                     changed = True
             self.unavailable = None
             if changed:
                 self._save(recovered)
+            else:
+                self._bump()
         except (OSError, ValueError, TypeError, KeyError, ControlError) as exc:
             self.unavailable = str(exc) if isinstance(exc, ControlError) else "simulation_metadata_unavailable"
+            self._bump("service")
 
     def _validate(self, value):
         if type(value) is not dict or set(value) != {"contract", "runs"} or value["contract"] != "catos.simulation.v1":
@@ -155,10 +186,12 @@ class LocalSimControlService:
                                    ("events_omitted", 100)):
                 if type(run[count]) is not int or not 0 <= run[count] <= maximum:
                     raise ValueError("invalid_run_counts")
+            lifecycle = run.get("lifecycle", [])
             if (not valid_id(run["instance_id"]) or type(run["worker_closed"]) is not bool
                     or (run["error"] is not None and type(run["error"]) is not str)
+                    or type(lifecycle) is not list or len(lifecycle) > MAX_LIFECYCLE
                     or any(type(event) is not dict or type(event.get("kind")) is not str
-                           for event in run["events"])):
+                           for event in [*run["events"], *lifecycle])):
                 raise ValueError("invalid_run_evidence")
             for field in ("created_at", "finished_at", "stop_requested_at"):
                 stamp = run[field]
@@ -173,7 +206,7 @@ class LocalSimControlService:
                     raise ValueError("invalid_command_binding")
                 bindings.add(command)
 
-    def _save(self, runs):
+    def _save(self, runs, *domains):
         try:
             encoded = json.dumps({"contract": "catos.simulation.v1", "runs": runs},
                                  ensure_ascii=False, allow_nan=False, separators=(",", ":"))
@@ -185,8 +218,10 @@ class LocalSimControlService:
                 os.fsync(stream.fileno())
             (self.root / "control.pending").replace(self.root / "control.json")
             self.runs = runs
+            self._bump(*domains)
         except (OSError, ValueError, TypeError):
             self.unavailable = "simulation_metadata_write_uncertain"
+            self._bump("service")
             if self.stop_event is not None:
                 self.stop_event.set()
             raise ControlError(self.unavailable) from None
@@ -260,15 +295,18 @@ class LocalSimControlService:
             build_id=self.loaded_build, instance_id=self.instance_id, created_at=now(),
             control_state="starting", cleanup_confirmed=False, stop_requested=False,
             stop_requested_at=None, stop_commands=[], bars=0, warmup_bars=0, fills=0,
-            events=[], events_omitted=0, error=None, finished_at=None, worker_closed=False)
+            events=[], events_omitted=0, error=None, finished_at=None, worker_closed=False,
+            lifecycle=[])
+        self._lifecycle(record, "run_state", state="starting", previous=None)
         runs = deepcopy(self.runs)
         runs[run_id] = record
         try:
             (self.root / run_id).mkdir(exist_ok=False)
         except OSError:
             self.unavailable = "simulation_run_directory_uncertain"
+            self._bump("service")
             raise ControlError(self.unavailable) from None
-        self._save(runs)
+        self._save(runs, "service", "bots", "events")
         self.active, self.stop_event = run_id, asyncio.Event()
         coroutine = self._execute(run_id)
         try:
@@ -298,32 +336,56 @@ class LocalSimControlService:
         record = runs[run_id]
         record["stop_commands"].append(request_id)
         if record["control_state"] in {"starting", "running", "stopping"}:
-            record.update(control_state="stopping", stop_requested=True,
-                          stop_requested_at=record["stop_requested_at"] or now())
-        self._save(runs)
+            if not record["stop_requested"]:
+                self._lifecycle(record, "stop_requested", request_id=request_id,
+                                state=record["control_state"])
+            self._transition(record, control_state="stopping", stop_requested=True,
+                             stop_requested_at=record["stop_requested_at"] or now())
+        self._save(runs, "service", "bots", "events")
         if self.active == run_id and self.stop_event is not None:
             self.stop_event.set()
         return self.snapshot(run_id)
+
+    def _lifecycle(self, record, kind, **values):
+        """Control-plane event kept apart from runner events so run evidence is unchanged."""
+        self.seq += 1
+        record.setdefault("lifecycle", []).append(
+            {"kind": kind, "wall_time": now(), "wall_time_ms": now_ms(),
+             "event_seq": self.seq, **values})
+        if len(record["lifecycle"]) > MAX_LIFECYCLE:
+            record["lifecycle"].pop(0)
+            record["events_omitted"] = min(record["events_omitted"] + 1, 100)
+
+    def _transition(self, record, **values):
+        previous = record["control_state"]
+        record.update(values)
+        if record["control_state"] != previous:
+            self._lifecycle(record, "run_state", state=record["control_state"], previous=previous)
+            return True
+        return False
 
     def _update(self, run_id, **values):
         runs = deepcopy(self.runs)
         record = runs[run_id]
         if record["control_state"] == "stopping" and values.get("control_state") == "running":
             values.pop("control_state")
-        record.update(values)
-        self._save(runs)
+        changed = self._transition(record, **values)
+        self._save(runs, "service", "bots", *(("events",) if changed else ()))
 
     def _emit(self, run_id, kind, **values):
         runs = deepcopy(self.runs)
         record = runs[run_id]
-        event = {"kind": kind, "wall_time": now(), **values}
+        self.seq += 1
+        event = {"kind": kind, "wall_time": now(), "wall_time_ms": now_ms(),
+                 "event_seq": self.seq, **values}
         record["events"].append(event)
         if len(record["events"]) > MAX_EVENTS:
             record["events"].pop(0)
             record["events_omitted"] += 1
         if kind in ("signal", "fill"):
             record["last_" + kind] = event
-        self._save(runs)
+        domains = ("events", "bots", "risk", "positions") if kind in catalog.ACCOUNT_EVENTS else ("events",)
+        self._save(runs, *domains)
 
     async def _execute(self, run_id):
         try:
@@ -344,8 +406,133 @@ class LocalSimControlService:
         finally:
             self.active = None
 
+    # Read-only projections (contract: docs/simulation-api-contract-draft.md section 2).
+    # They read control-plane memory only: no SQLite, no basis creation, no latch changes.
+
+    def contract(self):
+        if self._contract is None:
+            try:
+                self._contract = validate_request(DEFAULT_REQUEST)[1].contract
+            except (ValueError, OSError):
+                self._contract = False
+        return self._contract or None
+
+    def _latest_run(self):
+        if self.active is not None and self.active in self.runs:
+            return self.runs[self.active]
+        return next((self.runs[run_id] for run_id in reversed(self.runs)), None)
+
+    def strategies(self):
+        return {"items": [catalog.strategy_entry()], "version": self.state_version}
+
+    def bot(self, bot_id):
+        if type(bot_id) is not str or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", bot_id):
+            raise ControlError("invalid_bot_id", 422)
+        if bot_id != catalog.BOT_ID:
+            raise ControlError("bot_not_found", 404)
+        run = self._latest_run()
+        account, risk_state, source = catalog.latest_account(run)
+        view = catalog.bot_static(self.contract(), CONFIG["candle_timeframe_ms"], self.started_at_ms)
+        signal = None if run is None else run.get("last_signal")
+        terminal = run is not None and run["control_state"] in TERMINAL
+        view.update({
+            "version": self.state_version,
+            "state": "stopped" if run is None else run["control_state"],
+            "current_run_id": None if run is None else run["run_id"],
+            "active": run is not None and run["run_id"] == self.active,
+            "run_count": len(self.runs),
+            "worker_pid": None if run is None else run.get("worker_pid"),
+            "bars": 0 if run is None else run["bars"],
+            "warmup_bars": 0 if run is None else run["warmup_bars"],
+            "fills": 0 if run is None else run["fills"],
+            "last_synthetic_time_ms": None if run is None else run.get("last_synthetic_time_ms"),
+            "run_created_at_ms": None if run is None else catalog.iso_to_ms(run["created_at"]),
+            "finished_at_ms": None if run is None else catalog.iso_to_ms(run["finished_at"]),
+            "account_source": source,
+            **{name: None if account is None else account[name] for name in catalog.ACCOUNT_FIELDS},
+            "mark": catalog.latest_mark(run, risk_state),
+            "last_disposition": None if signal is None else signal.get("disposition"),
+            "last_reason": None if signal is None else signal.get("reason"),
+            "ownership_retained": bool(terminal and account is not None
+                                       and account["position"] not in ("0", None)
+                                       and Decimal(account["position"]) != 0),
+            "error": None if run is None else run["error"]})
+        return view
+
+    def bots(self):
+        return {"items": [self.bot(catalog.BOT_ID)], "version": self.state_version}
+
+    def _risk_inputs(self):
+        run = self._latest_run()
+        account, risk_state, _ = catalog.latest_account(run)
+        return run, account, risk_state
+
+    def risk(self):
+        self._ready()
+        run, _, risk_state = self._risk_inputs()
+        value = catalog.risk_projection(run, risk_state, self.contract(), self.limits)
+        return None if value is None else {"version": self.state_version, **value}
+
+    def positions(self):
+        self._ready()
+        run, account, risk_state = self._risk_inputs()
+        return {"items": catalog.position_projection(run, account, risk_state, self.contract()),
+                "version": self.state_version}
+
+    def summary(self):
+        run, account, risk_state = self._risk_inputs()
+        risk_dto = catalog.risk_projection(run, risk_state, self.contract(), self.limits)
+        return catalog.summary_projection(run, account, risk_dto, self.active, self.limits)
+
+    def _all_events(self):
+        for run_id, run in self.runs.items():
+            for event in [*run["events"], *run.get("lifecycle", [])]:
+                if type(event.get("event_seq")) is int:
+                    yield run_id, event
+
+    def events(self, since=0, limit=MAX_EVENTS):
+        if type(since) is not int or since < 0:
+            raise ControlError("invalid_since", 422)
+        if type(limit) is not int or not 1 <= limit <= catalog.MAX_EVENT_LIMIT:
+            raise ControlError("invalid_limit", 422)
+        ordered = sorted(((event["event_seq"], run_id, event) for run_id, event in self._all_events()
+                          if event["event_seq"] > since), key=lambda item: item[0])
+        items = [catalog.event_dto(run_id, event) for _, run_id, event in ordered[:limit]]
+        return {"items": items, "next_since": items[-1]["seq"] if items else since,
+                "more": len(ordered) > limit, "version": self.state_version,
+                "omitted": self._omitted()}
+
+    def state(self, since_version=None):
+        current = self.current_build()
+        if current != self.seen_build:
+            self.seen_build = current
+            self._bump("service")
+        self._ready()
+        if since_version is not None and (type(since_version) is not int or since_version < 0):
+            raise ControlError("invalid_since_version", 422)
+        base = {"contract": "catos.simulation.v1", "version": self.state_version,
+                "instance_id": self.instance_id, "observed_at_ms": now_ms()}
+        if since_version == self.state_version:
+            return {**base, "unchanged": True}
+        recent = sorted((catalog.event_dto(run_id, event) for run_id, event in self._all_events()),
+                        key=lambda dto: dto["seq"])[-MAX_EVENTS:]
+        return {**base, "unchanged": False, "service": self.version(),
+                "strategies": self.strategies()["items"], "bots": self.bots()["items"],
+                "risk": self.risk(), "positions": self.positions()["items"],
+                "summary": self.summary(),
+                "events": {"items": recent, "next_since": recent[-1]["seq"] if recent else 0,
+                           "omitted": self._omitted()},
+                "domains": dict(self.domains)}
+
+    def _omitted(self):
+        legacy = sum(1 for run in self.runs.values()
+                     for event in [*run["events"], *run.get("lifecycle", [])]
+                     if type(event.get("event_seq")) is not int)
+        return sum(run["events_omitted"] for run in self.runs.values()) + legacy
+
     async def close(self):
         self.closing = True
+        self._bump("service")
         if self.stop_event is not None and self.task is not None and not self.task.done():
             if not self.unavailable:
                 try:

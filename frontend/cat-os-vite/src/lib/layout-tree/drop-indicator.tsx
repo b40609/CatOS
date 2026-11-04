@@ -87,7 +87,7 @@ export function DropIndicator({
               {sourceTitle}
             </span>
           </div>
-          <span className="text-[10px] font-mono text-primary font-bold bg-primary/20 px-2 py-0.5 rounded border border-primary/50">
+          <span className="text-t2 font-mono text-primary font-bold bg-primary/20 px-2 py-0.5 rounded border border-primary/50">
             {layout.dirLabel}
           </span>
         </div>
@@ -97,7 +97,7 @@ export function DropIndicator({
           <div className="h-3 w-1/3 bg-primary/30 rounded animate-pulse" />
           <div className="h-6 w-2/3 bg-foreground/15 rounded" />
           <div className="flex-1 min-h-[36px] border border-dashed border-primary/40 rounded flex items-center justify-center bg-primary/[0.03]">
-            <span className="text-[11px] font-mono text-primary/90 font-semibold tracking-wider">
+            <span className="text-t3 font-mono text-primary/90 font-semibold tracking-wider">
               ⊞ DROP TO SPLIT SLOT
             </span>
           </div>

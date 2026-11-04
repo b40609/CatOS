@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { LayoutNode, LeafNode, SplitDirection, DropPosition, HoverDropTarget } from "@/lib/layout-tree/types";
+import type { LayoutNode, SplitDirection, DropPosition, HoverDropTarget } from "@/lib/layout-tree/types";
 import {
   createDefaultTree,
   createQuadTree,
@@ -20,6 +20,7 @@ import {
   addTabToLeaf,
   switchLeafTab,
   removeTabFromLeaf,
+  buildStableTreeFromCardIds,
 } from "@/lib/layout-tree/tree-ops";
 
 export type CardId =
@@ -53,14 +54,14 @@ export interface LayoutProfile {
 
 export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string }> = {
   equity: { zh: "帳戶權益與損益", en: "Equity & Drawdown", icon: "📈" },
-  positions: { zh: "持倉明細與在途委託", en: "Positions & Orders", icon: "📊" },
+  positions: { zh: "持倉明細與交易所風控", en: "Positions & Orders", icon: "📊" },
   bots: { zh: "策略機器人矩陣", en: "Bots Matrix", icon: "🤖" },
   allocation: { zh: "槓桿倍數與資產曝險", en: "Leverage & Allocation", icon: "🪙" },
   fills: { zh: "即時成交流水", en: "Recent Fills", icon: "⚡" },
   incidents: { zh: "風險警報與異常事件", en: "Risk Incidents", icon: "🚨" },
   market_watch: { zh: "標的行情與資金費率", en: "Market Watch & Rates", icon: "⏱️" },
   strategy_intents: { zh: "策略目標與訊號強度", en: "Signals & Radar", icon: "🎯" },
-  activity_deck: { zh: "交易日誌與風險事件", en: "Activity & Events", icon: "📜" },
+  activity_deck: { zh: "全域戰情日誌與成交流水", en: "Blotter & Activity Log", icon: "📜" },
   bot_inspector: { zh: "機器人深層檢測 (Master-Detail)", en: "Bot Inspector", icon: "🔍" },
 };
 
@@ -113,11 +114,19 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
   },
   {
     id: "flagship",
-    nameZh: "6卡操盤旗艦 (全景全功能監控)",
+    nameZh: "5卡操盤旗艦 (全景全功能監控)",
     shortName: "操盤旗艦",
     tag: "全景多螢",
-    cardCount: 6,
-    desc: "上層：權益損益+策略機器人+標的行情 / 下層：持倉委託+交易日誌+成交流水",
+    cardCount: 5,
+    desc: "上層：權益損益+策略機器人+標的行情 / 下層：持倉委託+全域戰情日誌",
+  },
+  {
+    id: "full9",
+    nameZh: "5卡全景大盤 (全核心模組展開)",
+    shortName: "5卡全景",
+    tag: "完整大盤",
+    cardCount: 5,
+    desc: "權益 · 機器人 · 槓桿 · 持倉 · 全域戰情日誌與成交流水",
   },
   {
     id: "focus_positions",
@@ -125,7 +134,7 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
     shortName: "部位全螢幕",
     tag: "單卡專注",
     cardCount: 1,
-    desc: "100% 滿版展示多空持倉、在途掛單撤單與 P6 災難停損防線",
+    desc: "100% 滿版展示多空持倉、在途掛單撤單與交易所停損防線",
   },
   {
     id: "empty",
@@ -165,10 +174,10 @@ export type SeamStyle = "seamless" | "compact" | "floating";
 export type DragPreviewMode = "real-card" | "minimal-blueprint" | "mini-tag";
 export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tactical_icon";
 
-const STORAGE_KEY_PROFILES = "catos_layout_profiles_v8_tsplit";
-const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v8_tsplit";
+const STORAGE_KEY_PROFILES = "catos_layout_profiles_v12_gold5";
+const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v12_gold5";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v8_tsplit";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v12_gold5";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";
@@ -208,6 +217,11 @@ interface LayoutState {
 
   toastMessage: string | null;
 
+  // 卡片最大化專注 (Maximize / Focus ⛶)
+  maximizedLeafId: string | null;
+  toggleMaximizeLeaf: (leafId: string) => void;
+  restoreMaximizedLeaf: () => void;
+
   // Layout Tree 引擎 Actions
   setRootNode: (node: LayoutNode | null, persist?: boolean) => void;
   clearAllCards: () => void;
@@ -220,6 +234,7 @@ interface LayoutState {
   resetToDefaultLayout: () => void;
   applyLayoutPreset: (preset?: LayoutPresetId) => void;
   addNewCard: (cardId: CardId) => void;
+  toggleCardStable: (cardId: CardId) => void;
   replaceLeafNode: (leafId: string, newCardId: CardId) => void;
   addTabToLeafNode: (leafId: string, cardId: CardId) => void;
   switchLeafTabNode: (leafId: string, cardId: CardId) => void;
@@ -277,6 +292,51 @@ function loadInitial(): {
     const currentId = localStorage.getItem(STORAGE_KEY_CURRENT) || DEFAULT_PROFILES[0].id;
     const active = profiles.find((p) => p.id === currentId) || profiles[0];
 
+function sanitizeAndPruneTree(root: LayoutNode | null): LayoutNode | null {
+  if (!root) return null;
+  let tree: LayoutNode | null = root;
+
+  // 1. 檢驗所有葉子節點
+  let leaves = getAllLeaves(tree);
+  let hasActivityDeck = leaves.some((l) => l.cardId === "activity_deck");
+
+  for (const leaf of leaves) {
+    if (leaf.cardId === "market_watch" || leaf.cardId === "strategy_intents") {
+      // 標的行情與策略目標已拆解融入頂部狀態總線與持倉，自樹結構中自動剪枝並平鋪相鄰卡片
+      if (tree) {
+        const next = removeLeaf(tree, leaf.id);
+        if (next) tree = next;
+      }
+    } else if (leaf.cardId === "fills" || leaf.cardId === "incidents") {
+      if (!hasActivityDeck) {
+        // 第一個轉換為 activity_deck
+        tree = replaceLeafCard(tree, leaf.id, "activity_deck");
+        hasActivityDeck = true;
+      } else {
+        // 其餘舊卡片節點直接自樹中拔除，自動平鋪展開相鄰視窗
+        if (tree) {
+          const next = removeLeaf(tree, leaf.id);
+          if (next) tree = next;
+        }
+      }
+    }
+  }
+
+  // 2. 拔除重複的 activity_deck 葉子
+  if (tree) {
+    const updatedLeaves = getAllLeaves(tree);
+    const activityLeaves = updatedLeaves.filter((l) => l.cardId === "activity_deck");
+    if (activityLeaves.length > 1) {
+      for (let i = 1; i < activityLeaves.length; i++) {
+        const next = removeLeaf(tree, activityLeaves[i].id);
+        if (next) tree = next;
+      }
+    }
+  }
+
+  return tree;
+}
+
     // 載入持久化 Layout Tree
     let rootNode: LayoutNode | null = active.rootNode ?? defaultTree;
     const rawTree = localStorage.getItem(STORAGE_KEY_TREE);
@@ -293,6 +353,13 @@ function loadInitial(): {
         }
       } catch {
         // 使用預設樹
+      }
+    }
+
+    if (rootNode) {
+      rootNode = sanitizeAndPruneTree(rootNode);
+      if (typeof window !== "undefined" && rootNode) {
+        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(rootNode));
       }
     }
 
@@ -377,6 +444,16 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   rootNode: init.rootNode,
   draggingLeafId: null,
   hoverTarget: null,
+  maximizedLeafId: null,
+
+  toggleMaximizeLeaf: (leafId: string) => {
+    set((state) => ({
+      maximizedLeafId: state.maximizedLeafId === leafId ? null : leafId,
+    }));
+  },
+  restoreMaximizedLeaf: () => {
+    set({ maximizedLeafId: null });
+  },
 
   // 向下相容舊參數
   leftColWidth: init.activeProfile.leftColWidth,
@@ -419,20 +496,26 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   removeLeafNode: (leafId) => {
     const currentTree = get().rootNode;
     if (!currentTree) return;
-    const nextTree = removeLeaf(currentTree, leafId);
+
+    const currentLeaves = getAllLeaves(currentTree);
+    if (currentLeaves.length <= 1) {
+      get().showToast("工作區至少需保留 1 個模組");
+      return;
+    }
+
+    const targetLeaf = currentLeaves.find((l) => l.id === leafId);
+    if (!targetLeaf) return;
+
+    const nextActive = currentLeaves
+      .filter((l) => l.id !== leafId)
+      .map((l) => l.cardId);
+
+    const nextTree = buildStableTreeFromCardIds(nextActive, currentTree);
     set({ rootNode: nextTree });
     if (typeof window !== "undefined") {
-      if (nextTree) {
-        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
-      } else {
-        localStorage.setItem(STORAGE_KEY_TREE, "null");
-      }
+      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
     }
-    if (!nextTree) {
-      get().showToast("已清空工作區，可由頂部 [＋卡片] 或推薦預設自由自訂");
-    } else {
-      get().showToast("已關閉卡片，空間已自動合併填滿");
-    }
+    get().showToast("已關閉卡片，其餘卡片保持原位自適應填滿");
   },
 
   moveAndSplitNode: (sourceLeafId, targetLeafId, pos) => {
@@ -507,27 +590,41 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
   addNewCard: (cardId) => {
     const currentTree = get().rootNode;
-    if (!currentTree) {
-      const newLeaf: LeafNode = {
-        type: "leaf",
-        id: `leaf-${cardId}-${Date.now()}`,
-        cardId,
-      };
-      set({ rootNode: newLeaf });
-      if (typeof window !== "undefined") {
-        localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(newLeaf));
+    const currentLeaves = getAllLeaves(currentTree);
+    const activeIds = currentLeaves.map((l) => l.cardId);
+
+    if (activeIds.includes(cardId)) return;
+
+    const nextActive = [...activeIds, cardId];
+    const nextTree = buildStableTreeFromCardIds(nextActive, currentTree);
+    set({ rootNode: nextTree });
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+    }
+    get().showToast(`已掛載卡片 [${CARD_TITLES[cardId]?.zh?.split(" ")[0] || cardId}]`);
+  },
+
+  toggleCardStable: (cardId) => {
+    const currentTree = get().rootNode;
+    const currentLeaves = getAllLeaves(currentTree);
+    const activeIds = currentLeaves.map((l) => l.cardId);
+
+    let nextActive: CardId[];
+    if (activeIds.includes(cardId)) {
+      if (activeIds.length <= 1) {
+        get().showToast("工作區至少需保留 1 個模組");
+        return;
       }
-      get().showToast(`已建立卡片 [${CARD_TITLES[cardId].zh.split(" ")[0]}]`);
-      return;
+      nextActive = activeIds.filter((id) => id !== cardId);
+    } else {
+      nextActive = [...activeIds, cardId];
     }
 
-    const leaves = getAllLeaves(currentTree);
-    if (leaves.length === 0) return;
-
-    const target = leaves[leaves.length - 1];
-    const direction: SplitDirection = leaves.length >= 2 ? "col" : "row";
-
-    get().splitLeafNode(target.id, direction, "after", cardId);
+    const nextTree = buildStableTreeFromCardIds(nextActive, currentTree);
+    set({ rootNode: nextTree });
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_TREE, JSON.stringify(nextTree));
+    }
   },
 
   replaceLeafNode: (leafId, newCardId) => {

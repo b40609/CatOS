@@ -66,7 +66,7 @@ export function BacktestUnderwaterChart({
           <span className="text-xs font-semibold text-foreground">
             回測深度量化分析 (Quant Equity & Underwater)
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground hidden sm:inline">
+          <span className="text-t2 font-mono text-muted-foreground hidden sm:inline">
             · Decimal 核心精確曲線
           </span>
         </div>
@@ -76,7 +76,7 @@ export function BacktestUnderwaterChart({
             type="button"
             onClick={() => setActiveTab("curve")}
             className={cn(
-              "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer",
+              "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer",
               activeTab === "curve"
                 ? "bg-secondary text-primary font-bold shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -88,7 +88,7 @@ export function BacktestUnderwaterChart({
             type="button"
             onClick={() => setActiveTab("heatmap")}
             className={cn(
-              "px-2 py-0.5 text-[10.5px] font-mono rounded transition-colors cursor-pointer flex items-center gap-1",
+              "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer flex items-center gap-1",
               activeTab === "heatmap"
                 ? "bg-secondary text-primary font-bold shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -109,7 +109,7 @@ export function BacktestUnderwaterChart({
         <div className="p-8 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-1.5">
           <TrendingUp className="size-5 text-muted-foreground/40" />
           <span className="text-foreground font-medium">暫無回測曲線數據</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-t3 text-muted-foreground">
             請點擊右上角「發起新回測」或於左側歷史清單選取已完成任務
           </span>
         </div>
@@ -117,12 +117,12 @@ export function BacktestUnderwaterChart({
         <div className="p-3 space-y-2">
           {/* 上半部：累積淨值曲線 (Equity Curve) */}
           <div>
-            <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-t3 font-mono text-muted-foreground mb-1">
               <span className="flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-400" />
                 累積帳戶權益 (Cumulative Equity, USDT)
                 {dataNotice && (
-                  <span className="text-[10px] text-amber-400/80 font-normal">
+                  <span className="text-t2 text-amber-400/80 font-normal">
                     · {dataNotice}
                   </span>
                 )}
@@ -153,7 +153,7 @@ export function BacktestUnderwaterChart({
 
           {/* 下半部：水下載回撤曲線 (Underwater Drawdown) */}
           <div className="pt-2 border-t border-border/50">
-            <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-t3 font-mono text-muted-foreground mb-1">
               <span className="flex items-center gap-1.5 text-down">
                 <AlertTriangle className="size-3" />
                 水下載歷史回撤 (Underwater Drawdown %)
@@ -187,7 +187,7 @@ export function BacktestUnderwaterChart({
         <div className="p-6 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-1.5">
           <Calendar className="size-5 text-muted-foreground/40" />
           <span className="text-foreground font-medium">單日 96 根 K 線合成取樣（無跨月份歷史資料）</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-t3 text-muted-foreground">
             月度跨期熱力收益矩陣需載入長週期多月行情；後端當前契約為單一合成資料集。
           </span>
         </div>

@@ -36,9 +36,9 @@ secrets/
 *.log
 /logs/
 
-# Isolated persisted research jobs (JSON/HTML; no trading DB)
-/outputs/research-web/
-/outputs/local-sim-r4/
+# One-off run artifacts, research jobs and evidence snapshots (v1 cleanup: directory untracked;
+# files still tracked here are referenced by catos/, tests/ or docs/ and stay versioned)
+/outputs/
 
 # Immutable local public-market snapshots and DCM research evidence
 /artifacts/dcm-*/
@@ -58,10 +58,10 @@ secrets/
 Thumbs.db
 Desktop.ini
 *.zip
-CatOS_Astra/
 
 # Local editor, AI assistant caches, and temporary prototypes
 .codex/
+.agents/
 .workbuddy-ai/
 /frontend/outputs/
 /frontend/prototypes/

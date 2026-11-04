@@ -3,7 +3,7 @@ import {
   Check,
   KeyRound,
   Palette,
-  ShieldCheck,
+  ShieldOff,
   Sliders,
   Type,
   User,
@@ -29,11 +29,12 @@ import {
   type ColorConvention,
   type FontFamily,
 } from "@/state/personalOsStore";
+import { useCatStore } from "@/state/catStore";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const AVATAR_OPTIONS = ["🚀", "₿", "Ξ", "◎", "🐱", "⚡", "🦁", "🐋"];
-const BADGE_OPTIONS = ["OKX VIP", "KOL Partner", "Quant Fund", "Alpha Trader"];
+const AVATAR_OPTIONS = ["⚡", "₿", "Ξ", "◎", "◈", "◆", "▲", "●"];
+const BADGE_OPTIONS = ["PRO TRADER", "QUANT FUND", "SUB-ACCOUNT", "ALPHA"];
 
 export function PersonalOsModal({
   isOpen,
@@ -67,12 +68,9 @@ export function PersonalOsModal({
     fontScale,
     setFontScale,
     applyPreset,
-    apiKey,
-    passphrase,
-    environment,
-    setEnvironment,
-    ping,
   } = usePersonalOs();
+  const connection = useCatStore((s) => s.connection);
+  const service = useCatStore((s) => s.service);
 
   const [nameInput, setNameInput] = useState(displayName);
   const [aliasInput, setAliasInput] = useState(subAccountAlias);
@@ -113,12 +111,12 @@ export function PersonalOsModal({
             </span>
             <div>
               <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                <span>{language === "zh-TW" ? "catOS 專屬量化交易作業系統設定" : "catOS Personal Trading OS"}</span>
-                <span className="rounded bg-primary/15 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-primary">
+                <span>{language === "zh-TW" ? "系統外觀與交易環境偏好設定" : "catOS Personal Trading OS"}</span>
+                <span className="rounded bg-primary/15 px-1.5 py-0.2 font-mono text-t1 font-semibold text-primary">
                   PRO
                 </span>
               </h2>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-t2 text-muted-foreground">
                 {language === "zh-TW"
                   ? "獨立金融漲跌色彩 · 全域數據字號密度 · 業界傳奇主題與外觀訂製"
                   : "Independent price colors, layout density, themes & live diagnostics"}
@@ -137,12 +135,12 @@ export function PersonalOsModal({
 
         {/* ==================== 即時微型看盤儀表預覽 (Live Mini-Dashboard Preview) ==================== */}
         <div className="px-6 pt-3 pb-2 shrink-0 bg-background/50 border-b border-border/30">
-          <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
+          <div className="flex items-center justify-between text-t2 font-mono text-muted-foreground mb-1.5">
             <span className="flex items-center gap-1.5 uppercase font-medium">
               <span className="size-1.5 rounded-full bg-primary animate-pulse" />
               {language === "zh-TW" ? "即時渲染預覽 (Live Interactive Preview)" : "Live Interactive Preview"}
             </span>
-            <span className="text-[10px] text-foreground/80 font-mono">
+            <span className="text-t2 text-foreground/80 font-mono">
               {currentScale.nameZh} · {currentConv.nameZh.split(" ")[0]} · {currentAccent.nameZh}
             </span>
           </div>
@@ -160,11 +158,11 @@ export function PersonalOsModal({
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-foreground">{displayName || "CatOS"}</span>
-                  <span className="rounded bg-primary/20 px-1 py-0.2 text-[9px] font-mono font-medium text-primary">
+                  <span className="rounded bg-primary/20 px-1 py-0.2 text-t1 font-mono font-medium text-primary">
                     {traderBadge}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] text-muted-foreground block">{subAccountAlias}</span>
+                <span className="font-mono text-t2 text-muted-foreground block">{subAccountAlias}</span>
               </div>
             </div>
 
@@ -174,7 +172,7 @@ export function PersonalOsModal({
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono text-xs font-semibold text-foreground">BTC-PERP</span>
                   <span
-                    className="rounded px-1 py-0.2 text-[9px] font-bold"
+                    className="rounded px-1 py-0.2 text-t1 font-bold"
                     style={{
                       backgroundColor: `color-mix(in srgb, ${currentConv.upHex} 15%, transparent)`,
                       color: currentConv.upHex,
@@ -184,7 +182,7 @@ export function PersonalOsModal({
                     LONG
                   </span>
                 </div>
-                <div className="font-mono text-[11px] text-foreground/90 mt-0.5">$64,280.50</div>
+                <div className="font-mono text-t3 text-foreground/90 mt-0.5">$64,280.50</div>
               </div>
 
               {/* 未實現盈虧（採用當前漲跌色） */}
@@ -196,7 +194,7 @@ export function PersonalOsModal({
                   +1,280.00 USDT
                 </span>
                 <span
-                  className="font-mono text-[10px] font-semibold"
+                  className="font-mono text-t2 font-semibold"
                   style={{ color: currentConv.upHex }}
                 >
                   +4.85%
@@ -216,10 +214,6 @@ export function PersonalOsModal({
               >
                 Buy / 買入
               </button>
-              <div className="flex items-center gap-1 font-mono text-[9.5px] text-muted-foreground bg-secondary/50 px-2 py-1 rounded">
-                <span className="size-1.5 rounded-full bg-emerald-400" />
-                <span>18ms WS</span>
-              </div>
             </div>
           </div>
         </div>
@@ -261,7 +255,7 @@ export function PersonalOsModal({
                   <Zap className="size-3.5 text-primary" />
                   <span>傳奇量化主題套裝 (Legendary Quant Presets)</span>
                 </h3>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                <p className="text-t3 text-muted-foreground mt-0.5 leading-relaxed">
                   一鍵套用業界頂級交易員調配之完整配置（含底座階調、介面強調色、漲跌色盤與字體排版）。
                 </p>
               </div>
@@ -313,12 +307,12 @@ export function PersonalOsModal({
                         </div>
                       </div>
 
-                      <p className="text-[10px] text-muted-foreground leading-normal line-clamp-2">
+                      <p className="text-t2 text-muted-foreground leading-normal line-clamp-2">
                         {preset.descZh}
                       </p>
 
                       {isCurrent && (
-                        <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-primary">
+                        <div className="mt-2 flex items-center gap-1 text-t2 font-medium text-primary">
                           <Check className="size-3" />
                           <span>當前套用中</span>
                         </div>
@@ -340,11 +334,11 @@ export function PersonalOsModal({
                     <Sparkles className="size-3.5 text-primary" />
                     <span>作業系統背景底座 (Surface Tone)</span>
                   </span>
-                  <span className="font-mono text-[10px] text-primary font-semibold uppercase">
+                  <span className="font-mono text-t2 text-primary font-semibold uppercase">
                     {surfaceTone}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-t3 text-muted-foreground leading-relaxed">
                   作業系統全局視窗與側邊欄底階。OLED 純黑提供 0 反光暗房對比度，黑曜金與冷鈦灰兼具細緻沉浸感。
                 </p>
                 <div className="grid grid-cols-3 gap-2.5 pt-1">
@@ -367,8 +361,8 @@ export function PersonalOsModal({
                           style={{ backgroundColor: item.bg }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-[11px] truncate text-foreground font-medium">{item.nameZh}</p>
-                          <p className="text-[9.5px] text-muted-foreground truncate">{item.nameEn}</p>
+                          <p className="text-t3 truncate text-foreground font-medium">{item.nameZh}</p>
+                          <p className="text-t1 text-muted-foreground truncate">{item.nameEn}</p>
                         </div>
                       </button>
                     );
@@ -383,11 +377,11 @@ export function PersonalOsModal({
                     <Flame className="size-3.5 text-primary" />
                     <span>系統介面強調色 (Accent Highlight · 8 款光色)</span>
                   </span>
-                  <span className="font-mono text-[10px] text-primary font-semibold uppercase">
+                  <span className="font-mono text-t2 text-primary font-semibold uppercase">
                     {accentColor}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-t3 text-muted-foreground leading-relaxed">
                   控制按鈕高亮、焦點環、選中狀態與主圖標光色。與 K 線漲跌色完全分離，互不干擾。
                 </p>
                 <div className="grid grid-cols-4 gap-2 pt-1">
@@ -406,7 +400,7 @@ export function PersonalOsModal({
                         )}
                       >
                         <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: item.hex }} />
-                        <span className="text-[11px] truncate">{item.nameZh}</span>
+                        <span className="text-t3 truncate">{item.nameZh}</span>
                       </button>
                     );
                   })}
@@ -420,7 +414,7 @@ export function PersonalOsModal({
                     <Type className="size-3.5 text-primary" />
                     <span>字體家族風格 (Typography Family)</span>
                   </span>
-                  <span className="font-mono text-[10px] text-primary font-semibold uppercase">
+                  <span className="font-mono text-t2 text-primary font-semibold uppercase">
                     {fontFamily}
                   </span>
                 </div>
@@ -440,7 +434,7 @@ export function PersonalOsModal({
                         )}
                       >
                         <p className="text-xs text-foreground font-medium">{item.nameZh}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{item.descZh}</p>
+                        <p className="text-t2 text-muted-foreground mt-0.5 line-clamp-1">{item.descZh}</p>
                       </button>
                     );
                   })}
@@ -459,11 +453,11 @@ export function PersonalOsModal({
                     <TrendingUp className="size-3.5 text-up" />
                     <span className="font-semibold">漲跌色彩慣例 (Price Trend Conventions)</span>
                   </span>
-                  <span className="font-mono text-[10px] text-up font-bold">
+                  <span className="font-mono text-t2 text-up font-bold">
                     {currentConv.nameZh.split(" ")[0]}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-t3 text-muted-foreground leading-relaxed">
                   【金融語意完全獨立】：量化交易員的核心肌肉記憶。切換後全站持倉、損益、走勢線與多空標籤即刻翻轉，與作業系統外觀主題完全獨立。
                 </p>
                 <div className="grid grid-cols-2 gap-3 pt-1">
@@ -484,7 +478,7 @@ export function PersonalOsModal({
                       >
                         <div className="min-w-0 pr-2">
                           <p className="text-xs font-semibold text-foreground truncate">{item.nameZh}</p>
-                          <p className="text-[9.5px] text-muted-foreground mt-0.5 line-clamp-1">{item.descZh}</p>
+                          <p className="text-t1 text-muted-foreground mt-0.5 line-clamp-1">{item.descZh}</p>
                         </div>
                         <div className="flex items-center gap-1.5 font-mono text-xs shrink-0 font-bold">
                           <span style={{ color: item.upHex }}>+12%</span>
@@ -503,11 +497,11 @@ export function PersonalOsModal({
                     <Monitor className="size-3.5 text-primary" />
                     <span>數據密度與字號縮放 (Layout Density & Scale · 5 檔)</span>
                   </span>
-                  <span className="font-mono text-[10px] text-primary font-bold">
+                  <span className="font-mono text-t2 text-primary font-bold">
                     {currentScale.nameZh}
                   </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-t3 text-muted-foreground leading-relaxed">
                   【內容與數字全面連動】：不僅改變標題，報價、持倉表格、成交明細與時間戳等所有數據一律成比例放大縮小。
                 </p>
                 <div className="grid grid-cols-5 gap-2 pt-1">
@@ -528,7 +522,7 @@ export function PersonalOsModal({
                         title={item.descZh}
                       >
                         <span className="text-xs font-medium">{item.nameZh.split(" ")[0]}</span>
-                        <span className="text-[9px] text-muted-foreground truncate w-full">{item.nameZh.split(" ")[1]}</span>
+                        <span className="text-t1 text-muted-foreground truncate w-full">{item.nameZh.split(" ")[1]}</span>
                       </button>
                     );
                   })}
@@ -541,7 +535,7 @@ export function PersonalOsModal({
           {activeTab === "identity" && (
             <form onSubmit={handleSaveIdentity} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-foreground mb-2">
+                <label className="block text-t3 font-medium text-foreground mb-2">
                   {language === "zh-TW" ? "專屬交易員頭像 (Avatar Emoji)" : "Select Avatar Emoji"}
                 </label>
                 <div className="grid grid-cols-8 gap-2">
@@ -565,7 +559,7 @@ export function PersonalOsModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-medium text-foreground">
+                  <label className="block text-t3 font-medium text-foreground">
                     {language === "zh-TW" ? "交易員暱稱 (Display Name)" : "Trader Nickname"}
                   </label>
                   <input
@@ -578,7 +572,7 @@ export function PersonalOsModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-medium text-foreground">
+                  <label className="block text-t3 font-medium text-foreground">
                     {language === "zh-TW" ? "OKX 專用子帳戶識別別名" : "Sub-Account Alias"}
                   </label>
                   <input
@@ -593,7 +587,7 @@ export function PersonalOsModal({
 
               {/* 身分尊榮徽章 */}
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-medium text-foreground">
+                <label className="block text-t3 font-medium text-foreground">
                   {language === "zh-TW" ? "交易所交易身分徽章" : "Trader Badge Tier"}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -603,7 +597,7 @@ export function PersonalOsModal({
                       type="button"
                       onClick={() => setTraderBadge(badge)}
                       className={cn(
-                        "rounded-lg py-1.5 text-center font-mono text-[10px] border transition-all cursor-pointer",
+                        "rounded-lg py-1.5 text-center font-mono text-t2 border transition-all cursor-pointer",
                         traderBadge === badge
                           ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
                           : "border-border/50 bg-secondary/40 text-muted-foreground hover:text-foreground"
@@ -616,7 +610,7 @@ export function PersonalOsModal({
               </div>
 
               <div className="pt-2 flex items-center justify-between border-t border-border/40">
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-t2 text-muted-foreground">
                   {language === "zh-TW" ? "專屬設定僅保存在本機，全站側邊欄即時同步" : "Saved locally on this machine"}
                 </span>
                 <button
@@ -633,83 +627,44 @@ export function PersonalOsModal({
           {/* ========== TAB 5: 交易所 API 與本地進程 (API & Daemon) ========== */}
           {activeTab === "api" && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="size-3.5 text-emerald-400" />
-                    <span>OKX 專用子帳戶金鑰連線</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("live")}
-                      className={cn(
-                        "rounded px-2 py-0.5 text-[10px] font-mono transition-all cursor-pointer",
-                        environment === "live"
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      LIVE 實盤
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("sim")}
-                      className={cn(
-                        "rounded px-2 py-0.5 text-[10px] font-mono transition-all cursor-pointer",
-                        environment === "sim"
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      SIM 模擬
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-[10px] text-muted-foreground font-mono">OKX API Key</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={apiKey}
-                      className="w-full mt-1 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 font-mono text-[11px] text-foreground/80 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-muted-foreground font-mono">Passphrase</label>
-                    <input
-                      type="password"
-                      readOnly
-                      value={passphrase}
-                      className="w-full mt-1 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 font-mono text-[11px] text-foreground/80 focus:outline-none"
-                    />
-                  </div>
-                </div>
+              <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-2">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldOff className="size-3.5 text-muted-foreground" />
+                  <span>OKX 專用子帳戶 API · v1 未接線</span>
+                </span>
+                <p className="text-t2 text-muted-foreground leading-relaxed">
+                  v1 只提供本機合成模擬（FakeExchange），不載入任何金鑰，也沒有 Demo／Live 下單路徑。
+                  金鑰日後只由本機 Supervisor 持有，不經前端輸入或保存。
+                </p>
               </div>
 
-              {/* 本地 WebSocket 守護進程診斷 */}
+              {/* 本機服務狀態：讀取控制面 /state 輪詢結果 */}
               <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-2">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Activity className="size-3.5 text-primary" />
-                  <span>本地守護進程連線狀態 (Local Daemon)</span>
+                  <span>本地服務狀態 (Local Engine)</span>
                 </span>
-                <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-[10.5px]">
+                <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-t2">
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
-                    <span className="text-[9.5px] text-muted-foreground block">WS 延遲 (Ping)</span>
-                    <span className="text-emerald-400 font-bold">{ping} ms</span>
+                    <span className="text-t1 text-muted-foreground block">連線</span>
+                    <span className={cn("font-bold", connection.status === "ok" ? "text-up" : "text-muted-foreground")}>
+                      {connection.status}
+                    </span>
                   </div>
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
-                    <span className="text-[9.5px] text-muted-foreground block">資料儲存底座</span>
+                    <span className="text-t1 text-muted-foreground block">資料儲存底座</span>
                     <span className="text-foreground truncate block font-bold">SQLite (WAL)</span>
                   </div>
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
-                    <span className="text-[9.5px] text-muted-foreground block">本地服務埠</span>
+                    <span className="text-t1 text-muted-foreground block">本地服務埠</span>
                     <span className="text-foreground font-bold">127.0.0.1:8770</span>
                   </div>
                 </div>
+                {service && (
+                  <p className="font-mono text-t1 text-muted-foreground/70 truncate">
+                    instance {service.instance_id} · slot {service.slot}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -718,7 +673,7 @@ export function PersonalOsModal({
 
         {/* ==================== 底部固定列 ==================== */}
         <footer className="flex items-center justify-between border-t border-border/50 px-6 py-3 bg-secondary/20 shrink-0">
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-t2 text-muted-foreground">
             catOS Personal Trading OS · 所有偏好即時同步本機 Storage
           </span>
           <button

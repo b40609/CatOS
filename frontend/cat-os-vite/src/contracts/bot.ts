@@ -1,9 +1,8 @@
 /**
- * Bot contract definition
- * Strict adherence to catOS v1:
- * Single bot exclusive swap contract, cross + net_mode, Decimal values
+ * Bot contract (GET /api/workspace/simulation/bots, /bots/{bot_id}).
+ * Field names follow docs/simulation-api-contract-draft.md section 8.1.
  */
-import type { StrategyArtifact, BoundedJsonValue } from './strategy';
+import type { DecimalString } from './decimal';
 
 export type BotMode = 'local' | 'demo' | 'live';
 
@@ -16,61 +15,56 @@ export type BotControlState =
   | 'failed'
   | 'recovery_required';
 
-export interface BotBinding {
-  artifact: StrategyArtifact;
-  artifact_hash: string;
-  parameters: Record<string, BoundedJsonValue>;
+export const ACTIVE_STATES: ReadonlySet<BotControlState> = new Set(['starting', 'running', 'stopping']);
+
+export interface ContractSpecDTO {
+  inst_id: string;
+  base_per_contract: DecimalString;
+  tick_size: DecimalString;
+  lot_size: DecimalString;
+  min_size: DecimalString;
 }
 
-/**
- * Raw Bot metadata returned from GET /api/workspace/simulation/bots
- * Pure static binding, no runtime state
- */
-export interface BotDTO {
+export type AccountSource = 'final_account' | 'signal' | 'signal_fill' | null;
+
+export interface BotViewDTO {
+  version: number;
   bot_id: string;
-  mode: BotMode;
-  binding: BotBinding;
-  trusted: boolean; // Must be manually confirmed, cannot be pre-checked
-  created_at: string;
-}
-
-/**
- * View Model for UI components, merged from BotDTO and latest RunDTO
- */
-export interface Bot extends BotDTO {
-  name?: string;
-  symbol: string; // e.g. "BTC-USDT-SWAP"
+  mode: 'local';
+  strategy_id: string;
+  strategy_version: string;
+  strategy_name: string;
+  artifact_hash: string;
+  parameters: Record<string, string | number>;
+  inst_id: string | null;
+  symbol: string | null;
+  contract: ContractSpecDTO | null;
+  timeframe_ms: number;
+  trusted: true;
+  created_at_ms: number;
   state: BotControlState;
-  current_run_id?: string;
-  pnl_usdt?: string; // Decimal string
-  position_contracts?: string; // Decimal string, e.g. "0", "-1"
-  equity_usdt?: string;
-  fee_usdt?: string;
-  ownership_retained?: boolean;
-  risk_retained?: boolean;
-  // Rich metrics for multi-style comparative rendering
-  side?: 'long' | 'short' | 'flat';
-  entry_price?: string;
-  mark_price?: string;
-  roe_pct?: string;
-  timeframe?: string;
-  next_bar_countdown?: string;
-  sl_price?: string;
-  sl_distance_pct?: number;
-  nominal_value_usdt?: string;
-  margin_usdt?: string;
-  leverage?: string;
-  worker_pid?: number;
-  worker_cpu?: string;
-  worker_rss?: string;
-  ipc_heartbeat_ago?: string;
-  strategy_step?: string;
-  recent_signals?: Array<{
-    bar_time: string;
-    signal: string;
-    close_price: string;
-    pnl_delta: string;
-    note?: string;
-  }>;
+  current_run_id: string | null;
+  active: boolean;
+  run_count: number;
+  worker_pid: number | null;
+  bars: number;
+  warmup_bars: number;
+  fills: number;
+  last_synthetic_time_ms: number | null;
+  run_created_at_ms: number | null;
+  finished_at_ms: number | null;
+  account_source: AccountSource;
+  position: DecimalString | null;
+  average_entry: DecimalString | null;
+  balance: DecimalString | null;
+  realized_pnl: DecimalString | null;
+  unrealized_pnl: DecimalString | null;
+  equity: DecimalString | null;
+  fees: DecimalString | null;
+  funding_paid: DecimalString | null;
+  mark: DecimalString | null;
+  last_disposition: string | null;
+  last_reason: string | null;
+  ownership_retained: boolean;
+  error: string | null;
 }
-

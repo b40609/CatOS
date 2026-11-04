@@ -1,148 +1,132 @@
-# CatOS — Crypto Agent Trading OS
+# CatOS v1
 
-**把交易想法變成可驗證、可控執行的策略。**
+CatOS 是一套本機專用（127.0.0.1）的量化交易系統，目標是分鐘至小時級、已收盤 K 線的策略研究與受控執行。v1 的交付範圍是**本機合成模擬**：同一套 Supervisor／Worker／Journal／風控程式在 FakeExchange 上跑完整的策略 → 意圖 → 風控 → 成交 → 帳務流程，並由 React 戰情台讀取真實投影資料。以下只寫 v1 實際存在並經驗證的能力；願景與歷史規劃見 `docs/archive/`。
 
-CatOS 是結合 AI Agent 的本機加密貨幣量化交易工作台，面向希望自行開發、驗證與管理策略的交易者。以 OKX USDT 本位永續合約為首個交易場景，將策略製作、回測、參數探索與本機模擬整合為可追溯的工作流程。
+## v1 範圍
 
-AI 協助撰寫與研究策略；交易與資金管理則由明確的執行契約和風控規則承接。從策略版本、參數到研究結果，使用者都能逐步檢查，再決定是否進入下一個階段。
-
-[核心特色](#核心特色) · [工程亮點](#工程亮點) · [功能與進度](#功能與進度) · [快速開始](#快速開始) · [文件](#文件)
-
-> **專案階段**：持續開發中，目前以策略研究與本機模擬為主要交付範圍。Web 工作台持續串接後端；Demo／Live 分階段推進。
-
-## 核心特色
-
-| 特色 | 帶來的價值 |
+| 項目 | v1 實況 |
 | --- | --- |
-| **AI Agent 輔助策略開發** | 透過 MCP 讀取策略契約、建立不可變版本與查詢模擬結果，讓人與 Agent 以共同介面協作。 |
-| **可追溯的研究流程** | 保存策略識別、參數、輸入資訊與結果，方便重現試驗、比較版本及定位問題。 |
-| **超越單次最佳回測** | 結合 Optuna、參數鄰域穩定度、滾動樣本外驗證與分市場環境評估，檢查策略的適用條件。 |
-| **策略與交易職責分離** | Worker 計算訊號，Supervisor 統一管理交易路由、風控與寫庫，集中處理執行決策。 |
-| **本機整合工作台** | 以 Python、SQLite 與瀏覽器介面整合研究及執行狀態，並朝同站整合可選的 Yaozi 市場情報模組。 |
+| 執行環境 | 僅 local-sim：`catos/fake_exchange.py` 合成撮合，固定模板 8 根＋2 根預熱的合成 15m K 線 |
+| 策略 | 一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略 |
+| Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
+| OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter、`tools/fetch_okx_candles.py`）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
+| 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
+| HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
+| 前端 | 戰情台、實例監控頁與側欄狀態列讀取控制面真資料；回測／優化／覆盤頁接研究 HTTP；其餘頁面（策略中心、風控中心、日誌、設定、市場情報）仍為展示資料 |
 
-產品流程涵蓋以下階段；實際支援範圍見下方進度表：
+## 平台與環境需求
 
-```text
-交易想法 → 策略規格與版本 → 回測與參數驗證 → 本機模擬與對帳
-                                                  ↓
-                                    經授權的 Demo／Live（後續階段）
+- **作業系統**：目前只在 Windows 驗證。`catos/account_lock.py` 的 `AccountLock.acquire()` 在非 `win32` 直接 `RuntimeError`（使用 `msvcrt` 檔案鎖），因此 local-sim 在 macOS／Linux 無法啟動。
+- **Python**：3.11 以上；本文件的驗證使用 `.venv`（Python 3.12.10）。執行與儲存底座只有 Python 與 SQLite（WAL），不使用 Docker、PostgreSQL、Redis。
+- **Node.js**：`frontend/cat-os-vite/package.json` 未宣告 `engines`；本文件的驗證使用 Node 24.19.0，Vite 6 需要 Node 18 以上。
+- **換行與策略雜湊**：策略製品的 sha256 直接算在檔案位元組上，`.gitattributes` 已固定所有文字檔為 LF。Windows 使用者請設 `git config core.autocrlf false`（本 repo 已含 `.gitattributes`，兩者擇一即可）；若工作樹被轉成 CRLF，`research_catalog`／`strategy_registry` 會以 `artifact_hash_mismatch` 拒絕載入策略，測試也會失敗。
+
+## 安裝
+
+後端（repo 根目錄）：
+
+```bash
+python -m venv .venv
 ```
 
-## 工程亮點
+```bash
+.venv/Scripts/python.exe -m pip install -r requirements-http.txt
+```
 
-CatOS 將研究可重現性、金融計算與執行邊界落實到具體模組：
+`requirements-http.txt` 會一併安裝 `requirements-research.txt`（optuna、mcp、tzdata）。`tzdata` 是 Windows 上 `Asia/Taipei` 時區的必要套件。
 
-| 設計 | 實作重點 | 程式與文件 |
+前端：
+
+```bash
+npm --prefix frontend/cat-os-vite ci
+```
+
+## 啟動
+
+| 服務 | 埠 | 指令 |
 | --- | --- | --- |
-| **Decimal 金融核心** | 金額、價格、部位與費用採 Decimal；SQLite 金融數值採 TEXT。Optuna 的衍生搜尋評分可轉 float，帳務依據維持 Decimal。 | [回測核心](catos/research.py) |
-| **明示回測假設** | 已收盤 K 線決策、下一根開盤加滑價成交；預熱期只更新指標，成本與資金費事件由設定明示。 | [合成範例](examples/closed_bar_demo.py) |
-| **策略程序分離** | 受信任的 Python Worker 透過 JSON IPC 傳遞意圖；執行、風控與持久化集中管理。 | [Supervisor](catos/supervisor.py) |
-| **樣本外研究驗證** | 先在訓練窗選參，再固定參數評估後段資料，保留規則、失敗原因與完整結果。 | [驗證方法](docs/research-validation.md) |
-| **Agent 工具介面** | 將策略版本建立與結果查詢封裝為 MCP 工具，沿用本機服務契約。 | [策略 MCP](catos/strategy_mcp.py) |
+| 後端（研究 API＋local-sim 控制面＋工作台） | `127.0.0.1:8770` | `.venv/Scripts/python.exe -B -m catos.workspace_api` |
+| 後端臨時預覽（研究仍由既有 8770 擁有） | `127.0.0.1:8771` | 同上加 `--preview` |
+| 前端 Vite 開發伺服器（`strictPort`） | `127.0.0.1:8890` | `npm --prefix frontend/cat-os-vite run dev` |
+| 整合測試隔離埠 | `18870`／`18890` | 由 `tests/simulation_integration_test.mjs` 自行啟停，不碰 8770／8890 |
 
-技術組成：**Python 3.11+ · React · TypeScript · Vite · SQLite WAL · Optuna · MCP**。核心部署不要求 Docker、PostgreSQL 或 Redis。
+FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-laptop-dev.ps1`）會核對 8890 的前端身分並在未啟動時以 Vite 啟動前端後開瀏覽器；遇到不明 owner 不接管。該腳本本輪未執行驗證。
 
-## 功能與進度
+## 測試
 
-各項能力依研究、本機模擬與交易接入階段分別交付：
+以下每條指令都在本文件撰寫時實際執行過（2026-11-03）。
 
-| 領域 | 目前提供的能力 | 交付範圍 |
-| --- | --- | --- |
-| 回測研究 | Closed Bar、預熱、Decimal 計算、成本模型、CSV 匯入與 HTML 報告 | 可由合成範例與 CLI 使用 |
-| 參數探索 | Optuna 搜尋、明示搜尋空間與試驗紀錄 | 研究用途 |
-| 策略驗證 | 參數鄰域穩定度、滾動樣本外、分環境評估與結果封存 | 已有後端實作與驗證紀錄；前端串接另計 |
-| Agent 介面 | 研究 MCP、策略版本 MCP、本機模擬結果查詢 | 本機服務與既定工具契約 |
-| 本機模擬 | 策略 Worker、執行狀態、帳務與風控模組 | local-sim；不等同交易所實盤驗證 |
-| Web 工作台 | React／TypeScript 介面、研究與交易管理畫面 | 持續整合中；部分畫面仍使用模擬資料 |
-| Yaozi 情報 | 可選市場情報模組與整合契約 | 依各模組資料來源及整合進度提供 |
-| Demo／Live | OKX 執行、對帳與授權相關底座 | 分階段開發，尚未完整交付 |
+後端完整套件（約 4 分鐘；本輪結果 1373 tests、0 FAIL、0 ERROR、11 或 12 skipped：11 個是 v2 候選的 python_strategy 兩個模組，另 1 個是 `test_lot_scenario_demo` 在 Windows 無權建立 symlink（未開開發人員模式）時跳過）：
+
+```bash
+.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"
+```
+
+後端示範回測（純標準函式庫，印出合成 SMA 回測 JSON）：
+
+```bash
+.venv/Scripts/python.exe -B -m examples.closed_bar_demo
+```
+
+前端型別檢查、單元測試與建置：
+
+```bash
+npm --prefix frontend/cat-os-vite run typecheck
+```
+
+```bash
+npm --prefix frontend/cat-os-vite test
+```
+
+```bash
+npm --prefix frontend/cat-os-vite run build
+```
+
+端到端整合測試（以 `.venv` 的 Python 在 18870 起真實 local-sim 後端、18890 起 Vite proxy，用 headless Chrome 讀戰情台與實例頁，驗證 Decimal 字串與無 NaN）：
+
+```bash
+node frontend/cat-os-vite/tests/simulation_integration_test.mjs
+```
+
+需要本機可用的 Chrome／Edge headless 與已建好的 `.venv`。新版 Chrome 的 `--dump-dom` 可能輸出空白，可用環境變數 `CATOS_CHROME` 指到 Playwright 的 `chrome-headless-shell.exe`（未指定時會自動找 `%LOCALAPPDATA%\ms-playwright` 下的版本）；截圖預設寫到系統暫存目錄的 `catos-screens`，可用 `CATOS_SCREENS` 覆寫。`frontend/cat-os-vite/tests/integration_baseline_test.mjs` 需要 playwright（未納入依賴），本輪未執行。
 
 ## 架構
 
 ```text
-使用者 / AI Agent
-        │
-        ├── Web 工作台
-        └── MCP 工具
-                │
-         本機應用與研究服務
-                │
-         Supervisor ───── SQLite WAL
-                │
-             JSON IPC
-                │
-         Python 策略 Worker
+React 19 / Vite (8890)
+   │  GET /api/workspace/simulation/{state,strategies,bots,bots/{id},risk,positions,events}
+   │  POST /api/workspace/simulation/{bots/start,runs/{run_id}/stop}
+   │  研究 HTTP /api/research/*
+   ▼
+FastAPI (127.0.0.1:8770)  catos/workspace_api.py
+   ├─ local-sim 控制面  catos/local_sim_control*.py（單槽、request_id 冪等、state_version／domains）
+   │     └─ runner → LocalSupervisor（catos/supervisor.py）
+   │            ├─ Worker 子程序：catos/worker.py，JSON IPC（catos/ipc.py），只回純資料意圖
+   │            │     └─ 策略由 catos/strategy_registry.py 依 manifest 驗證雜湊後載入
+   │            ├─ 風控：catos/risk.py（R1 日基準、Soft／Hard 鎖存、曝險預算）、catos/protection.py（P6）
+   │            ├─ 執行：catos/execution.py → catos/fake_exchange.py（v1 唯一交易所）
+   │            └─ 帳本：catos/journal.py，SQLite WAL，schema 7，所有金額為 Decimal 字串（TEXT）
+   └─ 研究：catos/research*.py（Closed Bar Decimal 回測、Optuna、OOS 驗證）
 ```
 
-- **Supervisor**：在應用職責上集中管理憑證、對外連線、交易、帳戶風控與 SQLite 寫入。
-- **Worker**：載入使用者選定、經檢查的策略及依賴，傳回純資料訊號或目標意圖；不取得交易 client、憑證或寫庫介面。
-- **研究核心**：借鑒 Jesse 的策略 API 風格，使用自有 Decimal 核心，不依賴完整 Jesse 套件。
-- **前端**：React、TypeScript、Vite；以資訊密度與研究／執行狀態的可辨識性為設計方向。
-- **情報整合**：Yaozi 與量化交易朝同一個 localhost 工作台整合；切換頁面不應控制策略生命週期。
+不變量：所有金額、價格、部位以 `Decimal`／SQLite `TEXT` 處理，禁止 float；Supervisor 獨佔交易出口、風控與寫庫，Worker 不持憑證、不連網；風控鎖存只能人工解除。完整規則見 `AGENTS.md`。
 
-Worker 採普通 Python 子程序與 JSON IPC，提供程序故障隔離，**不具備 OS 層惡意程式沙箱保證**。只應載入受信任的策略與依賴。
+## v1 不包含
 
-## 快速開始
+- `catos/python_strategy.py`／`strategy_library.py` 的上傳製品與 allocate 控制面（v2 候選；對應測試已 `unittest.skip`，見 `docs/simulation-api-contract-draft.md` Q1）。
+- OKX Demo／Live 下單、撤單、帳戶修改與憑證載入；前端 demo／live 模式只回「未開放」。
+- Yaozi 市場情報線（`catos/market_*.py`）：v1 凍結，無排程器、不主動更新，程式與測試保留；前端「市場情報」頁標示「v1 未啟用」。見 `docs/market-intel.md`。
+- 多 Bot、多合約、Kill-Switch／re-arm HTTP、P6 交易所端實際掛單。
 
-### 1. 執行最小研究範例
+## 文件索引
 
-需要 Git 與 Python 3.11 以上版本。在終端執行：
-
-```powershell
-git clone https://github.com/b40609/CatOS.git
-cd CatOS
-python -B -m examples.closed_bar_demo
-```
-
-此範例只使用合成 K 線及標準函式庫，輸出交易、資金費與績效的 JSON，不需要交易所 API Key，也不連線下單。
-
-回測採「本根收盤決策、下一根開盤加明示滑價成交」；預熱期只更新指標，不執行交易決策。它是研究成交模型，不能代表盤中撮合、真實流動性或完整帳戶風控。
-
-### 2. 探索參數搜尋
-
-建議先建立專用虛擬環境，再安裝研究用依賴：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-research.txt
-.\.venv\Scripts\python.exe -B -m examples.optuna_demo
-```
-
-此範例以合成資料執行 12 次試驗，示範搜尋流程；最佳樣本內分數不代表未來績效。
-
-### 3. 延伸使用
-
-- **CSV 與報告**：依[研究 CLI 文件](docs/research-cli.md)匯入資料、設定成本並產出報告。
-- **研究驗證**：閱讀[穩定度與樣本外驗證](docs/research-validation.md)及[分環境評估](docs/research-regimes.md)。
-- **Agent 整合**：研究橋接位於 [research_mcp.py](catos/research_mcp.py)，策略版本與結果工具位於 [strategy_mcp.py](catos/strategy_mcp.py)。需先準備相應本機服務；MCP 不是獨立交易引擎。
-- **Web 開發**：前端位於 [frontend/cat-os-vite](frontend/cat-os-vite)。畫面、服務與資料基線的當前狀態請先查看[接續入口](docs/current-handoff.md)。
-
-## 範圍與限制
-
-- v1 交易設計聚焦 OKX USDT-M SWAP、cross 保證金與 net_mode；單一合約由單一 Bot 獨佔。
-- 研究聚焦分鐘至小時級的已收盤 K 線，不以 1m 細部資料重播模擬所有盤中成交。
-- 風控包含曝險限制、停止增倉與鎖存機制；具體政策及已接入階段以文件為準。
-- 回測、研究完成或本機模擬通過，不構成 Demo／Live 的上線核准，也不保證策略獲利。
-
-## 文件
-
-| 文件 | 內容 |
-| --- | --- |
-| [架構設計](catOS-architecture-review.md) | 系統職責、策略介面與設計依據 |
-| [目前接續入口](docs/current-handoff.md) | 最新開發狀態、已知限制與交付證據 |
-| [研究 CLI](docs/research-cli.md) | CSV、回測設定與報告輸出 |
-| [研究驗證](docs/research-validation.md) | 鄰域穩定度與滾動樣本外方法及限制 |
-| [分環境評估](docs/research-regimes.md) | 市場環境分類與研究結果解讀 |
-| [研究驗證 API](docs/research-validation-api.md) | 任務、結果與封存介面 |
-| [風控期間基準](docs/risk-period-r1-local-sim.md) | R1 本機模擬的行為與邊界 |
-| [Yaozi 整合](docs/catos-yaozi-integration.md) | 情報與交易工作台的整合契約 |
-
-## 回饋與參與
-
-歡迎透過 [Issues](https://github.com/b40609/CatOS/issues) 提出可重現的問題或具體功能建議。回報時請附上版本、執行步驟、預期行為與去除敏感資訊的輸出。
-
-涉及帳務、交易授權或風控政策的提案，請先描述使用情境與行為影響，再討論實作。
+- `AGENTS.md`：專案規則、不變量、授權邊界與工作流程。
+- `docs/simulation-api-contract-draft.md`：local-sim 控制面投影 HTTP 契約與第 3／4 步實作紀錄。
+- `docs/backend-frontend-integration-map.md`：後端路由與前端頁面的對應。
+- `docs/worker.md`：Worker／IPC 契約與策略登錄。
+- `docs/market-intel.md`：Yaozi 市場情報線（v1 凍結）。
+- `docs/archive/`：落後 v1 實作的歷史文件（架構評估、工作計畫、交接）。
 
 ## 授權
 
-授權條款尚未指定；儲存庫目前沒有 LICENSE 檔案。
+MIT License，見 `LICENSE`。本專案僅供研究與本機模擬，不構成投資建議，使用風險自負。
