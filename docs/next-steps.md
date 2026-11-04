@@ -6,7 +6,7 @@
 
 | # | 工作包 | 內容 | 成本／風險 | 需要的授權或決策 |
 | --- | --- | --- | --- | --- |
-| A | v1.1 全站真資料（已完成，待獨驗） | 風控中心、系統日誌、策略中心改讀控制面資料；刪掉 `lib/mock/data.ts`、假即時數值 hook（`useLiveNumber`／`useLiveSeries`）與只剩測試在用的 `lib/mock/terminal.ts` | 小。只動前端三頁；資料 `catStore` 已在輪詢（`state/catStore.ts:41-48`），後端端點已在（`catos/local_sim_control_api.py:118,130,138`） | 不需新授權 |
+| A | v1.1 全站真資料（已完成並合併） | 風控中心、系統日誌、策略中心改讀控制面資料；刪掉 `lib/mock/data.ts`、假即時數值 hook（`useLiveNumber`／`useLiveSeries`）與只剩測試在用的 `lib/mock/terminal.ts` | 小。只動前端三頁；資料 `catStore` 已在輪詢（`state/catStore.ts:41-48`），後端端點已在（`catos/local_sim_control_api.py:118,130,138`） | 不需新授權 |
 | B | Kill-Switch／re-arm／門檻修改 HTTP | 把 `supervisor.latch`、`set_loss_limits`、`rearm`（`catos/supervisor.py:108,952,970`）接上 HTTP 和風控中心按鈕 | 中。牽涉鎖存與人工恢復政策；Demo 前必備 | 恢復介面細節（確認步驟、誰能 re-arm）。動工前先查業界／開源做法再提方案 |
 | C | 真實歷史 K 線研究 | 研究目前寫死一份 96 根合成資料（`catos/research_catalog.py:21-22,222`）。改成可登錄多份資料集，用 `tools/fetch_okx_candles.py` 抓 OKX 公開歷史 K 線跑回測／優化 | 中。公開行情 GET，不用金鑰 | 採集授權（AGENTS.md：採集不因工作包自動授權） |
 | D | OKX Demo 接線 | Supervisor 持金鑰連 OKX 模擬盤、下單、對帳 | 大，多個工作包；I-b-4 Demo 對帳未通過仍是已知阻斷（`docs/demo-collection-handoff.md`） | Demo 授權、金鑰保管方式；建議 B 先完成 |
@@ -14,8 +14,8 @@
 
 ## 建議順序
 
-1. **A 已完成**（2026-11-04，分支 `feat/v1.1-real-data-pages`，待獨立驗收）。過程中發現策略覆盤頁也是假資料（sin 波曲線與寫死的「實盤淨值」），已改標「v1 未啟用」；實作紀錄見 `docs/simulation-api-contract-draft.md` 第 10 節。
-2. **方向已定：研究線**（2026-11-04 使用者選定）。工作包 C 已完成，待獨立驗收（分支 `feat/research-real-data`）：已抓取 BTC-USDT-SWAP 15m 90 天的公開資料，回測與優化可選資料集。方案、授權範圍與實作紀錄見 `docs/research-real-data-plan.md`。原本的選項：
+1. **A 已完成**（2026-11-04），已通過獨立驗收（`reports/v1.1-acceptance-20261104/acceptance.md`）並合併進 main（`0dc1fae`）。過程中發現策略覆盤頁也是假資料（sin 波曲線與寫死的「實盤淨值」），已改標「v1 未啟用」；實作紀錄見 `docs/simulation-api-contract-draft.md` 第 10 節。
+2. **方向已定：研究線**（2026-11-04 使用者選定）。工作包 C 已完成並通過獨立驗收（`reports/research-real-data-acceptance-20261104/acceptance.md`，6/6 PASS）；驗收後依觀察 O1、O7、O8 補了請求上限硬鎖與文件，這部分只有開發者自測：已抓取 BTC-USDT-SWAP 15m 90 天的公開資料，回測與優化可選資料集。方案、授權範圍與實作紀錄見 `docs/research-real-data-plan.md`。原本的選項：
    - 研究線（C）：先找到值得跑的策略。現在唯一的策略是 SMA，只在合成資料上跑過，接 Demo 只能驗證管線。
    - 實盤線（B → D）：先讓下單、對帳、緊急停止在真交易所跑通。
    - 我傾向研究線先行：風險最低、不碰金鑰，而且能早點知道策略值不值得上線。這是產品方向，由你決定。

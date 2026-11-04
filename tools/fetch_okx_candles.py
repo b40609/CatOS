@@ -4,7 +4,7 @@ Public GET endpoints only: no API key, no account endpoint, no order. Every
 request is paced at least MIN_INTERVAL_S after the previous one (OKX publishes
 20 req/2 s for history candles and 10 req/2 s for funding history), retried with
 backoff on HTTP 429/5xx, OKX code 50011 and network errors, and capped by
---max-requests. Pages are checked against the cursor semantics this tool relies
+--max-requests (hard cap 150). Pages are checked against the cursor semantics this tool relies
 on (``after`` returns strictly older records, newest first); any surprise stops
 the run instead of guessing. Files are written last, by
 ``catos.research_datasets.write_dataset``, which refuses gaps and incomplete funding.
@@ -31,6 +31,8 @@ CANDLES_PATH, FUNDING_PATH, INSTRUMENTS_PATH = datasets.ENDPOINTS
 MIN_INTERVAL_S = 0.25
 PAGE_LIMIT = 100
 MAX_RETRIES = 3
+# Hard cap from the 2026-11-04 collection authorization (AGENTS.md); raising it needs a new one.
+MAX_REQUESTS_CAP = 150
 DAY_MS = 86_400_000
 USER_AGENT = "catOS-research/1.0"
 
@@ -54,6 +56,8 @@ class Client:
 
     def __init__(self, *, max_requests, opener=urlopen_json, clock=time.monotonic, sleep=time.sleep,
                  base_url=BASE_URL):
+        if type(max_requests) is not int or not 1 <= max_requests <= MAX_REQUESTS_CAP:
+            raise ValueError(f"max_requests must be an integer in [1, {MAX_REQUESTS_CAP}]")
         self.max_requests = max_requests
         self.opener = opener
         self.clock = clock
@@ -185,10 +189,12 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     parser.add_argument("--bar", default="15m", choices=sorted(datasets.BAR_MS))
     parser.add_argument("--days", type=int, required=True, help="whole days ending at the last closed bar")
     parser.add_argument("--end-ms", type=int, help="exclusive end (bar-aligned) to re-fetch a known range")
-    parser.add_argument("--max-requests", type=int, default=150)
+    parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS_CAP)
     args = parser.parse_args(argv)
     if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= 365:
         parser.error("inst-id must be <BASE>-USDT-SWAP and days in [1, 365]")
+    if not 1 <= args.max_requests <= MAX_REQUESTS_CAP:
+        parser.error(f"max-requests must be in [1, {MAX_REQUESTS_CAP}] (authorized cap)")
     timeframe = datasets.BAR_MS[args.bar]
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
     end_ms = args.end_ms if args.end_ms is not None else now_ms // timeframe * timeframe
