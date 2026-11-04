@@ -56,7 +56,7 @@ FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-l
 
 以下每條指令都在本文件撰寫時實際執行過（2026-11-03）。
 
-後端完整套件（約 4 分鐘；本輪結果 1373 tests、0 FAIL、0 ERROR、12 skipped，skipped 為 v2 候選的 python_strategy 兩個模組與一個既有 skip）：
+後端完整套件（約 4 分鐘；本輪結果 1373 tests、0 FAIL、0 ERROR、11 或 12 skipped：11 個是 v2 候選的 python_strategy 兩個模組，另 1 個是 `test_lot_scenario_demo` 在 Windows 無權建立 symlink（未開開發人員模式）時跳過）：
 
 ```bash
 .venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"
