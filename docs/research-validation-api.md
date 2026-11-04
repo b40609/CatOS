@@ -2,7 +2,7 @@
 
 2026-10-19 開發完成、126/126 自測通過；後續已由使用者指定 GPT-6 Sol 完成三個研究包獨驗與唯讀 Git 核對，均 PASS，見[獨驗報告](../reports/research-independent-acceptance-20261019-gpt6sol/acceptance.md)。範圍限合成資料與隔離後端，不包含正式服務更新或前端串接。下方「本輪」驗證數字仍指原開發自測，不冒充獨驗或 2026-10-20 重驗。
 
-2026-11-04 第二次更新（分支 `feat/research-second-strategy`，尚未獨立驗收）：策略可選 `sma-trend` 或 `donchian-breakout`，`search_space` 依策略的參數名稱各給一條 range（見下方表格）。
+2026-11-04 第二次更新（分支 `feat/research-second-strategy`；獨立驗收 7／7 PASS，見 `reports/research-second-strategy-acceptance-20261104/acceptance.md`，驗收後的觀察修正只有開發者自測）：策略可選 `sma-trend` 或 `donchian-breakout`，`search_space` 依策略的參數名稱各給一條 range（見下方表格）。
 
 2026-11-04 更新（分支 `feat/research-validation-real-data`，已合併進 `main`；獨立驗收 7／7 PASS，見 `reports/research-validation-real-data-acceptance-20261104/acceptance.md`，驗收後依觀察 O1–O4 的修正只有開發者自測）：結果升為 `catos.research.validation-result.v2`，可在已登錄的 OKX 公開歷史資料集上執行，並接上 React 滾動驗證頁（`frontend/cat-os-vite/src/pages/validation.tsx`）。v1 → v2 的差異見文末「v2 輸出」；方案比較與實測見 [研究線方案](research-real-data-plan.md)。
 

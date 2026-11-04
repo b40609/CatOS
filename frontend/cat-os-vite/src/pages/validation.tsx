@@ -640,7 +640,7 @@ function ValidationPage() {
 
               <div className="space-y-1">
                 <Label className="text-t2 text-muted-foreground">
-                  候選參數（完整格點，{count === null ? "候選未對齊" : `${count} 個候選`}）
+                  候選參數（完整格點，{count === null ? "格點無效，原因見下方" : `${count} 個候選`}）
                 </Label>
                 {paramSpecs(strategy).map((spec) => (
                   <div key={spec.name} className="grid grid-cols-[5.5rem_1fr_1fr_1fr] items-center gap-2">
@@ -680,7 +680,7 @@ function ValidationPage() {
                 <p className="text-t2 text-muted-foreground">
                   訓練 · 測試 · 視窗數；使用 {barsUsed(form, strategy).toLocaleString()} / {dataset?.bars.toLocaleString() ?? NA} 根 ·{" "}
                   {count === null
-                    ? "候選參數未對齊，無法估算回測次數與計算量"
+                    ? "格點無效，無法估算回測次數與計算量"
                     : `需 ${requiredRuns(form, strategy)} 次回測 · 計算量 ${barEvaluations(form, strategy)?.toLocaleString()} / ${limits?.max_bar_evaluations.toLocaleString() ?? NA}`}
                 </p>
               </div>

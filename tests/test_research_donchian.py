@@ -136,6 +136,11 @@ class RegistrationTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, error):
                 validate_strategy_manifest({**manifest, field: value}, spec)
 
+    def test_build_id_covers_the_research_strategy_sources(self):
+        from catos.research_api import RUNTIME_FILES
+        for path in (*DONCHIAN_FILES, DONCHIAN_MANIFEST.relative_to(DONCHIAN_MANIFEST.parents[2]).as_posix()):
+            self.assertIn(path, RUNTIME_FILES)
+
     def test_worker_registry_and_ipc_never_resolve_the_research_strategy(self):
         self.assertNotIn(DONCHIAN_ID, {sid for sid, _ in strategy_registry.manifests()})
         with self.assertRaisesRegex(strategy_registry.RegistryError, "unknown_strategy"):
@@ -171,8 +176,12 @@ class RequestTests(unittest.TestCase):
         for changes in variants:
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 validate_request(donchian_request(**changes))
-        validate_request(donchian_request(parameters={"entry_bars": 960, "exit_bars": 959, "quantity": "1"},
-                                          warmup_bars=960))
+        # The 96-bar synthetic fixture cannot hold a 200-bar warm-up; a 960-bar one fits a fetched dataset.
+        with self.assertRaisesRegex(ValueError, "must leave evaluation bars in the 96-bar dataset"):
+            validate_request(donchian_request(parameters={"entry_bars": 200, "exit_bars": 10, "quantity": "1"},
+                                              warmup_bars=200))
+        validate_request(donchian_request(parameters={"entry_bars": 95, "exit_bars": 94, "quantity": "1"},
+                                          warmup_bars=95))
 
     def test_search_spaces_keep_every_grid_point_valid(self):
         def optimization(space, warmup=6):

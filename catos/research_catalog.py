@@ -325,6 +325,9 @@ def validate_request(value):
     warmup = value["warmup_bars"]
     if type(warmup) is not int or not params[spec.lookback] <= warmup < spec.warmup_limit:
         raise ValueError(f"warmup_bars: integer >= {spec.lookback} and < {spec.warmup_limit} required")
+    # Donchian warm-up can exceed the 96-bar fixture; reject before a task is queued.
+    if warmup >= dataset.bars:
+        raise ValueError(f"warmup_bars: must leave evaluation bars in the {dataset.bars}-bar dataset")
     quantity = decimal_string(params["quantity"], "quantity", positive=True)
     if quantity > Decimal("1000") or quantity % Decimal("1"):
         raise ValueError("quantity: whole contracts in [1, 1000] required")

@@ -27,7 +27,7 @@ import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { formatDecimal } from "@/lib/format";
 import {
   type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase,
-  gridProblems, gridWarmup, paramLabel, paramSpecs, pickStrategy, shortName,
+  gridProblems, gridWarmup, paramLabel, paramSpecs, pickStrategy, shortName, warmupBarsProblems,
 } from "@/lib/research-strategies";
 
 // SMA keeps its original 2~8 step 1 search and warm-up of at least 8 bars.
@@ -71,7 +71,10 @@ function OptimizationPage() {
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const dataset = pickDataset(catalog?.datasets, datasetId);
   const strategy = pickStrategy(catalog?.strategies, strategyId);
-  const problems = strategy ? gridProblems(strategy, axes) : [];
+  // SMA keeps a warm-up of at least 8 bars; Donchian covers its highest entry channel.
+  const warmup = !strategy ? 0
+    : strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes));
+  const problems = strategy ? [...gridProblems(strategy, axes), ...warmupBarsProblems(warmup, dataset)] : [];
 
   const changeStrategy = (sid: string) => {
     setStrategyId(sid);
@@ -88,7 +91,6 @@ function OptimizationPage() {
     if (!strategy || problems.length) return;
     // SMA keeps its fixed period 2 base; Donchian starts from the lowest grid point.
     const base = strategy.id === DONCHIAN_ID ? gridBase(strategy, axes) : { period: 2 };
-    const warmup = strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes));
     const req: OptimizationRequest = {
       backtest: {
         strategy_id: strategy.id, dataset_id: dataset?.id || "synthetic-btc-15m-v1",
@@ -437,7 +439,7 @@ function OptimizationPage() {
               ))}
               {strategy && (
                 <p className="text-t2 text-muted-foreground">
-                  預熱 {strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes))} 根（涵蓋最大{paramLabel(strategy.warmup.covers)}）
+                  預熱 {warmup} 根（涵蓋最大{paramLabel(strategy.warmup.covers)}）
                 </p>
               )}
               {problems.length > 0 && (

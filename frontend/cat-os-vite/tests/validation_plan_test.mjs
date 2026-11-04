@@ -133,4 +133,8 @@ test('backtest parameter checks follow the catalog bounds and the Donchian order
   assert.equal(strategies.formatTrialParams([['period', 32]]), '32');
   assert.equal(strategies.formatTrialParams([['entry_bars', 96], ['exit_bars', 24]]), 'entry_bars=96, exit_bars=24');
   assert.equal(strategies.formatRanges({ entry_bars: { low: 96, high: 384, step: 96 } }), 'entry_bars 96~384/96');
+  // A warm-up must leave evaluation bars; the backend rejects it with 422 before queueing.
+  assert.deepEqual(strategies.warmupBarsProblems(95, SYNTHETIC), []);
+  assert.ok(strategies.warmupBarsProblems(96, SYNTHETIC).some((p) => p.includes('需少於資料集的 96 根')));
+  assert.deepEqual(strategies.warmupBarsProblems(960, FETCHED), []);
 });
