@@ -1,206 +1,220 @@
-"""Fetch historical closed candles from OKX Public REST API and format for CatOS.
+"""Fetch one OKX public research dataset: closed candles, realized funding and the instrument spec.
 
-Uses only Python standard library (urllib.request, json, csv, argparse).
-Default output follows CatOS Task A CSV specification (open_time_ms,open,high,low,close,closed).
+Public GET endpoints only: no API key, no account endpoint, no order. Every
+request is paced at least MIN_INTERVAL_S after the previous one (OKX publishes
+20 req/2 s for history candles and 10 req/2 s for funding history), retried with
+backoff on HTTP 429/5xx, OKX code 50011 and network errors, and capped by
+--max-requests. Pages are checked against the cursor semantics this tool relies
+on (``after`` returns strictly older records, newest first); any surprise stops
+the run instead of guessing. Files are written last, by
+``catos.research_datasets.write_dataset``, which refuses gaps and incomplete funding.
+
+Usage (repo root):
+    .venv/Scripts/python.exe -B tools/fetch_okx_candles.py --inst-id BTC-USDT-SWAP --bar 15m --days 90
 """
 
 import argparse
-import csv
+from decimal import Decimal, InvalidOperation
 import json
 from pathlib import Path
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.parse
+import urllib.request
 
-OKX_HISTORY_CANDLES_URL = "https://www.okx.com/api/v5/market/history-candles"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from catos import research_datasets as datasets  # noqa: E402
 
-
-def fetch_okx_closed_candles(
-    inst_id: str = "BTC-USDT-SWAP",
-    bar: str = "1H",
-    total_count: int = 1000,
-    request_limit: int = 100,
-) -> list[list[str]]:
-    """Fetch closed candles from OKX public history-candles endpoint with pagination.
-
-    Parameters
-    ----------
-    inst_id : str
-        Instrument ID (e.g. 'BTC-USDT-SWAP').
-    bar : str
-        Bar timeframe (e.g. '1H', '15m').
-    total_count : int
-        Desired number of closed candles.
-    request_limit : int
-        Page limit per API request (max 100 for OKX).
-
-    Returns
-    -------
-    list[list[str]]
-        List of closed candles sorted in chronological order (oldest first).
-    """
-    closed_candles: list[list[str]] = []
-    after: str | None = None
-    headers = {"User-Agent": "catOS-research/1.0"}
-
-    print(f"開始自 OKX 下載 {inst_id} ({bar})，目標數量: {total_count} 根已收盤 K 線...")
-
-    while len(closed_candles) < total_count:
-        params = [
-            f"instId={urllib.parse.quote(inst_id)}",
-            f"bar={urllib.parse.quote(bar)}",
-            f"limit={min(request_limit, 100)}",
-        ]
-        if after:
-            params.append(f"after={after}")
-
-        url = f"{OKX_HISTORY_CANDLES_URL}?{'&'.join(params)}"
-        req = urllib.request.Request(url, headers=headers)
-
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"OKX API HTTP 請求失敗 ({e.code}): {e.reason}") from e
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"OKX API 連線失敗: {e.reason}") from e
-
-        code = payload.get("code")
-        if code != "0":
-            msg = payload.get("msg", "未知錯誤")
-            raise RuntimeError(f"OKX API 回傳錯誤碼 {code}: {msg}")
-
-        data = payload.get("data", [])
-        if not data:
-            print("API 無更多歷史資料可供抓取。")
-            break
-
-        # Filter only closed candles (confirm == "1")
-        # OKX candle schema: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
-        for item in data:
-            confirm = item[8] if len(item) > 8 else "1"
-            if confirm == "1":
-                closed_candles.append(item)
-                if len(closed_candles) >= total_count:
-                    break
-
-        # Next page uses the oldest timestamp in the current batch
-        oldest_ts_in_batch = data[-1][0]
-        after = oldest_ts_in_batch
-        print(f"已獲取 {len(closed_candles)}/{total_count} 根已收盤 K 線 (當前批次時間戳: {oldest_ts_in_batch})...")
-
-        time.sleep(0.05)  # Respect OKX 20 req/2s rate limit
-
-    # Sort in ascending chronological order (oldest first)
-    closed_candles.sort(key=lambda x: int(x[0]))
-    return closed_candles
+BASE_URL = "https://www.okx.com"
+CANDLES_PATH, FUNDING_PATH, INSTRUMENTS_PATH = datasets.ENDPOINTS
+MIN_INTERVAL_S = 0.25
+PAGE_LIMIT = 100
+MAX_RETRIES = 3
+DAY_MS = 86_400_000
+USER_AGENT = "catOS-research/1.0"
 
 
-def save_candles_to_csv(
-    candles: list[list[str]],
-    output_path: Path | str,
-    output_format: str = "catos",
-) -> Path:
-    """Save candles into CSV.
-
-    Parameters
-    ----------
-    candles : list[list[str]]
-        Candles sorted chronologically.
-    output_path : Path or str
-        Destination CSV file path.
-    output_format : str
-        'catos' for CatOS Task A format (open_time_ms,open,high,low,close,closed)
-        'ohlcv' for standard OHLCV format (timestamp,open,high,low,close,volume)
-
-    Returns
-    -------
-    Path
-        Resolved output path.
-    """
-    path = Path(output_path).resolve()
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(path, mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        if output_format == "catos":
-            # CatOS Task A specification: open_time_ms,open,high,low,close,closed
-            writer.writerow(["open_time_ms", "open", "high", "low", "close", "closed"])
-            for c in candles:
-                writer.writerow([c[0], c[1], c[2], c[3], c[4], "1"])
-        elif output_format == "ohlcv":
-            # Standard OHLCV: timestamp,open,high,low,close,volume
-            writer.writerow(["timestamp", "open", "high", "low", "close", "volume"])
-            for c in candles:
-                writer.writerow([c[0], c[1], c[2], c[3], c[4], c[5]])
-        else:
-            raise ValueError(f"不支援的輸出格式: {output_format!r}")
-
-    return path
+class FetchError(RuntimeError):
+    pass
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Fetch closed candles from OKX and adapt format for CatOS."
-    )
-    parser.add_argument(
-        "--inst-id",
-        default="BTC-USDT-SWAP",
-        help="OKX 合約代碼 (預設: BTC-USDT-SWAP)",
-    )
-    parser.add_argument(
-        "--bar",
-        default="1H",
-        help="K 線週期 (預設: 1H)",
-    )
-    parser.add_argument(
-        "--count",
-        type=int,
-        default=1000,
-        help="抓取 K 線根數 (預設: 1000)",
-    )
-    parser.add_argument(
-        "--output",
-        default="data/BTC-USDT-SWAP-1H.csv",
-        help="輸出 CSV 路徑 (預設: data/BTC-USDT-SWAP-1H.csv)",
-    )
-    parser.add_argument(
-        "--format",
-        choices=["catos", "ohlcv"],
-        default="catos",
-        help="輸出格式：'catos' (CatOS Task A 格式) 或 'ohlcv' (timestamp,open,high,low,close,volume) (預設: catos)",
-    )
-
-    args = parser.parse_args(argv)
-
+def urlopen_json(url):
+    """(HTTP status, body bytes) for one public GET; HTTP errors are returned, not raised."""
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
-        candles = fetch_okx_closed_candles(
-            inst_id=args.inst_id,
-            bar=args.bar,
-            total_count=args.count,
-        )
-        saved_path = save_candles_to_csv(
-            candles=candles,
-            output_path=args.output,
-            output_format=args.format,
-        )
-        print(f"\n成功儲存 {len(candles)} 根 K 線至: {saved_path}")
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read()
 
-        # Display first 3 lines of the CSV file
-        print("\n=== 前 3 行資料檢視 ===")
-        with open(saved_path, mode="r", encoding="utf-8") as f:
-            for _ in range(3):
-                line = f.readline()
-                if not line:
-                    break
-                print(line.rstrip("\r\n"))
 
-        return 0
-    except Exception as err:
-        sys.stderr.write(f"\n錯誤: {err}\n")
+class Client:
+    """Paced, budgeted public GET client. opener/clock/sleep are injectable for offline tests."""
+
+    def __init__(self, *, max_requests, opener=urlopen_json, clock=time.monotonic, sleep=time.sleep,
+                 base_url=BASE_URL):
+        self.max_requests = max_requests
+        self.opener = opener
+        self.clock = clock
+        self.sleep = sleep
+        self.base_url = base_url
+        self.requests = 0
+        self._last = None
+
+    def get(self, path, params):
+        if path not in datasets.ENDPOINTS:
+            raise FetchError(f"endpoint_not_allowed: {path}")
+        url = f"{self.base_url}{path}?{urllib.parse.urlencode(params)}"
+        for attempt in range(MAX_RETRIES + 1):
+            if self.requests >= self.max_requests:
+                raise FetchError(f"request_budget_exhausted: {self.max_requests}")
+            if self._last is not None:
+                wait = MIN_INTERVAL_S - (self.clock() - self._last)
+                if wait > 0:
+                    self.sleep(wait)
+            self._last = self.clock()
+            self.requests += 1
+            try:
+                status, body = self.opener(url)
+            except (urllib.error.URLError, OSError) as error:
+                failure = f"network: {error}"
+            else:
+                if status == 200:
+                    payload = json.loads(body)
+                    if payload.get("code") == "0":
+                        return payload.get("data")
+                    if payload.get("code") != "50011":
+                        raise FetchError(f"okx_error {payload.get('code')}: {payload.get('msg')}")
+                    failure = "okx_rate_limited"
+                elif status == 429 or status >= 500:
+                    failure = f"http_{status}"
+                else:
+                    raise FetchError(f"http_{status}")
+            if attempt == MAX_RETRIES:
+                raise FetchError(f"retries_exhausted: {failure}")
+            self.sleep(2 ** attempt)
+        raise AssertionError("unreachable")
+
+
+def _price(value, name):
+    try:
+        number = Decimal(value) if type(value) is str else None
+    except InvalidOperation:
+        number = None
+    if number is None or not number.is_finite() or number <= 0:
+        raise FetchError(f"invalid_{name}: {value!r}")
+    return value
+
+
+def _rate(value, name):
+    try:
+        number = Decimal(value) if type(value) is str else None
+    except InvalidOperation:
+        number = None
+    if number is None or not number.is_finite() or not -1 < number < 1:
+        raise FetchError(f"invalid_{name}: {value!r}")
+    return value
+
+
+def _check_page(times, cursor):
+    """Newest first, unique and strictly older than the cursor, at most PAGE_LIMIT rows."""
+    if (len(times) > PAGE_LIMIT or any(ms >= cursor for ms in times)
+            or times != sorted(set(times), reverse=True)):
+        raise FetchError("pagination_unexpected")
+
+
+def fetch_instrument(client, inst_id):
+    data = client.get(INSTRUMENTS_PATH, {"instType": "SWAP", "instId": inst_id})
+    if type(data) is not list or len(data) != 1 or type(data[0]) is not dict:
+        raise FetchError("instrument_not_found")
+    return data[0]
+
+
+def fetch_candles(client, inst_id, bar, start_ms, end_ms):
+    """Closed bars with open time in [start, end), ascending, as (ms, open, high, low, close)."""
+    rows = {}
+    cursor = end_ms
+    while cursor > start_ms:
+        page = client.get(CANDLES_PATH, {"instId": inst_id, "bar": bar, "after": str(cursor),
+                                         "limit": str(PAGE_LIMIT)})
+        if not page:
+            break
+        if any(type(item) is not list or len(item) < 9 or not str(item[0]).isdigit() for item in page):
+            raise FetchError("candle_row_shape_unexpected")
+        times = [int(item[0]) for item in page]
+        _check_page(times, cursor)
+        for ms, item in zip(times, page):
+            if ms < start_ms:
+                continue
+            if item[8] != "1":
+                raise FetchError(f"unclosed_candle_in_range: {ms}")
+            o, h, low, c = (_price(item[i], name) for i, name in ((1, "open"), (2, "high"), (3, "low"), (4, "close")))
+            if not Decimal(low) <= min(Decimal(o), Decimal(c)) <= max(Decimal(o), Decimal(c)) <= Decimal(h):
+                raise FetchError(f"invalid_ohlc_bounds: {ms}")
+            rows[ms] = (ms, o, h, low, c)
+        cursor = times[-1]
+    return [rows[ms] for ms in sorted(rows)]
+
+
+def fetch_funding(client, inst_id, start_ms, end_ms):
+    """Settled funding in [start, end), ascending, as (ms, realized_rate, funding_rate)."""
+    rows = {}
+    cursor = end_ms
+    while cursor > start_ms:
+        page = client.get(FUNDING_PATH, {"instId": inst_id, "after": str(cursor), "limit": str(PAGE_LIMIT)})
+        if not page:
+            break
+        if any(type(item) is not dict or item.get("instId") != inst_id
+               or not str(item.get("fundingTime", "")).isdigit() for item in page):
+            raise FetchError("funding_row_shape_unexpected")
+        times = [int(item["fundingTime"]) for item in page]
+        _check_page(times, cursor)
+        for ms, item in zip(times, page):
+            if ms < start_ms:
+                continue
+            rows[ms] = (ms, _rate(item.get(datasets.RATE_FIELD), "realized_rate"),
+                        _rate(item.get("fundingRate"), "funding_rate"))
+        cursor = times[-1]
+    return [rows[ms] for ms in sorted(rows)]
+
+
+def main(argv=None, *, client=None, now_ms=None, root=None):
+    parser = argparse.ArgumentParser(description="Fetch one OKX public research dataset (no API key).")
+    parser.add_argument("--inst-id", default="BTC-USDT-SWAP")
+    parser.add_argument("--bar", default="15m", choices=sorted(datasets.BAR_MS))
+    parser.add_argument("--days", type=int, required=True, help="whole days ending at the last closed bar")
+    parser.add_argument("--end-ms", type=int, help="exclusive end (bar-aligned) to re-fetch a known range")
+    parser.add_argument("--max-requests", type=int, default=150)
+    args = parser.parse_args(argv)
+    if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= 365:
+        parser.error("inst-id must be <BASE>-USDT-SWAP and days in [1, 365]")
+    timeframe = datasets.BAR_MS[args.bar]
+    now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+    end_ms = args.end_ms if args.end_ms is not None else now_ms // timeframe * timeframe
+    if end_ms % timeframe or end_ms > now_ms:
+        parser.error("end-ms must be bar-aligned and not in the future")
+    start_ms = end_ms - args.days * DAY_MS
+    client = client or Client(max_requests=args.max_requests)
+    try:
+        instrument = fetch_instrument(client, args.inst_id)
+        datasets.contract_from_instrument(instrument, args.inst_id)  # fail before paging candles
+        candles = fetch_candles(client, args.inst_id, args.bar, start_ms, end_ms)
+        funding = fetch_funding(client, args.inst_id, start_ms, end_ms)
+        target = datasets.write_dataset(
+            root, inst_id=args.inst_id, bar=args.bar, start_ms=start_ms, end_ms=end_ms,
+            candles=candles, funding=funding, instrument=instrument,
+            fetched_at_ms=now_ms, requests=client.requests,
+        )
+        dataset = datasets.load_manifest(target / datasets.MANIFEST, root)
+    except (FetchError, ValueError, FileExistsError) as error:
+        print(f"stopped after {client.requests} requests: {error}", file=sys.stderr)
         return 1
+    print(json.dumps({"dataset_id": dataset.dataset_id, "path": datasets.rel_path(target),
+                      "bars": dataset.bars, "funding_events": len(funding),
+                      "requests": client.requests, "files": dict(dataset.files)}, ensure_ascii=False, indent=2))
+    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

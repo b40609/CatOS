@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { TrendingUp, AlertTriangle, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDecimal, formatDrawdownPct } from "@/lib/format";
 
 // Real curve interfaces and empty state support
 
@@ -20,6 +21,7 @@ export interface BacktestUnderwaterChartProps {
   returnPct?: string;
   maxDrawdownPct?: string;
   dataNotice?: string;
+  sampling?: { total_points: number; returned_points: number };
   loading?: boolean;
 }
 
@@ -30,32 +32,39 @@ export function BacktestUnderwaterChart({
   returnPct,
   maxDrawdownPct,
   dataNotice,
+  sampling,
   loading = false,
 }: BacktestUnderwaterChartProps = {}) {
   const [activeTab, setActiveTab] = useState<"curve" | "heatmap">("curve");
 
   const hasData = Array.isArray(equityCurve) && equityCurve.length > 0;
+  // Multi-day runs label the axis by UTC date; a single day keeps HH:MM.
+  const multiDay = hasData && equityCurve[equityCurve.length - 1].time_ms - equityCurve[0].time_ms > 86_400_000;
 
-  // Format real curves if provided
+  // Plot numbers are geometry only; the tooltip shows the original Decimal string.
   const chartData = hasData
     ? equityCurve.map((point, index) => {
         const ddPoint = drawdownCurve && drawdownCurve[index];
         const ddVal = ddPoint ? -Math.abs(parseFloat(ddPoint.drawdown_pct) || 0) : 0;
         const d = new Date(point.time_ms);
+        const pad = (n: number) => String(n).padStart(2, '0');
         const timeLabel = isNaN(d.getTime())
           ? `#${index + 1}`
-          : `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+          : multiDay
+            ? `${pad(d.getUTCMonth() + 1)}/${pad(d.getUTCDate())}`
+            : `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
         return {
           date: timeLabel,
           equity: parseFloat(point.equity) || 0,
+          equityText: point.equity,
           dd: ddVal,
         };
       })
     : [];
 
   const displayEquity = currentEquity || "--";
-  const displayReturn = returnPct ? `${parseFloat(returnPct) >= 0 ? '+' : ''}${returnPct}%` : "--";
-  const displayMaxDd = maxDrawdownPct ? `-${Math.abs(parseFloat(maxDrawdownPct))}%` : "--";
+  const displayReturn = formatDecimal(returnPct, { digits: 2, sign: true, suffix: "%" }, "--");
+  const displayMaxDd = formatDrawdownPct(maxDrawdownPct);
 
   return (
     <div className="rounded-xl border border-border/80 bg-surface/90 overflow-hidden shadow-xs backdrop-blur-md">
@@ -126,6 +135,11 @@ export function BacktestUnderwaterChart({
                     · {dataNotice}
                   </span>
                 )}
+                {sampling && (
+                  <span className="text-t2 font-normal" title="每段保留回撤最深的一點；績效數字以全部 K 線計算">
+                    · 圖表取樣 {sampling.returned_points.toLocaleString()} / {sampling.total_points.toLocaleString()} 點
+                  </span>
+                )}
               </span>
               <span className="text-up font-bold">當前 {displayEquity} ({displayReturn})</span>
             </div>
@@ -140,10 +154,12 @@ export function BacktestUnderwaterChart({
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.3} />
                   <XAxis dataKey="date" hide />
-                  <YAxis domain={["dataMin - 10", "dataMax + 10"]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
+                  <YAxis domain={["dataMin - 10", "dataMax + 10"]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }}
+                         tickFormatter={(v: number) => v.toFixed(0)} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)", fontSize: "11px", fontFamily: "var(--font-mono)" }}
-                    formatter={(v: number) => [`$${v.toLocaleString()} USDT`, "權益"]}
+                    formatter={(_v: number, _name: string, item: { payload?: { equityText?: string } }) =>
+                      [formatDecimal(item.payload?.equityText, { prefix: "$", suffix: " USDT" }, "--"), "權益"]}
                   />
                   <Area type="monotone" dataKey="equity" stroke="var(--color-up)" strokeWidth={1.8} fill="url(#equityGrad)" />
                 </AreaChart>
@@ -171,7 +187,7 @@ export function BacktestUnderwaterChart({
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.3} />
                   <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} />
-                  <YAxis domain={["dataMin", 0]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} tickFormatter={(v) => `${v}%`} />
+                  <YAxis domain={["dataMin", 0]} tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }} tickFormatter={(v: number) => `${v.toFixed(1)}%`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)", fontSize: "11px", fontFamily: "var(--font-mono)" }}
                     formatter={(v: number) => [`${v.toFixed(2)}%`, "距峰頂回撤"]}
@@ -186,9 +202,9 @@ export function BacktestUnderwaterChart({
         /* 月度收益熱力矩陣 (Monthly Heatmap) */
         <div className="p-6 text-center text-xs font-mono text-muted-foreground flex flex-col items-center justify-center gap-1.5">
           <Calendar className="size-5 text-muted-foreground/40" />
-          <span className="text-foreground font-medium">單日 96 根 K 線合成取樣（無跨月份歷史資料）</span>
+          <span className="text-foreground font-medium">月度收益矩陣尚未實作</span>
           <span className="text-t3 text-muted-foreground">
-            月度跨期熱力收益矩陣需載入長週期多月行情；後端當前契約為單一合成資料集。
+            目前請以權益與回撤曲線判讀；績效數字以全部 K 線計算。
           </span>
         </div>
       )}

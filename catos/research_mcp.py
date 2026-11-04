@@ -195,7 +195,8 @@ def create_mcp_server(bridge=None):
     server = FastMCP(
         "catOS Research R3",
         instructions=(
-            "Local synthetic research only. Use the registered strategy/dataset catalog; "
+            "Local research on registered datasets only (the synthetic fixture or hash-checked "
+            "OKX public history fetched beforehand). Use the registered strategy/dataset catalog; "
             "no arbitrary Python, path, URL, trading, credentials, or database access."
         ),
         log_level="ERROR",

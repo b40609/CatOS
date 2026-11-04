@@ -53,6 +53,12 @@ export interface ResearchDatasetMeta {
   symbol: string;
   timeframe: string;
   bars: number;
+  // Fetched OKX datasets also carry their range, funding flag, notice and per-file hashes.
+  start_ms?: number | null;
+  end_ms?: number | null;
+  funding?: boolean;
+  notice?: string;
+  files?: Record<string, string>;
   contract: {
     inst_id: string;
     base_per_contract: string;
@@ -188,6 +194,8 @@ export interface BacktestResultPayload {
   drawdown_curve: DrawdownCurvePoint[];
   data_notice: string;
   trade_count_unit: string;
+  // Present only when the curves were thinned for the payload; performance uses every bar.
+  curve_sampling?: { total_points: number; returned_points: number; method: string };
 }
 
 export interface OptimizationTrial {

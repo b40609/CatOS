@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-chart";
+import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
+import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
 import {
   researchApi,
   ResearchApiError,
@@ -76,6 +78,8 @@ function BacktestPage() {
   const [feeRate, setFeeRate] = useState<string>("0.0005");
   const [slippageBps, setSlippageBps] = useState<string>("2");
   const [warmupBars, setWarmupBars] = useState<number>(2);
+  const [datasetId, setDatasetId] = useState<string | null>(null);
+  const dataset = pickDataset(catalog?.datasets, datasetId);
 
   const selectedRunRef = useRef<ResearchRunStatus | null>(null);
   selectedRunRef.current = selectedRun;
@@ -347,7 +351,7 @@ function BacktestPage() {
 
     const payload: BacktestRequest = {
       strategy_id: catalog.strategies[0]?.id || "sma-trend",
-      dataset_id: catalog.datasets[0]?.id || "synthetic-btc-15m-v1",
+      dataset_id: dataset?.id || "synthetic-btc-15m-v1",
       parameters: {
         period: Number(period),
         quantity: String(quantity).trim(),
@@ -458,7 +462,7 @@ function BacktestPage() {
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              資料集: <strong className="text-foreground">{catalog?.datasets[0]?.name || "合成 BTC 15m (96 根)"}</strong>
+              資料集: <strong className="text-foreground">{dataset?.name || "合成 BTC 15m (96 根)"}</strong>
             </span>
           </div>
 
@@ -493,19 +497,19 @@ function BacktestPage() {
         >
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground">
-              總回報: <strong className={cn("font-bold text-sm", perf && parseFloat(perf.return_pct) >= 0 ? "text-up" : "text-down")}>
-                {perf ? `${parseFloat(perf.return_pct) >= 0 ? '+' : ''}${perf.return_pct}%` : "--"}
+              總回報: <strong className={cn("font-bold text-sm", perf && signOf(perf.return_pct) === "negative" ? "text-down" : "text-up")}>
+                {perf ? formatDecimal(perf.return_pct, { digits: 2, sign: true, suffix: "%" }) : "--"}
               </strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              淨損益: <strong className={cn("font-bold", perf && parseFloat(perf.net_pnl) >= 0 ? "text-up" : "text-down")}>
-                {perf ? `${parseFloat(perf.net_pnl) >= 0 ? '+' : ''}${perf.net_pnl} USDT` : "--"}
+              淨損益: <strong className={cn("font-bold", perf && signOf(perf.net_pnl) === "negative" ? "text-down" : "text-up")}>
+                {perf ? formatDecimal(perf.net_pnl, { digits: 2, sign: true, suffix: " USDT" }) : "--"}
               </strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              最大回撤: <strong className="text-down font-bold">{perf ? `-${perf.max_drawdown_pct}%` : "--"}</strong>
+              最大回撤: <strong className="text-down font-bold">{perf ? formatDrawdownPct(perf.max_drawdown_pct) : "--"}</strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
@@ -522,9 +526,9 @@ function BacktestPage() {
             </span>
           </div>
           <div className="flex items-center gap-2.5 text-t3 text-muted-foreground">
-            <span>初始本金: <strong className="text-foreground">{perf ? `${perf.initial_equity} USDT` : "--"}</strong></span>
+            <span>初始本金: <strong className="text-foreground">{perf ? formatDecimal(perf.initial_equity, { suffix: " USDT" }) : "--"}</strong></span>
             <span className="text-border">|</span>
-            <span>期末權益: <strong className="text-primary font-semibold">{perf ? `${perf.final_equity} USDT` : "--"}</strong></span>
+            <span>期末權益: <strong className="text-primary font-semibold">{perf ? formatDecimal(perf.final_equity, { suffix: " USDT" }) : "--"}</strong></span>
             <span className="text-border">|</span>
             <span className="text-amber-400/90 text-t2">期末估值，未強制平倉</span>
           </div>
@@ -534,10 +538,11 @@ function BacktestPage() {
         <BacktestUnderwaterChart
           equityCurve={result?.result?.equity_curve}
           drawdownCurve={result?.drawdown_curve}
-          currentEquity={perf ? `${perf.final_equity} USDT` : undefined}
+          currentEquity={perf ? formatDecimal(perf.final_equity, { suffix: " USDT" }) : undefined}
           returnPct={perf?.return_pct}
           maxDrawdownPct={perf?.max_drawdown_pct}
           dataNotice={result?.data_notice}
+          sampling={result?.curve_sampling}
           loading={resultLoading}
         />
 
@@ -631,7 +636,11 @@ function BacktestPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">資金費與平倉</span>
-                  <span className="font-mono text-foreground font-medium">明示零資金費 · 期末估值平倉</span>
+                  <span className="font-mono text-foreground font-medium">
+                    {activeRequest && activeRequest.dataset_id !== "synthetic-btc-15m-v1"
+                      ? `資料集實際費率${perf ? `（本次 ${formatDecimal(perf.funding_paid, { digits: 4, suffix: " USDT" })}）` : ""} · 期末估值平倉`
+                      : "明示零資金費 · 期末估值平倉"}
+                  </span>
                 </div>
               </div>
             </Panel>
@@ -710,9 +719,9 @@ function BacktestPage() {
                             <td className="py-2.5 px-3 text-right text-muted-foreground">{t.fee} USDT</td>
                             <td className={cn(
                               "py-2.5 px-3 text-right font-medium",
-                              parseFloat(t.realized_pnl) >= 0 ? "text-up" : "text-down"
+                              signOf(t.realized_pnl) === "negative" ? "text-down" : "text-up"
                             )}>
-                              {parseFloat(t.realized_pnl) >= 0 ? `+${t.realized_pnl}` : t.realized_pnl} USDT
+                              {signOf(t.realized_pnl) === "positive" ? `+${t.realized_pnl}` : t.realized_pnl} USDT
                             </td>
                             <td className="py-2.5 px-3 text-right text-muted-foreground font-semibold">
                               {t.position_after}
@@ -753,7 +762,7 @@ function BacktestPage() {
               發起 Closed Bar 策略回測
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              嚴格遵循 Decimal 計算契約 · 單合約、單週期合成 K 線
+              嚴格遵循 Decimal 計算契約 · 單合約、單週期已收盤 K 線
             </DialogDescription>
           </DialogHeader>
 
@@ -767,10 +776,7 @@ function BacktestPage() {
 
             <div className="space-y-1">
               <Label className="text-t3 font-mono text-muted-foreground">標的與資料集</Label>
-              <div className="px-2.5 py-1.5 rounded border border-border bg-background text-xs font-mono text-foreground flex items-center justify-between">
-                <span>{catalog?.datasets[0]?.name || "合成 BTC 15m · 96 根 K 線"}</span>
-                <span className="text-t2 text-primary">BTC-USDT-SWAP</span>
-              </div>
+              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={setDatasetId} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

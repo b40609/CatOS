@@ -124,6 +124,12 @@ export function compareDecimal(
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
+/** Drawdown magnitude ("6.1193…", >= 0) shown as "-6.12%"; zero stays "0.00%". */
+export function formatDrawdownPct(magnitude: DecimalString | null | undefined, fallback = '--'): string {
+  const text = formatDecimal(magnitude, { digits: 2, suffix: '%' }, fallback);
+  return text === fallback || text === '0.00%' ? text : `-${text}`;
+}
+
 export type Sign = 'positive' | 'negative' | 'zero';
 
 export function signOf(value: DecimalString | null | undefined): Sign | null {

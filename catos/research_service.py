@@ -148,7 +148,8 @@ class ResearchService:
             run_id = uuid.uuid4().hex
             directory = self.output_dir / run_id
             directory.mkdir(exist_ok=False)
-            source = provenance()
+            # Backtests carry dataset_id at the top level; optimization/validation inside "backtest".
+            source = provenance(snapshot.get("backtest", snapshot)["dataset_id"])
             envelope = {"run_id": run_id, "created_at": now(), "build_id": build_id,
                         "kind": kind, "request": snapshot, "provenance": source}
             self._write_new(directory / "request.json", json_text(envelope))
@@ -237,7 +238,8 @@ class ResearchService:
         reply = json.loads(chunks["stdout"].decode("utf-8"))
         if "error" in reply:
             raise ResearchError(reply["error"])
-        if reply["payload"]["provenance"] != envelope["provenance"] or provenance() != envelope["provenance"]:
+        if (reply["payload"]["provenance"] != envelope["provenance"]
+                or provenance(envelope["provenance"]["dataset"]["id"]) != envelope["provenance"]):
             raise ResearchError("source_changed_during_run")
         return reply
 
