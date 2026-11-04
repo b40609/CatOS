@@ -2,8 +2,16 @@
 
 - 日期：2026-11-04（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話（筆電）。未撰寫本工作包的任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。開發者是另一個 Claude 會話。
-- 範圍：`feat/v1.1-real-data-pages` 的 `845ab14..12fdb09`，1 個 commit，20 個檔案（+736／−1711）。
-- 結論：**FAIL（6 項中 5 項 PASS，第 1 項 FAIL）**。缺陷 D2：全站命令面板有兩個假動作，其中一個謊稱「Kill-Switch 已鎖存」。四個改寫頁面本身全部通過。依指示只 commit 本報告，不合併、不 push，修正交回開發者。
+- 範圍：`feat/v1.1-real-data-pages` 的 `845ab14..9fef976`。
+  - 初驗 `845ab14..12fdb09`：1 個 commit，20 個檔案（+736／−1711）。
+  - 重驗 `67d56fd..9fef976`：D2 修正，1 個 commit，5 個檔案（+32／−26）。
+  - 中間的 `67d56fd` 是本報告的初驗版。
+- **正式結論：PASS（6／6）**。
+  - 初驗判 FAIL（5／6），缺陷是 D2：命令面板有兩個假動作。
+  - D2 已由 `9fef976` 修正，本驗收者重驗通過；同一個 commit 也修掉了觀察 O2、O4。
+  - 依指示只 commit 本報告，不合併 main、不 push；合併與推送要等使用者指示。
+
+> 下方「總表」到「未涵蓋」為初驗原文，判定以「重驗（D2 修正）與最終結論」一節為準。
 
 ## 自我揭露
 
@@ -15,7 +23,7 @@ D2 所在的 `command-palette.tsx` 在 v1 範圍內被 `428e182` 修改過；本
 - 瀏覽器實測：以 `tests.integration_http_fixture` 搭配**全新空資料根**，在 18870 起後端、在 18890 起 Vite proxy，用內建瀏覽器操作，用完即關閉，並確認兩個埠都已釋放。
 - 沒有碰 8770／8771／8890、既有資料根、憑證或 OKX。後端 Python 在本範圍內沒有變更，所以未重跑後端全套。
 
-## 總表
+## 總表（初驗 `12fdb09`）
 
 | # | 項目 | 結果 |
 | --- | --- | --- |
@@ -28,7 +36,7 @@ D2 所在的 `command-palette.tsx` 在 v1 範圍內被 `428e182` 修改過；本
 
 ## 缺陷
 
-### D2（阻斷）：命令面板的兩個假動作
+### D2（阻斷，已於 `9fef976` 修正並重驗通過）：命令面板的兩個假動作
 
 - 位置：`frontend/cat-os-vite/src/components/catos/command-palette.tsx`，「風控與應急處置 (Risk & Safety)」群組（第 152–175 行，原始碼註解寫著 `風控處置 (Mock 模擬)`）。
 - 掛載方式：`shell.tsx:347` `<CommandPalette />` 全站掛載，任何頁面按 Ctrl／⌘+K 都能開啟（`command-palette.tsx:43`）。
@@ -173,3 +181,72 @@ formatRatioPct("5.0E-7") = 不適用 | formatDecimal("1E+3") = 不適用
 - 沒有觸發 `eventsOmitted > 0`，也沒有觸發 Soft／Hard 鎖存或 WARN／ERROR 事件；這些情況的顯示只做了程式碼核對。
 - 沒有重跑後端完整套件：`git diff 845ab14..12fdb09 -- catos tests` 為空，沿用 v1 正式驗收的結果。
 - 沒有做整體視覺驗收，由使用者自行在網頁上驗收；也沒有跑 `integration_baseline_test.mjs`。
+
+## 重驗（D2 修正）與最終結論
+
+- 重驗範圍：`67d56fd..9fef976`，1 個 commit，5 個檔案（+32／−26）：`command-palette.tsx`、`pages/risk.tsx`、`pages/strategies.tsx`、`docs/next-steps.md`、`docs/simulation-api-contract-draft.md`。
+- 後端仍未變更：`git diff 845ab14..9fef976 -- catos tests` 為空。
+- 重驗方式比照初驗：乾淨 clone（HEAD `9fef976`）加 `npm ci` 全新安裝；瀏覽器實測用全新空資料根，在隔離的 18870／18890 進行，用完關閉並確認兩埠已釋放。
+
+### D2 修正核對：PASS
+
+程式（`frontend/cat-os-vite/src/components/catos/command-palette.tsx`）：
+- 「風控與應急處置」群組的兩個項目都改為 `<CommandItem disabled …>`，沒有 `onSelect`；文字改為「帳戶與委託對帳 (Recon) · 未接線（v1 不連 OKX）」與「Emergency Kill-Switch · 未接線（v1 無 Kill-Switch HTTP）」。
+- 全站重掃 `toast.(success|error|info|warning)` 與 `toast(`，只剩第 66 行 `handleSelectBot` 的「已聚焦機器人」。它前面有真實的 `selectBot(id)` 與 `navigate("/")`，不是假回饋。
+- `cmdk` 版本 1.1.1（lockfile）。`disabled` 會讓項目加上 `aria-disabled`／`data-disabled`，鍵盤導覽會跳過。`ui/command.tsx` 的 `CommandItem` 原樣轉傳 props，並帶 `data-[disabled=true]:pointer-events-none`。`keywords` 是 cmdk 1.x 的正式 prop（見 `node_modules/cmdk/dist/index.d.ts`）。
+- 「風控中心」導覽項目加上 `keywords={["kill-switch","re-arm","熔斷","鎖存"]}`；輸入框提示移除舊 mock 名 `tabby` 與已不存在的「底部Console」。
+
+瀏覽器實測（本驗收者親自以真實滑鼠與鍵盤事件操作）：
+
+| 操作 | 結果 |
+| --- | --- |
+| 在 `#/logs` 按 Ctrl+K | 面板開啟；提示文字為「輸入指令或快捷搜尋 (例如: 回測, 風控, T-Split, sim-control-sma)...」 |
+| 檢查兩個應急項目 | `aria-disabled="true"`、`data-disabled="true"`；「風控中心」為 `false` |
+| 滑鼠點擊停用的 Kill-Switch | 面板維持開啟，toast 0 則，網址仍是 `#/logs` |
+| 滑鼠點擊停用的對帳 | 同上 |
+| 輸入「對帳」 | 只剩停用的對帳項目，沒有任何項目被選中 |
+| 再按 Enter | 沒有任何動作：面板維持開啟、toast 0 則、網址不變 |
+| 清空後輸入「kill」 | 命中「風控中心」、「市場情報」、「Emergency Kill-Switch · 未接線」三項，第一個選中的是「風控中心」 |
+| 再按 Enter | 導到 `#/risk`，面板關閉，toast 0 則 |
+| 重新載入後的主控台 | 沒有錯誤。重載前那些 `ws://127.0.0.1:18890` 錯誤都發生在 Vite 重新連上之前，也就是上一輪服務關閉期間的 HMR 重連紀錄，與本次程式無關 |
+
+### 同一 commit 的觀察修正
+
+- O2：`pages/risk.tsx` 的事實面板標題改為「風控參數與最後一次觀測」，meta 顯示「觀測 seq N · 合成 HH:MM:SS · 門檻修改 HTTP 未接線」。整合測試證據 `dom-risk.txt` 實際文字：「參數與最後一次觀測 觀測 seq 8 · 合成 00:30:00 · 門檻修改 HTTP 未接線」。**已修**。
+- O4：`pages/strategies.tsx` 新增 `boundTotal`，只計算 `strategy_id` 與 `version` 對得上登錄策略的 Bot；`dom-strategies.txt` 顯示「登錄 1 · 綁定 Bot 1」。**已修**。
+- O1、O3、O6 與 backtest 的 `parseFloat`，已記入 `docs/next-steps.md`「已知小缺口」，維持非阻斷。
+- 文件核對：
+  - `docs/next-steps.md` 已把 supervisor 列舉順序改成「latch、set_loss_limits、rearm」，與行號 108、952、970 對齊。
+  - 契約文件第 10 節新增的命令面板段落與程式一致。
+  - 第 10 節標題「全站真資料」在 D2 修正後成立。
+
+### 重驗命令與結果
+
+`<clone12>` 指 `9fef976` 的乾淨 clone，`<fe>` 指 `<clone12>/frontend/cat-os-vite`。
+
+| 命令 | 位置 | 結果 |
+| --- | --- | --- |
+| `git clone -b feat/v1.1-real-data-pages …` | 暫存區 | HEAD `9fef976` |
+| `npm ci --no-audit --no-fund` | `<fe>` | exit 0 |
+| `npm run typecheck` | `<fe>` | exit 0 |
+| `npm test` | `<fe>` | `check:tokens OK`；tests 11、pass 11、fail 0 |
+| `npm run build` | `<fe>` | exit 0，`✓ built in 15.20s` |
+| `node tests/simulation_integration_test.mjs <.venv python>` | `<fe>` | exit 0，9 PASS；證據 `%TEMP%\catos-sim-integration-UVYz1l` |
+| 瀏覽器實測命令面板（`serve-check.mjs`，全新資料根，18870／18890） | `<fe>` | 見上表 |
+
+### 最終總表（`9fef976`）
+
+| # | 項目 | 結果 |
+| --- | --- | --- |
+| 1 | 四頁與整站沒有殘留展示假值或假即時數字；`lib/mock`、`use-live` 已無引用 | PASS（D2 已修；O5 為已標示的示範內容） |
+| 2 | Decimal 紀律與 `compareDecimal` 正確性 | PASS（O1 記入已知缺口） |
+| 3 | 風控頁語義 | PASS（O2 已修；O3 記入已知缺口） |
+| 4 | 日誌與策略頁 | PASS（O4 已修） |
+| 5 | 刪除的元件與依賴沒有遺漏引用，package.json 與 lockfile 一致 | PASS |
+| 6 | README 與文件的敘述和程式一致 | PASS |
+
+**正式結論：v1.1「全站真資料」獨立驗收 PASS（6／6）**，範圍 `845ab14..9fef976`。合併進 `main` 與推送，需等使用者明確指示。
+
+重驗未涵蓋：
+- 命令面板沒有自動化互動測試，因為整合測試的 headless Chrome 無法開啟它；已記在 `docs/next-steps.md`。本報告只有上表的手動互動證據。
+- 初驗「未涵蓋」各項維持不變。
