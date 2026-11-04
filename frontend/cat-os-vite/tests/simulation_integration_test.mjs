@@ -2,7 +2,8 @@
 // Starts an isolated backend fixture (real bounded synthetic runner) on 18870 and the real
 // Vite proxy on 18890, drives the production simulation adapter + store against it through
 // the proxy, then loads the dashboard, bots, risk, logs, strategies and review pages in headless
-// Chrome and checks the DOM.
+// Chrome and checks the DOM. Finally it submits the synthetic walk-forward example through the
+// proxy and checks the validation page.
 // 8770/8771/8890 and outputs/local-sim-control are never touched.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -190,6 +191,35 @@ try {
     const { text, shot } = await page('/review', 'review');
     for (const bad of [...FORBIDDEN, '12,483,920', '34.80', '實盤淨值']) assert.ok(!text.includes(bad), `review page contains "${bad}"`);
     assert.ok(text.includes('v1 未啟用'), 'review page not marked as not enabled');
+    console.log(`screenshot ${shot}`);
+  });
+  await check('validation page shows a real walk-forward run submitted through the proxy', async () => {
+    const getJson = async (route) => (await fetch(origin + route)).json();
+    const version = await getJson('/api/research/version');
+    const { validation } = await getJson('/api/research/catalog');
+    const submitted = await fetch(`${origin}/api/research/validations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CatOS-Build': version.build_id },
+      body: JSON.stringify(validation.example_request) });
+    const body = await submitted.text();
+    assert.equal(submitted.status, 202, body);
+    const { run_id: runId } = JSON.parse(body);
+    await waitFor(async () => (await getJson(`/api/research/runs/${runId}`)).status === 'complete',
+      'validation run did not complete', 60000);
+    const result = await getJson(`/api/research/runs/${runId}/result`);
+    assert.equal(result.schema, 'catos.research.validation-result.v2');
+    assert.ok(!('labels' in result.result), 'v2 result still carries per-bar labels');
+    const { formatDecimal } = await vite.ssrLoadModule('/src/lib/format.ts');
+    const { text, shot } = await page('/validation', 'validation');
+    for (const bad of FORBIDDEN) assert.ok(!text.includes(bad), `validation page contains "${bad}"`);
+    assert.ok(text.includes(`#${runId.slice(0, 8)}`), 'validation run missing from the list');
+    const windows = result.result.validation.windows;
+    assert.ok(text.includes(`${windows.length} / ${windows.length} COMPLETE`), 'window status HUD missing');
+    assert.ok(text.includes('maximin_axis_neighbors_v1'), 'selection rule missing');
+    for (const window of windows) {
+      const pnl = formatDecimal(window.out_of_sample.performance.net_pnl, { digits: 2, sign: true });
+      assert.ok(text.includes(pnl), `window ${window.number} net PnL ${pnl} missing`);
+    }
+    assert.ok(text.includes('合計') && text.includes('與樣本外帳務核對一致'), 'regime attribution missing');
     console.log(`screenshot ${shot}`);
   });
   await fs.writeFile(path.join(evidence, 'result.json'), JSON.stringify({ passed, backendLog, ports: [18870, 18890] }, null, 2));

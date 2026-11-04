@@ -74,7 +74,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 - 前端：回測與優化頁加上資料集選擇（`components/catos/dataset-picker.tsx`）；績效數字改用 Decimal 格式化（原本直接顯示 50 位小數）；資金費說明改依資料集顯示；圖表座標軸取整、多日資料改用日期標籤。
 
 和方案不同的地方：
-- **滾動驗證只接受合成資料。** 在 8,640 根上量到的輸出是 13.7 MB（逐根環境標籤 1.8 MB、各視窗權益曲線 1.8 MB、區間評估 1.8 MB，加上 8.2 MB 的 HTML 報表），超過 2 MB 上限，而且和方案大小無關。所以改在送出時就拒絕（`validation_supports_synthetic_dataset_only`），不讓它跑完才失敗。
+- **滾動驗證只接受合成資料。** 在 8,640 根上量到的輸出是 13.7 MB（逐根環境標籤 1.8 MB、各視窗權益曲線 1.8 MB、區間評估 1.8 MB，加上 8.2 MB 的 HTML 報表），超過 2 MB 上限，而且和方案大小無關。所以改在送出時就拒絕（`validation_supports_synthetic_dataset_only`），不讓它跑完才失敗。（已由下方「滾動驗證接上真實資料」取代：v2 輸出瘦身後不再拒絕。）
 
 實測（本機，真實資料集）：
 - 回測（period 20、1 張、本金 10,000）：0.57 秒，輸出含 HTML 報表約 1.1 MB，其中 payload JSON 約 856 KB（曲線從 8,621 點取樣為 1,725 點）。報酬 -5.67%，最大回撤 6.12%，1,062 筆成交，手續費 415.04，資金費 5.92 USDT。
@@ -90,6 +90,73 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 其餘觀察（被拒資料集不顯示原因、曲線取樣偏向低點、回撤 tooltip 與版本 `mode` 等既有文字、manifest 防意外不防偽造）留在報告，未處理。
 
 後續（未做）：
-- 滾動驗證輸出瘦身（標籤與曲線取樣、精簡報表），之後才能用在真實資料上。
+- ~~滾動驗證輸出瘦身~~（2026-11-04 完成，見下節）。
 - 月度收益矩陣（頁籤目前標示尚未實作）。
 - 保證金與強平模型（目前回撤可能超過 100%）。
+
+## 滾動驗證接上真實資料（2026-11-04，分支 `feat/research-validation-real-data`）
+
+開發者自測完成，待另一個 Claude 會話獨立驗收；未 push、未 merge。
+
+### 業界與開源 walk-forward 報告怎麼呈現
+
+| 工具 | 每個視窗保留什麼 | 跨視窗怎麼呈現 | 逐根資料 |
+| --- | --- | --- | --- |
+| [AmiBroker](https://amibroker.com/guide/h_walkforward.html) | 每段 IS／OOS 各一份回測報告，依最佳化目標排序選參 | 「PS」彙總報告涵蓋所有 OOS 段；OOS 權益串成 `~~~OSEQUITY`，每段以上一段期末權益起算（假設複利） | 權益只在合成曲線裡 |
+| [TradeStation WFO](https://help.tradestation.com/09_01/tswfo/topics/walk-forward_summary_out-of-sample.htm) | 每次 run 的 IS 與 OOS 摘要列 | Walk-Forward Efficiency（OOS 對 IS 年化報酬）、獲利 run 比例、單一 run 占總淨利比例、單 run 最大回撤，並內建[通過／不通過準則](https://help.tradestation.com/09_01/tswfo/topics/walkforward_test_results.htm) | 不列 |
+| [NinjaTrader 8](https://ninjatrader.com/de/support/helpGuides/nt8/walk_forward_optimize_a_strate.htm) | 每段一列：起訖日與最佳參數，保留前 N 名結果可點開 | 未見合併的 OOS 摘要 | 不列 |
+| [vectorbt 範例](https://github.com/polakowo/vectorbt/blob/master/examples/WalkForwardOptimization.ipynb) | 每段只存純量（IS／OOS Sharpe、最佳參數） | 逐段的純量表與折線 | 不保留，組合物件算完即丟 |
+| Freqtrade（[回測輸出](https://github.com/freqtrade/freqtrade/blob/develop/freqtrade/optimize/optimize_reports/optimize_reports.py)、[FreqAI 滑動視窗](https://www.freqtrade.io/en/stable/freqai-running/)） | 全部成交、`daily_profit` 日彙總、週期分組 | FreqAI 依 `train_period_days`／`backtest_period_days` 滑動重訓 | 不存逐根權益，只有日彙總 |
+| [QuantConnect LEAN](https://quantconnect.com/docs/v1/algorithm-reference/charting) | — | 圖表每張上限 4,000 點，超過要降低取樣頻率 | 圖表一律取樣 |
+| NautilusTrader | 報表是訂單、成交、部位、帳戶表 | 沒找到官方 walk-forward 報表（只有社群專案） | — |
+
+共通點：每個視窗一列摘要（區間、選定參數、IS 分數、OOS 績效），細節按需展開；沒有工具在報告裡保存逐根標籤或逐根歸屬；曲線一律取樣。CatOS 不照搬兩件事：AmiBroker 的 OOS 權益串接（CatOS 明訂各窗獨立、不是連續投資組合），以及 TradeStation 的自動通過門檻（CatOS 明訂驗證不是部署門檻）。
+
+### 採用的瘦身方案（結果 schema 升為 v2）
+
+| 部分 | 做法 | 理由 |
+| --- | --- | --- |
+| 逐根環境標籤 | 改為七類環境的 K 線數（`label_counts`） | 實測改成區間（run-length）也有 3,540 段（lookback 4），不夠小；逐根標籤可由綁定的資料與規則重算 |
+| 逐根分環境歸屬 | 只留各環境彙總與核對結果 | 彙總就是報告要呈現的內容；核對仍以全部 K 線計算 |
+| 各窗 OOS 權益曲線 | 超過 1,000 ÷ 視窗數點才取樣，沿用 `sample_curve_indices`，另保留起點 | 與回測曲線取樣同一方法；合成資料不會觸發 |
+| 來源快照 | `data/okx` 下的檔案只記路徑與 sha256 | 原本每份結果都內嵌 400 KB 的 K 線；資料已由 manifest 雜湊固定 |
+| HTML 報表 | 改成摘要表 | 原本把整份 JSON 轉義後塞進報表，比結果本身還大 |
+| 成交、資金費、訓練格點 | 不動 | 是 OOS 結果的證據；最壞情況量過仍在上限內 |
+
+合成資料的結果除了去掉 `labels`、`intervals` 並加上 `label_counts`、`omitted_detail` 外，欄位與數值和 v1 完全相同（有測試逐欄核對）。欄位說明見 [驗證 API 契約](research-validation-api.md) 的「v2 輸出」。
+
+另外加了送出前的計算量檢查：`windows × (候選數 × (warmup + train) + warmup + test)` 不得超過 250,000。實測有合法請求會超過 30 秒逾時（8 窗 × 11 候選 × 8,000 根訓練，程序內 36.7 秒）；本機每秒約 1.9～2.7 萬根，250,000 約 13 秒，保留約兩倍餘裕給較慢的機器。
+
+### 實測（本機，真實資料集）
+
+量測設定（任務指定）：period 8~32 步進 8、train 2000、test 1000、6 窗、max_candidates 4、max_runs 30、warmup 32、1 張、本金 10,000。
+
+| 量測 | v1 | v2 |
+| --- | --- | --- |
+| Worker 輸出（payload＋報表） | 14,085,346 bytes | 605,985 bytes |
+| 其中 payload | 5,916,864 | 599,397（來源快照 147,261，結果 449,460） |
+| 其中 HTML 報表 | 8,168,455 | 6,561 |
+| 程序內耗時 | 2.39 秒 | 2.06 秒 |
+
+研究服務實測（`tests.integration_http_fixture` 起在隔離的 18870、獨立輸出目錄，以 HTTP 送出，與前端相同路徑；結束後確認埠已釋放）：
+
+| 請求 | 任務耗時（started → finished） | result.json | report.html |
+| --- | --- | --- | --- |
+| 量測設定 | 4.35 秒（送出到完成 5.0 秒） | 599,573 bytes | 9,972 bytes |
+| 計算量邊緣：SMA 2~32 步進 3（11 候選）、train 2700、test 200、8 窗（242,272） | 7.72 秒 | 557,025 bytes | 12,371 bytes |
+| 成交最多：同上候選、train 64、test 1068、8 窗、手續費與滑價 0（2,591 筆 OOS 成交） | 2.91 秒 | 988,759 bytes | 13,024 bytes |
+
+量測設定的結果：6 窗都完成，每窗都選 period 32；OOS 報酬 -0.79%、-0.73%、+0.04%、-0.57%、-1.04%、-0.29%，6 窗只有 1 窗為正。前端預設設定（2 張、本金 1,000、train 2152、test 1076、6 窗）在瀏覽器實際送出：6 窗都選 32，OOS 報酬 -4.76% ~ -16.53%，全部為負。樣本外檢驗與樣本內優化的結論一致：SMA 在這 90 天被手續費拖累。
+
+### 前端
+
+新增「滾動驗證」頁（`#/validation`，側欄「策略與研究」）：沿用優化頁的版型（左側任務清單與邊界說明、右側結果），送出對話框帶資料集選擇、候選週期、滾動計畫與分類規則，並即時顯示使用根數、回測次數與計算量；超出上限時列出原因並停用送出。結果有四格摘要、各窗表、點選後的該窗 OOS 權益曲線、訓練格點（含鄰域分數）與分環境表。版面沿用既有頁面，沒有新的版面選擇需要定案。
+
+優化頁與驗證頁的任務清單、共用忙碌槽輪詢與送出邏輯抽成 `hooks/use-research-runs.ts`，優化頁行為不變（隔離環境實際送出一次優化確認）。
+
+### 未涵蓋
+
+- 輸出上限仍是 2 MB 的硬上限：成交筆數隨 OOS 根數成長，換成更長的資料集（`MAX_BARS` 20,000）且選到短週期時仍可能超過，屆時任務以 `research_output_limit` 失敗。
+- 計算量上限依本機速度訂定，沒有在另一台機器上量過。
+- 前端分類規則的預設值沿用合成示範門檻（高波動 250 bps），在 BTC 15m 上幾乎都會被分到低波動；門檻要使用者自行明示。
+- HTML 報表沒有前端入口（既有缺口）。

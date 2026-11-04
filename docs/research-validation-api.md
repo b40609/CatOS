@@ -2,6 +2,8 @@
 
 2026-10-19 開發完成、126/126 自測通過；後續已由使用者指定 GPT-6 Sol 完成三個研究包獨驗與唯讀 Git 核對，均 PASS，見[獨驗報告](../reports/research-independent-acceptance-20261019-gpt6sol/acceptance.md)。範圍限合成資料與隔離後端，不包含正式服務更新或前端串接。下方「本輪」驗證數字仍指原開發自測，不冒充獨驗或 2026-10-20 重驗。
 
+2026-11-04 更新（分支 `feat/research-validation-real-data`，開發者自測完成、待獨立驗收）：結果升為 `catos.research.validation-result.v2`，可在已登錄的 OKX 公開歷史資料集上執行，並接上 React 滾動驗證頁（`frontend/cat-os-vite/src/pages/validation.tsx`）。v1 → v2 的差異見文末「v2 輸出」；方案比較與實測見 [研究線方案](research-real-data-plan.md)。
+
 ## 已可交付的行為
 
 新增 `kind=validation` 任務。每個訓練視窗先跑完整參數格點與鄰域穩定區排序，再固定參數跑 OOS，最後依事前明示的市場環境規則歸屬逐根損益。分類不反饋選參，未新增策略、資料來源、評分公式或金融部署門檻。
@@ -41,9 +43,9 @@ POST `/api/research/validations`，Content-Type 為 application/json，標頭 `X
 }
 ```
 
-`backtest.parameters.period` 保留原請求格式；驗證任務的候選週期由 `search_space.period` 決定，quantity 固定。策略只允許已核准的 RegisteredSMA，資料只允許既有 96 根合成 15m K 線。整數 range 須對齊、至少兩個候選、週期在 2 到 32，預熱涵蓋最高候選週期。
+`backtest.parameters.period` 保留原請求格式；驗證任務的候選週期由 `search_space.period` 決定，quantity 固定。策略只允許已核准的 RegisteredSMA；資料可選任一已登錄資料集（96 根合成 15m K 線，或經 manifest 雜湊核對的 OKX 公開歷史資料）。整數 range 須對齊、至少兩個候選、週期在 2 到 32，預熱涵蓋最高候選週期。
 
-任務最多 20 個格點、8 個視窗、100 次回測；提交時預檢 `windows × (格點數 + 1) <= max_runs`，且 `warmup_bars + train_bars + windows × test_bars <= 資料根數`。不自動縮短計畫、補預算或增加成功次數。已有的 30 秒逾時、2,000,000 bytes 子程序輸出上限仍適用。目前沿用參數型別的既有 Optuna 依賴；本任務採完整格點，不啟動 Optuna 搜尋，也不轉 Float 排名。
+任務最多 20 個格點、8 個視窗、100 次回測；提交時預檢 `windows × (格點數 + 1) <= max_runs`、`warmup_bars + train_bars + windows × test_bars <= 資料根數`，以及 `windows × (格點數 × (warmup_bars + train_bars) + warmup_bars + test_bars) <= max_bar_evaluations`（250,000；本機實測每秒約 1.9～2.7 萬根，超過就在送出時以 422 拒絕，不等 30 秒逾時）。不自動縮短計畫、補預算或增加成功次數。已有的 30 秒逾時、2,000,000 bytes 子程序輸出上限仍適用。目前沿用參數型別的既有 Optuna 依賴；本任務採完整格點，不啟動 Optuna 搜尋，也不轉 Float 排名。
 
 | 操作 | API | 用途 |
 | --- | --- | --- |
@@ -57,22 +59,24 @@ POST `/api/research/validations`，Content-Type 為 application/json，標頭 `X
 
 ## 結果欄位
 
-頂層 `schema=catos.research.validation-result.v1`、kind、run_id、created_at、build_id、request、provenance 與原任務綁定。`reproduction.files` 為相對路徑、sha256、content_utf8；只供檢查／人工重現，API 不執行封存程式碼。雜湊和來源快照不是防竄改簽章、可安裝環境或跨版本重現保證；未保存套件本體與完整環境鎖檔。
+頂層 `schema=catos.research.validation-result.v2`、kind、run_id、created_at、build_id、request、provenance 與原任務綁定。`reproduction.files` 為相對路徑、sha256、content_utf8；已抓取資料集的檔案改列在 `reproduction.referenced_files`（路徑與 sha256，不內嵌內容）；只供檢查／人工重現，API 不執行封存程式碼。雜湊和來源快照不是防竄改簽章、可安裝環境或跨版本重現保證；未保存套件本體與完整環境鎖檔。
 
 | JSON 路徑 | 內容 |
 | --- | --- |
 | `result.validation.windows[n].training` | 格點、各候選原績效／錯誤、鄰域、固定選擇與排序規則 |
-| `result.validation.windows[n].out_of_sample` | 當窗完整 OOS 回測：績效、成交、資金費、權益與末筆意圖 |
+| `result.validation.windows[n].out_of_sample` | 當窗完整 OOS 回測：績效、成交、資金費、權益與末筆意圖；權益曲線超過每窗上限時取樣 |
+| `result.validation.windows[n].curve_sampling` | 只在取樣時出現：total_points、returned_points、method（`bucket_deepest_drawdown_keep_first`） |
 | `result.windows[n].evaluation.summaries` | UNKNOWN／上漲／下跌／震盪 × 波動組別，含零樣本組 |
 | `result.windows[n].evaluation.total` | 當窗損益、成本、K 線數與成交數 |
 | `result.windows[n].evaluation.reconciled` | 分環境歸屬與原 OOS 帳務核對 |
-| `result.rule`、`result.rule_version`、`result.labels` | 門檻、分類版本及逐根標籤 |
+| `result.rule`、`result.rule_version`、`result.label_counts` | 門檻、分類版本及全資料各環境的 K 線數（v2 不再輸出逐根標籤） |
+| `result.omitted_detail` | v2 省略的逐根明細：`labels`、`windows.evaluation.intervals` |
 | `evaluation_complete` | 是否每個 OOS 視窗均 COMPLETE，非策略有效或可部署判定 |
 | `reproduction`、`provenance` | 研究來源快照、版本與既有核准策略身分 |
 
 Service 的 `status=complete` 表示計算與封存完成。研究視窗若有 NO_SELECTION／OOS_FAILED，任務仍可 complete，但 `evaluation_complete=false`；原錯誤保留，該窗 `out_of_sample`／`evaluation` 為 null，不補零，不重試。Worker 失敗、逾時、輸出超限或來源漂移則整個任務 failed，結果查詢 409。請求不合格為 422，過大為 413，版本不符／忙碌為 409，Origin 不符為 403。
 
-所有金額與比例採 Decimal 字串；時間、根數、候選索引採整數。不要把正損益 K 線比例當往返交易勝率，也不要串接獨立 OOS 權益曲線當連續投資組合。期末部位估值而非強平，沒有新增末筆成交或假設平倉費。資金費事件仍明示為空，不能當歷史資金費完整的證明。
+所有金額與比例採 Decimal 字串；時間、根數、候選索引採整數。不要把正損益 K 線比例當往返交易勝率，也不要串接獨立 OOS 權益曲線當連續投資組合。期末部位估值而非強平，沒有新增末筆成交或假設平倉費。合成資料的資金費事件明示為空，不能當歷史資金費完整的證明；OKX 資料集帶實際資金費率，以結算當下 K 線開盤價近似 mark price。
 
 ## 實際驗證與界線
 
@@ -96,3 +100,17 @@ py -3 -B reports/research-validation-archive-20261019/verify.py
 reports 沿既有忽略規則保留本機；本節保存原開發自測，後續獨驗另見文首連結。開發交付時既有運行服務尚未載入此變更；不能將 TestClient 通過當正式服務已更新，2026-10-20 文件盤點亦未查證服務現況。本開發工作包沒有真實行情、AI 自主提出策略、外部 provider、產品 DB／憑證、採集、Demo／Live、Git 或前端操作。
 
 接續價值最高的成果是讓前端依本契約顯示「候選穩定區 → 各窗 OOS → 分環境樣本與成本」，由 Antigravity 參照[前後端串接清單](backend-frontend-integration-map.md) 承接；三個後端研究包已獨驗 PASS。任何真實資料研究或 AI 代理寫入策略仍需另訂範圍。
+
+## v2 輸出（2026-11-04）
+
+v1 在 8,640 根的 OKX 資料上量到 13.7 MB（逐根標籤 1.8 MB、各窗權益曲線 1.8 MB、逐根歸屬 1.76 MB，加上把整份 JSON 轉成 HTML 的 8.2 MB 報表），超過 2,000,000 bytes 的 Worker 輸出上限。v2 只拿掉隨資料長度成長的逐根明細，回報的數字不變：
+
+| 項目 | v1 | v2 |
+| --- | --- | --- |
+| 環境標籤 | `result.labels` 逐根（含每根 efficiency、volatility_bps） | `result.label_counts`：七類環境的 K 線數；逐根標籤可由綁定的資料集與規則以 `classify_regimes` 重算 |
+| 分環境歸屬 | `evaluation.intervals` 逐根＋`summaries`／`total` | 只保留 `summaries`／`total`／`reconciled`／`core_net_rounding_residual` |
+| 各窗 OOS 權益曲線 | 全部點 | 每窗超過 `max_curve_points`（1,000）÷ 視窗數時取樣：每段保留回撤最深的一點，並保留起點與終點；績效、成交、資金費不受影響 |
+| 來源快照 | 所有檔案內嵌內容 | 程式與合成 CSV 照舊內嵌；`data/okx` 下的檔案只記路徑與 sha256 |
+| HTML 報表 | 整份 JSON 放進 `<pre>` | 設定、各窗與分環境摘要表；完整紀錄以 `result.json` 為準 |
+
+合成資料在這個規模不會觸發取樣，所以 v2 結果等於 v1 結果去掉 `labels` 與 `intervals`、加上 `label_counts` 與 `omitted_detail`，其餘欄位與數值完全相同（`tests/test_research_validation_web.py` 的 `test_v2_keeps_every_v1_figure_and_only_drops_per_bar_detail` 逐欄核對）。v1 封存結果不會被改寫；讀取端以 `schema` 分辨版本。

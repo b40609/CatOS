@@ -1,5 +1,6 @@
 """Synthetic validation requests, real worker archives and in-process HTTP only."""
 
+from collections import Counter
 from dataclasses import asdict
 from decimal import Decimal, localcontext
 from hashlib import sha256
@@ -15,7 +16,7 @@ from fastapi.testclient import TestClient
 from catos.research import backtest
 from catos.research_api import create_app
 from catos.research_catalog import DEFAULT_VALIDATION, json_text, provenance
-from catos.research_regimes import REGIMES
+from catos.research_regimes import REGIMES, regime_walk_forward, regimes_json
 from catos.research_service import ResearchError, ResearchService
 from catos.research_validation import walk_forward
 from catos.research_validation_job import (
@@ -90,8 +91,51 @@ class ValidationJobTests(unittest.TestCase):
             self.assertFalse(Path(item["path"]).is_absolute())
         dataset = next(item for item in first["reproduction"]["files"] if item["path"].endswith(".csv"))
         self.assertEqual(dataset["sha256"], source["dataset"]["sha256"])
+        # The in-repo synthetic fixture stays embedded; only fetched data is referenced by hash.
+        self.assertEqual(first["reproduction"]["referenced_files"], [])
         self.assertIn("no random seed", first["reproduction"]["algorithm"])
         self.assertLess(len(json_text({"payload": first, "report": ""}).encode("utf-8")), 2_000_000)
+
+    def test_v2_keeps_every_v1_figure_and_only_drops_per_bar_detail(self):
+        request = request_copy()
+        source = provenance()
+        payload, report = execute_validation(request, source)
+        _, config, quantity, bars, space, plan, rule = validate_validation_request(request)
+        from catos.research_catalog import load_registered_strategy
+        strategy = load_registered_strategy(source)
+        full = json.loads(regimes_json(regime_walk_forward(
+            strategy_factory=lambda params: strategy(params["period"], quantity),
+            search_space={"period": space}, candles=bars, config=config, rule=rule,
+            score=lambda p: p.return_pct, score_name="return_pct", plan=plan,
+            max_candidates=3, max_runs=12,
+        )))
+        compact = payload["result"]
+        counts = Counter(label["regime"] for label in full["labels"])
+        self.assertEqual(compact["label_counts"],
+                         [{"regime": name, "bar_count": counts[name]} for name in REGIMES])
+        self.assertEqual(compact["omitted_detail"], ["labels", "windows.evaluation.intervals"])
+        for row in full["windows"]:
+            self.assertEqual(len(row["evaluation"]["intervals"]), plan.test_bars)
+            del row["evaluation"]["intervals"]
+        del full["labels"]
+        # At fixture scale nothing is sampled: every v1 field and value is unchanged.
+        self.assertEqual({key: value for key, value in compact.items()
+                          if key not in ("label_counts", "omitted_detail")}, full)
+        self.assertTrue(all("curve_sampling" not in row for row in compact["validation"]["windows"]))
+        self.assertIn("<table>", report)
+        self.assertEqual(report.count("<tr>"), 1 + 8 + 1 + plan.windows + 1 + sum(
+            1 for row in compact["windows"] for summary in row["evaluation"]["summaries"]
+            if summary["bar_count"]))
+
+    def test_bar_evaluation_budget_is_checked_before_strategy_load(self):
+        # Default plan: 3 windows x (3 candidates x (4 warm-up + 24 train) + 4 + 16) = 312.
+        with patch("catos.research_validation_job.MAX_VALIDATION_BAR_EVALUATIONS", 311), \
+                patch("catos.research_validation_job.load_registered_strategy") as load:
+            with self.assertRaisesRegex(ValueError, "max_bar_evaluations"):
+                execute_validation(request_copy(), provenance())
+        load.assert_not_called()
+        with patch("catos.research_validation_job.MAX_VALIDATION_BAR_EVALUATIONS", 312):
+            validate_validation_request(request_copy())
 
     def test_preflight_rejects_invalid_requests_before_strategy_load(self):
         variants = [
@@ -221,7 +265,9 @@ class ValidationApiTests(unittest.TestCase):
             with TestClient(app, base_url="http://127.0.0.1:8770") as client:
                 version = client.get("/api/research/version").json()
                 headers = {"X-CatOS-Build": version["build_id"], "Origin": "http://127.0.0.1:8770"}
-                example = client.get("/api/research/catalog").json()["validation"]["example_request"]
+                limits = client.get("/api/research/catalog").json()["validation"]
+                self.assertEqual((limits["max_bar_evaluations"], limits["max_curve_points"]), (250_000, 1_000))
+                example = limits["example_request"]
                 endpoint = "/api/research/validations"
                 for changes, code in (({"X-CatOS-Build": "old"}, 409), ({"Origin": "http://evil.invalid"}, 403)):
                     self.assertEqual(client.post(endpoint, json=example, headers={**headers, **changes}).status_code, code)
