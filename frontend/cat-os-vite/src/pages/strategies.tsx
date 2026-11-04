@@ -111,6 +111,9 @@ function StrategyCenter() {
   const boundOf = (s: RegisteredStrategyDTO) =>
     bots.filter((b) => b.strategy_id === s.strategy_id && b.strategy_version === s.version);
   const bound = active ? boundOf(active) : [];
+  const boundTotal = bots.filter((b) =>
+    strategies.some((s) => s.strategy_id === b.strategy_id && s.version === b.strategy_version),
+  ).length;
   const runBot = bound.find((b) => b.current_run_id) ?? null;
   const runId = runBot?.current_run_id ?? null;
 
@@ -136,7 +139,7 @@ function StrategyCenter() {
         right={
           <span className="num text-t3 text-muted-foreground">
             登錄 <span className="text-gold-bright">{strategies.length}</span> · 綁定 Bot{" "}
-            <span className="text-gold-bright">{bots.length}</span>
+            <span className="text-gold-bright">{boundTotal}</span>
           </span>
         }
       />

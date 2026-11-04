@@ -7,7 +7,7 @@
 | # | 工作包 | 內容 | 成本／風險 | 需要的授權或決策 |
 | --- | --- | --- | --- | --- |
 | A | v1.1 全站真資料（已完成，待獨驗） | 風控中心、系統日誌、策略中心改讀控制面資料；刪掉 `lib/mock/data.ts`、假即時數值 hook（`useLiveNumber`／`useLiveSeries`）與只剩測試在用的 `lib/mock/terminal.ts` | 小。只動前端三頁；資料 `catStore` 已在輪詢（`state/catStore.ts:41-48`），後端端點已在（`catos/local_sim_control_api.py:118,130,138`） | 不需新授權 |
-| B | Kill-Switch／re-arm／門檻修改 HTTP | 把 `supervisor.latch`、`rearm`、`set_loss_limits`（`catos/supervisor.py:108,952,970`）接上 HTTP 和風控中心按鈕 | 中。牽涉鎖存與人工恢復政策；Demo 前必備 | 恢復介面細節（確認步驟、誰能 re-arm）。動工前先查業界／開源做法再提方案 |
+| B | Kill-Switch／re-arm／門檻修改 HTTP | 把 `supervisor.latch`、`set_loss_limits`、`rearm`（`catos/supervisor.py:108,952,970`）接上 HTTP 和風控中心按鈕 | 中。牽涉鎖存與人工恢復政策；Demo 前必備 | 恢復介面細節（確認步驟、誰能 re-arm）。動工前先查業界／開源做法再提方案 |
 | C | 真實歷史 K 線研究 | 研究目前寫死一份 96 根合成資料（`catos/research_catalog.py:21-22,222`）。改成可登錄多份資料集，用 `tools/fetch_okx_candles.py` 抓 OKX 公開歷史 K 線跑回測／優化 | 中。公開行情 GET，不用金鑰 | 採集授權（AGENTS.md：採集不因工作包自動授權） |
 | D | OKX Demo 接線 | Supervisor 持金鑰連 OKX 模擬盤、下單、對帳 | 大，多個工作包；I-b-4 Demo 對帳未通過仍是已知阻斷（`docs/demo-collection-handoff.md`） | Demo 授權、金鑰保管方式；建議 B 先完成 |
 | E | v2：策略上傳／多 Bot／Yaozi 重啟 | python_strategy 上傳製品（測試已 skip）、多 Bot 多策略、市場情報線解凍 | 大 | 受信策略邊界、資料模型、採集邊界 |
@@ -20,12 +20,17 @@
    - 實盤線（B → D）：先讓下單、對帳、緊急停止在真交易所跑通。
    - 我傾向研究線先行：風險最低、不碰金鑰，而且能早點知道策略值不值得上線。這是產品方向，由你決定。
 
-## 已知小缺口（來自 v2 候選清單）
+## 已知小缺口（來自 v2 候選清單與 v1.1 驗收觀察）
 
 - 後端沒有 `exposure_ratio`，前端甜甜圈「佔預算 x%」用浮點換算，只用於顯示。
 - bots 艦隊表窄視窗時右側欄位被截斷；權益曲線 y 軸百分比標籤待調整。
 - `.venv` 的 pytest 損壞（缺 `_pytest.scope`），後端測試用 `python -m unittest discover`。
 - `AccountLock` 只支援 Windows（`catos/account_lock.py`）。
+- 後端以 `str(Decimal)` 輸出，絕對值小於 1e-6 的非零值會變成科學記號（如 `5.0E-7`）；前端 `lib/format.ts` 的 `parse()` 只接受零的科學記號，這類值會顯示「不適用」。修法二選一：後端改 `format(x, 'f')`，或前端支援非零科學記號（v1.1 驗收 O1）。
+- `simulation_catalog.risk_projection` 的 `can_increase` 沒有納入 `position_verified` 與 `reduction_conflict`；local-sim 四個旗標恆為 True 不會誤顯示，Demo／Live 前要修（v1.1 驗收 O3）。
+- 設定頁的「有效槓桿上限 3.0x · 單幣預算上限 50%」是寫死的政策說明，不是讀 `risk.limits`（v1.1 驗收 O6）。
+- `pages/backtest.tsx` 用 `parseFloat` 判斷報酬正負色（既有）。
+- 命令面板等需要鍵盤操作的元件沒有自動化互動測試；要補需要引入 playwright 或 jsdom。
 
 ## 收尾雜項（刪除類要你確認）
 

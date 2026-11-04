@@ -292,8 +292,12 @@ function RiskManagement() {
 
       <div className="mt-3 grid gap-3 xl:grid-cols-[1.5fr_1fr]">
         <Panel
-          title="風控參數與觀測事實"
-          meta={<span className="font-mono text-t2 text-muted-foreground">門檻修改 HTTP 未接線</span>}
+          title="風控參數與最後一次觀測"
+          meta={
+            <span className="font-mono text-t2 text-muted-foreground">
+              {risk ? `觀測 seq ${risk.seq} · 合成 ${formatClock(risk.time_ms)} · ` : ""}門檻修改 HTTP 未接線
+            </span>
+          }
         >
           {risk && derived && limits ? (
             <div className="grid gap-x-6 font-mono text-t2 md:grid-cols-2">
