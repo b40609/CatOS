@@ -3,7 +3,7 @@ import {
   Check,
   KeyRound,
   Palette,
-  ShieldCheck,
+  ShieldOff,
   Sliders,
   Type,
   User,
@@ -29,6 +29,7 @@ import {
   type ColorConvention,
   type FontFamily,
 } from "@/state/personalOsStore";
+import { useCatStore } from "@/state/catStore";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -67,12 +68,9 @@ export function PersonalOsModal({
     fontScale,
     setFontScale,
     applyPreset,
-    apiKey,
-    passphrase,
-    environment,
-    setEnvironment,
-    ping,
   } = usePersonalOs();
+  const connection = useCatStore((s) => s.connection);
+  const service = useCatStore((s) => s.service);
 
   const [nameInput, setNameInput] = useState(displayName);
   const [aliasInput, setAliasInput] = useState(subAccountAlias);
@@ -216,10 +214,6 @@ export function PersonalOsModal({
               >
                 Buy / 買入
               </button>
-              <div className="flex items-center gap-1 font-mono text-t1 text-muted-foreground bg-secondary/50 px-2 py-1 rounded">
-                <span className="size-1.5 rounded-full bg-emerald-400" />
-                <span>18ms WS</span>
-              </div>
             </div>
           </div>
         </div>
@@ -633,73 +627,29 @@ export function PersonalOsModal({
           {/* ========== TAB 5: 交易所 API 與本地進程 (API & Daemon) ========== */}
           {activeTab === "api" && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="size-3.5 text-emerald-400" />
-                    <span>OKX 專用子帳戶金鑰連線</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("live")}
-                      className={cn(
-                        "rounded px-2 py-0.5 text-t2 font-mono transition-all cursor-pointer",
-                        environment === "live"
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      LIVE 實盤
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEnvironment("sim")}
-                      className={cn(
-                        "rounded px-2 py-0.5 text-t2 font-mono transition-all cursor-pointer",
-                        environment === "sim"
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      SIM 模擬
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-t2 text-muted-foreground font-mono">OKX API Key</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={apiKey}
-                      className="w-full mt-1 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 font-mono text-t3 text-foreground/80 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-t2 text-muted-foreground font-mono">Passphrase</label>
-                    <input
-                      type="password"
-                      readOnly
-                      value={passphrase}
-                      className="w-full mt-1 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 font-mono text-t3 text-foreground/80 focus:outline-none"
-                    />
-                  </div>
-                </div>
+              <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-2">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldOff className="size-3.5 text-muted-foreground" />
+                  <span>OKX 專用子帳戶 API · v1 未接線</span>
+                </span>
+                <p className="text-t2 text-muted-foreground leading-relaxed">
+                  v1 只提供本機合成模擬（FakeExchange），不載入任何金鑰，也沒有 Demo／Live 下單路徑。
+                  金鑰日後只由本機 Supervisor 持有，不經前端輸入或保存。
+                </p>
               </div>
 
-              {/* 本地 WebSocket 守護進程診斷 */}
+              {/* 本機服務狀態：讀取控制面 /state 輪詢結果 */}
               <div className="rounded-xl border border-border/50 bg-secondary/25 p-4 space-y-2">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Activity className="size-3.5 text-primary" />
-                  <span>本地守護進程連線狀態 (Local Daemon)</span>
+                  <span>本地服務狀態 (Local Engine)</span>
                 </span>
                 <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-t2">
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
-                    <span className="text-t1 text-muted-foreground block">WS 延遲 (Ping)</span>
-                    <span className="text-emerald-400 font-bold">{ping} ms</span>
+                    <span className="text-t1 text-muted-foreground block">連線</span>
+                    <span className={cn("font-bold", connection.status === "ok" ? "text-up" : "text-muted-foreground")}>
+                      {connection.status}
+                    </span>
                   </div>
                   <div className="rounded-lg bg-background/60 p-2.5 border border-border/40">
                     <span className="text-t1 text-muted-foreground block">資料儲存底座</span>
@@ -710,6 +660,11 @@ export function PersonalOsModal({
                     <span className="text-foreground font-bold">127.0.0.1:8770</span>
                   </div>
                 </div>
+                {service && (
+                  <p className="font-mono text-t1 text-muted-foreground/70 truncate">
+                    instance {service.instance_id} · slot {service.slot}
+                  </p>
+                )}
               </div>
             </div>
           )}
