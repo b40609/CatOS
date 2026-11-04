@@ -19,7 +19,7 @@
    - 研究線（C）：先找到值得跑的策略。現在唯一的策略是 SMA，只在合成資料上跑過，接 Demo 只能驗證管線。
    - 實盤線（B → D）：先讓下單、對帳、緊急停止在真交易所跑通。
    - 我傾向研究線先行：風險最低、不碰金鑰，而且能早點知道策略值不值得上線。這是產品方向，由你決定。
-3. **滾動驗證接上真實資料**（2026-11-04，分支 `feat/research-validation-real-data`，獨立驗收 7／7 PASS，`reports/research-validation-real-data-acceptance-20261104/acceptance.md`；驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，只有開發者自測；未合併）：驗證結果升為 v2（不保存逐根明細），真實資料上以研究服務實測 4.35 秒、result.json 0.6 MB（原本 14 MB，超過 2 MB 上限）；前端新增「滾動驗證」頁。樣本外結果：SMA 在 6 個視窗中 5 窗虧損（1 張、本金 10,000），和樣本內優化的結論一致。方案比較與量測見 `docs/research-real-data-plan.md`。研究線接下來的候選：月度收益矩陣、保證金與強平模型、換一個策略再驗證。
+3. **滾動驗證接上真實資料**（2026-11-04，分支 `feat/research-validation-real-data`，獨立驗收 7／7 PASS，`reports/research-validation-real-data-acceptance-20261104/acceptance.md`；驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，只有開發者自測；已合併進 `main`（`aa4def4`）並推送）：驗證結果升為 v2（不保存逐根明細），真實資料上以研究服務實測 4.35 秒、result.json 0.6 MB（原本 14 MB，超過 2 MB 上限）；前端新增「滾動驗證」頁。樣本外結果：SMA 在 6 個視窗中 5 窗虧損（1 張、本金 10,000），和樣本內優化的結論一致。方案比較與量測見 `docs/research-real-data-plan.md`。研究線接下來的候選：月度收益矩陣、保證金與強平模型、換一個策略再驗證。
 
 ## 已知小缺口（來自 v2 候選清單與 v1.1 驗收觀察）
 
@@ -41,7 +41,7 @@
 | --- | --- |
 | 已合併的本機分支：`fix/v1-safety`、`docs/v1-release`、`chore/v1-cleanup`、`chore/v1-type-scale`、`feat/v1-simulation-api`、`feat/v1-simulation-endpoints`、`feat/v1-simulation-frontend` | 已刪除 |
 | `feature/catos-react-vite`（本機多一個 `d8c2133`，內容已併入本文件；遠端停在 `5a101d4`，已包含在 `main`） | 已刪除本機與遠端 |
-| 遠端 `feature/catos-v1-sim`（已合併進 `main`） | 已刪除 |
+| 遠端 `feature/catos-v1-sim`（已合併進 `main`） | 已刪除；之後重新推送 `ab5043d`，以 PR #1 合併進 `main`（`6ffd18f`），遠端分支目前還在 |
 | 遠端 `feature/frontend-redesign-v2`、`archive/catos-v1` | 保留（歷史） |
 | `docs/review-20261102/`（11/02 讀碼筆記，行號以舊版 `fffed2e` 為準） | 已刪除 |
 | `.git/worktrees/main-wt`、`main-wt2` | 已刪除 |
