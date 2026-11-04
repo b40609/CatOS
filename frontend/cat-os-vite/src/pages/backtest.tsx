@@ -20,6 +20,7 @@ import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
 import {
   DONCHIAN_ID, donchianParams, formatParams, paramLabel, paramProblems, paramSpecs, pickStrategy, shortName,
+  warmupBarsProblems,
 } from "@/lib/research-strategies";
 import {
   researchApi,
@@ -346,7 +347,9 @@ function BacktestPage() {
     setErrorMsg(null);
 
     // Strict validation against the catalog bounds; the backend repeats every check.
-    const problems = strategy ? paramProblems(strategy, params, warmupBars) : ["策略清單尚未載入"];
+    const problems = strategy
+      ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+      : ["策略清單尚未載入"];
     if (!strategy || problems.length) {
       setErrorMsg(problems[0]);
       setSubmitting(false);
@@ -400,7 +403,9 @@ function BacktestPage() {
   const activeRequest = result?.request || selectedRun?.request;
   const perf = result?.result?.performance;
   const activeStrategy = pickStrategy(catalog?.strategies, activeRequest?.strategy_id ?? strategy?.id ?? null);
-  const formProblems = strategy ? paramProblems(strategy, params, warmupBars) : [];
+  const formProblems = strategy
+    ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+    : [];
 
   // Switching strategy (or the Donchian dataset) restores defaults that fit the bounds and data length.
   const applyDefaults = (sid: string, target = dataset) => {
@@ -644,7 +649,9 @@ function BacktestPage() {
                   <span className="font-mono text-foreground font-medium">Closed Bar（次根開盤市價撮合）</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                  <span className="text-muted-foreground">策略參數 ({shortName(activeRequest?.strategy_id)})</span>
+                  <span className="text-muted-foreground">
+                    策略參數{activeRequest ? ` (${shortName(activeRequest.strategy_id)})` : ""}
+                  </span>
                   <span className="font-mono text-foreground font-medium">{formatParams(activeRequest?.parameters) || "--"}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">

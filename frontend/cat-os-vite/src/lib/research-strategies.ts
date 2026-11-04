@@ -62,6 +62,11 @@ export function formatRanges(space?: Record<string, Axis> | null): string {
   return Object.entries(space).map(([name, axis]) => `${name} ${axis.low}~${axis.high}/${axis.step}`).join(' · ');
 }
 
+/** Problems with a warm-up that would leave no evaluation bar in the dataset. */
+export function warmupBarsProblems(warmup: number, dataset: ResearchDatasetMeta | null): string[] {
+  return dataset && warmup >= dataset.bars ? [`預熱根數 ${warmup} 需少於資料集的 ${dataset.bars} 根`] : [];
+}
+
 /** Problems with one parameter set and its warm-up; empty when the backtest can be submitted. */
 export function paramProblems(meta: ResearchStrategyMeta, values: Record<string, number>, warmup: number): string[] {
   const problems: string[] = [];

@@ -170,7 +170,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 
 ## 第二個策略：Donchian 通道突破（2026-11-04，分支 `feat/research-second-strategy`）
 
-尚未獨立驗收。只有開發者自測，未 push、未 merge。
+獨立驗收 7／7 PASS，附 7 項非阻斷觀察（`reports/research-second-strategy-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O3、O6、O7 補了預熱預檢、build_id 綁定、前端用語與文件，O4、O5 記在下方，這部分只有開發者自測。未 push、未 merge。
 
 ### 為什麼換、怎麼選
 
@@ -193,7 +193,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 
 - 進場通道是前 `entry_bars` 根（不含正在決策的這一根）的最高價與最低價；收盤高於最高價做多、低於最低價做空，反向部位直接反手。
 - 出場通道是前 `exit_bars` 根的最低價（多單）或最高價（空單）；收盤跌破就平多、突破就平空。
-- 其餘情況維持部位。`exit_bars` 必須小於 `entry_bars`，所以出場一定比反手先觸發；預熱至少 `entry_bars` 根。
+- 其餘情況維持部位。進場判斷先於出場：同一根收盤同時穿過出場與進場通道時直接反手。`exit_bars` 必須小於 `entry_bars`，所以出場通道比進場通道貼近價格，價格逐步反轉時會先平倉；預熱至少 `entry_bars` 根，且要留下可評估的 K 線。
 - 通道用單調佇列維護，每根 O(1)，只做 Decimal 比大小，沒有任何算術捨入。
 
 ### 實作
@@ -203,6 +203,9 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 - manifest 放在 `catos/research_only_artifacts/`。Worker 登錄表 `catos/strategy_registry.py` 只讀 `catos/research_artifacts/*.json`，所以 local-sim Bot 與 IPC（`WorkerConfig.from_wire`）解析不到 Donchian，測試有涵蓋。
 - 研究服務送出時依請求的策略計算來源綁定，完成時再核對一次；請求與綁定的策略不同時以 `strategy_source_mismatch` 拒絕。
 - 優化與滾動驗證的 HTML 報表改為通用的「參數」「選定參數」欄；優化報表不再寫死「合成資料樣本內搜尋」，改用資料集的聲明（原本的已知缺口）。
+- 預熱根數必須少於資料集根數，否則送出時就以 422 拒絕；Donchian 的預熱可到 960 根，超過 96 根的合成資料（驗收觀察 O2）。
+- 研究服務的 build_id 綁定清單（`catos/research_api.py` 的 `RUNTIME_FILES`）加入 Donchian 原始碼、它的 manifest，以及原本漏列的 `catos/research_datasets.py`（驗收觀察 O3）。
+- 合併後 `research_catalog.py` 等檔案的雜湊改變，127.0.0.1:8770 的服務要重啟才會載入；用新程式重驗舊的 local-sim R4 證據會得到 `runtime_digest_changed`，這是預期結果（驗收觀察 O5）。
 
 ### 實測（本機，研究服務，真實資料集）
 
@@ -214,7 +217,9 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 | 優化 entry 96~384/96 × exit 24~72/24（12 格點）、20 trials | 4.26 秒 | 13,254 bytes | 25,782 bytes |
 | 滾動驗證，同上 12 格點、預熱 384、train 2000／test 1000／6 窗（與 SMA 量測同計畫） | 4.85 秒 | 556,397 bytes | 10,377 bytes |
 | 計算量邊緣：entry 96~960/96 × exit 24~48/24（20 格點）、預熱 960、train 4000／test 1800／2 窗（203,920） | 5.25 秒 | 471,763 bytes | 7,159 bytes |
-| 前端預設：12 格點、2 張、本金 1,000、train 2064／test 1032／6 窗（184,752） | 5.17 秒 | 562,531 bytes | 10,365 bytes |
+| 前端預設：12 格點、2 張、本金 1,000、train 2064／test 1032／6 窗（184,752） | 5.17 秒（獨立驗收重跑 4.77 秒） | 562,531 bytes | 10,365 bytes |
+
+原始證據（量測腳本、`measure.json`、各案例 result.json，以及前端預設那次的封存 `ui-default/`）在開發會話的 notes 資料夾 `second-strategy-tools/measure-20261104/`，不在 repo。獨立驗收在 18870 重跑前四列：0.80／4.20／4.82／5.10 秒，bytes 完全相同（`reports/research-second-strategy-acceptance-20261104/acceptance.md`）。
 
 和 SMA 同計畫的比較（Donchian 預熱 384 根、SMA 32 根，所以 OOS 視窗起點晚 352 根，約 3.7 天，期間不完全相同）：
 
@@ -244,3 +249,4 @@ Donchian 各窗 OOS 報酬：-0.015%、+0.140%、-0.075%、-0.281%、-0.393%、+
 - 固定張數，沒有依波動調整部位，也沒有停損、保證金與強平模型。
 - SMA 的週期上限 32 根沒有放寬；若要確認 SMA 是否只輸在週期太短，需要另外放寬再量。
 - 外部證據多在日線以上，這裡是在 15m K 線上做 1～4 天的通道。
+- 研究 catalog 會核對每個策略的 manifest；任何一個策略製品損壞時，整個 catalog 都會失敗（fail-closed），SMA 的研究頁也讀不到 catalog，但 SMA 請求本身的驗證不受影響（驗收觀察 O4，維持現狀）。

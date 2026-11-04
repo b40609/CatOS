@@ -65,7 +65,7 @@ FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-l
 
 工具每次請求至少間隔 0.25 秒、單次最多 150 次請求，遇到缺口、未收盤 K 線、分頁行為不符或資金費不完整就停止，不寫入任何檔案。
 
-滾動驗證（walk-forward）可直接用這份資料：前端「滾動驗證」頁（`#/validation`）或 POST `/api/research/validations`。結果 schema 是 `catos.research.validation-result.v2`：逐根環境標籤改為各環境的 K 線數，逐根歸屬只留各環境彙總，各窗樣本外權益曲線超過上限時取樣，`data/okx` 的檔案在來源快照裡只記路徑與 sha256；績效與分環境合計仍以全部 K 線計算。送出時另檢查計算量 `windows × (候選數 × (warmup + train) + warmup + test) <= 250,000`，環境分類的回看根數上限 512，避免超過 30 秒逾時。本機以研究服務實測（6 窗、4 個候選、train 2000／test 1000）：4.35 秒，result.json 599,573 bytes。欄位見 `docs/research-validation-api.md`，方案比較與更多量測見 `docs/research-real-data-plan.md`。
+滾動驗證（walk-forward）可直接用這份資料：前端「滾動驗證」頁（`#/validation`）或 POST `/api/research/validations`。結果 schema 是 `catos.research.validation-result.v2`：逐根環境標籤改為各環境的 K 線數，逐根歸屬只留各環境彙總，各窗樣本外權益曲線超過上限時取樣，`data/okx` 的檔案在來源快照裡只記路徑與 sha256；績效與分環境合計仍以全部 K 線計算。送出時另檢查計算量 `windows × (候選數 × (warmup + train) + warmup + test) <= 250,000`，環境分類的回看根數上限 512，避免超過 30 秒逾時。本機以研究服務實測（6 窗、4 個候選、train 2000／test 1000）：4.35 秒，result.json 599,573 bytes（上一個工作包量測；之後來源快照內嵌的引擎原始碼變大，同一請求的 result.json 會略大，結果本體相同）。欄位見 `docs/research-validation-api.md`，方案比較與更多量測見 `docs/research-real-data-plan.md`。
 
 第二個策略 Donchian 通道突破（`donchian-breakout`，2026-11-04 使用者選定）：收盤突破前 `entry_bars` 根的最高價做多、跌破最低價做空，收盤跌破／突破前 `exit_bars` 根的反向極值就平倉。`entry_bars` 2～960、`exit_bars` 1～959 且須小於 `entry_bars`，預熱至少涵蓋最高的 `entry_bars`。三個研究頁的送出對話框都可選策略。研究服務實測 12 格點（entry 96~384/96 × exit 24~72/24）、train 2000／test 1000／6 窗：4.85 秒，result.json 556,397 bytes。和 SMA 同計畫比較，成交從 582 筆降到 55 筆、淨損從 338.51 降到 58.52 USDT，但扣成本前的價格損益仍為負，6 窗 2 窗為正。比較與量測見 `docs/research-real-data-plan.md` 的「第二個策略」。
 
