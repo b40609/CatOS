@@ -9,8 +9,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research
-from catos.data_io import load_candles_csv
+from catos import research, research_datasets
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,7 +40,7 @@ ENGINE_FILES = (
     "catos/research_catalog.py", "catos/research_worker.py",
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
-    "catos/research_validation_job.py",
+    "catos/research_validation_job.py", "catos/research_datasets.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -49,7 +48,10 @@ DEFAULT_REQUEST = {
     "initial_balance": "1000", "fee_rate": "0.0005",
     "slippage_bps": "2", "warmup_bars": 2,
 }
-MAX_BARS = 512
+# The Decimal core runs ~45k bars/s locally; the binding limit is output size,
+# so equity/drawdown curves above MAX_CURVE_POINTS are sampled in the payload.
+MAX_BARS = 20_000
+MAX_CURVE_POINTS = 2_000
 MAX_RUNS = 200
 TIMEOUT_SECONDS = 30
 MAX_OUTPUT_BYTES = 2_000_000
@@ -180,7 +182,37 @@ def load_strategy_manifest():
     return validate_strategy_manifest(value)
 
 
-def provenance():
+SYNTHETIC_CONTRACT = research.ContractSpec(
+    "BTC-USDT-SWAP", Decimal("0.01"), Decimal("0.01"), Decimal("1"), Decimal("1"))
+
+
+def _synthetic_dataset():
+    return research_datasets.Dataset(
+        dataset_id=DATASET_ID, name="合成 BTC 15m · 96 根已收盤 K 線", source="synthetic_closed_bars",
+        candles_path=DATA_PATH, contract=SYNTHETIC_CONTRACT, timeframe_ms=900_000, bars=96,
+        start_ms=None, end_ms=None,
+        files=((DATA_PATH.relative_to(ROOT).as_posix(), file_hash(DATA_PATH)),),
+        funding_path=None, notice="合成資料；不代表歷史市場績效。資金費事件明示為空。",
+    )
+
+
+def datasets():
+    """The built-in synthetic fixture first, then every valid fetched dataset."""
+    return [_synthetic_dataset(), *research_datasets.list_datasets()[0]]
+
+
+def resolve_dataset(dataset_id):
+    if dataset_id == DATASET_ID:
+        return _synthetic_dataset()
+    if type(dataset_id) is not str or not research_datasets.DATASET_ID.fullmatch(dataset_id):
+        raise ValueError("unknown_dataset")
+    for dataset in research_datasets.list_datasets()[0]:
+        if dataset.dataset_id == dataset_id:
+            return dataset
+    raise ValueError("unknown_dataset")
+
+
+def provenance(dataset_id=DATASET_ID):
     artifact = load_strategy_manifest()
     return {
         "strategy": {
@@ -194,8 +226,7 @@ def provenance():
                 "provenance": dict(artifact["provenance"]),
             },
         },
-        "dataset": {"id": DATASET_ID, "source": "synthetic_closed_bars",
-                    "sha256": file_hash(DATA_PATH)},
+        "dataset": resolve_dataset(dataset_id).provenance(),
         "engine_sha256": files_hash(ENGINE_FILES),
     }
 
@@ -219,8 +250,7 @@ def validate_request(value):
     # Every execution path revalidates the fixed local artifact manifest and
     # current allowlisted source hash before accepting a registered strategy.
     load_strategy_manifest()
-    if value["dataset_id"] != DATASET_ID:
-        raise ValueError("unknown_dataset")
+    dataset = resolve_dataset(value["dataset_id"])
     params = value["parameters"]
     if type(params) is not dict or set(params) != {"period", "quantity"}:
         raise ValueError("parameters: period and quantity required")
@@ -242,11 +272,8 @@ def validate_request(value):
         raise ValueError("fee_rate: ratio in [0, 0.01] required")
     if not Decimal("0") <= slip <= Decimal("100"):
         raise ValueError("slippage_bps: in [0, 100] required")
-    cfg = research.BacktestConfig(
-        research.ContractSpec("BTC-USDT-SWAP", Decimal("0.01"),
-                              Decimal("0.01"), Decimal("1"), Decimal("1")),
-        900_000, balance, fee, slip, (),
-    )
+    # Funding events are attached when the dataset's bars are loaded.
+    cfg = research.BacktestConfig(dataset.contract, dataset.timeframe_ms, balance, fee, slip, ())
     # A JSON round-trip owns an immutable-by-convention request copy.
     snapshot = json.loads(json_text(value))
     return snapshot, cfg, period, quantity
@@ -284,9 +311,8 @@ def catalog():
         "strategies": [{**source["strategy"], "name": "SMA 趨勢（Long / Flat）",
                         "parameters": {"period": {"min": 2, "max": 32},
                                        "quantity": {"unit": "contracts"}}}],
-        "datasets": [{**source["dataset"], "name": "合成 BTC 15m · 96 根已收盤 K 線",
-                      "symbol": "BTC-USDT-SWAP", "timeframe": "15m", "bars": 96,
-                      "contract": asdict(validate_request(DEFAULT_REQUEST)[1].contract)}],
+        "datasets": [{**dataset.describe(), "contract": asdict(dataset.contract)}
+                     for dataset in datasets()],
         "defaults": DEFAULT_REQUEST,
         "optimization": {"defaults": DEFAULT_OPTIMIZATION, "max_trials": MAX_TRIALS,
                          "score_name": "return_pct", "direction": "maximize",
@@ -299,7 +325,8 @@ def catalog():
         "limits": {"concurrent_tasks": 1, "max_bars": MAX_BARS,
                    "timeout_seconds": TIMEOUT_SECONDS, "max_runs": MAX_RUNS,
                    "max_output_bytes": MAX_OUTPUT_BYTES},
-        "model": "Synthetic only; market at next open; explicit zero funding events.",
+        "model": ("Market at next open plus explicit slippage; funding from the dataset "
+                  "(synthetic: none); no order book, margin or liquidation model."),
     }
 
 
@@ -334,16 +361,42 @@ def _strategy_from_verified_snapshot(snapshot):
 
 def load_registered_strategy(expected_source):
     """Execute only a verified immutable snapshot of the approved strategy source."""
-    if provenance() != expected_source:
+    dataset_id = expected_source["dataset"]["id"]
+    if provenance(dataset_id) != expected_source:
         raise ValueError("source_changed_restart_required")
     artifact = load_strategy_manifest()
     snapshot, source_hash = _verified_strategy_source_snapshot(artifact["source_files"])
     if source_hash != artifact["sha256"] or source_hash != APPROVED_STRATEGY_SHA256:
         raise ValueError("artifact_hash_mismatch")
     RegisteredSMA = _strategy_from_verified_snapshot(snapshot)
-    if provenance() != expected_source:
+    if provenance(dataset_id) != expected_source:
         raise ValueError("source_changed_during_strategy_load")
     return RegisteredSMA
+
+
+def load_dataset_bars(dataset_id, config):
+    """Hash-checked bars and funding for a registered dataset, within MAX_BARS."""
+    bars, config = resolve_dataset(dataset_id).load(config)
+    if len(bars) > MAX_BARS:
+        raise ValueError("dataset_bar_limit")
+    return bars, config
+
+
+def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
+    """Indices kept for the payload chart: per bucket the deepest drawdown, plus the last point.
+
+    Performance figures are computed on every bar before sampling; only the
+    returned chart points are thinned so large datasets stay under the output cap.
+    """
+    total = len(drawdowns)
+    if total <= limit:
+        return list(range(total))
+    size = -(-total // (limit - 1))
+    keep = [max(range(start, min(start + size, total)), key=lambda i: (drawdowns[i], -i))
+            for start in range(0, total, size)]
+    if keep[-1] != total - 1:
+        keep.append(total - 1)
+    return keep
 
 
 def execute_request(request, expected_source):
@@ -352,9 +405,8 @@ def execute_request(request, expected_source):
     # snapshotted and hash-verified before execution so validation and code
     # execution cannot observe different strategy file contents.
     RegisteredSMA = load_registered_strategy(expected_source)
-    bars = load_candles_csv(DATA_PATH, config=config)
-    if len(bars) > MAX_BARS:
-        raise ValueError("dataset_bar_limit")
+    dataset = resolve_dataset(snapshot["dataset_id"])
+    bars, config = load_dataset_bars(dataset.dataset_id, config)
     result = research.backtest(
         strategy=lambda: RegisteredSMA(period, quantity), candles=bars,
         config=config, warmup_bars=snapshot["warmup_bars"],
@@ -366,13 +418,20 @@ def execute_request(request, expected_source):
             peak = max(peak, point.equity)
             drawdown.append({"time_ms": point.time_ms,
                              "drawdown_pct": (peak - point.equity) / peak * Decimal("100")})
+    result_payload = asdict(result)
+    keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
     payload = {
         "request": snapshot, "provenance": expected_source,
-        "result": asdict(result), "drawdown_curve": drawdown,
-        "data_notice": "合成資料；不代表歷史市場績效。資金費事件明示為空。",
+        "result": result_payload, "drawdown_curve": drawdown,
+        "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }
+    if len(keep) < len(drawdown):
+        result_payload["equity_curve"] = [result_payload["equity_curve"][i] for i in keep]
+        payload["drawdown_curve"] = [drawdown[i] for i in keep]
+        payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
+                                     "method": "bucket_deepest_drawdown"}
     report = render_report(result)
-    if provenance() != expected_source:
+    if provenance(dataset.dataset_id) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report

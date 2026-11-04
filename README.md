@@ -11,7 +11,8 @@ v1 已於 2026-11-04 通過正式獨立驗收（`reports/v1-acceptance-20261104/
 | 執行環境 | 僅 local-sim：`catos/fake_exchange.py` 合成撮合，固定模板 8 根＋2 根預熱的合成 15m K 線 |
 | 策略 | 一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略 |
 | Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
-| OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter、`tools/fetch_okx_candles.py`）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
+| OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter）與研究資料抓取工具 `tools/fetch_okx_candles.py`（三個公開端點、不用金鑰）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
+| 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口、資金費完整的資料集，不符即拒絕。回測與優化可選資料集；滾動驗證目前只接受合成資料（真實資料的輸出會超過 2 MB 上限）。見 `docs/research-real-data-plan.md` |
 | 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
 | HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
 | 前端 | 戰情台、實例監控、風控中心、策略中心、系統日誌與側欄狀態列讀取控制面真資料；回測／優化頁接研究 HTTP；設定頁讀取服務版本；策略覆盤與市場情報頁標示「v1 未啟用」 |
@@ -53,6 +54,16 @@ npm --prefix frontend/cat-os-vite ci
 | 整合測試隔離埠 | `18870`／`18890` | 由 `tests/simulation_integration_test.mjs` 自行啟停，不碰 8770／8890 |
 
 FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-laptop-dev.ps1`）會核對 8890 的前端身分並在未啟動時以 Vite 啟動前端後開瀏覽器；遇到不明 owner 不接管。該腳本本輪未執行驗證。
+
+## 研究資料
+
+抓取需要授權（AGENTS.md：採集不因工作包自動授權）。2026-11-04 已授權的範圍是 BTC-USDT-SWAP、15m、90 天，只呼叫三個公開端點。另一台機器要用同一份資料時，以 `--end-ms` 重抓同一區間；資料集 id 相同，`candles.csv` 與 `funding.csv` 的雜湊應一致（`instrument.json` 可能因 OKX 更新欄位而不同）：
+
+```bash
+.venv/Scripts/python.exe -B tools/fetch_okx_candles.py --inst-id BTC-USDT-SWAP --bar 15m --days 90 --end-ms 1793764800000
+```
+
+工具每次請求至少間隔 0.25 秒、單次最多 150 次請求，遇到缺口、未收盤 K 線、分頁行為不符或資金費不完整就停止，不寫入任何檔案。
 
 ## 測試
 
@@ -126,6 +137,7 @@ FastAPI (127.0.0.1:8770)  catos/workspace_api.py
 - `AGENTS.md`：專案規則、不變量、授權邊界與工作流程。
 - `docs/simulation-api-contract-draft.md`：local-sim 控制面投影 HTTP 契約與第 3／4 步、v1.1 實作紀錄。
 - `docs/next-steps.md`：v1 之後的候選工作包、建議順序與收尾雜項。
+- `docs/research-real-data-plan.md`：研究線（真實歷史 K 線）方案、採集授權範圍與實作紀錄。
 - `docs/backend-frontend-integration-map.md`：後端路由與前端頁面的對應。
 - `docs/worker.md`：Worker／IPC 契約與策略登錄。
 - `docs/market-intel.md`：Yaozi 市場情報線（v1 凍結）。

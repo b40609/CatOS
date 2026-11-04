@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { OptimizationRequest } from "@/adapters/research-api-adapter";
 import { useOptimizationResearch } from "@/hooks/use-optimization-research";
+import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
+import { formatDecimal } from "@/lib/format";
 
 export const Route = createFileRoute("/optimization")({
   head: () => ({
@@ -59,11 +61,13 @@ function OptimizationPage() {
   const [periodStep, setPeriodStep] = useState(1);
   const [nTrials, setNTrials] = useState(8);
   const [seed, setSeed] = useState(42);
+  const [datasetId, setDatasetId] = useState<string | null>(null);
+  const dataset = pickDataset(catalog?.datasets, datasetId);
 
   const handleSubmitRealOpt = async () => {
     const req: OptimizationRequest = {
       backtest: {
-        strategy_id: "sma-trend", dataset_id: "synthetic-btc-15m-v1",
+        strategy_id: "sma-trend", dataset_id: dataset?.id || "synthetic-btc-15m-v1",
         parameters: { period: 2, quantity: "2" }, initial_balance: "1000",
         fee_rate: "0.0005", slippage_bps: "2", warmup_bars: Math.max(8, periodHigh),
       },
@@ -322,17 +326,18 @@ function OptimizationPage() {
                                 <td className="py-2.5 px-3 text-right font-semibold text-foreground">
                                   {t.params.period}
                                 </td>
-                                <td className="py-2.5 px-3 text-right font-bold text-primary">
-                                  {t.score_decimal}
+                                {/* 顯示取兩位小數；title 保留完整 Decimal 字串供核對 */}
+                                <td className="py-2.5 px-3 text-right font-bold text-primary" title={t.score_decimal ?? undefined}>
+                                  {formatDecimal(t.score_decimal, { digits: 2, sign: true, suffix: "%" }, "--")}
                                 </td>
-                                <td className="py-2.5 px-3 text-right font-semibold text-foreground">
-                                  {t.performance ? `${t.performance.net_pnl} USDT` : "--"}
+                                <td className="py-2.5 px-3 text-right font-semibold text-foreground" title={t.performance?.net_pnl}>
+                                  {t.performance ? formatDecimal(t.performance.net_pnl, { digits: 2, sign: true, suffix: " USDT" }) : "--"}
                                 </td>
-                                <td className="py-2.5 px-3 text-right text-muted-foreground">
-                                  {t.performance ? t.performance.fees : "--"}
+                                <td className="py-2.5 px-3 text-right text-muted-foreground" title={t.performance?.fees}>
+                                  {t.performance ? formatDecimal(t.performance.fees, { digits: 2 }) : "--"}
                                 </td>
-                                <td className="py-2.5 px-3 text-right text-muted-foreground">
-                                  {t.performance ? `${t.performance.max_drawdown_pct}%` : "--"}
+                                <td className="py-2.5 px-3 text-right text-muted-foreground" title={t.performance?.max_drawdown_pct}>
+                                  {t.performance ? formatDecimal(t.performance.max_drawdown_pct, { digits: 2, suffix: "%" }) : "--"}
                                 </td>
                                 <td className="py-2.5 px-3 text-right text-muted-foreground">
                                   {t.performance ? t.performance.trade_count : "--"}
@@ -372,16 +377,19 @@ function OptimizationPage() {
               <Sparkles className="size-4 text-primary" /> 發起 SMA 參數優化任務
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              符合後端 POST /api/research/optimizations 契約（合成 BTC 15m 資料 · 96 根）
+              符合後端 POST /api/research/optimizations 契約 · 樣本內搜尋
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs font-mono">
             <div className="rounded border border-primary/25 bg-primary/5 p-2.5 space-y-1 text-t3">
               <span className="text-primary font-semibold">固定登錄模型</span>
-              <p className="text-muted-foreground text-t2">
-                策略: RegisteredSMA (sma-trend) · 資料: synthetic-btc-15m-v1
-              </p>
+              <p className="text-muted-foreground text-t2">策略: RegisteredSMA (sma-trend)</p>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-t2 text-muted-foreground">資料集</Label>
+              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={setDatasetId} />
             </div>
 
             <div className="grid grid-cols-3 gap-2">

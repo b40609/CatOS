@@ -4,10 +4,9 @@ from dataclasses import asdict
 from html import escape
 import json
 
-from catos.data_io import load_candles_csv
 from catos.optimization import IntRange, optimize
 from catos.research_catalog import (
-    DATA_PATH, MAX_BARS, json_text, load_registered_strategy, provenance,
+    json_text, load_dataset_bars, load_registered_strategy, provenance, resolve_dataset,
     validate_optimization_request,
 )
 
@@ -17,9 +16,8 @@ def execute_optimization(request, expected_source):
     # Keep the strategy import in the calculation process and share the same
     # approved-artifact gate as backtests.
     RegisteredSMA = load_registered_strategy(expected_source)
-    bars = load_candles_csv(DATA_PATH, config=config)
-    if len(bars) > MAX_BARS:
-        raise ValueError("dataset_bar_limit")
+    dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
+    bars, config = load_dataset_bars(dataset.dataset_id, config)
     period = snapshot["search_space"]["period"]
     result = optimize(
         strategy_factory=lambda params: RegisteredSMA(params["period"], quantity),
@@ -29,7 +27,7 @@ def execute_optimization(request, expected_source):
         n_trials=snapshot["n_trials"], seed=snapshot["seed"],
         warmup_bars=snapshot["backtest"]["warmup_bars"],
     )
-    if provenance() != expected_source:
+    if provenance(dataset.dataset_id) != expected_source:
         raise ValueError("source_changed_during_run")
     trials = [{"number": trial.number, "state": trial.state,
                "params": dict(trial.params), "score_decimal": trial.score_decimal,
@@ -41,7 +39,7 @@ def execute_optimization(request, expected_source):
                "objective": {"name": result.score_name, "direction": result.direction,
                              "formula": "Decimal performance.return_pct; Float only for Optuna ranking"},
                "seed": result.seed, "optuna_version": result.optuna_version,
-               "data_notice": "合成資料的樣本內搜尋；未執行樣本外檢驗，不代表市場績效。"}
+               "data_notice": f"樣本內搜尋，未執行樣本外檢驗，不代表市場績效。{dataset.notice}"}
     payload = json.loads(json_text(payload))
     rows = "".join(
         "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(

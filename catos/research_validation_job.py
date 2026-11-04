@@ -1,4 +1,4 @@
-"""Registered synthetic validation adapter; persistence belongs to ResearchService."""
+"""Registered validation adapter over a registered dataset; persistence belongs to ResearchService."""
 
 from hashlib import sha256
 from html import escape
@@ -8,14 +8,14 @@ import platform
 import optuna
 import packaging
 
-from catos.data_io import load_candles_csv
 from catos.optimization import IntRange
 from catos.research_catalog import (
-    DATA_PATH, DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_CANDIDATES,
+    DATASET_ID, DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_CANDIDATES,
     MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, STRATEGY_FILES,
-    STRATEGY_MANIFEST, decimal_string, json_text, load_registered_strategy,
-    provenance, validate_request,
+    STRATEGY_MANIFEST, decimal_string, json_text, load_dataset_bars, load_registered_strategy,
+    provenance, resolve_dataset, validate_request,
 )
+from catos.research_datasets import rel_path
 from catos.research_regimes import RegimeRule, regime_walk_forward, regimes_json
 from catos.research_validation import WalkForwardPlan
 
@@ -32,6 +32,11 @@ def validate_validation_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_VALIDATION):
         raise ValueError("validation: exact registered fields required")
     backtest, config, _, quantity = validate_request(value["backtest"])
+    # Per-bar regime labels, per-window curves and the HTML report exceed the 2 MB
+    # output cap on a fetched dataset (13.7 MB measured on 8,640 bars), so reject
+    # at submission instead of failing after the computation.
+    if backtest["dataset_id"] != DATASET_ID:
+        raise ValueError("validation_supports_synthetic_dataset_only")
     space = value["search_space"]
     if type(space) is not dict or set(space) != {"period"}:
         raise ValueError("search_space: only registered period range is supported")
@@ -68,9 +73,7 @@ def validate_validation_request(value):
     volatility = decimal_string(rule["high_volatility_bps"], "high_volatility_bps", positive=True)
     if efficiency > 1:
         raise ValueError("trend_efficiency: must be <= 1")
-    bars = load_candles_csv(DATA_PATH, config=config)
-    if len(bars) > MAX_BARS:
-        raise ValueError("dataset_bar_limit")
+    bars, config = load_dataset_bars(backtest["dataset_id"], config)
     if backtest["warmup_bars"] + train + windows * test > len(bars):
         raise ValueError("insufficient candles for the explicit walk-forward plan")
     snapshot = json.loads(json_text(value))
@@ -83,9 +86,10 @@ def validate_validation_request(value):
 def _reproduction(expected_source):
     # Fixed, inspected source/data paths only. Never follow request-supplied paths
     # or execute archived code. These materials travel through the existing writer.
+    dataset = resolve_dataset(expected_source["dataset"]["id"])
     names = tuple(dict.fromkeys((*ENGINE_FILES, *STRATEGY_FILES,
                                  STRATEGY_MANIFEST.relative_to(ROOT).as_posix(),
-                                 DATA_PATH.relative_to(ROOT).as_posix())))
+                                 *(path for path, _ in dataset.files))))
     files = []
     for name in names:
         content = (ROOT / name).read_bytes()
@@ -97,7 +101,8 @@ def _reproduction(expected_source):
         actual = sha256(json_text([(name, hashes[name]) for name in names]).encode("utf-8")).hexdigest()
         if actual != expected:
             raise ValueError("source_changed_during_archive")
-    if (hashes[DATA_PATH.relative_to(ROOT).as_posix()] != expected_source["dataset"]["sha256"]
+    if (any(hashes[path] != sha for path, sha in dataset.files)
+            or hashes[rel_path(dataset.candles_path)] != expected_source["dataset"]["sha256"]
             or hashes[STRATEGY_MANIFEST.relative_to(ROOT).as_posix()]
             != expected_source["strategy"]["artifact_manifest"]["sha256"]):
         raise ValueError("source_changed_during_archive")
@@ -120,7 +125,8 @@ def execute_validation(request, expected_source):
         plan=plan, max_candidates=snapshot["max_candidates"], max_runs=snapshot["max_runs"],
         direction="maximize",
     )
-    if provenance() != expected_source:
+    dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
+    if provenance(dataset.dataset_id) != expected_source:
         raise ValueError("source_changed_during_run")
     payload = {
         "schema": SCHEMA, "kind": "validation", "request": snapshot,
@@ -129,7 +135,7 @@ def execute_validation(request, expected_source):
                       "formula": "Decimal performance.return_pct; no float conversion"},
         "result": json.loads(regimes_json(result)),
         "evaluation_complete": result.validation.complete,
-        "data_notice": "合成資料；各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。",
+        "data_notice": f"各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。{dataset.notice}",
     }
     # A read-only downloadable report, not a new interactive frontend.
     report = ("<!doctype html><html lang='zh-TW'><meta charset='utf-8'>"
