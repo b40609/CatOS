@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
 import { spawn, execFile } from 'node:child_process';
@@ -18,8 +19,18 @@ import ts from 'typescript';
 const frontend = fileURLToPath(new URL('..', import.meta.url));
 const repo = path.resolve(frontend, '../..');
 const python = process.argv[2] ?? path.join(repo, '.venv', 'Scripts', 'python.exe');
-const chrome = process.argv[3] ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const screens = process.env.CATOS_SCREENS ?? 'C:/Users/kai/Desktop/CatOS-screens';
+// Newer desktop Chrome can print an empty --dump-dom, so prefer Playwright's chrome-headless-shell.
+function headlessShell() {
+  const root = path.join(process.env.LOCALAPPDATA ?? '', 'ms-playwright');
+  if (!existsSync(root)) return undefined;
+  const dir = readdirSync(root).filter(d => d.startsWith('chromium_headless_shell-')).sort().pop();
+  const exe = dir && path.join(root, dir, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe');
+  return exe && existsSync(exe) ? exe : undefined;
+}
+const chrome = process.argv[3] ?? process.env.CATOS_CHROME ?? headlessShell()
+  ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+// Short default dir: Chrome cannot write a screenshot path over the 260-char Windows limit.
+const screens = process.env.CATOS_SCREENS ?? path.join(os.tmpdir(), 'catos-screens');
 const evidence = await fs.mkdtemp(path.join(os.tmpdir(), 'catos-sim-integration-'));
 const origin = 'http://127.0.0.1:18890';
 const passed = [];
@@ -121,6 +132,7 @@ try {
   const FORBIDDEN = ['NaN', 'undefined', 'tabby', 'calico', 'mochi', 'shiro', 'BOT-BTC-15M', '61,480', '74,535', '125,480', '$69,888', '--'];
   async function page(route, name) {
     const shot = path.join(screens, `step4-${name}.png`);
+    assert.ok(shot.length < 260, `screenshot path over 260 chars, set a shorter CATOS_SCREENS: ${shot}`);
     const run = (args) => promisify(execFile)(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--hide-scrollbars',
       '--window-size=1440,900', '--force-device-scale-factor=1', '--virtual-time-budget=20000', ...args, `${origin}/#${route}`],
       { maxBuffer: 64 * 1024 * 1024, windowsHide: true });

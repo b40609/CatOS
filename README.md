@@ -88,7 +88,7 @@ npm --prefix frontend/cat-os-vite run build
 node frontend/cat-os-vite/tests/simulation_integration_test.mjs
 ```
 
-需要本機可用的 Chrome／Edge headless 與已建好的 `.venv`。`frontend/cat-os-vite/tests/integration_baseline_test.mjs` 需要 playwright（未納入依賴），本輪未執行。
+需要本機可用的 Chrome／Edge headless 與已建好的 `.venv`。新版 Chrome 的 `--dump-dom` 可能輸出空白，可用環境變數 `CATOS_CHROME` 指到 Playwright 的 `chrome-headless-shell.exe`（未指定時會自動找 `%LOCALAPPDATA%\ms-playwright` 下的版本）；截圖預設寫到系統暫存目錄的 `catos-screens`，可用 `CATOS_SCREENS` 覆寫。`frontend/cat-os-vite/tests/integration_baseline_test.mjs` 需要 playwright（未納入依賴），本輪未執行。
 
 ## 架構
 
