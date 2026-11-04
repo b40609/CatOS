@@ -227,7 +227,7 @@ POST `/api/research/validations`；同一任務產生三項能力，不猜另一
 }
 ```
 
-限制：HTTP 驗證至少 2 個候選、最多 20，預熱 >= high；windows 1～8。max_runs 是此驗證計算預算，最多 100；windows ×（候選數＋1）不得超過預算。warmup＋train_bars＋windows × test_bars 不得超過資料長度。另須 windows ×（候選數 ×（warmup＋train_bars）＋warmup＋test_bars）<= catalog.validation.max_bar_evaluations（250,000），避免超過 30 秒逾時。train_bars／test_bars 為正整數；lookback_bars 為 1～19,999 整數，trend_efficiency 為 >0 且 <=1 的 Decimal 字串，high_volatility_bps 為正 Decimal 字串。此 API 是確定性網格驗證，不使用 Optuna 隨機搜尋。
+限制：HTTP 驗證至少 2 個候選、最多 20，預熱 >= high；windows 1～8。max_runs 是此驗證計算預算，最多 100；windows ×（候選數＋1）不得超過預算。warmup＋train_bars＋windows × test_bars 不得超過資料長度。另須 windows ×（候選數 ×（warmup＋train_bars）＋warmup＋test_bars）<= catalog.validation.max_bar_evaluations（250,000），避免超過 30 秒逾時。train_bars／test_bars 為正整數；lookback_bars 為 1～512 整數（catalog.validation.max_lookback_bars），trend_efficiency 為 >0 且 <=1 的 Decimal 字串，high_volatility_bps 為正 Decimal 字串。此 API 是確定性網格驗證，不使用 Optuna 隨機搜尋。
 
 回應根層 schema 為 `catos.research.validation-result.v2`（v1 → v2 的差異見[驗證 API 契約](research-validation-api.md)）、kind=validation；最小結果取用路徑：
 

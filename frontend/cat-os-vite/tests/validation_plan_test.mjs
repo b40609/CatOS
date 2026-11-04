@@ -21,7 +21,8 @@ const EXAMPLE = {
   max_candidates: 3, max_runs: 12,
 };
 const LIMITS = { example_request: EXAMPLE, max_candidates: 20, max_runs: 100, max_windows: 8,
-  max_bar_evaluations: 250_000, max_curve_points: 1_000, score_name: 'return_pct', direction: 'maximize', notice: '' };
+  max_bar_evaluations: 250_000, max_lookback_bars: 512, max_curve_points: 1_000,
+  score_name: 'return_pct', direction: 'maximize', notice: '' };
 const SYNTHETIC = { id: 'synthetic-btc-15m-v1', source: 'synthetic_closed_bars', bars: 96 };
 const FETCHED = { id: 'okx-btc-usdt-swap-15m-20260806-20261104', source: 'okx_public_history', bars: 8640 };
 
@@ -66,4 +67,19 @@ test('problems mirror the backend preflight before submission', () => {
   assert.ok(plan.validationProblems(runs, FETCHED, LIMITS).some((p) => p.includes('次回測')));
   const grid = { ...base, periodStep: 5 };
   assert.ok(plan.validationProblems(grid, FETCHED, LIMITS).some((p) => p.includes('候選週期')));
+});
+
+test('regime rule fields are checked as exact Decimal text and a bounded lookback', () => {
+  const base = plan.defaultValidationForm(FETCHED, EXAMPLE);
+  const problems = (over) => plan.validationProblems({ ...base, ...over }, FETCHED, LIMITS);
+  assert.deepEqual(problems({ lookbackBars: 512, trendEfficiency: '1', highVolatilityBps: '0.000001' }), []);
+  assert.ok(problems({ lookbackBars: 513 }).some((p) => p.includes('回看根數需在 1~512')));
+  assert.ok(problems({ lookbackBars: 0 }).some((p) => p.includes('回看根數')));
+  for (const bad of ['0', '1.0000000000000000000001', 'abc', '0.5.1', '-0.5', '']) {
+    assert.ok(problems({ trendEfficiency: bad }).some((p) => p.includes('趨勢效率門檻')), bad);
+  }
+  for (const bad of ['0', '0.0', '1e3', 'NaN', '25bps', '']) {
+    assert.ok(problems({ highVolatilityBps: bad }).some((p) => p.includes('高波動門檻')), bad);
+  }
+  assert.ok(problems({ highVolatilityBps: '1'.repeat(65) }).some((p) => p.includes('高波動門檻')));
 });

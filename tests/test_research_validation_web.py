@@ -149,6 +149,7 @@ class ValidationJobTests(unittest.TestCase):
             {"search_space": {"quantity": {"low": 1, "high": 2, "step": 1}}},
             {"backtest": {**request_copy()["backtest"], "warmup_bars": 2}},
             {"regime_rule": {"lookback_bars": 0, "trend_efficiency": "0.5", "high_volatility_bps": "250"}},
+            {"regime_rule": {"lookback_bars": 513, "trend_efficiency": "0.5", "high_volatility_bps": "250"}},
             {"regime_rule": {"lookback_bars": 4, "trend_efficiency": 0.5, "high_volatility_bps": "250"}},
             {"regime_rule": {"lookback_bars": 4, "trend_efficiency": "1.1", "high_volatility_bps": "250"}},
             {"regime_rule": {"lookback_bars": 4, "trend_efficiency": "NaN", "high_volatility_bps": "250"}},
@@ -266,7 +267,8 @@ class ValidationApiTests(unittest.TestCase):
                 version = client.get("/api/research/version").json()
                 headers = {"X-CatOS-Build": version["build_id"], "Origin": "http://127.0.0.1:8770"}
                 limits = client.get("/api/research/catalog").json()["validation"]
-                self.assertEqual((limits["max_bar_evaluations"], limits["max_curve_points"]), (250_000, 1_000))
+                self.assertEqual((limits["max_bar_evaluations"], limits["max_lookback_bars"],
+                                  limits["max_curve_points"]), (250_000, 512, 1_000))
                 example = limits["example_request"]
                 endpoint = "/api/research/validations"
                 for changes, code in (({"X-CatOS-Build": "old"}, 409), ({"Origin": "http://evil.invalid"}, 403)):
