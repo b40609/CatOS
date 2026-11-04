@@ -395,3 +395,13 @@ v1 規則：
 - 甜甜圈「佔預算 x%」與進度條比例、權益曲線座標、sparkline 由 `toPlotNumber` 以浮點計算（幾何／標註），金額文字一律來自後端字串；後端未提供曝險占比欄位，若要避免前端換算需另加 `exposure_ratio`。
 - 「保證金佔用」分頁標示不適用（無保證金模型），僅顯示 `margin_ok` 布林事實；持倉表的 ROE／資金費率／強平／P6 欄顯示「不適用／未啟用」，平倉與重啟按鈕停用並標「未接線」。
 - 自測：`npm test`（check:tokens＋10 個單元測試）、`tsc --noEmit`、`npm run build` 零錯誤；新增 `tests/simulation_integration_test.mjs`（隔離 18870 真 runner＋18890 Vite proxy＋headless Chrome DOM 檢查與截圖；`tests/integration_http_fixture.py` 加第三個參數 `real`）。既有 `tests/integration_baseline_test.mjs` 需要 playwright（本機未安裝），且其最後兩個戰情台檢查在本輪前即引用不存在的 `展示環境模式切換` 選擇器，本輪未改。
+
+## 10. v1.1 全站真資料（2026-11-04，分支 `feat/v1.1-real-data-pages`）
+
+前端其餘頁面改讀同一份控制面投影（`catStore` 已由 `stateAdapter` 全域輪詢），不新增後端端點：
+- **風控中心**（`pages/risk.tsx`）：讀 `risk`（`limits`／`basis`／`snapshot`／`derived`）與事件中 `category == "RISK"` 或 WARN／ERROR 的項目。儀表弧度用 `toPlotNumber`（只作幾何）；超限判斷用新增的 `compareDecimal`（`lib/format.ts`，以整數位數精確比較 Decimal 字串，不經浮點）；文字一律來自後端字串。顯示 `risk.Snapshot` 四個 fail-closed 事實旗標與 `reduction_conflict`。re-arm／門檻修改仍無 HTTP，按鈕標示「未接線」；原本的前端假 re-arm 對話框與規則滑桿移除。
+- **系統日誌**（`pages/logs.tsx`）：讀 store 的 `events`（依 `seq` 遞增，前端最多保留 400 筆，後端 `omitted` 照實顯示）。TRADE 篩選等於 `category == "ORDER"`，其餘依 `level`；行標題沿用戰情台事件卡的 `eventTitle`。
+- **策略中心**（`pages/strategies.tsx`）：讀 `strategies`、綁定的 `bots` 與 `StateAdapter.equityCurve`（本次 run 權益）。控制面沒有年化、夏普等績效欄位，相關卡片移除；策略啟停沒有 HTTP，開關移除。
+- **策略覆盤**（`pages/review.tsx`）：原頁面是 sin 波產生的曲線與寫死的「實盤淨值」等數字，並非 README 原先所寫的「接研究 HTTP」。v1 沒有 Demo／實盤歷史可覆盤，改為標示「v1 未啟用」並連到回測、實例監控與風控中心。
+- 刪除已無引用的 `lib/mock/{data,terminal,terminal.test}.ts`、`hooks/use-live.ts`、`components/ui/{slider,switch}.tsx`，以及 `@radix-ui/react-slider`、`@radix-ui/react-switch` 依賴（lockfile 已更新）。
+- 自測：`tsc --noEmit`、`npm test`（check:tokens＋11 個單元測試，新增 `compareDecimal`）、`npm run build` 零錯誤；`tests/simulation_integration_test.mjs` 擴充為 9 項（新增風控、日誌、策略、覆盤四頁的 DOM 檢查，並把每頁 DOM 文字存入證據資料夾）。另以隔離 18870／18890 在瀏覽器實際操作：空狀態、兩次 run 期間事件即時增加、篩選、搜尋、自動捲動開關與覆盤頁連結。

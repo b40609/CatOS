@@ -105,6 +105,25 @@ export function formatRatioPct(
   return formatDecimal(shiftDecimal(value, 2), { digits: 2, sign: true, ...options, suffix: '%' }, fallback);
 }
 
+/** Exact comparison of two Decimal strings; null when either side is missing or malformed. */
+export function compareDecimal(
+  a: DecimalString | null | undefined,
+  b: DecimalString | null | undefined,
+): -1 | 0 | 1 | null {
+  if (a === null || a === undefined || b === null || b === undefined) return null;
+  const left = parse(a);
+  const right = parse(b);
+  if (!left || !right) return null;
+  const digits = Math.max(left.frac.length, right.frac.length);
+  const scaled = (p: Parts) => {
+    const magnitude = BigInt(p.int + p.frac.padEnd(digits, '0'));
+    return p.negative ? -magnitude : magnitude;
+  };
+  const x = scaled(left);
+  const y = scaled(right);
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 export type Sign = 'positive' | 'negative' | 'zero';
 
 export function signOf(value: DecimalString | null | undefined): Sign | null {

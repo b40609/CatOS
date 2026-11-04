@@ -276,3 +276,16 @@ test('equityCurve picks signal.account.equity of the given run only, as strings'
   assert.deepEqual(StateAdapter.equityCurve(events, RUN).map((p) => p.equity), ['1000.00000001', '1003.21']);
   assert.deepEqual(StateAdapter.equityCurve(events, null), []);
 });
+
+test('compareDecimal compares Decimal strings exactly, beyond float precision', async () => {
+  const { compareDecimal } = await server.ssrLoadModule('/src/lib/format.ts');
+  assert.equal(compareDecimal('1.10', '1.1'), 0);
+  assert.equal(compareDecimal('2.5', '3.0'), -1);
+  assert.equal(compareDecimal('-0.5', '0'), -1);
+  assert.equal(compareDecimal('0E-7', '0.000'), 0);
+  // 9007199254740993 is not representable as a double; Number() would call these equal.
+  assert.equal(compareDecimal('9007199254740993.1', '9007199254740993.09'), 1);
+  assert.equal(compareDecimal('9007199254740993', '9007199254740992'), 1);
+  assert.equal(compareDecimal(null, '1'), null);
+  assert.equal(compareDecimal('abc', '1'), null);
+});
