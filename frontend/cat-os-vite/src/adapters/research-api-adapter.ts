@@ -5,6 +5,8 @@
  *   GET  /api/research/catalog
  *   GET  /api/research/runs
  *   POST /api/research/backtests
+ *   POST /api/research/optimizations
+ *   POST /api/research/validations
  *   GET  /api/research/runs/{run_id}
  *   GET  /api/research/runs/{run_id}/result
  *   GET  /api/research/runs/{run_id}/report
@@ -93,10 +95,16 @@ export interface ResearchCatalog {
     notice: string;
   };
   validation: {
-    example_request: any;
+    example_request: ValidationRequest;
     max_candidates: number;
     max_runs: number;
     max_windows: number;
+    // windows × (candidates × (warmup + train) + warmup + test), checked before execution
+    max_bar_evaluations: number;
+    // Upper bound of regime_rule.lookback_bars (the classifier sums its window at every bar)
+    max_lookback_bars: number;
+    // OOS equity points kept per payload, shared by its windows
+    max_curve_points: number;
     score_name: string;
     direction: string;
     notice: string;
@@ -222,6 +230,128 @@ export interface OptimizationResultPayload {
   };
   seed: number;
   optuna_version: string;
+  data_notice: string;
+  run_id?: string;
+  created_at?: string;
+  build_id?: string;
+}
+
+export interface ValidationRequest {
+  backtest: BacktestRequest;
+  search_space: {
+    period: { low: number; high: number; step: number };
+  };
+  plan: { train_bars: number; test_bars: number; windows: number };
+  regime_rule: {
+    lookback_bars: number;
+    trend_efficiency: string; // Decimal string in (0, 1]
+    high_volatility_bps: string; // Decimal string > 0
+  };
+  max_candidates: number;
+  max_runs: number;
+}
+
+export interface ValidationTrial {
+  number: number;
+  indices: number[];
+  params: [string, number | string][]; // Name/value pairs, unlike the optimization object
+  score: string | null;
+  performance: BacktestPerformance | null;
+  terminal_position: string | null;
+  pending_intent: any | null;
+  error: string | null;
+}
+
+export interface ValidationNeighborhood {
+  trial_number: number;
+  members: number[]; // Includes the center; axis neighbors only
+  complete: boolean;
+  worst_score: string | null;
+  mean_score: string | null;
+}
+
+export interface ValidationWindow {
+  number: number;
+  train_start_ms: number;
+  train_end_ms: number;
+  test_start_ms: number;
+  test_end_ms: number;
+  status: 'COMPLETE' | 'NO_SELECTION' | 'OOS_FAILED';
+  error: string | null;
+  training: {
+    selection_rule: string;
+    selected_trial_number: number | null;
+    trials: ValidationTrial[];
+    neighborhoods: ValidationNeighborhood[];
+    warmup_bars: number;
+    evaluation_start_ms: number;
+    evaluation_end_ms: number;
+  };
+  // Null when no candidate was selected or the OOS run failed; never a zero result.
+  out_of_sample: {
+    evaluation_start_ms: number;
+    evaluation_end_ms: number;
+    trades: TradeItem[];
+    funding: any[];
+    equity_curve: EquityCurvePoint[];
+    performance: BacktestPerformance;
+    pending_intent: any | null;
+  } | null;
+  // Present only when this window's OOS curve was thinned; performance uses every bar.
+  curve_sampling?: { total_points: number; returned_points: number; method: string };
+}
+
+export interface RegimeSummary {
+  regime: string;
+  bar_count: number;
+  positive_bars: number;
+  negative_bars: number;
+  zero_bars: number;
+  fill_count: number;
+  funding_payment_count: number;
+  net_pnl: string;
+  gross_pnl: string;
+  fees: string;
+  funding_paid: string;
+}
+
+export interface ValidationResultPayload {
+  schema: string; // catos.research.validation-result.v2
+  kind: 'validation';
+  request: ValidationRequest;
+  provenance: any;
+  reproduction: any;
+  objective: { name: string; direction: string; formula?: string };
+  result: {
+    rule: ValidationRequest['regime_rule'];
+    rule_version: string;
+    validation: {
+      plan: { train_bars: number; test_bars: number; windows: number; warmup_bars: number };
+      max_runs: number;
+      required_runs: number;
+      attempted_runs: number;
+      unused_bars: number;
+      complete: boolean;
+      windows: ValidationWindow[];
+    };
+    windows: {
+      number: number;
+      status: string;
+      selected_trial_number: number | null;
+      error: string | null;
+      evaluation: {
+        summaries: RegimeSummary[];
+        total: RegimeSummary;
+        core_net_rounding_residual: string;
+        reconciled: boolean;
+      } | null;
+    }[];
+    // v2: per-bar labels and interval attribution are omitted; these totals remain.
+    label_counts: { regime: string; bar_count: number }[];
+    omitted_detail: string[];
+    complete: boolean;
+  };
+  evaluation_complete: boolean;
   data_notice: string;
   run_id?: string;
   created_at?: string;
@@ -404,6 +534,37 @@ export const researchApi = {
       if (err instanceof ResearchApiError) throw err;
       if (err.name === 'AbortError') throw err;
       throw new ResearchApiError(0, 'network_error', '優化搜尋提交失敗，請先檢查任務清單確認狀態，勿盲目重送');
+    }
+  },
+
+  /**
+   * Submit a walk-forward validation (exhaustive grid, independent OOS windows)
+   * Strict invariants:
+   * - Must supply X-CatOS-Build
+   * - max_candidates / max_runs are explicit budgets; the backend never extends them
+   * - Never creates fake run_id or auto-retries on failure
+   */
+  async submitValidation(
+    request: ValidationRequest,
+    buildId: string,
+    signal?: AbortSignal
+  ): Promise<ResearchRunStatus> {
+    try {
+      const res = await fetch('/api/research/validations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CatOS-Build': buildId,
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal,
+      });
+      return await handleResponse<ResearchRunStatus>(res);
+    } catch (err: any) {
+      if (err instanceof ResearchApiError) throw err;
+      if (err.name === 'AbortError') throw err;
+      throw new ResearchApiError(0, 'network_error', '滾動驗證提交失敗，請先檢查任務清單確認狀態，勿盲目重送');
     }
   },
 };

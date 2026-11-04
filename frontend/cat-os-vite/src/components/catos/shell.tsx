@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, Route, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -48,6 +48,7 @@ const GROUPS: NavigationGroup[] = [
       { to: "/strategies", name: "策略中心", sub: "STRATEGY HUB", icon: Activity },
       { to: "/backtest", name: "歷史回測", sub: "BACKTESTING", icon: FlaskConical },
       { to: "/optimization", name: "參數優化", sub: "OPTIMIZATION", icon: SlidersHorizontal },
+      { to: "/validation", name: "滾動驗證", sub: "WALK-FORWARD", icon: Route },
       { to: "/review", name: "策略覆盤", sub: "STRATEGY REVIEW", icon: ScanLine },
     ],
   },

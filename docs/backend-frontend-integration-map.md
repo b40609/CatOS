@@ -12,10 +12,10 @@
 | --- | --- | --- | --- |
 | 回測、權益／回撤、成交明細 | 已有 HTTP；Decimal 研究核心 | POST `/api/research/backtests`，共用 runs 查詢 | **React 已串接** version、catalog、提交、歷史、輪詢與結果；仍有第 7 節問題，未完成本輪互動驗收。只有登錄的 SMA／96 根合成 15m 資料 |
 | 參數搜尋 | 已有 HTTP；Optuna 樣本內搜尋 | POST `/api/research/optimizations` | **React 已接研究 HTTP**：提交、歷史、共用槽輪詢與結果；後端只搜 SMA period，以 return_pct 排序。另有明示「概念展示」的獨立視圖，不能當真實結果 |
-| 參數穩定區 | 已有 HTTP；候選網格與鄰域選參 | POST `/api/research/validations`，讀訓練結果 | React 尚無對應呼叫；不是另一個 stability 端點。Python 核心另有可重用能力，不表示 HTTP 接受任意策略 |
-| Walk-Forward／樣本外 | 已有 HTTP；滾動訓練、固定參數後測試 | 同一 validations 任務，讀各窗 out_of_sample | React 尚無對應呼叫；各窗空倉獨立起跑，不能拼成連續帳戶績效 |
-| 分市場環境評估 | 已有 HTTP；七類環境損益／成本歸屬 | 同一 validations 結果的分環境區段 | React 尚無對應呼叫；示範門檻，非自動部署通過規則 |
-| 研究封存、歷史與報告 | 已有 HTTP；三類任務共用封存 | GET runs、單次狀態、result、report | 回測與優化頁已各接對應 kind 歷史與 JSON；validation 與 HTML 報告入口尚未接 React |
+| 參數穩定區 | 已有 HTTP；候選網格與鄰域選參 | POST `/api/research/validations`，讀訓練結果 | **React 已串接**（2026-11-04，滾動驗證頁 `pages/validation.tsx`）；不是另一個 stability 端點。Python 核心另有可重用能力，不表示 HTTP 接受任意策略 |
+| Walk-Forward／樣本外 | 已有 HTTP；滾動訓練、固定參數後測試 | 同一 validations 任務，讀各窗 out_of_sample | **React 已串接**，合成與已登錄的 OKX 資料集皆可；各窗空倉獨立起跑，不能拼成連續帳戶績效 |
+| 分市場環境評估 | 已有 HTTP；七類環境損益／成本歸屬 | 同一 validations 結果的分環境區段 | **React 已串接**（各窗分環境表）；示範門檻，非自動部署通過規則 |
+| 研究封存、歷史與報告 | 已有 HTTP；三類任務共用封存 | GET runs、單次狀態、result、report | 回測、優化與滾動驗證頁已各接對應 kind 歷史與 JSON；HTML 報告入口尚未接 React |
 | 策略版本、Bot 建立／部署 | 已有部分 Python 製品／策略庫／狀態能力，**目前管理 HTTP 未掛載** | 先確認缺口，不能使用 mock 中的網址當 API | 主要狀態仍走 mockAdapter；舊文件／MCP 呼叫不等於路由可用 |
 | 固定模板本機模擬 | 已有 HTTP；單槽 SMA 合成 smoke 模板 start／stop | `/api/workspace/simulation/*` | 尚未透過主 React 狀態 adapter 串接；只限固定 8 根／2 根預熱模板，非任意 Bot 或常駐交易 |
 | 舊 local-sim 證據瀏覽 | 已有唯讀 HTTP | `/api/workspace/local-sim/runs*` | 可讀 manifest／status／events；不是即時帳戶、Worker 存活或風控就緒證明 |
@@ -98,7 +98,7 @@ GET 狀態完成與失敗的最小辨識欄位：
 {"run_id":"0123456789abcdef0123456789abcdef","kind":"backtest","status":"failed","error":"interrupted_by_service_restart"}
 ```
 
-版本與結果 DTO 節錄不表示可忽略其他欄位。React adapter 已有 submitBacktest／submitOptimization 與各自結果 DTO；getRunResult 支援型別參數。尚無 validation 提交與 report 方法；泛型斷言不是執行期 schema 驗證，不能用 backtest 型別接其他 kind。
+版本與結果 DTO 節錄不表示可忽略其他欄位。React adapter 已有 submitBacktest／submitOptimization／submitValidation 與各自結果 DTO；getRunResult 支援型別參數。尚無 report 方法；泛型斷言不是執行期 schema 驗證，不能用 backtest 型別接其他 kind。
 
 ## 4. 研究請求與結果怎麼接
 
@@ -227,9 +227,9 @@ POST `/api/research/validations`；同一任務產生三項能力，不猜另一
 }
 ```
 
-限制：HTTP 驗證至少 2 個候選、最多 20，預熱 >= high；windows 1～8。max_runs 是此驗證計算預算，最多 100；windows ×（候選數＋1）不得超過預算。warmup＋train_bars＋windows × test_bars 不得超過資料長度。train_bars／test_bars 為正整數；lookback_bars 為 1～511 整數，trend_efficiency 為 >0 且 <=1 的 Decimal 字串，high_volatility_bps 為正 Decimal 字串。此 API 是確定性網格驗證，不使用 Optuna 隨機搜尋。
+限制：HTTP 驗證至少 2 個候選、最多 20，預熱 >= high；windows 1～8。max_runs 是此驗證計算預算，最多 100；windows ×（候選數＋1）不得超過預算。warmup＋train_bars＋windows × test_bars 不得超過資料長度。另須 windows ×（候選數 ×（warmup＋train_bars）＋warmup＋test_bars）<= catalog.validation.max_bar_evaluations（250,000），避免超過 30 秒逾時。train_bars／test_bars 為正整數；lookback_bars 為 1～512 整數（catalog.validation.max_lookback_bars），trend_efficiency 為 >0 且 <=1 的 Decimal 字串，high_volatility_bps 為正 Decimal 字串。此 API 是確定性網格驗證，不使用 Optuna 隨機搜尋。
 
-回應根層 schema 為 `catos.research.validation-result.v1`、kind=validation；最小結果取用路徑：
+回應根層 schema 為 `catos.research.validation-result.v2`（v1 → v2 的差異見[驗證 API 契約](research-validation-api.md)）、kind=validation；最小結果取用路徑：
 
 ```javascript
 // payload = GET /api/research/runs/{run_id}/result 的 validation JSON
@@ -242,7 +242,7 @@ const environment = payload.result.windows[0].evaluation;
 回應形狀節錄（只展示成功窗的辨識欄位，不表示每次皆成功）：
 
 ```json
-{"schema":"catos.research.validation-result.v1","kind":"validation","evaluation_complete":true,"result":{"validation":{"windows":[{"status":"COMPLETE","training":{"selection_rule":"maximin_axis_neighbors_v1"}}]}}}
+{"schema":"catos.research.validation-result.v2","kind":"validation","evaluation_complete":true,"result":{"validation":{"windows":[{"status":"COMPLETE","training":{"selection_rule":"maximin_axis_neighbors_v1"}}]}}}
 ```
 
 | 呈現內容 | 欄位 | 必須保留的語義 |
@@ -255,7 +255,7 @@ const environment = payload.result.windows[0].evaluation;
 | 計算預算 | result.validation.required_runs、attempted_runs、max_runs、unused_bars | 次數／剩餘資料統計，不是瀏覽器即時進度 |
 | 分環境 | result.windows[n].evaluation.summaries | regime、bar_count、positive_bars、negative_bars、zero_bars、fill_count、funding_payment_count、net_pnl、gross_pnl、fees、funding_paid |
 | 分環境核對 | evaluation.total、core_net_rounding_residual、reconciled | 保留成本、誤差與核對狀態；net_pnl 已扣費用／資金費，不能再扣一次；gross_pnl 也不等於已還原滑價 |
-| 規則／來源 | result.rule、rule_version、labels；根層 request／provenance／reproduction／data_notice | 規則使用先前已收盤資料；門檻僅示範，不新增前端自訂驗收／部署門檻 |
+| 規則／來源 | result.rule、rule_version、label_counts（v2 不再有逐根 labels）、omitted_detail；各窗 curve_sampling；根層 request／provenance／reproduction／data_notice | 規則使用先前已收盤資料；門檻僅示範，不新增前端自訂驗收／部署門檻 |
 
 七類為 UNKNOWN、UP_LOW、UP_HIGH、DOWN_LOW、DOWN_HIGH、RANGE_LOW、RANGE_HIGH，零樣本組也保留。分環境結果不是七個獨立策略回測；目前未提供各環境報酬率、最大回撤、統計顯著性或自動通過門檻。
 
@@ -263,7 +263,7 @@ const environment = payload.result.windows[0].evaluation;
 
 三種任務共用 runs，依 kind 分流。根層 request／provenance／run_id／created_at／build_id 對應該次封存，不用目前表單值覆蓋歷史請求。report 是 HTML，可作報告連結；現有 React adapter 尚未提供該方法／入口。
 
-validation 的 reproduction 含 Python／套件版本、演算法及 files（path、sha256、content_utf8）；供查看與核對，不是環境鎖檔、自動載入套件、部署製品或防竄改簽章。不得直接執行快照內容。
+validation 的 reproduction 含 Python／套件版本、演算法、files（path、sha256、content_utf8）及 referenced_files（已抓取資料集檔案的 path、sha256，不內嵌內容）；供查看與核對，不是環境鎖檔、自動載入套件、部署製品或防竄改簽章。不得直接執行快照內容。
 
 catalog.limits.max_runs=200 是研究封存數上限；catalog.validation.max_runs=100 是單次驗證回測預算，兩者不可混淆。共用執行逾時 30 秒，Worker 輸出上限 2,000,000 bytes。沒有刪除封存、任意匯入歷史或清空資料 API 可供前端自行推定。
 
@@ -377,7 +377,7 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 | --- | --- | --- |
 | 共用槽釋放短窗 | `149f9fc` 回測已保留後端 active_run_id；本輪優化 hook 也等 version 確認釋放，並追蹤其他 kind | 優化已做隔離瀏覽器斷言；回測此項為來源複核，未冒充本輪回測互動重驗 |
 | 隔離宣稱與代理目標不符 | 8890 的研究代理固定到正式 8770；舊 8887 入口已退役 | 未來隔離 UI 證據須來自真正專用 backend／資料根／proxy；現行正式代理本身不是「沒有設定」 |
-| 尚缺 DTO 與路由 | 優化已有專用 DTO／提交；validation 尚未接 React，策略／Bot HTTP 仍未掛載 | 先取得對應契約；不把展示命令視為已控制 Bot／帳戶風控 |
+| 尚缺 DTO 與路由 | 優化與滾動驗證已有專用 DTO／提交；策略／Bot HTTP 仍未掛載 | 先取得對應契約；不把展示命令視為已控制 Bot／帳戶風控 |
 | 圖表錯值轉零 | 水下圖使用 parseFloat(value) || 0，缺 drawdown 點也給 0，並按陣列索引配對 | 正常後端有等長證據，但缺欄／非數值／時間錯位可能被畫成正常 0；不能拿此圖判定資料完整或風險正常 |
 
 ### 已有改善，不再照列為尚未修復
@@ -462,6 +462,6 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 
 > 請繼續依我們目前方向完成 CatOS 前端版面與操作細節，保留已定案設計；這份盤點不是要求立即改版、一次接完全部後端或完成驗收。請先讀 docs/current-handoff.md 與 docs/backend-frontend-integration-map.md，等相關頁面流程穩定後再逐步接入。
 >
-> 回測頁目前已接真實研究 API；參數搜尋、參數穩定區、Walk-Forward／OOS、分市場環境及研究封存／報告也已有後端 HTTP，可依文件範例與欄位對照承接。穩定區／OOS／分環境共用 validations 任務，資料目前僅登錄 SMA 與合成 K 線。金融值維持 Decimal 字串，未提供的指標不顯示成真實結果。
+> 回測頁目前已接真實研究 API；參數搜尋、參數穩定區、Walk-Forward／OOS、分市場環境及研究封存／報告也已有後端 HTTP，可依文件範例與欄位對照承接。穩定區／OOS／分環境共用 validations 任務（React 滾動驗證頁已接），策略只登錄 SMA，資料為合成 K 線與經雜湊核對的 OKX 公開歷史資料集。金融值維持 Decimal 字串，未提供的指標不顯示成真實結果。
 >
-> 接線時先留意：回測與優化共用槽以後端 active_run_id 為準；8890 代理固定到正式 8770，不能當隔離驗證。優化已有專用 React adapter／DTO，validation 與 HTML report 尚未接入；這是本機既有來源狀態，不涵蓋另一台 PC 的未推送內容。策略／Bot 管理路由、R1 風控與完整設定保存 HTTP 尚未接通，先保留清楚的展示／不可用狀態，依第 6 節確認最小契約，不自行猜 API。新任務選取、刷新／切換／離頁與斷線提示可隨頁面成熟逐項核對，不需重做整套版面或重跑全部歷史驗收。
+> 接線時先留意：回測與優化共用槽以後端 active_run_id 為準；8890 代理固定到正式 8770，不能當隔離驗證。優化與滾動驗證已有專用 React adapter／DTO，HTML report 尚未接入；這是本機既有來源狀態，不涵蓋另一台 PC 的未推送內容。策略／Bot 管理路由、R1 風控與完整設定保存 HTTP 尚未接通，先保留清楚的展示／不可用狀態，依第 6 節確認最小契約，不自行猜 API。新任務選取、刷新／切換／離頁與斷線提示可隨頁面成熟逐項核對，不需重做整套版面或重跑全部歷史驗收。
