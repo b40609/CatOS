@@ -46,7 +46,7 @@
 | `docs/review-20261102/`（11/02 讀碼筆記，行號以舊版 `fffed2e` 為準） | 已刪除 |
 | `.git/worktrees/main-wt`、`main-wt2` | 已刪除 |
 | `.claude/launch.json`（本機 Vite 預覽設定） | 改用本機 `.git/info/exclude` 忽略，沒有改 `.gitignore` |
-| 筆電工作樹仍有舊的 CRLF 檔 | 未處理，維持原樣：全面改寫要跑 `git reset --hard`，會影響同一目錄裡進行中的工作 |
+| 筆電工作樹仍有舊的 CRLF 檔 | 已處理：滾動驗證合併後，452 個檔案就地改為 LF，逐檔核對與 index 位元組一致，沒有跑 `git reset --hard`；策略登錄與資料集測試通過 |
 
 ## 兩台機器怎麼分工
 
