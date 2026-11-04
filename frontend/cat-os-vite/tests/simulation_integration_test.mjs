@@ -1,7 +1,8 @@
 // Run from this frontend: node tests/simulation_integration_test.mjs [python] [chrome.exe]
 // Starts an isolated backend fixture (real bounded synthetic runner) on 18870 and the real
 // Vite proxy on 18890, drives the production simulation adapter + store against it through
-// the proxy, then loads the dashboard and bots pages in headless Chrome and checks the DOM.
+// the proxy, then loads the dashboard, bots, risk, logs, strategies and review pages in headless
+// Chrome and checks the DOM.
 // 8770/8771/8890 and outputs/local-sim-control are never touched.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -139,6 +140,7 @@ try {
     const { stdout } = await run(['--dump-dom']);
     await run([`--screenshot=${shot}`]);
     const text = stdout.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ');
+    await fs.writeFile(path.join(evidence, `dom-${name}.txt`), text);
     return { text, shot };
   }
   await check('dashboard DOM shows the real run and no NaN / mock values', async () => {
@@ -156,6 +158,38 @@ try {
     assert.ok(text.includes('999.91'), 'bots equity missing');
     assert.ok(text.includes('sim-control-sma') && text.includes('BTC-USDT-SWAP'), 'bots identity missing');
     assert.ok(text.includes('未接線'), 'kill-switch / restart not marked as unwired');
+    console.log(`screenshot ${shot}`);
+  });
+  // v1.1: the remaining pages read the same projections; the old mock values must be gone.
+  const final = store.getState();
+  await check('risk page DOM shows the real risk projection and no mock values', async () => {
+    const { text, shot } = await page('/risk', 'risk');
+    for (const bad of [...FORBIDDEN, '12,500', '427.5', '展示資料', '197/197']) assert.ok(!text.includes(bad), `risk page contains "${bad}"`);
+    assert.match(text, /正常 · (可|禁)增倉/, 'risk status chip missing');
+    assert.ok(text.includes(`seq ${final.risk.seq}`), 'risk observation seq missing');
+    assert.ok(text.includes('Soft 10.00%') && text.includes('Hard 20.00%'), 'loss limits missing');
+    assert.ok(text.includes('未接線'), 're-arm not marked as unwired');
+    console.log(`screenshot ${shot}`);
+  });
+  await check('logs page DOM shows the real event stream and no mock values', async () => {
+    const { text, shot } = await page('/logs', 'logs');
+    for (const bad of [...FORBIDDEN, 'catnet', 'whisker', 'venue=okx']) assert.ok(!text.includes(bad), `logs page contains "${bad}"`);
+    assert.ok(text.includes('TRADE') && text.includes('BTC-USDT-SWAP'), 'fill lines missing');
+    assert.ok(text.includes('最終帳戶'), 'final account event missing');
+    assert.ok(text.includes(`${final.events.length} / ${final.events.length} lines`), 'line count does not match the store');
+    console.log(`screenshot ${shot}`);
+  });
+  await check('strategies page DOM shows the registered strategy and no mock values', async () => {
+    const { text, shot } = await page('/strategies', 'strategies');
+    for (const bad of [...FORBIDDEN, 'catnet', '組合夏普']) assert.ok(!text.includes(bad), `strategies page contains "${bad}"`);
+    assert.ok(text.includes('sma-trend') && text.includes('sma-parameters-v1') && text.includes('approved'), 'registry entry missing');
+    assert.ok(text.includes('999.91'), 'bound bot equity missing');
+    console.log(`screenshot ${shot}`);
+  });
+  await check('review page is marked not enabled and shows no demo numbers', async () => {
+    const { text, shot } = await page('/review', 'review');
+    for (const bad of [...FORBIDDEN, '12,483,920', '34.80', '實盤淨值']) assert.ok(!text.includes(bad), `review page contains "${bad}"`);
+    assert.ok(text.includes('v1 未啟用'), 'review page not marked as not enabled');
     console.log(`screenshot ${shot}`);
   });
   await fs.writeFile(path.join(evidence, 'result.json'), JSON.stringify({ passed, backendLog, ports: [18870, 18890] }, null, 2));

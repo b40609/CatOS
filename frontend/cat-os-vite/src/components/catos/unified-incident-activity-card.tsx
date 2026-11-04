@@ -105,7 +105,8 @@ function sideOf(ev: EventDTO): Side {
   return side === 'buy' || side === 'sell' ? side : null;
 }
 
-function buildTitle(ev: EventDTO, instLabel: string): string {
+/** 控制面事件的單行標題；系統日誌與風控中心共用。 */
+export function eventTitle(ev: EventDTO, instLabel: string): string {
   const p = ev.payload;
   switch (ev.kind) {
     case 'run_state': {
@@ -199,7 +200,7 @@ function toRow(ev: EventDTO, instLabel: string): EventRow {
     event: ev,
     time: formatClock(ev.wall_time_ms),
     syntheticLabel: ev.synthetic_time_ms ? formatDateTime(ev.synthetic_time_ms) : null,
-    title: buildTitle(ev, instLabel),
+    title: eventTitle(ev, instLabel),
     rightText,
     side: sideOf(ev),
     isAlert,

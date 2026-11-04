@@ -2,6 +2,8 @@
 
 CatOS 是一套本機專用（127.0.0.1）的量化交易系統，目標是分鐘至小時級、已收盤 K 線的策略研究與受控執行。v1 的交付範圍是**本機合成模擬**：同一套 Supervisor／Worker／Journal／風控程式在 FakeExchange 上跑完整的策略 → 意圖 → 風控 → 成交 → 帳務流程，並由 React 戰情台讀取真實投影資料。以下只寫 v1 實際存在並經驗證的能力；願景與歷史規劃見 `docs/archive/`。
 
+v1 已於 2026-11-04 通過正式獨立驗收（`reports/v1-acceptance-20261104/acceptance.md`）並合併進 `main`。下一步與候選工作包見 `docs/next-steps.md`。
+
 ## v1 範圍
 
 | 項目 | v1 實況 |
@@ -12,7 +14,7 @@ CatOS 是一套本機專用（127.0.0.1）的量化交易系統，目標是分�
 | OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter、`tools/fetch_okx_candles.py`）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
 | 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
 | HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
-| 前端 | 戰情台、實例監控頁與側欄狀態列讀取控制面真資料；回測／優化／覆盤頁接研究 HTTP；其餘頁面（策略中心、風控中心、日誌、設定、市場情報）仍為展示資料 |
+| 前端 | 戰情台、實例監控、風控中心、策略中心、系統日誌與側欄狀態列讀取控制面真資料；回測／優化頁接研究 HTTP；設定頁讀取服務版本；策略覆盤與市場情報頁標示「v1 未啟用」 |
 
 ## 平台與環境需求
 
@@ -54,7 +56,7 @@ FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-l
 
 ## 測試
 
-以下每條指令都在本文件撰寫時實際執行過（2026-11-03）。
+以下每條指令都實際執行過（後端 2026-11-03；前端與整合測試 2026-11-04）。
 
 後端完整套件（約 4 分鐘；本輪結果 1373 tests、0 FAIL、0 ERROR、11 或 12 skipped：11 個是 v2 候選的 python_strategy 兩個模組，另 1 個是 `test_lot_scenario_demo` 在 Windows 無權建立 symlink（未開開發人員模式）時跳過）：
 
@@ -82,13 +84,13 @@ npm --prefix frontend/cat-os-vite test
 npm --prefix frontend/cat-os-vite run build
 ```
 
-端到端整合測試（以 `.venv` 的 Python 在 18870 起真實 local-sim 後端、18890 起 Vite proxy，用 headless Chrome 讀戰情台與實例頁，驗證 Decimal 字串與無 NaN）：
+端到端整合測試（以 `.venv` 的 Python 在 18870 起真實 local-sim 後端、18890 起 Vite proxy，用 headless Chrome 讀戰情台、實例監控、風控中心、系統日誌、策略中心與策略覆盤頁，驗證 Decimal 字串、無 NaN 與無展示假值）：
 
 ```bash
 node frontend/cat-os-vite/tests/simulation_integration_test.mjs
 ```
 
-需要本機可用的 Chrome／Edge headless 與已建好的 `.venv`。新版 Chrome 的 `--dump-dom` 可能輸出空白，可用環境變數 `CATOS_CHROME` 指到 Playwright 的 `chrome-headless-shell.exe`（未指定時會自動找 `%LOCALAPPDATA%\ms-playwright` 下的版本）；截圖預設寫到系統暫存目錄的 `catos-screens`，可用 `CATOS_SCREENS` 覆寫。`frontend/cat-os-vite/tests/integration_baseline_test.mjs` 需要 playwright（未納入依賴），本輪未執行。
+需要本機可用的 Chrome／Edge headless 與已建好的 `.venv`。Chrome 156（本機 156.0.8078.80 實測）的 `--dump-dom` 輸出空白，請用 `npx playwright install --only-shell chromium` 安裝 Playwright 的 `chrome-headless-shell`；測試會自動找 `%LOCALAPPDATA%\ms-playwright` 下的版本，也可用環境變數 `CATOS_CHROME` 指定路徑；截圖預設寫到系統暫存目錄的 `catos-screens`，可用 `CATOS_SCREENS` 覆寫。`frontend/cat-os-vite/tests/integration_baseline_test.mjs` 需要 playwright（未納入依賴），本輪未執行。
 
 ## 架構
 
@@ -116,12 +118,14 @@ FastAPI (127.0.0.1:8770)  catos/workspace_api.py
 - `catos/python_strategy.py`／`strategy_library.py` 的上傳製品與 allocate 控制面（v2 候選；對應測試已 `unittest.skip`，見 `docs/simulation-api-contract-draft.md` Q1）。
 - OKX Demo／Live 下單、撤單、帳戶修改與憑證載入；前端 demo／live 模式只回「未開放」。
 - Yaozi 市場情報線（`catos/market_*.py`）：v1 凍結，無排程器、不主動更新，程式與測試保留；前端「市場情報」頁標示「v1 未啟用」。見 `docs/market-intel.md`。
+- 策略覆盤：需要 Demo／實盤的成交與權益歷史；前端「策略覆盤」頁標示「v1 未啟用」，不顯示任何示範數字。
 - 多 Bot、多合約、Kill-Switch／re-arm HTTP、P6 交易所端實際掛單。
 
 ## 文件索引
 
 - `AGENTS.md`：專案規則、不變量、授權邊界與工作流程。
-- `docs/simulation-api-contract-draft.md`：local-sim 控制面投影 HTTP 契約與第 3／4 步實作紀錄。
+- `docs/simulation-api-contract-draft.md`：local-sim 控制面投影 HTTP 契約與第 3／4 步、v1.1 實作紀錄。
+- `docs/next-steps.md`：v1 之後的候選工作包、建議順序與收尾雜項。
 - `docs/backend-frontend-integration-map.md`：後端路由與前端頁面的對應。
 - `docs/worker.md`：Worker／IPC 契約與策略登錄。
 - `docs/market-intel.md`：Yaozi 市場情報線（v1 凍結）。
