@@ -1,139 +1,199 @@
-# CatOS v1 獨立驗收報告
+# CatOS v1 獨立驗收報告（正式）
 
 - 日期：2026-11-04（Asia/Taipei）
-- 範圍：`feature/catos-v1-sim`，`5a101d4..ba51c1b`，共 21 個 commit（214 檔，+5669／-32714）
-- 驗收者：Claude Opus 5.5（由使用者在本次提示詞指定）
-- 結論：**FAIL**（6 項中 5 項 PASS，第 5 項 FAIL）。依指示只 commit 本報告到 `feature/catos-v1-sim`，不動 `main`。
+- 驗收者：Claude Opus 5.5，獨立驗收會話（筆電）。未撰寫範圍內任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
+- 範圍：`feature/catos-v1-sim` 的 `5a101d4..14279af`，共 24 個 commit（216 檔，+5830／−32808）。其中 `ee6f157` 是預審報告（本檔前一版），`14279af` 是 D1 修正。
+- 結論：**PASS（6／6）**。預審發現的缺陷 D1 已由 `14279af` 修正，本輪覆驗通過。
 
-## 利益揭露與角色
+## 預審報告的性質
 
-- AGENTS.md「DEVELOPMENT WORKFLOW」與「SESSION HANDOFF」記載的獨驗角色是 GPT-6 Sol。本次由使用者在提示詞中另行指定驗收者，本報告不代表 GPT-6 Sol 的獨驗。
-- 範圍內 `faefef15`（test_research_cli UTF-8）與 `ba51c1b8`（整合測試可攜性＋README）由本驗收者在前一工作包撰寫，只改測試與文件。這兩個 commit 不影響下列 6 項結論的依據，但它們本身不算獨立驗收。
-- **資格限制**：本報告寫完後，遠端出現 `cc2433d3`（2026-11-04 09:50，只改 AGENTS.md），規定「獨立驗收由未參與該工作包開發的另一個 Claude 會話或子代理執行」、「不得由同一工作包的開發會話自行充任」。本驗收者與上述兩個 commit 出自同一會話，依新規定**不具獨驗資格**。本報告應視為預審，正式獨驗請改由另一個未參與開發的 Claude 會話或子代理重做。`cc2433d3` 本身只改文件，不在本次核對範圍內。
-- 開發者自測（後端 1373／0 失敗、前端 typecheck、10 個前端測試、整合 5/5）只當參考。下列結論依原始碼核對與本輪實際執行。
+- `ee6f157` 是另一台 PC 上的會話撰寫的報告，判定 FAIL（5／6，缺陷 D1）。該會話撰寫過範圍內的 `faefef1`、`ba51c1b`，依 `cc2433d` 起的規定不具獨驗資格，所以那份報告只算**預審**。本檔取代它，成為正式驗收結論。
+- 預審找到的 D1 經本驗收者確認屬實，並列入下方第 5 項。預審的其他敘述只作為線索；本報告的結論都以本驗收者的原始碼核對與實際執行結果為準。
+- 開發者自測（後端 1373／0 FAIL、前端 typecheck 0 錯、`npm test` 10 通過、build、整合測試 5 PASS；D1 修正另附瀏覽器實點）同樣只當參考。
+
+## 隔離方式
+
+- 所有重跑都在暫存區的乾淨 clone 進行（`git clone -b feature/catos-v1-sim`，系統 `core.autocrlf=true`），避開使用者工作樹的未追蹤檔。Python 使用 repo 的 `.venv`（3.12.10），Node 使用 24.19.0。
+- 只用合成資料，沒有讀取憑證，沒有連 OKX，也沒有碰 8770／8771／8890；瀏覽器實測使用隔離埠 18870／18890，結束後已關閉。
 
 ## 總表
 
 | # | 項目 | 結果 |
-|---|---|---|
-| 1 | risk.Snapshot 四旗標 fail-closed，只有 local-sim 傳 True | PASS |
-| 2 | strategy_registry 只收 approved、sha256 核對、worker 不寫死、LF | PASS |
-| 3 | 金額／價格／部位全程 Decimal 與字串，前端不用 float 計算 | PASS（附觀察） |
-| 4 | 無新增 Demo／Live 下單、撤單、帳戶修改、憑證讀取；只綁 127.0.0.1 | PASS |
-| 5 | 戰情台、實例頁、側欄接 local-sim 真資料，無殘留 mock 或假登入 | **FAIL** |
-| 6 | 被 skip 的 python_strategy 測試屬 v2，不是掩蓋失敗 | PASS |
+| --- | --- | --- |
+| 1 | `risk.Snapshot` 四個事實旗標 fail-closed，只有 local-sim 傳 True | PASS |
+| 2 | 策略登錄、雜湊核對、Worker 不寫死、IPC 身分驗證、LF 固定 | PASS |
+| 3 | 金額／價格／部位全程 Decimal 字串，前端不以 float 計算 | PASS（附觀察 O1） |
+| 4 | 無 Demo／Live 下單、撤單、帳戶修改或憑證讀取路徑；只綁 127.0.0.1 | PASS |
+| 5 | 戰情台、實例頁、側欄讀 local-sim 真資料；沒有 mock store，也沒有假登入 | PASS（D1 已修） |
+| 6 | `tests/test_python_strategy_*.py` 的 skip 屬 v2 範圍 | PASS |
 
-## 1. risk.Snapshot 四旗標：PASS
+第 1–4、6 項在 `cc2433d` 上驗過（見「實際執行的命令與結果」）。`14279af` 只改 `README.md`、`personal-os-modal.tsx`、`personalOsStore.ts`，這幾項依據的程式都沒有變，所以不重做；第 5 項與 D1 在 `14279af` 上重驗。
+
+## 1. Snapshot 事實旗標 fail-closed：PASS
 
 依據：
-- `catos/risk.py` `Snapshot`：`valuation_known`、`flows_known`、`margin_ok`、`position_verified` 預設皆為 `False`（commit `479f9a69`，原為 `True`）。`__post_init__` 要求型別必須是 `bool`。
-- 正式程式中建構 `risk.Snapshot(` 的地方只有一處：`catos/local_sim_r4.py` `observe()`。這裡明示傳入四個 `True`，路徑是 FakeExchange（`local_sim_control_runner.py` 從 `local_sim_r4` 匯入 `observe`，交易所是 `catos.fake_exchange.FakeExchange`）。
+- `catos/risk.py` `Snapshot`：`valuation_known`、`flows_known`、`margin_ok`、`position_verified` 預設都是 `False`（`479f9a6`），`__post_init__` 要求型別必須是 `bool`。
+- 產品碼中唯一直接建構 `risk.Snapshot(...)` 的地方是 `catos/local_sim_r4.py` `observe()`。它明示傳入四個 `True`，並附 FakeExchange 為何成立的註解。
 - 其他產生路徑：
-  - `Snapshot.from_wire()` 用 `cls(**values)`，而 `to_wire()` 以 `vars(self)` 寫出全部欄位，所以已持久化的快照都帶明示旗標；欄位缺漏時會落到預設 `False`，也就是 fail-closed。
-  - `catos/supervisor.py` `observe_risk_period()` 用 `replace(snapshot, ...)`，保留呼叫端的旗標，不會自行補 `True`。正式程式中沒有呼叫端，只有測試呼叫，且已明示傳入（`tests/test_risk_period_r1.py`）。
-  - `catos/journal.py:297` 還原時設 `snapshot=None`。
-- 讀取端：`risk.py`（health 判定、禁增倉條件）、`journal.py:645`、`protection.py:195` 都把 `False` 當成未知而降級。
-- 全庫搜尋 `Snapshot(`（排除 tests／outputs／frontend）後，其餘結果都是其他類別（`VenueMarketSnapshot`、`OwnershipSnapshot` 等），或 `workbench_prototype.py` 內嵌的 JS 字串，與此無關。
+  - `Supervisor.observe_risk_period()`（`catos/supervisor.py`）以 `dataclasses.replace` 沿用呼叫端快照的旗標，不會自行補 True。
+  - `Snapshot.from_wire()` 遇到缺欄時落回預設 False。
+- 在 `catos/` 搜尋 `Snapshot(`，其餘命中都是其他類別（`market_*`、`reconciliation_gate`）。
+- 測試端（`tests/test_risk.py`、`test_risk_period_r1.py`、`test_simulation_workspace_api.py`）都改為明示傳入 `KNOWN` 旗標。
 
-實際執行：
-- `.venv\Scripts\python.exe -B -m unittest discover -s tests -p "test_risk*.py"` → `Ran 48 tests … OK`
-- `… -p "test_local_sim_control*.py"` → `Ran 28 tests … OK`
-- `… -p "test_simulation_workspace_api.py"` → `Ran 14 tests … OK`
+本驗收者自寫的驗證腳本 `snapshot_failclosed.py`，實際輸出：
 
-## 2. strategy_registry／LF：PASS
+```text
+defaults: {'valuation_known': False, 'flows_known': False, 'margin_ok': False, 'position_verified': False}
+未宣告: health=DEGRADED increase_accepted=False reason=position_not_verified
+全部宣告 True: health=HEALTHY increase_accepted=True reason=exposure_reserved
+僅 valuation_known=False: health=DEGRADED increase_accepted=False reason=increase_gate_closed
+僅 flows_known=False: health=DEGRADED increase_accepted=False reason=increase_gate_closed
+僅 margin_ok=False: health=DEGRADED increase_accepted=False reason=increase_gate_closed
+僅 position_verified=False: health=HEALTHY increase_accepted=False reason=position_not_verified
+缺旗標的舊 wire 還原: {全部 False}
+```
+
+任一旗標沒有宣告，都會禁止增倉；只有四項全部明示，才會放行。
+
+## 2. 策略登錄與雜湊：PASS
 
 依據：
 - `catos/strategy_registry.py`：
-  - `resolve()` 只回傳 `approved`；沒有 approved 時丟出 `artifact_not_approved`，多個 approved 時丟出 `ambiguous_strategy_version`。
-  - `RegisteredStrategy.load()` 先檢查 `approved`，再呼叫 `verified_sources()` 計算 source_files 的聯合 sha256，不符時丟出 `artifact_hash_mismatch`。
-  - 執行用的是已驗證的 bytes（`exec(compile(snapshot[...]))`），驗證後檔案被換掉也不會執行到新內容，沒有 TOCTOU 問題；也不寫入 `sys.modules`。
-  - `read_manifest()` 要求欄位完全相符、拒絕重複鍵與 NaN 類常數、拒絕 symlink 與跳出 root 的路徑；任何一份 manifest 無效，整個 registry 就 fail-closed。
-- `catos/worker.py` `run()`：用 `strategy_registry.resolve(config.strategy_id, config.strategy_artifact)` 取得策略；已移除寫死的 `examples/sma_state.py`（commit `be72e70f` 刪檔）。`catos/ipc.py` `WorkerConfig.from_wire` 也經由 registry 驗證身分。
-- `.gitattributes`：`* text=auto eol=lf`，二進位格式設 `-text`。`git ls-files --eol` 中 `i/crlf` 或 `w/crlf` 為 0 筆；`git check-attr eol` 對兩個策略原始檔回報 `lf`。
-- 唯一 manifest：`catos/research_artifacts/sma-trend-sma-parameters-v1.json`，`approval_state: approved`，sha256 `3b411bb1…2cf2`。
+  - `RegisteredStrategy.load()` 先檢查是否 `approved`，再由 `verified_sources()` 讀取原始檔。它會拒絕 symlink 與跳出 root 的路徑，接著比對聯合 sha256，不符就丟出 `RegistryError("artifact_hash_mismatch")`。
+  - 執行時只用已驗證的記憶體位元組（`exec(compile(...))`），也不寫入 `sys.modules`。
+  - `resolve()` 遇到未核准的策略丟出 `artifact_not_approved`，遇到未知身分丟出 `unknown_strategy`，不會退回預設策略。
+  - `read_manifest()` 要求欄位完全相符，並拒絕重複鍵與非有限常數。
+- `catos/worker.py`：已移除 `examples.sma_state` 的寫死匯入，改用 `strategy_registry.resolve(config.strategy_id, config.strategy_artifact)` 取得策略，再呼叫 `restore(checkpoint)`。
+- `catos/ipc.py` `WorkerConfig.from_wire()`：身分必須通過 `strategy_registry.resolve()`，失敗時轉成 `ProtocolError("unregistered strategy: …")`。
+- `.gitattributes`：`* text=auto eol=lf`，二進位格式設為 `-text`。唯一的 manifest 是 `catos/research_artifacts/sma-trend-sma-parameters-v1.json`，狀態為 `approved`。
 
-實際執行：
-- 獨立竄改探針（本驗收者撰寫，放在 repo 外的 scratchpad 目錄，以 `directory`／`root` 參數指向暫存複本，不改動 repo）：
+本驗收者自寫的驗證腳本 `registry_check.py` 會在暫存目錄複製 manifest 與原始檔後竄改。實際輸出：
 
-  ```
-  PASS baseline loaded
-  PASS crlf artifact_hash_mismatch
-  PASS one_byte artifact_hash_mismatch
-  PASS pending artifact_not_approved
-  PASS wrong_sha artifact_hash_mismatch
-  PASS extra_field artifact_manifest_exact_fields_required
-  repo_tree PASS
-  ```
-- `… -p "test_strategy_registry.py"` → `Ran 6 tests … OK`；`test_ipc.py` → `Ran 11 … OK`；`test_worker*.py` → `Ran 15 … OK`
+```text
+real load: RegisteredSMA
+copy load: RegisteredSMA
+PASS source tampered: RegistryError(artifact_hash_mismatch)        # 只把一個 \n 換成 \r\n
+PASS unapproved resolve: RegistryError(artifact_not_approved)
+PASS unapproved direct load: RegistryError(artifact_not_approved)
+PASS unknown id: RegistryError(unknown_strategy)
+PASS wire unknown strategy_id: ProtocolError(unregistered strategy: unknown_strategy)
+PASS wire unknown artifact: ProtocolError(unregistered strategy: unknown_strategy)
+wire ok: sma-trend
+strategy modules in sys.modules after load: []
+```
 
-## 3. Decimal 與字串：PASS（附觀察）
+LF 實測：在系統 `core.autocrlf=true` 的環境做乾淨 clone，`git ls-files --eol` 顯示 556 檔是 `w/lf`，`w/crlf` 為 0 檔。
 
-依據：
-- 後端：範圍內改到的 9 個 `catos/*.py` 都沒有 `float(` 或 `: float`。`simulation_catalog.py` 以 `str(Decimal)` 輸出；整合測試對 `summary`、`risk.derived`、`risk.limits`、`risk.snapshot.mark` 與每筆 signal 的 `mark` 斷言型別為字串且符合 `^-?\d+(\.\d+)?$`。
-- 前端契約 `src/contracts/*.ts`：金額欄位是 `DecimalString`；型別為 `number` 的只有版本、序號、計數與時間戳。
-- `src/lib/format.ts`：`formatDecimal`、`roundTo`（BigInt 四捨五入）、`shiftDecimal`、`signOf` 都用字串或整數運算。唯一的 float 轉換點是 `toPlotNumber`，註明只供繪圖。
-- 戰情台與實例頁的金額標籤（`allocation-donut-card.tsx` 的 `amountStr`、`v0-bot-table.tsx`）全部來自 `formatDecimal(後端字串)`。
-
-觀察（不構成 FAIL，屬於顯示用衍生比例，不是帳務或風控依據）：
-- `account-equity-band.tsx:81-147`：hover 與 Y 軸上的「報酬 %」標籤，是先用 `toPlotNumber(equity)` 轉成 float，再算 `(v / base - 1) * 100` 後以 `toFixed(2)` 顯示。這與 `toPlotNumber` 註解「結果不得格式化回標籤」的精神不一致，只是數字是比例、不是金額。
-- `allocation-donut-card.tsx:444, 563, 845, 895`：占比 `pct_share.toFixed(1)%` 同樣由 float 算出。
-- 非 v1 範圍的頁面（`pages/backtest.tsx`、`components/catos/backtest-underwater-chart.tsx`）用 `parseFloat` 判斷正負號與畫圖，`displayMaxDd` 會把 float 重新顯示成文字。這些頁面屬於研究頁，不在本項的戰情台與實例頁範圍。
-
-## 4. 無新增交易／憑證路徑，只綁 127.0.0.1：PASS
+## 3. Decimal 全程：PASS（附觀察 O1）
 
 依據：
-- 對範圍內新增行（`catos`、`examples`、`scripts`、`frontend/cat-os-vite/src`、`vite*.ts`）搜尋 `okx.com|/api/v5|place_order|cancel_order|amend|api_key|secret|passphrase|credential|os.environ|getenv|requests|httpx|urllib|socket.|aiohttp|websocket|host=|0.0.0.0|uvicorn.run|withdraw|transfer`：只命中 1 行，是 `personal-os-modal.tsx` 中 `Passphrase` 標籤的字級 class 變更（原本就存在的唯讀顯示，見第 5 項）。
-- 新增的 HTTP 路由（`catos/local_sim_control_api.py`）：GET `/state`、`/strategies`、`/bots`、`/bots/{id}`、`/risk`、`/positions`、`/events`，以及 POST `/bots/start`。POST 只啟動 FakeExchange 合成案例：`local_sim_control_runner.py` 只匯入 `catos.fake_exchange`，沒有 OKX client。控制面模組中沒有 `environ`、`getenv` 或憑證存取。
-- 綁定位址：
-  - `catos/workspace_api.py:203` `listener.bind(("127.0.0.1", port))` 搭配 `uvicorn.Config(host="127.0.0.1")`，控制面經 `mount_simulation` 掛在這裡。
-  - `catos/research_api.py:212, 222` 同樣只綁 127.0.0.1。
-  - `frontend/cat-os-vite/vite.config.ts` 設 `host: '127.0.0.1'`、`strictPort`。
-- 既有、範圍外的項目：`catos/market_api.py` `serve(host="127.0.0.1")` 可帶參數，但全庫沒有呼叫端傳入其他 host（Yaozi 已凍結）。`catos/demo_collection.py` 是既有的 I-b-4 唯讀採集，本範圍未修改。
+- 後端：新增的投影 `catos/simulation_catalog.py` 全部用 `Decimal`，例如 `period_pnl_ratio = str(pnl / Decimal(basis["equity"]))`。`local_sim_control.py`、`local_sim_control_api.py` 的新增碼沒有 `float(` 或 `round(`。
+- `src/contracts/decimal.ts`：`DecimalString = string`。
+- `src/lib/format.ts`：
+  - `formatDecimal` 與 `roundTo` 用字串和 `BigInt` 做四捨五入；`shiftDecimal` 直接在字串上移動小數點；`signOf`／`toneOf` 用字串判斷正負。
+  - 唯一的 float 轉換是 `toPlotNumber`，註明只供繪圖幾何使用。
+- `src/state/stateAdapter.ts`：只做版本比較與事件游標的整數運算，不碰金額。
+- 前端搜尋 `parseFloat|Number(` 的命中：
+  - `account-equity-band`、`allocation-donut-card`、`v0-bot-table` 都經 `toPlotNumber`，只用來算座標。
+  - `backtest.tsx` 與 `backtest-underwater-chart.tsx` 的 `parseFloat` 只用於判斷正負號和畫圖，而且在 `5a101d4` 之前就存在，不是本範圍新增。
+- 整合測試斷言 `bot.equity === '999.91375990'`、`fees === '0.00404010'`，所有 Decimal 欄位都是字串，且符合 `^-?\d+(\.\d+)?$`。
 
-## 5. 前端真資料／無 mock、無假登入：FAIL
-
-通過的部分：
-- 戰情台（`#/`）與實例頁（`#/bots`）：整合測試在真實 local-sim fixture 與 Vite proxy 下，用 headless 瀏覽器讀取 DOM：權益 `999.91` 與 bot id `sim-control-sma` 出現，沒有 NaN、`undefined`、舊 mock 字串（`tabby`、`BOT-BTC-15M`、`$69,888` 等），未接線項目明確標示「未接線」。
-- 側欄狀態列：`simulation-status-strip.tsx` 讀取 store 的 service 與 connection；`account-menu.tsx` 頂部顯示 `build`、`slot`、`connection.status`。
-- 假登入已移除：`account-menu.tsx:281-283` 顯示「本機單人終端 · 無登入」（commit `e87b6cc4`）。
-- 戰情台、實例頁與側欄的元件都沒有匯入 `lib/mock` 或 `use-live`。
-
-缺陷 D1（造成 FAIL）：側欄帳戶選單 →「OKX 專用子帳戶 API」開啟的偏好設定分頁，仍呈現 mock 的連線狀態。
-- 入口：`src/components/catos/account-menu.tsx:231-240`，選單項目本身標示「未接線」。
-- 內容：`src/components/catos/personal-os-modal.tsx`（`activeTab === "api"` 區塊，約 632-713 行）：
-  - 綠色 ShieldCheck 加上標題「OKX 專用子帳戶金鑰連線」。
-  - 唯讀顯示假金鑰 `okx_api_••••••••38f2` 與 Passphrase `••••••••`，來源是 `src/state/personalOsStore.ts:510-511` 的預設值。
-  - 環境切換預設 `"live"`（`personalOsStore.ts:512`），畫面以綠色高亮「LIVE 實盤」。
-  - 「WS 延遲 (Ping)」以綠字顯示 `18 ms`，數值寫死在 `personalOsStore.ts:513` `ping: 18`，全庫沒有任何地方更新它。
-- 情境：使用者打開這個分頁，會看到「已連上 OKX、LIVE 實盤、延遲 18 ms」的假狀態，與 v1「不接 Demo／Live、不碰憑證」不符，也與選單上的「未接線」標示矛盾。
-- 嚴重度：中低。只影響顯示，沒有網路請求，也沒有寫入或讀取真實憑證（`setApiCredentials` 全庫沒有呼叫端）。
-- 建議修法（最小）：把 api 分頁改成「v1 未接線」的說明，移除假金鑰、LIVE／SIM 切換與 ping 顯示，並刪掉 `personalOsStore` 中 `apiKey`、`passphrase`、`environment`、`ping` 的預設假值。
-
-範圍外但需知悉：README 第 15 行已揭露，策略中心、風控中心、日誌、設定、市場情報頁仍是展示資料（例如 `pages/risk.tsx` 用 `useLiveNumber` 產生隨機數，並標示「展示資料 · 本地風控模擬」）。這些頁面不屬於本項範圍，不計入 FAIL。
-
-實際執行：
-- `node frontend/cat-os-vite/tests/simulation_integration_test.mjs` → 5 項全部 PASS（自動選到 Playwright chrome-headless-shell），證據目錄 `%TEMP%\catos-sim-integration-8hzDxL`。
-- `npm --prefix frontend/cat-os-vite run typecheck` → 0 錯誤。
-- `npm --prefix frontend/cat-os-vite test` → `tests 10, pass 10, fail 0`。
-
-## 6. python_strategy skip：PASS
+## 4. 無交易出口，只綁 127.0.0.1：PASS
 
 依據：
-- skip 只出現在 `tests/test_python_strategy_api.py` `PythonApiTests`，以及 `tests/test_python_strategy_v1.py` 的 `PythonWorkerTests` 與 `LibraryAndRunTests`，合計 11 個測試，與全套件的 `skipped=11` 相符。理由註明為 v2 候選，見 `docs/simulation-api-contract-draft.md`（第 1 節「不提供（v1）：POST /strategies、POST /bots」與第 6 節 Q1）。
-- 本驗收者把 `@unittest.skip` 去掉後執行複本（放在 scratchpad，不改動 repo）：`Ran 11 tests … FAILED (failures=2, errors=8)`，原因全部是正式功能不存在：
-  - `TypeError: WorkerConfig.__init__() got an unexpected keyword argument 'python_strategy'`（4 個）
-  - `AttributeError: 'LocalSimControlService' object has no attribute 'library'`（3 個）
-  - `KeyError: 'artifact_hash'`（1 個）
-  - `POST /strategies` 回 `405`（2 個）
-- 這些功能在 `5a101d4` 與 `ba51c1b` 都不存在，`git log --all -S"python_strategy=" -- catos/ipc.py` 也沒有任何結果，可見它們從未存在於任何分支。測試檔最早由 `2290593f`（2026-10-22）加入，當時就無法通過，所以這些 skip 不是在掩蓋 v1 的回歸。
-- 其他 skip（`skipUnless win32`、symlink 不可用時的 `skipTest`）在本機都沒有觸發。
+- 後端只改了 9 個 `catos/*.py`，`tools/` 與 `scripts/` 沒有變更。對差異的新增行搜尋 `os.environ|getenv|api_key|secret|passphrase|credential|/api/v5/trade|place_order|cancel|requests.|httpx|urlopen|0.0.0.0|host=`，結果為 0 筆。
+- 新增的路由都在 `local_sim_control_api.py`：
+  - GET `/state`、`/strategies`、`/bots`、`/bots/{id}`、`/risk`、`/positions`、`/events`，以及 POST `/bots/start`。
+  - `/bots/start` 會拒絕 `mode != "local"`；檔內定義 `FORBIDDEN_MODES = {"demo","live"}`。
+  - 沒有 POST `/strategies` 或 POST `/bots`。
+- 綁定位址：`catos/workspace_api.py` 用 `listener.bind(("127.0.0.1", port))`，並設 `uvicorn.Config(host="127.0.0.1")`；`catos/research_api.py` 同樣只綁 `127.0.0.1`。
+- 前端 `simulation-api-adapter.ts` 在 demo／live 模式下不發請求，只回 `mode_not_open`。`npm test` 的 live 案例實測確認：不送請求，變更類操作回 403。
+- `14279af` 移除了前端的 `setApiCredentials`，前端從此沒有任何輸入或保存金鑰的程式。
 
-## 本輪未涵蓋
+## 5. 前端讀真資料、無 mock store、無假登入：PASS（D1 已修）
 
-- 完整後端套件：本輪沒有重跑，只跑了上列受影響的 7 組。上一工作包在 `b2c9ce27` 跑過完整套件（`Ran 1373 tests … OK (skipped=11)`，屬歷史證據）；之後 `faefef15`、`ba51c1b8` 只改測試與 README。
-- README 寫「12 skipped」，本機實測是 11，可能是筆電上 symlink 不可用而多出 1 個 skip。這是文件與實測的差異，未修正。
-- 沒有逐檔審查 73 個被刪除的前端檔案。只確認戰情台、實例頁與側欄沒有匯入任何殘留的 mock 模組，以及 typecheck 通過。
-- `strategy_registry` 的 `hooked_import` 只攔截 manifest 列出的模組，策略匯入的其他模組照一般 import 從磁碟載入，不經雜湊核對。這符合 AGENTS.md P1「受信策略邊界」，不屬於沙箱保證。
-- `research_catalog.py` 仍有一套平行的固定 SMA 載入器（`_strategy_from_verified_snapshot`、`APPROVED_STRATEGY_SHA256`），只供研究路徑使用，也會檢查 approved 與 sha256。它與 registry 重複，但不屬於本項「worker 不寫死」的範圍。
-- 沒有做人工視覺驗收（依 AGENTS.md「交付驗收鐵律」由使用者自行驗收畫面）。
-- 沒有連 OKX、沒有讀取憑證或環境變數中的機密。
+已刪除的檔案：`src/adapters/mock-adapter.ts`、`src/mock/default-data.ts`、`src/lib/mock/market-tape-10m.ts`、`src/lib/mock/unified-events.ts`、`src/lib/v0-engine.ts`、`src/lib/auth.tsx`、`src/pages/profile.tsx`。
+
+在 `14279af` 對整個 `src/` 搜尋 `mock-adapter`、`default-data`、`INSPECTOR_BOTS`、`usePreviewStore`、`liveMarketStore`、`MARKET_TAPE`、`useAuth`、`login`，結果為 0 筆。
+
+各畫面的資料來源：
+- 戰情台：`src/pages/index.tsx` `renderCard` 的 7 張卡片分別由 `AccountEquityBand`、`ActivityPanel`、`V0BotTable`、`AllocationDonutCard`、`UnifiedIncidentActivityCard` 呈現，這些元件都是 `useCatStore`／`StateAdapter` 的消費者。
+- 實例頁 `src/pages/bots.tsx`、側欄 `simulation-status-strip.tsx`（由 `shell.tsx` 掛載）與 `account-menu.tsx` 同樣讀 store；`App.tsx` 啟動 `stateAdapter`。
+- 假登入已移除，`account-menu` 顯示「本機單人終端 · 無登入」。
+
+README 的「v1 範圍」已如實揭露：策略中心、風控中心、日誌、設定、市場情報仍是展示資料。這些頁面不屬於本項的「戰情台／實例頁／側欄」範圍。
+
+### D1（預審發現，已修正、已覆驗）
+
+缺陷內容：側欄帳戶選單 →「OKX 專用子帳戶 API」分頁（`personal-os-modal.tsx`，`activeTab === "api"`）出現以下假狀態：
+- 假金鑰 `okx_api_••••••••38f2` 與 Passphrase，預設值來自 `personalOsStore.ts`。
+- 預設 `environment: "live"`，畫面以綠色高亮「LIVE 實盤」。
+- 寫死的 `ping: 18`，綠字顯示「18 ms」。
+- 主題預覽卡上的「18ms WS」標示。
+
+這些內容與 v1「不接 Demo／Live、不碰憑證」不符。
+
+修正 `14279af` 的核對結果：
+- `src/state/personalOsStore.ts`：
+  - `PersonalOsState` 移除 `apiKey`、`passphrase`、`environment`、`ping` 與 `setApiCredentials`、`setEnvironment`。
+  - store 預設值不再有這些欄位，`save()` 寫入 localStorage 的 payload 也不再包含它們。
+- `src/components/catos/personal-os-modal.tsx`：
+  - API 分頁改為 `ShieldOff`，標題「OKX 專用子帳戶 API · v1 未接線」，說明 v1 不載入金鑰、沒有 Demo／Live 下單路徑。
+  - 「本地服務狀態」改讀 `useCatStore` 的 `connection.status` 與 `service.instance_id`／`slot`。
+  - 主題預覽卡上的「18ms WS」已移除。
+- 對 `src/` 搜尋 `apiKey|passphrase|Passphrase|setEnvironment|setApiCredentials|38f2|\bping\b|18ms|18 ms|WS 延遲|LIVE 實盤`：只剩 CSS 的 `animate-ping` 與 `src/lib/mock/data.ts` 的日誌頁展示字串（屬於 README 已揭露的展示頁），API 分頁與側欄不再有命中。
+- 瀏覽器實測：在乾淨 clone 以 `tests.integration_http_fixture` 在 18870 起 local-sim 後端、在 18890 起 Vite proxy，在內建瀏覽器開啟後點「帳戶選單 →『OKX 專用子帳戶 API』」。
+  - 實測前先在 localStorage 塞入修正前格式的舊值（`apiKey: okx_api_STALE_9999`、`environment: live`），模擬舊使用者。
+  - 分頁實際文字：「OKX 專用子帳戶 API · v1 未接線」、「連線 ok」、「instance 51501dc3… · slot idle」。
+  - 全頁搜尋 `STALE|38f2|LIVE 實盤|18 ms|18ms|Passphrase`：`false`。舊的 localStorage 值仍留在瀏覽器中，但不會被讀取或顯示，下次儲存偏好時就會被覆寫掉。
+
+## 6. python_strategy 的 skip 屬 v2：PASS
+
+依據：
+- `cfa7f39` 只在 `PythonApiTests`、`PythonWorkerTests`、`LibraryAndRunTests` 三個類別加上 `@unittest.skip("v2 候選：…Q1")`，測試本體沒有修改。
+- 本驗收者把 skip 拿掉後實跑（`unskip_python_strategy.py`）：11 個測試中 8 個 ERROR、2 個 FAIL，原因全部是功能未實作：
+
+```text
+4 TypeError: WorkerConfig.__init__() got an unexpected keyword argument 'python_strategy'
+3 AttributeError: 'LocalSimControlService' object has no attribute 'library'
+1 KeyError: 'artifact_hash'          # POST /strategies 回 405，取不到建立結果
+1 AssertionError: 405 != 201         # POST /strategies 未掛載
+1 AssertionError: 405 != 409         # 同上
+```
+
+- `git log --all -S'self.library' -- catos` 查無任何提交，可見上傳製品與 allocate 控制面從未存在，不是被 v1 改壞。這與契約文件第 0 節第 2 點及 Q1 的定案一致。
+- 跳過數是 11 或 12：另 1 個是 `test_lot_scenario_demo` 在無權建立 symlink 時呼叫 `skipTest`。本機實測為 12，與 `14279af` 修正後的 README 說法一致。
+
+## 實際執行的命令與結果
+
+`<clone>` 指 `cc2433d` 的乾淨 clone，`<clone2>` 指 `14279af` 的乾淨 clone；`.venv` 是 `C:\Users\kai\Desktop\CatOS\.venv`。
+
+| 命令 | 位置／版本 | 結果 |
+| --- | --- | --- |
+| `git clone` 後 `git ls-files --eol` | `<clone>` `cc2433d` | 556 檔 `w/lf`，0 檔 `w/crlf` |
+| `.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"` | `<clone>` `cc2433d` | `Ran 1373 tests in 268.952s`、`OK (skipped=12)` |
+| `npm run typecheck`／`npm test`／`npm run build` | `<clone>` `cc2433d` | exit 0／10 pass 0 fail／exit 0 |
+| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone>` `cc2433d` | 5 PASS |
+| `snapshot_failclosed.py`、`registry_check.py`、`unskip_python_strategy.py` | repo 根目錄，`PYTHONPATH=.;tests` | 輸出見第 1、2、6 項 |
+| `npm run typecheck` | `<clone2>` `14279af` | exit 0 |
+| `npm test` | `<clone2>` `14279af` | tests 10、pass 10、fail 0 |
+| `npm run build` | `<clone2>` `14279af` | exit 0 |
+| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone2>` `14279af` | exit 0，5 PASS（`/state` 經 proxy、合成 run 全 Decimal 字串、`since_version` unchanged、戰情台 DOM、實例頁 DOM 無 NaN／mock 值） |
+| 瀏覽器實點 API 分頁（18870／18890） | `<clone2>` `14279af` | 見第 5 項 D1 |
+
+後端在 `14279af` 沒有變更（`git diff cc2433d..14279af -- catos tests` 為空），所以 `cc2433d` 的完整套件結果適用。合併 main 之後的重跑，記錄在合併 commit 之後的回報中。
+
+## 非阻斷觀察
+
+- **O1（前端顯示）**：`account-equity-band.tsx` 懸停標籤的百分比是用 float 算的（第 84 行 `(v / base - 1) * 100`，第 147 行 `toFixed(2)`）。`allocation-donut-card` 的占比 `%` 也一樣。它們不是金額、價格或部位，也不會回流帳務或風控，但與 `toPlotNumber` 註解的精神不一致。建議之後改用字串計算。
+- **O2（模式選單文案）**：`mode-selector.tsx` 的 `MODES` 把 Demo／Live 描述成「OKX 模擬交易」「OKX 實盤連線 · 真實 USDT-M SWAP 交易」，沒有標示 v1 未開放。實際選取後不會發出任何請求，側欄狀態列顯示「LIVE · 模式未開放」，戰情台與實例頁顯示「此模式未開放（demo/live 不在 v1 範圍）」。因為選取後的狀態是如實呈現的，不同於 D1 那種「預設就假裝已連線」，所以不判 FAIL。建議在選單文案加上「v1 未開放」。
+- **O3（固定標籤）**：API 分頁的「本地服務埠 127.0.0.1:8770」是寫死的文字，在隔離埠或 8771 preview 下不會反映實際的埠。這屬於靜態說明，不影響判定。
+- **O4（信任邊界，符合 P1）**：manifest 雜湊只涵蓋 `source_files`；策略匯入的 `catos.research` 等執行期模組照一般方式從磁碟載入，不在雜湊範圍內。這符合 AGENTS.md P1「受信策略邊界」，在此記錄以免被誤讀為完整的供應鏈驗證。
+- 補充：`.gitignore` 第 47 行 `/reports/*` 會忽略本報告，提交時以 `git add -f` 單獨加入此檔。
+
+## 未涵蓋
+
+- 沒有逐頁人工檢視畫面。UI 以程式碼核對、整合測試（headless DOM）與 API 分頁的單點實測為證據；整體視覺由使用者自行驗收。
+- 沒有跑 `tests/integration_baseline_test.mjs`（需要 playwright，未納入依賴），也沒有跑 `start-laptop-dev.bat`。
+- 沒有啟動 8770／8771 正式服務、沒有使用既有資料根，也沒有做全市場回測、採集或 Demo／Live。
+- 沒有在 macOS／Linux 驗證（`AccountLock` 只支援 win32）。
