@@ -68,7 +68,7 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="輸入指令或快捷搜尋 (例如: 回測, tabby, T-Split, 底部Console)..." />
+      <CommandInput placeholder="輸入指令或快捷搜尋 (例如: 回測, 風控, T-Split, sim-control-sma)..." />
       <CommandList className="font-mono text-xs max-h-[380px]">
         <CommandEmpty>找不到符合的指令或目標</CommandEmpty>
 
@@ -90,7 +90,12 @@ export function CommandPalette() {
             <ScanLine className="mr-2 size-4 text-primary" />
             <span>策略覆盤 (Strategy Review)</span>
           </CommandItem>
-          <CommandItem onSelect={() => handleNav("/risk")} className="cursor-pointer">
+          {/* 搜尋 kill-switch 等字時優先導到風控中心（真實狀態與未接線標示），而不是其他模糊命中的頁面 */}
+          <CommandItem
+            onSelect={() => handleNav("/risk")}
+            keywords={["kill-switch", "re-arm", "熔斷", "鎖存"]}
+            className="cursor-pointer"
+          >
             <ShieldCheck className="mr-2 size-4 text-primary" />
             <span>風控中心 (Risk & R1 Period)</span>
           </CommandItem>
@@ -150,27 +155,15 @@ export function CommandPalette() {
 
         <CommandSeparator />
 
-        {/* 5. 風控處置 (Mock 模擬) */}
+        {/* 5. 風控處置：v1 沒有對帳與 Kill-Switch HTTP，只列出並標示未接線，不回報任何結果 */}
         <CommandGroup heading="風控與應急處置 (Risk & Safety)">
-          <CommandItem
-            onSelect={() => {
-              setOpen(false);
-              toast.info("已執行帳戶快速對帳檢查，本地與 OKX 完全一致 (Recon Pass)");
-            }}
-            className="cursor-pointer"
-          >
-            <RefreshCw className="mr-2 size-4 text-primary" />
-            <span>執行帳戶與委託強制對帳 (Recon Audit)</span>
+          <CommandItem disabled className="text-muted-foreground">
+            <RefreshCw className="mr-2 size-4 text-muted-foreground" />
+            <span>帳戶與委託對帳 (Recon) · 未接線（v1 不連 OKX）</span>
           </CommandItem>
-          <CommandItem
-            onSelect={() => {
-              setOpen(false);
-              toast.error("已觸發模擬緊急停止 (Kill-Switch Latch 已鎖存)");
-            }}
-            className="cursor-pointer text-destructive"
-          >
-            <AlertOctagon className="mr-2 size-4 text-destructive" />
-            <span>觸發 Emergency Kill-Switch (模擬鎖存)</span>
+          <CommandItem disabled className="text-muted-foreground">
+            <AlertOctagon className="mr-2 size-4 text-muted-foreground" />
+            <span>Emergency Kill-Switch · 未接線（v1 無 Kill-Switch HTTP）</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

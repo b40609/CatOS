@@ -403,5 +403,6 @@ v1 規則：
 - **系統日誌**（`pages/logs.tsx`）：讀 store 的 `events`（依 `seq` 遞增，前端最多保留 400 筆，後端 `omitted` 照實顯示）。TRADE 篩選等於 `category == "ORDER"`，其餘依 `level`；行標題沿用戰情台事件卡的 `eventTitle`。
 - **策略中心**（`pages/strategies.tsx`）：讀 `strategies`、綁定的 `bots` 與 `StateAdapter.equityCurve`（本次 run 權益）。控制面沒有年化、夏普等績效欄位，相關卡片移除；策略啟停沒有 HTTP，開關移除。
 - **策略覆盤**（`pages/review.tsx`）：原頁面是 sin 波產生的曲線與寫死的「實盤淨值」等數字，並非 README 原先所寫的「接研究 HTTP」。v1 沒有 Demo／實盤歷史可覆盤，改為標示「v1 未啟用」並連到回測、實例監控與風控中心。
+- **命令面板**（`components/catos/command-palette.tsx`，v1.1 驗收缺陷 D2）：「強制對帳」與「Emergency Kill-Switch」原本只跳假成功訊息（「本地與 OKX 完全一致 (Recon Pass)」、「Kill-Switch Latch 已鎖存」），沒有發出任何請求。改為停用並標示「未接線」，不回報任何結果；「風控中心」導覽項目加上 kill-switch／re-arm／熔斷／鎖存搜尋關鍵字，輸入「kill」按 Enter 會到風控中心。輸入框提示移除舊 mock 機器人名。風控頁事實面板改標「最後一次觀測」並顯示 seq 與合成時間；策略頁「綁定 Bot」只計算綁定到登錄策略的 Bot。
 - 刪除已無引用的 `lib/mock/{data,terminal,terminal.test}.ts`、`hooks/use-live.ts`、`components/ui/{slider,switch}.tsx`，以及 `@radix-ui/react-slider`、`@radix-ui/react-switch` 依賴（lockfile 已更新）。
 - 自測：`tsc --noEmit`、`npm test`（check:tokens＋11 個單元測試，新增 `compareDecimal`）、`npm run build` 零錯誤；`tests/simulation_integration_test.mjs` 擴充為 9 項（新增風控、日誌、策略、覆盤四頁的 DOM 檢查，並把每頁 DOM 文字存入證據資料夾）。另以隔離 18870／18890 在瀏覽器實際操作：空狀態、兩次 run 期間事件即時增加、篩選、搜尋、自動捲動開關與覆盤頁連結。
