@@ -11,6 +11,7 @@ import { Route as LogsRoute } from '@/pages/logs';
 import { Route as SettingsRoute } from '@/pages/settings';
 import { Route as BacktestRoute } from '@/pages/backtest';
 import { Route as OptimizationRoute } from '@/pages/optimization';
+import { Route as ValidationRoute } from '@/pages/validation';
 import { Route as ReviewRoute } from '@/pages/review';
 import { Route as MarketIntelRoute } from '@/pages/market-intel';
 
@@ -23,6 +24,7 @@ const routeMap: Record<string, React.ComponentType> = {
   '/settings': SettingsRoute.component,
   '/backtest': BacktestRoute.component,
   '/optimization': OptimizationRoute.component,
+  '/validation': ValidationRoute.component,
   '/review': ReviewRoute.component,
   '/market-intel': MarketIntelRoute.component,
 };
