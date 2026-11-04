@@ -147,6 +147,15 @@ class FetchToolTest(unittest.TestCase):
         code, _, err, _ = self.run_tool(FakeOKX(self.time))
         self.assertEqual((code, "dataset_exists" in err), (1, True))
 
+    def test_request_cap_from_the_authorization_is_enforced(self):
+        with self.assertRaisesRegex(ValueError, "max_requests"):
+            fetch.Client(max_requests=fetch.MAX_REQUESTS_CAP + 1, opener=FakeOKX(self.time))
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit):
+            fetch.main(["--days", "3", "--max-requests", "151"], now_ms=END, root=self.root)
+        self.assertIn("authorized cap", err.getvalue())
+        self.assertEqual(self.written(), [])
+
     def test_only_the_three_public_endpoints_are_allowed(self):
         client = fetch.Client(max_requests=5, opener=FakeOKX(self.time), clock=self.time.clock,
                               sleep=self.time.sleep)
