@@ -184,7 +184,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
 
         {/* 左側 KPI 欄：全部來自 summary（後端 Decimal 計算） */}
         <div className={cn(
-          "shrink-0 border-r border-border/80 flex flex-col justify-between overflow-y-auto bg-surface/30",
+          "shrink-0 border-r border-border/80 flex flex-col justify-between overflow-y-auto bg-surface/30 custom-scrollbar",
           isNarrow ? "w-[130px] p-2 gap-1.5" : "w-[205px] p-2.5 gap-2"
         )}>
           <div className="flex flex-col gap-2">

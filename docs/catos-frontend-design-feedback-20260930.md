@@ -2,6 +2,22 @@
 
 更新：2026-09-30（六頁交付）。首頁方向已接受，其餘六頁已展開；下方原版差異與15:46等待方向敘述僅保留歷史。
 
+## 已確認偏好：選取狀態與捲軸（2026-11-04）
+
+來源：OmniKit 前端設計槽位 F1 的盲選，紀錄在 OmniKit 的 `data/evals/2026-11-04-frontend-design-F1.md`。
+
+- **怎麼選的：** frontend-design 與 impeccable 各改一版 `frontend/cat-os-vite`，基準是 commit `9fef976`。使用者在桌機用無痕視窗比較原版和這兩版，截下喜歡的部分。
+- **結果：** 原版 2 處、frontend-design 1 處、impeccable 0 處。
+
+以後改前端要遵守這三條：
+
+- **選取狀態用中性灰底、白字。** 用 `bg-secondary text-foreground` 加 `shadow-xs`；金色只用在圖示（`[&_svg]:text-primary`）。
+  - 適用側欄（`shell.tsx` 的 `activeProps`）和分段篩選，例如 `v0-bot-table.tsx` 的「全部／運作／停止」。
+  - 兩組都把選取改成金字或金框，使用者兩處都選了原版。
+- **副標維持 `text-muted-foreground`。** 例如側欄的 `DASHBOARD`，不跟著選取變色。
+- **面板內的小捲動區加 `custom-scrollbar`。** 也就是 5 px、`rgba(255, 255, 255, 0.12)`、圓角 4 px 的細捲軸，見 `styles/globals.css`；不要出現 15 px 的系統捲軸。
+  - 權益卡的 KPI 欄（`account-equity-band.tsx`）已經補上。
+
 ## 最新決策：首頁接受，六頁展開（2026-09-30）
 
 使用者已確認「首頁方向 OK，展開其他頁」，取代 15:46 的等待方向／尚未授權其他頁。六頁已依相同黑金、緊湊導航、面板與布局操作完成；不是再另起一套設計。來源／版本／驗收進詳情，缺帳戶／風控／Yaozi 用短狀態；Gemini 原目錄未修改。
