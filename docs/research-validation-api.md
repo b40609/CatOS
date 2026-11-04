@@ -2,7 +2,9 @@
 
 2026-10-19 開發完成、126/126 自測通過；後續已由使用者指定 GPT-6 Sol 完成三個研究包獨驗與唯讀 Git 核對，均 PASS，見[獨驗報告](../reports/research-independent-acceptance-20261019-gpt6sol/acceptance.md)。範圍限合成資料與隔離後端，不包含正式服務更新或前端串接。下方「本輪」驗證數字仍指原開發自測，不冒充獨驗或 2026-10-20 重驗。
 
-2026-11-04 更新（分支 `feat/research-validation-real-data`；獨立驗收 7／7 PASS，見 `reports/research-validation-real-data-acceptance-20261104/acceptance.md`，驗收後依觀察 O1–O4 的修正只有開發者自測）：結果升為 `catos.research.validation-result.v2`，可在已登錄的 OKX 公開歷史資料集上執行，並接上 React 滾動驗證頁（`frontend/cat-os-vite/src/pages/validation.tsx`）。v1 → v2 的差異見文末「v2 輸出」；方案比較與實測見 [研究線方案](research-real-data-plan.md)。
+2026-11-04 第二次更新（分支 `feat/research-second-strategy`，尚未獨立驗收）：策略可選 `sma-trend` 或 `donchian-breakout`，`search_space` 依策略的參數名稱各給一條 range（見下方表格）。
+
+2026-11-04 更新（分支 `feat/research-validation-real-data`，已合併進 `main`；獨立驗收 7／7 PASS，見 `reports/research-validation-real-data-acceptance-20261104/acceptance.md`，驗收後依觀察 O1–O4 的修正只有開發者自測）：結果升為 `catos.research.validation-result.v2`，可在已登錄的 OKX 公開歷史資料集上執行，並接上 React 滾動驗證頁（`frontend/cat-os-vite/src/pages/validation.tsx`）。v1 → v2 的差異見文末「v2 輸出」；方案比較與實測見 [研究線方案](research-real-data-plan.md)。
 
 ## 已可交付的行為
 
@@ -43,7 +45,14 @@ POST `/api/research/validations`，Content-Type 為 application/json，標頭 `X
 }
 ```
 
-`backtest.parameters.period` 保留原請求格式；驗證任務的候選週期由 `search_space.period` 決定，quantity 固定。策略只允許已核准的 RegisteredSMA；資料可選任一已登錄資料集（96 根合成 15m K 線，或經 manifest 雜湊核對的 OKX 公開歷史資料）。整數 range 須對齊、至少兩個候選、週期在 2 到 32，預熱涵蓋最高候選週期。
+`backtest.parameters` 保留原請求格式；驗證任務的候選參數由 `search_space` 決定，quantity 固定。策略只允許 catalog 白名單上的兩個已核准策略（2026-11-04 起），每個整數參數一條 range，參數名稱必須與策略完全相同：
+
+| `strategy_id` | 參數（`backtest.parameters` 與 `search_space` 的鍵） | 範圍 | 預熱 |
+| --- | --- | --- | --- |
+| `sma-trend` | `period` | 2～32；單軸至少兩個候選 | `warmup_bars` ≥ 最高候選 `period` 且 < 64 |
+| `donchian-breakout` | `entry_bars`、`exit_bars` | 2～960、1～959；每格點都要 `exit_bars` < `entry_bars`，所以 `exit_bars` 最大值須小於 `entry_bars` 最小值；全部格點至少兩個 | `warmup_bars` ≥ 最高候選 `entry_bars` 且 ≤ 960 |
+
+資料可選任一已登錄資料集（96 根合成 15m K 線，或經 manifest 雜湊核對的 OKX 公開歷史資料）。整數 range 須對齊（差距為步進的整數倍）。單參數策略的錯誤訊息沿用原本的 `low`／`high`／`step` 欄名，多參數策略為 `entry_bars.low` 這類帶參數名的欄名。HTML 報表的「選定參數」欄以 `name=value` 列出各窗選定的參數組。
 
 任務最多 20 個格點、8 個視窗、100 次回測；提交時預檢 `windows × (格點數 + 1) <= max_runs`、`warmup_bars + train_bars + windows × test_bars <= 資料根數`，以及 `windows × (格點數 × (warmup_bars + train_bars) + warmup_bars + test_bars) <= max_bar_evaluations`（250,000；本機實測每秒約 1.9～5.4 萬根，超過就在送出時以 422 拒絕，不等 30 秒逾時）。環境分類器每根都加總整個回看窗，所以 `regime_rule.lookback_bars` 上限是 `max_lookback_bars`（512）。不自動縮短計畫、補預算或增加成功次數。已有的 30 秒逾時、2,000,000 bytes 子程序輸出上限仍適用。目前沿用參數型別的既有 Optuna 依賴；本任務採完整格點，不啟動 Optuna 搜尋，也不轉 Float 排名。
 

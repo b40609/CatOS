@@ -2,8 +2,8 @@
 // Starts an isolated backend fixture (real bounded synthetic runner) on 18870 and the real
 // Vite proxy on 18890, drives the production simulation adapter + store against it through
 // the proxy, then loads the dashboard, bots, risk, logs, strategies and review pages in headless
-// Chrome and checks the DOM. Finally it submits the synthetic walk-forward example through the
-// proxy and checks the validation page.
+// Chrome and checks the DOM. Finally it submits the synthetic walk-forward example, a Donchian
+// backtest and a Donchian walk-forward through the proxy and checks the backtest and validation pages.
 // 8770/8771/8890 and outputs/local-sim-control are never touched.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -220,6 +220,57 @@ try {
       assert.ok(text.includes(pnl), `window ${window.number} net PnL ${pnl} missing`);
     }
     assert.ok(text.includes('合計') && text.includes('與樣本外帳務核對一致'), 'regime attribution missing');
+    console.log(`screenshot ${shot}`);
+  });
+  // Submit a research run through the proxy exactly like the pages do and wait for its archive.
+  async function researchRun(kind, request) {
+    const getJson = async (route) => (await fetch(origin + route)).json();
+    const version = await getJson('/api/research/version');
+    const submitted = await fetch(`${origin}/api/research/${kind}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CatOS-Build': version.build_id },
+      body: JSON.stringify(request) });
+    const body = await submitted.text();
+    assert.equal(submitted.status, 202, body);
+    const { run_id: runId } = JSON.parse(body);
+    await waitFor(async () => (await getJson(`/api/research/runs/${runId}`)).status === 'complete',
+      `${kind} run did not complete`, 60000);
+    return { runId, result: await getJson(`/api/research/runs/${runId}/result`) };
+  }
+  const DONCHIAN = { strategy_id: 'donchian-breakout', parameters: { entry_bars: 6, exit_bars: 3, quantity: '1' },
+    warmup_bars: 6 };
+  await check('backtest page shows a Donchian run submitted through the proxy', async () => {
+    const catalog = await (await fetch(`${origin}/api/research/catalog`)).json();
+    assert.deepEqual(catalog.strategies.map((s) => s.id), ['sma-trend', 'donchian-breakout']);
+    const { runId, result } = await researchRun('backtests', { ...catalog.defaults, ...DONCHIAN });
+    assert.equal(result.provenance.strategy.id, 'donchian-breakout');
+    const { formatDecimal } = await vite.ssrLoadModule('/src/lib/format.ts');
+    const { text, shot } = await page('/backtest', 'backtest-donchian');
+    // The backtest page keeps "--" placeholders for absent fields, so only NaN/undefined are checked here.
+    for (const bad of ['NaN', 'undefined']) assert.ok(!text.includes(bad), `backtest page contains "${bad}"`);
+    assert.ok(text.includes('Donchian 回測 · entry_bars=6, exit_bars=3'), `run ${runId} label missing`);
+    assert.ok(text.includes('Donchian 通道突破（Long / Short）'), 'strategy name missing');
+    const returnPct = formatDecimal(result.result.performance.return_pct, { digits: 2, sign: true, suffix: '%' });
+    assert.ok(text.includes(returnPct), `return ${returnPct} missing`);
+    console.log(`screenshot ${shot}`);
+  });
+  await check('validation page shows a Donchian walk-forward with its selected channels', async () => {
+    const { validation } = await (await fetch(`${origin}/api/research/catalog`)).json();
+    const { runId, result } = await researchRun('validations', {
+      ...validation.example_request, backtest: { ...validation.example_request.backtest, ...DONCHIAN },
+      search_space: { entry_bars: { low: 4, high: 6, step: 2 }, exit_bars: { low: 2, high: 3, step: 1 } },
+      max_candidates: 4, max_runs: 15 });
+    const { formatDecimal } = await vite.ssrLoadModule('/src/lib/format.ts');
+    const { text, shot } = await page('/validation', 'validation-donchian');
+    for (const bad of FORBIDDEN) assert.ok(!text.includes(bad), `validation page contains "${bad}"`);
+    assert.ok(text.includes(`#${runId.slice(0, 8)}`), 'Donchian validation run missing from the list');
+    assert.ok(text.includes('Donchian entry_bars 4~6/2 · exit_bars 2~3/1'), 'Donchian run summary missing');
+    for (const window of result.result.validation.windows) {
+      const chosen = window.training.trials[window.training.selected_trial_number].params;
+      const label = chosen.map(([name, value]) => `${name}=${value}`).join(', ');
+      assert.ok(text.includes(label), `window ${window.number} selected ${label} missing`);
+      const pnl = formatDecimal(window.out_of_sample.performance.net_pnl, { digits: 2, sign: true });
+      assert.ok(text.includes(pnl), `window ${window.number} net PnL ${pnl} missing`);
+    }
     console.log(`screenshot ${shot}`);
   });
   await fs.writeFile(path.join(evidence, 'result.json'), JSON.stringify({ passed, backendLog, ports: [18870, 18890] }, null, 2));

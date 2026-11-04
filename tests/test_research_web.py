@@ -41,8 +41,9 @@ def await_task(service, run_id):
 
 class ResearchCatalogTests(unittest.TestCase):
     def test_exact_core_equivalence_and_decimal_serialization(self):
-        request, config, period, quantity = validate_request(request_copy())
-        result = backtest(strategy=lambda: RegisteredSMA(period, quantity),
+        request, config, params, quantity = validate_request(request_copy())
+        self.assertEqual(params, {"period": 2})
+        result = backtest(strategy=lambda: RegisteredSMA(params["period"], quantity),
                           candles=load_candles_csv(DATA_PATH, config=config),
                           config=config, warmup_bars=request["warmup_bars"])
         payload, report = execute_request(request, provenance())

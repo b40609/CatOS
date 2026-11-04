@@ -1,6 +1,6 @@
 """Fixed trusted registry and strict Decimal-string research contract."""
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation, localcontext
 import builtins
 import hashlib
@@ -34,6 +34,57 @@ ARTIFACT_FIELDS = {
     "schema", "schema_version", "artifact_id", "version", "sha256", "entry",
     "source_files", "approval_state", "provenance",
 }
+DONCHIAN_ID = "donchian-breakout"
+DONCHIAN_VERSION = "donchian-parameters-v1"
+DONCHIAN_ENTRY = "catos.research_donchian:RegisteredDonchian"
+DONCHIAN_SHA256 = "1596e3ace639379086f6fd5ff2ba73948697c2b34884366c3b32b15ba9ba6817"
+DONCHIAN_FILES = ("catos/research_donchian.py",)
+# Research only: the worker registry (strategy_registry) reads catos/research_artifacts
+# alone, so a local-sim Bot can never resolve this strategy.
+DONCHIAN_MANIFEST = (ROOT / "catos" / "research_only_artifacts"
+                     / "donchian-breakout-donchian-parameters-v1.json")
+DONCHIAN_PROVENANCE = {
+    "origin": "catos-research-donchian",
+    "approval_basis": "user-selected-inspected-local-artifact",
+    "scope": "research-only",
+}
+# Channels up to ten 15m days (96 bars a day).
+DONCHIAN_MAX_BARS = 960
+
+
+@dataclass(frozen=True)
+class ResearchStrategy:
+    """One fixed, inspected research strategy: pinned identity, sources and request bounds."""
+    strategy_id: str
+    version: str
+    entry: str
+    sha256: str
+    files: tuple
+    manifest: Path
+    artifact_provenance: dict
+    name: str
+    parameters: tuple  # (name, low, high) integers, in constructor order before quantity
+    lookback: str  # the parameter warmup_bars must cover
+    warmup_limit: int  # warmup_bars must stay below this
+
+
+STRATEGIES = {spec.strategy_id: spec for spec in (
+    ResearchStrategy(STRATEGY_ID, STRATEGY_VERSION, STRATEGY_ENTRY, APPROVED_STRATEGY_SHA256,
+                     STRATEGY_FILES, STRATEGY_MANIFEST, ARTIFACT_PROVENANCE,
+                     "SMA 趨勢（Long / Flat）", (("period", 2, 32),), "period", 64),
+    ResearchStrategy(DONCHIAN_ID, DONCHIAN_VERSION, DONCHIAN_ENTRY, DONCHIAN_SHA256,
+                     DONCHIAN_FILES, DONCHIAN_MANIFEST, DONCHIAN_PROVENANCE,
+                     "Donchian 通道突破（Long / Short）",
+                     (("entry_bars", 2, DONCHIAN_MAX_BARS), ("exit_bars", 1, DONCHIAN_MAX_BARS - 1)),
+                     "entry_bars", DONCHIAN_MAX_BARS + 1),
+)}
+
+
+def strategy_spec(strategy_id):
+    spec = STRATEGIES.get(strategy_id) if type(strategy_id) is str else None
+    if spec is None:
+        raise ValueError("unknown_strategy")
+    return spec
 SHA256 = re.compile(r"[0-9a-f]{64}")
 ENGINE_FILES = (
     "catos/research.py", "catos/data_io.py", "catos/reporting.py",
@@ -116,14 +167,14 @@ def _strict_json(raw):
     return json.loads(raw, object_pairs_hook=pairs, parse_constant=reject_constant)
 
 
-def _verified_strategy_source_snapshot(source_files):
-    if type(source_files) is not list or source_files != list(STRATEGY_FILES):
+def _verified_strategy_source_snapshot(source_files, spec=STRATEGIES[STRATEGY_ID]):
+    if type(source_files) is not list or source_files != list(spec.files):
         raise ValueError("artifact_source_files_mismatch")
     root = ROOT.resolve()
     snapshot = {}
     entries = []
     for name in source_files:
-        if type(name) is not str or name not in STRATEGY_FILES:
+        if type(name) is not str or name not in spec.files:
             raise ValueError("artifact_source_files_mismatch")
         path = ROOT / name
         try:
@@ -143,44 +194,45 @@ def _verified_strategy_source_snapshot(source_files):
     return snapshot, source_hash
 
 
-def _verified_strategy_source_hash(source_files):
-    return _verified_strategy_source_snapshot(source_files)[1]
+def _verified_strategy_source_hash(source_files, spec=STRATEGIES[STRATEGY_ID]):
+    return _verified_strategy_source_snapshot(source_files, spec)[1]
 
 
-def validate_strategy_manifest(value):
+def validate_strategy_manifest(value, spec=STRATEGIES[STRATEGY_ID]):
     if type(value) is not dict or set(value) != ARTIFACT_FIELDS:
         raise ValueError("artifact_manifest_exact_fields_required")
     if value["schema"] != ARTIFACT_SCHEMA or type(value["schema"]) is not str:
         raise ValueError("artifact_manifest_schema_mismatch")
     if type(value["schema_version"]) is not int or value["schema_version"] != ARTIFACT_SCHEMA_VERSION:
         raise ValueError("artifact_manifest_schema_version_mismatch")
-    if type(value["artifact_id"]) is not str or value["artifact_id"] != STRATEGY_ID:
+    if type(value["artifact_id"]) is not str or value["artifact_id"] != spec.strategy_id:
         raise ValueError("unknown_artifact")
-    if type(value["version"]) is not str or value["version"] != STRATEGY_VERSION:
+    if type(value["version"]) is not str or value["version"] != spec.version:
         raise ValueError("artifact_version_mismatch")
     if type(value["sha256"]) is not str or SHA256.fullmatch(value["sha256"]) is None:
         raise ValueError("artifact_sha256_invalid")
-    if value["sha256"] != APPROVED_STRATEGY_SHA256:
+    if value["sha256"] != spec.sha256:
         raise ValueError("artifact_identity_mismatch")
-    if type(value["entry"]) is not str or value["entry"] != STRATEGY_ENTRY:
+    if type(value["entry"]) is not str or value["entry"] != spec.entry:
         raise ValueError("artifact_entry_mismatch")
     if value["approval_state"] != "approved" or type(value["approval_state"]) is not str:
         raise ValueError("artifact_not_approved")
-    if type(value["provenance"]) is not dict or value["provenance"] != ARTIFACT_PROVENANCE:
+    if type(value["provenance"]) is not dict or value["provenance"] != spec.artifact_provenance:
         raise ValueError("artifact_provenance_mismatch")
-    source_hash = _verified_strategy_source_hash(value["source_files"])
+    source_hash = _verified_strategy_source_hash(value["source_files"], spec)
     if value["sha256"] != source_hash:
         raise ValueError("artifact_hash_mismatch")
     return json.loads(json_text(value))
 
 
-def load_strategy_manifest():
-    if STRATEGY_MANIFEST.is_symlink():
+def load_strategy_manifest(spec=STRATEGIES[STRATEGY_ID]):
+    manifest = spec.manifest
+    if manifest.is_symlink():
         raise ValueError("artifact_manifest_symlink_rejected")
     try:
-        resolved = STRATEGY_MANIFEST.resolve(strict=True)
+        resolved = manifest.resolve(strict=True)
         resolved.relative_to(ROOT.resolve())
-        raw = STRATEGY_MANIFEST.read_text(encoding="utf-8")
+        raw = manifest.read_text(encoding="utf-8")
     except (OSError, ValueError):
         raise ValueError("artifact_manifest_unavailable") from None
     if len(raw.encode("utf-8")) > 8192:
@@ -189,7 +241,7 @@ def load_strategy_manifest():
         value = _strict_json(raw)
     except (json.JSONDecodeError, ValueError) as error:
         raise ValueError(str(error)) from None
-    return validate_strategy_manifest(value)
+    return validate_strategy_manifest(value, spec)
 
 
 SYNTHETIC_CONTRACT = research.ContractSpec(
@@ -222,8 +274,9 @@ def resolve_dataset(dataset_id):
     raise ValueError("unknown_dataset")
 
 
-def provenance(dataset_id=DATASET_ID):
-    artifact = load_strategy_manifest()
+def provenance(dataset_id=DATASET_ID, strategy_id=STRATEGY_ID):
+    spec = strategy_spec(strategy_id)
+    artifact = load_strategy_manifest(spec)
     return {
         "strategy": {
             "id": artifact["artifact_id"], "version": artifact["version"],
@@ -232,7 +285,7 @@ def provenance(dataset_id=DATASET_ID):
             "approval_state": artifact["approval_state"],
             "artifact_manifest": {
                 "schema": artifact["schema"], "schema_version": artifact["schema_version"],
-                "sha256": file_hash(STRATEGY_MANIFEST),
+                "sha256": file_hash(spec.manifest),
                 "provenance": dict(artifact["provenance"]),
             },
         },
@@ -255,21 +308,23 @@ def decimal_string(value, name, *, positive=False):
 def validate_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_REQUEST):
         raise ValueError("request: exact registered fields required")
-    if value["strategy_id"] != STRATEGY_ID:
-        raise ValueError("unknown_strategy")
+    spec = strategy_spec(value["strategy_id"])
     # Every execution path revalidates the fixed local artifact manifest and
     # current allowlisted source hash before accepting a registered strategy.
-    load_strategy_manifest()
+    load_strategy_manifest(spec)
     dataset = resolve_dataset(value["dataset_id"])
     params = value["parameters"]
-    if type(params) is not dict or set(params) != {"period", "quantity"}:
-        raise ValueError("parameters: period and quantity required")
-    period = params["period"]
+    names = [name for name, _, _ in spec.parameters]
+    if type(params) is not dict or set(params) != {*names, "quantity"}:
+        raise ValueError(f"parameters: {', '.join(names)} and quantity required")
+    for name, low, high in spec.parameters:
+        if type(params[name]) is not int or not low <= params[name] <= high:
+            raise ValueError(f"{name}: integer in [{low}, {high}] required")
+    if spec.strategy_id == DONCHIAN_ID and params["exit_bars"] >= params["entry_bars"]:
+        raise ValueError("exit_bars: must be below entry_bars")
     warmup = value["warmup_bars"]
-    if type(period) is not int or not 2 <= period <= 32:
-        raise ValueError("period: integer in [2, 32] required")
-    if type(warmup) is not int or not period <= warmup < 64:
-        raise ValueError("warmup_bars: integer >= period and < 64 required")
+    if type(warmup) is not int or not params[spec.lookback] <= warmup < spec.warmup_limit:
+        raise ValueError(f"warmup_bars: integer >= {spec.lookback} and < {spec.warmup_limit} required")
     quantity = decimal_string(params["quantity"], "quantity", positive=True)
     if quantity > Decimal("1000") or quantity % Decimal("1"):
         raise ValueError("quantity: whole contracts in [1, 1000] required")
@@ -286,26 +341,43 @@ def validate_request(value):
     cfg = research.BacktestConfig(dataset.contract, dataset.timeframe_ms, balance, fee, slip, ())
     # A JSON round-trip owns an immutable-by-convention request copy.
     snapshot = json.loads(json_text(value))
-    return snapshot, cfg, period, quantity
+    return snapshot, cfg, {name: params[name] for name in names}, quantity
+
+
+def require_search_names(spec, space):
+    names = [name for name, _, _ in spec.parameters]
+    if type(space) is not dict or set(space) != set(names):
+        ranges = " and ".join(names) + (" ranges are" if len(names) > 1 else " range is")
+        raise ValueError(f"search_space: only registered {ranges} supported")
+    for name in names:
+        if type(space[name]) is not dict or set(space[name]) != {"low", "high", "step"}:
+            raise ValueError(f"{name}: low, high and step required")
+
+
+def check_search_grid(spec, ranges, warmup):
+    """Rules every grid point must meet; ``ranges`` maps a parameter to its (low, high)."""
+    if spec.strategy_id == DONCHIAN_ID and ranges["exit_bars"][1] >= ranges["entry_bars"][0]:
+        raise ValueError("exit_bars: highest searched value must be below lowest entry_bars")
+    if warmup < ranges[spec.lookback][1]:
+        raise ValueError(f"warmup_bars: must cover highest searched {spec.lookback}")
 
 
 def validate_optimization_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_OPTIMIZATION):
         raise ValueError("optimization: exact registered fields required")
     backtest_request, config, _, quantity = validate_request(value["backtest"])
+    spec = strategy_spec(backtest_request["strategy_id"])
     space = value["search_space"]
-    if type(space) is not dict or set(space) != {"period"}:
-        raise ValueError("search_space: only registered period range is supported")
-    period = space["period"]
-    if type(period) is not dict or set(period) != {"low", "high", "step"}:
-        raise ValueError("period: low, high and step required")
-    low, high, step = period["low"], period["high"], period["step"]
-    if any(type(number) is not int for number in (low, high, step)) or not (
-        2 <= low <= high <= 32 and 1 <= step <= 30 and (high - low) % step == 0
-    ):
-        raise ValueError("period: aligned integer range within [2, 32] required")
-    if backtest_request["warmup_bars"] < high:
-        raise ValueError("warmup_bars: must cover highest searched period")
+    require_search_names(spec, space)
+    for name, low_bound, high_bound in spec.parameters:
+        low, high, step = space[name]["low"], space[name]["high"], space[name]["step"]
+        if any(type(number) is not int for number in (low, high, step)) or not (
+            low_bound <= low <= high <= high_bound and 1 <= step <= high_bound - low_bound
+            and (high - low) % step == 0
+        ):
+            raise ValueError(f"{name}: aligned integer range within [{low_bound}, {high_bound}] required")
+    check_search_grid(spec, {name: (item["low"], item["high"]) for name, item in space.items()},
+                      backtest_request["warmup_bars"])
     if type(value["n_trials"]) is not int or not 1 <= value["n_trials"] <= MAX_TRIALS:
         raise ValueError(f"n_trials: integer in [1, {MAX_TRIALS}] required")
     if type(value["seed"]) is not int or not 0 <= value["seed"] <= 2 ** 32 - 1:
@@ -316,17 +388,19 @@ def validate_optimization_request(value):
 
 
 def catalog():
-    source = provenance()
     return {
-        "strategies": [{**source["strategy"], "name": "SMA 趨勢（Long / Flat）",
-                        "parameters": {"period": {"min": 2, "max": 32},
-                                       "quantity": {"unit": "contracts"}}}],
+        "strategies": [{**provenance(strategy_id=spec.strategy_id)["strategy"], "name": spec.name,
+                        "parameters": {**{name: {"min": low, "max": high}
+                                          for name, low, high in spec.parameters},
+                                       "quantity": {"unit": "contracts"}},
+                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit}}
+                       for spec in STRATEGIES.values()],
         "datasets": [{**dataset.describe(), "contract": asdict(dataset.contract)}
                      for dataset in datasets()],
         "defaults": DEFAULT_REQUEST,
         "optimization": {"defaults": DEFAULT_OPTIMIZATION, "max_trials": MAX_TRIALS,
                          "score_name": "return_pct", "direction": "maximize",
-                         "notice": "僅合成資料、樣本內搜尋；未執行樣本外檢驗。"},
+                         "notice": "樣本內搜尋；未執行樣本外檢驗。"},
         "validation": {"example_request": DEFAULT_VALIDATION,
                        "max_candidates": MAX_VALIDATION_CANDIDATES,
                        "max_runs": MAX_VALIDATION_RUNS, "max_windows": MAX_VALIDATION_WINDOWS,
@@ -372,19 +446,45 @@ def _strategy_from_verified_snapshot(snapshot):
     return RegisteredSMA
 
 
+def _module_strategy_from_verified_snapshot(snapshot, spec):
+    """Build a single-file strategy from already-verified source bytes."""
+    (name,) = spec.files
+    if set(snapshot) != {name}:
+        raise ValueError("artifact_source_snapshot_mismatch")
+    module_name, attribute = spec.entry.split(":")
+    module = ModuleType(module_name)
+    module.__file__ = str(ROOT / name)
+    exec(compile(snapshot[name], module.__file__, "exec"), module.__dict__)
+    strategy = getattr(module, attribute, None)
+    if not isinstance(strategy, type):
+        raise ValueError("artifact_entry_unavailable")
+    return strategy
+
+
 def load_registered_strategy(expected_source):
     """Execute only a verified immutable snapshot of the approved strategy source."""
+    spec = strategy_spec(expected_source["strategy"]["id"])
     dataset_id = expected_source["dataset"]["id"]
-    if provenance(dataset_id) != expected_source:
+    if provenance(dataset_id, spec.strategy_id) != expected_source:
         raise ValueError("source_changed_restart_required")
-    artifact = load_strategy_manifest()
-    snapshot, source_hash = _verified_strategy_source_snapshot(artifact["source_files"])
-    if source_hash != artifact["sha256"] or source_hash != APPROVED_STRATEGY_SHA256:
+    artifact = load_strategy_manifest(spec)
+    snapshot, source_hash = _verified_strategy_source_snapshot(artifact["source_files"], spec)
+    if source_hash != artifact["sha256"] or source_hash != spec.sha256:
         raise ValueError("artifact_hash_mismatch")
-    RegisteredSMA = _strategy_from_verified_snapshot(snapshot)
-    if provenance(dataset_id) != expected_source:
+    strategy = (_strategy_from_verified_snapshot(snapshot) if spec.strategy_id == STRATEGY_ID
+                else _module_strategy_from_verified_snapshot(snapshot, spec))
+    if provenance(dataset_id, spec.strategy_id) != expected_source:
         raise ValueError("source_changed_during_strategy_load")
-    return RegisteredSMA
+    return strategy
+
+
+def registered_factory(expected_source, strategy_id, quantity):
+    """The verified strategy bound to a run's quantity; the request must name the same strategy."""
+    if expected_source["strategy"]["id"] != strategy_id:
+        raise ValueError("strategy_source_mismatch")
+    strategy = load_registered_strategy(expected_source)
+    names = [name for name, _, _ in strategy_spec(strategy_id).parameters]
+    return lambda params: strategy(*(params[name] for name in names), quantity)
 
 
 def load_dataset_bars(dataset_id, config):
@@ -424,15 +524,15 @@ def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
 
 
 def execute_request(request, expected_source):
-    snapshot, config, period, quantity = validate_request(request)
+    snapshot, config, params, quantity = validate_request(request)
     # The worker, not MCP/web, executes the fixed strategy. Source bytes are
     # snapshotted and hash-verified before execution so validation and code
     # execution cannot observe different strategy file contents.
-    RegisteredSMA = load_registered_strategy(expected_source)
+    build = registered_factory(expected_source, snapshot["strategy_id"], quantity)
     dataset = resolve_dataset(snapshot["dataset_id"])
     bars, config = load_dataset_bars(dataset.dataset_id, config)
     result = research.backtest(
-        strategy=lambda: RegisteredSMA(period, quantity), candles=bars,
+        strategy=lambda: build(params), candles=bars,
         config=config, warmup_bars=snapshot["warmup_bars"],
     )
     drawdown = [{"time_ms": point.time_ms, "drawdown_pct": value} for point, value
@@ -451,6 +551,6 @@ def execute_request(request, expected_source):
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
                                      "method": "bucket_deepest_drawdown"}
     report = render_report(result)
-    if provenance(dataset.dataset_id) != expected_source:
+    if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report

@@ -55,7 +55,7 @@ class ValidationJobTests(unittest.TestCase):
         strategy = load_registered_strategy(source)
         direct = walk_forward(
             strategy_factory=lambda params: strategy(params["period"], quantity),
-            search_space={"period": space}, candles=bars, config=config,
+            search_space=space, candles=bars, config=config,
             score=lambda p: p.return_pct, score_name="return_pct", plan=plan,
             max_candidates=3, max_runs=12,
         )
@@ -105,7 +105,7 @@ class ValidationJobTests(unittest.TestCase):
         strategy = load_registered_strategy(source)
         full = json.loads(regimes_json(regime_walk_forward(
             strategy_factory=lambda params: strategy(params["period"], quantity),
-            search_space={"period": space}, candles=bars, config=config, rule=rule,
+            search_space=space, candles=bars, config=config, rule=rule,
             score=lambda p: p.return_pct, score_name="return_pct", plan=plan,
             max_candidates=3, max_runs=12,
         )))
@@ -130,7 +130,7 @@ class ValidationJobTests(unittest.TestCase):
     def test_bar_evaluation_budget_is_checked_before_strategy_load(self):
         # Default plan: 3 windows x (3 candidates x (4 warm-up + 24 train) + 4 + 16) = 312.
         with patch("catos.research_validation_job.MAX_VALIDATION_BAR_EVALUATIONS", 311), \
-                patch("catos.research_validation_job.load_registered_strategy") as load:
+                patch("catos.research_validation_job.registered_factory") as load:
             with self.assertRaisesRegex(ValueError, "max_bar_evaluations"):
                 execute_validation(request_copy(), provenance())
         load.assert_not_called()
@@ -155,7 +155,7 @@ class ValidationJobTests(unittest.TestCase):
             {"regime_rule": {"lookback_bars": 4, "trend_efficiency": "NaN", "high_volatility_bps": "250"}},
             {"python": "forbidden"}, {"path": "../forbidden"},
         ]
-        with patch("catos.research_validation_job.load_registered_strategy") as load:
+        with patch("catos.research_validation_job.registered_factory") as load:
             for changes in variants:
                 with self.subTest(changes=changes), self.assertRaises((ValueError, TypeError)):
                     execute_validation({**request_copy(), **changes}, provenance())
