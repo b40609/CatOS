@@ -7,14 +7,17 @@ import json
 import re
 import struct
 
-from catos import research
+from catos import research, strategy_registry
 from catos.research import AccountView, BacktestConfig, Candle, ContractSpec
 
 VERSION = 1
 MAX_FRAME = 65_536
 MAX_DEPTH = 8
 MAX_INTEGER = 2**63 - 1
+# v1's only registered strategy id; identity is validated through the manifest
+# registry, this constant is just the default alias.
 STRATEGY_ID = "sma-trend"
+# Wire schema marker of the strategy config block, not the artifact version.
 STRATEGY_VERSION = 1
 _NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
 _TOKEN = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
@@ -207,11 +210,12 @@ class WorkerConfig:
     timeframe_ms: int
     warmup_bars: int
     strategy_artifact: str | None = None
+    strategy_id: str = STRATEGY_ID
 
     def to_wire(self):
         if not isinstance(self.contract, ContractSpec):
             raise ProtocolError("contract must be ContractSpec")
-        value = dict(strategy_id=STRATEGY_ID, strategy_version=STRATEGY_VERSION,
+        value = dict(strategy_id=self.strategy_id, strategy_version=STRATEGY_VERSION,
                     contract={f.name: (str(getattr(self.contract, f.name))
                               if isinstance(getattr(self.contract, f.name), Decimal)
                               else getattr(self.contract, f.name)) for f in fields(ContractSpec)},
@@ -225,19 +229,24 @@ class WorkerConfig:
         keys = ("strategy_id", "strategy_version", "contract", "timeframe_ms", "warmup_bars")
         exact(value, (*keys, "strategy_artifact") if "strategy_artifact" in value else keys)
         artifact = value.get("strategy_artifact")
-        if "strategy_artifact" in value and artifact != "sma-parameters-v1":
+        if "strategy_artifact" in value and type(artifact) is not str:
             raise ProtocolError("unsupported registered strategy artifact")
-        if (value["strategy_id"] != STRATEGY_ID
-                or type(value["strategy_version"]) is not int
+        strategy_id = value["strategy_id"]
+        if (type(strategy_id) is not str or type(value["strategy_version"]) is not int
                 or value["strategy_version"] != STRATEGY_VERSION):
             raise ProtocolError("unsupported inspected strategy artifact")
+        try:
+            # Identity must resolve to exactly one approved manifest (fail-closed).
+            strategy_registry.resolve(strategy_id, artifact)
+        except strategy_registry.RegistryError as exc:
+            raise ProtocolError(f"unregistered strategy: {exc}") from exc
         spec = exact(value["contract"], tuple(f.name for f in fields(ContractSpec)))
         if type(spec["inst_id"]) is not str or len(spec["inst_id"]) > 64:
             raise ProtocolError("invalid contract label")
         contract = ContractSpec(spec["inst_id"], **{
             key: decimal_text(spec[key], key, positive=True) for key in spec if key != "inst_id"})
         result = cls(contract, integer(value["timeframe_ms"], "timeframe_ms", 60_000),
-                     integer(value["warmup_bars"], "warmup_bars"), artifact)
+                     integer(value["warmup_bars"], "warmup_bars"), artifact, strategy_id)
         price = contract.tick_size
         result.validate_bar(Candle(0, price, price, price, price))
         return result

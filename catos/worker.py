@@ -2,8 +2,7 @@
 
 import sys
 
-from catos import ipc, research
-from examples.sma_state import restore_sma, snapshot_closes
+from catos import ipc, research, strategy_registry
 
 
 def run(reader, writer):
@@ -20,12 +19,15 @@ def run(reader, writer):
     checkpoint = ipc.Checkpoint.from_wire(payload["checkpoint"], config)
     if seq != checkpoint.event_seq:
         raise ipc.ProtocolError("init sequence/checkpoint mismatch")
-    strategy = restore_sma(checkpoint)
+    # The strategy comes only from an approved manifest whose source hash still
+    # matches; any mismatch raises here and the worker exits without a strategy.
+    registered = strategy_registry.resolve(config.strategy_id, config.strategy_artifact)
     expected_source = None
     if config.strategy_artifact is not None:
         from catos.research_catalog import provenance
 
         expected_source = provenance()
+    strategy = registered.restore(checkpoint)
     ipc.write_frame_sync(writer, ipc.envelope("initialized", generation, seq,
                                              {"checkpoint": checkpoint.to_wire()}))
     while True:
@@ -43,7 +45,7 @@ def run(reader, writer):
         if target is not None:
             research._decimal(target, "target_position")
         next_checkpoint = ipc.Checkpoint(config, checkpoint.event_seq + 1,
-                                         bar.open_time_ms, snapshot_closes(strategy))
+                                         bar.open_time_ms, registered.snapshot(strategy))
         result = dict(target=None if target is None else str(target),
                       checkpoint=next_checkpoint.to_wire(), ready=ready)
         ipc.parse_result(result, checkpoint, bar, account, warmup)

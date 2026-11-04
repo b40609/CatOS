@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { RouterProvider, useRouter } from '@/lib/router';
-import { AuthProvider } from '@/lib/auth';
 import { stateAdapter } from '@/state/stateAdapter';
 
 // Import Page Routes
@@ -12,7 +11,6 @@ import { Route as LogsRoute } from '@/pages/logs';
 import { Route as SettingsRoute } from '@/pages/settings';
 import { Route as BacktestRoute } from '@/pages/backtest';
 import { Route as OptimizationRoute } from '@/pages/optimization';
-import { Route as ProfileRoute } from '@/pages/profile';
 import { Route as ReviewRoute } from '@/pages/review';
 import { Route as MarketIntelRoute } from '@/pages/market-intel';
 
@@ -25,7 +23,6 @@ const routeMap: Record<string, React.ComponentType> = {
   '/settings': SettingsRoute.component,
   '/backtest': BacktestRoute.component,
   '/optimization': OptimizationRoute.component,
-  '/profile': ProfileRoute.component,
   '/review': ReviewRoute.component,
   '/market-intel': MarketIntelRoute.component,
 };
@@ -36,7 +33,7 @@ function RouterView() {
 
   // Initialize CatOS authoritative state once
   useEffect(() => {
-    stateAdapter.init('normal').catch(console.error);
+    stateAdapter.init().catch(console.error);
   }, []);
 
   return <Component />;
@@ -44,11 +41,9 @@ function RouterView() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <RouterProvider>
-        <RouterView />
-      </RouterProvider>
-    </AuthProvider>
+    <RouterProvider>
+      <RouterView />
+    </RouterProvider>
   );
 }
 

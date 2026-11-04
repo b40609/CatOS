@@ -3,13 +3,17 @@ import {
   LineChart,
   Bot,
   PieChart,
-  Zap,
-  ShieldAlert,
-  Timer,
-  Target,
   ScrollText,
 } from "lucide-react";
 import type { CardId } from "@/state/layoutStore";
+
+export interface CardSpec {
+  dataFeed: string;
+  latency: string;
+  engine: string;
+  tier: "核心防線" | "委託執行" | "策略情報" | "日誌審計";
+  codeId: string;
+}
 
 export interface CardMeta {
   id: CardId;
@@ -19,84 +23,104 @@ export interface CardMeta {
   desc: string;
   icon: typeof TrendingUp;
   badge?: string;
+  minHeight?: number;
+  spec: CardSpec;
 }
 
 export const ALL_CARDS: CardMeta[] = [
   {
     id: "equity",
     nameZh: "帳戶權益與損益",
-    nameEn: "Equity & Drawdown",
+    nameEn: "Equity & Verified Drawdown",
     category: "資產風控",
-    desc: "即時淨值資產、今日損益、回撤警報與 7D 響應式走勢圖",
+    desc: "實時淨值資產、台北日切 00:00 風控基準、當日損益監控與 7D 走勢圖",
     icon: TrendingUp,
-    badge: "核心",
-  },
-  {
-    id: "positions",
-    nameZh: "持倉明細與在途委託",
-    nameEn: "Positions & Orders",
-    category: "交易執行",
-    desc: "多空持倉明細、P6 災難停損防線、在途掛單撤單與即時凍結保證金",
-    icon: LineChart,
-    badge: "核心",
-  },
-  {
-    id: "bots",
-    nameZh: "策略機器人矩陣",
-    nameEn: "Bots Matrix",
-    category: "交易執行",
-    desc: "4 隻專用 KOL 策略機器人、狀態監控、運行心跳與一鍵啟停",
-    icon: Bot,
-    badge: "核心",
+    badge: "R1 基準",
+    spec: {
+      dataFeed: "Supervisor API / DB",
+      latency: "1s 心跳",
+      engine: "Decimal E_risk",
+      tier: "核心防線",
+      codeId: "EQUITY_MONITOR_V1",
+    },
   },
   {
     id: "allocation",
     nameZh: "槓桿倍數與資產曝險",
-    nameEn: "Leverage & Allocation",
+    nameEn: "Leverage & Allocation Donut",
     category: "資產風控",
-    desc: "帳戶有效槓桿倍數、幣種名義曝險額與多空 Donut 資產分佈環圖",
+    desc: "帳戶有效槓桿倍數、單幣曝險預算 50% 限制與多空甜甜圈資產分佈",
     icon: PieChart,
-    badge: "核心",
+    badge: "3.0x 上限",
+    spec: {
+      dataFeed: "OKX SWAP WebSocket",
+      latency: "100ms 實時",
+      engine: "事前槓桿審計",
+      tier: "核心防線",
+      codeId: "LEVERAGE_DONUT_V1",
+    },
+  },
+  {
+    id: "positions",
+    nameZh: "持倉明細與交易所風控",
+    nameEn: "Positions & OKX Stop Guard",
+    category: "交易執行",
+    desc: "多空持倉明細、交易所條件單防線覆蓋、在途掛單撤單與即時凍結保證金",
+    icon: LineChart,
+    badge: "交易所條件單防線",
+    spec: {
+      dataFeed: "OKX 專用子帳戶",
+      latency: "事件驅動",
+      engine: "Mark 取整停損",
+      tier: "委託執行",
+      codeId: "POSITIONS_GUARD_DECK",
+    },
+  },
+  {
+    id: "bots",
+    nameZh: "策略機器人矩陣",
+    nameEn: "Bots Runtime Matrix",
+    category: "交易執行",
+    desc: "4 隻專用 KOL 策略進程、單幣獨佔約束、Worker 心跳檢測與一鍵啟停",
+    icon: Bot,
+    badge: "單幣獨佔",
+    spec: {
+      dataFeed: "Supervisor IPC (JSON)",
+      latency: "500ms 輪詢",
+      engine: "無憑證策略隔離",
+      tier: "委託執行",
+      codeId: "BOT_SUPERVISOR_MATRIX",
+    },
   },
   {
     id: "activity_deck",
-    nameZh: "交易日誌與風險事件",
-    nameEn: "Activity & Events",
+    nameZh: "全域戰情日誌與成交流水",
+    nameEn: "Unified Blotter & Activity Log",
     category: "日誌審計",
-    desc: "全域戰情日誌台，統合即時成交流水、風控警報與系統生命週期",
+    desc: "全時序合流：未解除判定、風控告警、逐筆成交流水、在途委託與系統心跳",
     icon: ScrollText,
-    badge: "核心",
-  },
-  {
-    id: "fills",
-    nameZh: "即時成交流水",
-    nameEn: "Recent Fills",
-    category: "交易執行",
-    desc: "OKX SWAP 實時逐筆成交流水、買賣單向、成交價格與損益跳動",
-    icon: Zap,
-  },
-  {
-    id: "market_watch",
-    nameZh: "標的行情與資金費率",
-    nameEn: "Market Watch & Rates",
-    category: "策略行情",
-    desc: "BTC/ETH/SOL 實時標記價、OKX 資金費率結算倒數計時與收盤時鐘",
-    icon: Timer,
-  },
-  {
-    id: "strategy_intents",
-    nameZh: "策略目標與訊號強度",
-    nameEn: "Signals & Radar",
-    category: "策略行情",
-    desc: "Worker 傳出的純資料目標意圖、多空訊號強度雷達與關鍵指標偏離度",
-    icon: Target,
-  },
-  {
-    id: "incidents",
-    nameZh: "風險警報與異常事件",
-    nameEn: "Risk Incidents",
-    category: "日誌審計",
-    desc: "撮合滑價偏離警報、P6 保險停損更新日誌與帳戶風控異常事件流",
-    icon: ShieldAlert,
+    badge: "全時序合流",
+    spec: {
+      dataFeed: "Local SQLite (WAL)",
+      latency: "逐筆寫入",
+      engine: "不可竄改日誌鏈",
+      tier: "日誌審計",
+      codeId: "ACTIVITY_DECK_V2",
+    },
   },
 ];
+
+/**
+ * 各卡片預設最小安全閱讀高度 (px)
+ * 供使用者隨時根據每張卡片的資料密度與排版需求自訂調整預設值
+ */
+export const CARD_DEFAULT_MIN_HEIGHTS: Partial<Record<CardId, number>> = {
+  equity: 340,           // 權益走勢圖 + 核心 KPI + 台北日切基準
+  positions: 340,        // 持倉明細與在途委託雙檢視表 + 底部撤單統計
+  bots: 320,             // 4 隻 KOL 機器人監控表格 + 狀態指示
+  allocation: 320,       // 槓桿儀表板 + 甜甜圈圓餅圖 + 幣種曝險進度條
+  activity_deck: 340,    // 全域戰情日誌時間軸
+  fills: 280,            // 即時成交流水表
+  incidents: 300,        // 風險警報與異常審計
+  bot_inspector: 380,    // 機器人深層檢測 (Master-Detail)
+};

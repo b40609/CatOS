@@ -1,442 +1,261 @@
-import { useState, useEffect, Fragment } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { INITIAL_BOTS, equitySeries, summarize, formatPct, toneOf, type Bot } from "@/lib/v0-engine";
 import { CardHeaderTitle } from "./card-header-title";
-import { BotMonitorTable, type BotMonitoringView } from "./bot-monitor-table";
-import { usePreviewStore } from "@/preview/preview-store";
 import { useInspectorStore } from "@/state/inspectorStore";
-import { InlineBotRow } from "./inspector/inline-bot-row";
-import { useLiveMarketStore } from "@/state/liveMarketStore";
-import { NumberTicker } from "./motion/number-ticker";
-import { ChevronRight } from "lucide-react";
-
-interface BotPosMeta {
-  side: "long" | "short" | "idle";
-  qtyText: string;
-  notional: number;
-  upnl: number;
-  upnlPct: number;
-  dd: number;
-  p6StopPrice: string;
-  p6DistPct: string;
-  p6Status: "ACTIVE" | "STANDBY" | "ALERT" | "UPDATING";
-  p6Rounding: string;
-  p6BudgetPct: number;
-  intentSummary?: string;
-  warning?: boolean;
-}
+import { useCatStore } from "@/state/catStore";
+import { StateAdapter, stateAdapter } from "@/state/stateAdapter";
+import { ACTIVE_STATES, type BotViewDTO } from "@/contracts";
+import { formatDecimal, formatRatioPct, formatTimeframe, toPlotNumber, toneOf } from "@/lib/format";
+import { useRouter } from "@/lib/router";
+import { ArrowUpRight } from "lucide-react";
 
 interface V0BotTableProps {
   className?: string;
   showHeader?: boolean;
-  monitoring?: BotMonitoringView;
-  isIntegratedPreview?: boolean;
 }
 
-export function V0BotTable({ className, showHeader = true, monitoring, isIntegratedPreview }: V0BotTableProps) {
-  const [localBots, setLocalBots] = useState<Bot[]>(INITIAL_BOTS);
-  const [focusedBotId, setFocusedBotId] = useState<string | null>(null);
-  const [flashBotId, setFlashBotId] = useState<Record<string, "up" | "down">>({});
+export const RISK_STATUS_META: Record<string, { label: string; className: string }> = {
+  normal: { label: "正常", className: "bg-emerald-400/10 text-emerald-400 border-emerald-400/30" },
+  soft_latch: { label: "軟鎖存", className: "bg-amber-400/10 text-amber-400 border-amber-400/30" },
+  hard_latch: { label: "硬鎖存", className: "bg-rose-400/10 text-rose-400 border-rose-400/30" },
+  missing: { label: "缺基準", className: "bg-zinc-400/10 text-zinc-300 border-zinc-400/30" },
+};
 
-  // 預覽 Store 綁定
-  const {
-    bots: previewBots,
-    toggleBotPause: previewTogglePause,
-    highlightTarget,
-  } = usePreviewStore();
+export const BOT_STATE_LABEL: Record<string, string> = {
+  starting: "啟動中", running: "運行中", stopping: "停止中", completed: "已完成",
+  stopped: "已停止", failed: "失敗", recovery_required: "待恢復",
+};
 
-  // 定案 B：行內展開 Accordion 狀態綁定
-  const {
-    selectedBotId,
-    selectBot,
-    expandedInlineBotIds,
-    toggleInlineExpand,
-  } = useInspectorStore();
+export const ACCOUNT_SOURCE_LABEL: Record<string, string> = {
+  final_account: "最終帳戶", signal: "決策前視圖", signal_fill: "含同根成交",
+};
 
-  // 即時市場撮合心跳 Store
-  const { botsLive } = useLiveMarketStore();
+/** 由 Bot 狀態與服務能力決定可用的控制動作；demo/live 一律停用。 */
+export function useBotControls() {
+  const service = useCatStore((s) => s.service);
+  const mode = useCatStore((s) => s.mode);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const bots = isIntegratedPreview
-    ? INITIAL_BOTS.map((ib) => {
-        const pb = previewBots.find((p) => p.id === ib.id);
-        return pb ? { ...ib, status: pb.status } : ib;
-      })
-    : localBots;
-
-  // 模擬 Tick 波動微光跳動 (已定案固化，預覽模式維持數據嚴格一致)
-  useEffect(() => {
-    if (monitoring || isIntegratedPreview) return;
-    const timer = setInterval(() => {
-      const targetIdx = Math.floor(Math.random() * INITIAL_BOTS.length);
-      const isUp = Math.random() > 0.45;
-      const targetBot = INITIAL_BOTS[targetIdx];
-      if (!targetBot) return;
-
-      setFlashBotId((prev) => ({ ...prev, [targetBot.id]: isUp ? "up" : "down" }));
-      setTimeout(() => {
-        setFlashBotId((prev) => {
-          const next = { ...prev };
-          delete next[targetBot.id];
-          return next;
-        });
-      }, 700);
-    }, 3200);
-    return () => clearInterval(timer);
-  }, [monitoring, isIntegratedPreview]);
-
-  const runningCount = bots.filter((b) => b.status === "running").length;
-
-  const togglePause = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isIntegratedPreview) {
-      previewTogglePause(id);
-    } else {
-      setLocalBots((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, status: b.status === "running" ? "paused" : "running" } : b))
-      );
+  const run = async (key: string, action: () => Promise<void>) => {
+    setBusy(key);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
     }
   };
 
-  // 生成 Sparkline SVG 迷你走勢線路徑
-  const getSparkline = (bot: Bot) => {
-    const series = equitySeries(bot);
-    const sum = summarize(series, "7D", 32);
-    const pts = sum.points.filter((v) => !Number.isNaN(v));
-    if (pts.length < 2) return { path: "", isGain: true };
-    const lo = Math.min(...pts);
-    const hi = Math.max(...pts);
-    const span = hi - lo || 1;
-    const w = 64;
-    const h = 18;
-    const n = pts.length;
-    let d = "";
-    pts.forEach((pt, k) => {
-      const x = (k / (n - 1)) * w;
-      const y = 2 + ((hi - pt) / span) * (h - 4);
-      d += `${k === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    return { path: d, isGain: sum.ret >= 0 };
+  return {
+    busy, error,
+    canStart: mode === "local" && !!service?.capabilities.start,
+    canStop: mode === "local" && !!service?.capabilities.stop,
+    start: (bot: BotViewDTO) => run(`start:${bot.bot_id}`, () => stateAdapter.startBot(bot.bot_id)),
+    stop: (bot: BotViewDTO) => bot.current_run_id
+      ? run(`stop:${bot.bot_id}`, () => stateAdapter.stopBot(bot.current_run_id as string))
+      : Promise.resolve(),
   };
+}
 
-  const getPosMeta = (bot: Bot): BotPosMeta => {
-    const live = botsLive[bot.id];
+export function V0BotTable({ className, showHeader = true }: V0BotTableProps) {
+  const bots = useCatStore((s) => s.bots);
+  const risk = useCatStore((s) => s.risk);
+  const events = useCatStore((s) => s.events);
+  const connection = useCatStore((s) => s.connection);
+  const [botFilter, setBotFilter] = useState<"all" | "running" | "stopped">("all");
+  const { selectedBotId, selectBot } = useInspectorStore();
+  const { navigate } = useRouter();
+  const controls = useBotControls();
 
-    if (isIntegratedPreview) {
-      const pb = previewBots.find((p) => p.id === bot.id);
-      if (pb) {
-        return {
-          side: pb.side,
-          qtyText: pb.qtyText,
-          notional: live?.notional ?? pb.notional,
-          upnl: live?.upnl ?? pb.upnl,
-          upnlPct: live?.upnlPct ?? pb.upnlPct,
-          dd: pb.dd,
-          p6StopPrice: pb.p6StopPrice,
-          p6DistPct: live?.p6DistPct ?? pb.p6DistPct,
-          p6Status: pb.p6Status,
-          p6Rounding: pb.p6Rounding,
-          p6BudgetPct: 15,
-          intentSummary: pb.intentSummary,
-          warning: pb.warning,
-        };
-      }
-    }
+  const runningCount = bots.filter((b) => ACTIVE_STATES.has(b.state)).length;
+  const rows = bots.filter((b) => botFilter === "all" ? true
+    : botFilter === "running" ? ACTIVE_STATES.has(b.state) : !ACTIVE_STATES.has(b.state));
 
-    switch (bot.id) {
-      case "tabby":
-        return {
-          side: "long" as const,
-          qtyText: "0.85 BTC",
-          notional: live?.notional ?? 52820,
-          upnl: live?.upnl ?? 561.43,
-          upnlPct: live?.upnlPct ?? 1.07,
-          dd: -1.24,
-          p6StopPrice: "$59,500.00",
-          p6DistPct: live?.p6DistPct ?? "-4.25%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
-        };
-      case "calico":
-        return {
-          side: "long" as const,
-          qtyText: "9.50 ETH",
-          notional: live?.notional ?? 32060,
-          upnl: live?.upnl ?? 524.40,
-          upnlPct: live?.upnlPct ?? 1.66,
-          dd: -2.15,
-          p6StopPrice: "$3,210.00",
-          p6DistPct: live?.p6DistPct ?? "-4.89%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
-        };
-      case "mochi":
-        return {
-          side: "long" as const,
-          qtyText: "95.0 SOL",
-          notional: live?.notional ?? 14516,
-          upnl: live?.upnl ?? 437.00,
-          upnlPct: live?.upnlPct ?? 3.10,
-          dd: -0.85,
-          p6StopPrice: "$142.00",
-          p6DistPct: live?.p6DistPct ?? "-7.07%",
-          p6Status: "ACTIVE",
-          p6Rounding: "CEIL 向上取整",
-          p6BudgetPct: 15,
-        };
-      case "shiro":
-      default:
-        return {
-          side: "idle" as const,
-          qtyText: "0.00",
-          notional: 0,
-          upnl: 0,
-          upnlPct: 0,
-          dd: -3.42,
-          p6StopPrice: "—",
-          p6DistPct: "無持倉",
-          p6Status: "STANDBY",
-          p6Rounding: "待命",
-          p6BudgetPct: 0,
-        };
-    }
-  };
+  // Sparkline：本次 run 的 signal.account.equity 序列（幾何用途的浮點轉換）
+  const sparkFor = useMemo(() => {
+    const cache = new Map<string, { path: string; isGain: boolean }>();
+    return (bot: BotViewDTO) => {
+      const key = bot.current_run_id ?? "none";
+      const cached = cache.get(key);
+      if (cached) return cached;
+      const pts = StateAdapter.equityCurve(events, bot.current_run_id).map((p) => toPlotNumber(p.equity)).filter((v) => !Number.isNaN(v));
+      if (pts.length < 2) { const empty = { path: "", isGain: true }; cache.set(key, empty); return empty; }
+      const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+      const w = 56, h = 16, n = pts.length;
+      let d = "";
+      pts.forEach((pt, k) => {
+        const x = (k / (n - 1)) * w;
+        const y = 2 + ((hi - pt) / span) * (h - 4);
+        d += `${k === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      const value = { path: d, isGain: pts[pts.length - 1] >= pts[0] };
+      cache.set(key, value);
+      return value;
+    };
+  }, [events]);
+
+  const emptyText =
+    connection.status === "mode_not_open" ? "此模式未開放（demo/live 不在 v1 範圍）"
+    : connection.status === "unavailable" ? `模擬服務不可用：${connection.detail ?? "unknown"}`
+    : connection.status === "error" ? `無法連線：${connection.detail ?? "network_error"}`
+    : bots.length === 0 ? "等待模擬服務…" : "此篩選無實例";
 
   return (
     <div className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
-      {/* 1. 一體化 Header */}
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
-          <CardHeaderTitle
-            cardId="bots"
-            title="策略機器人矩陣"
-            subtext={
-              <span className="text-[10px] font-mono text-muted-foreground ml-1">
-                {runningCount} 運作 · {bots.length - runningCount} 暫停
-              </span>
-            }
-          />
-
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-            <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60">
-              1 Bot : 1 SWAP 獨佔
-            </span>
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+          <CardHeaderTitle cardId="bots" title="策略實例監控矩陣" />
+          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 whitespace-nowrap flex-nowrap">
+            {[
+              { id: "all", label: `全部(${bots.length})` },
+              { id: "running", label: `運作(${runningCount})` },
+              { id: "stopped", label: `停止(${bots.length - runningCount})` },
+            ].map((f) => (
+              <button key={f.id} type="button" onClick={() => setBotFilter(f.id as typeof botFilter)}
+                className={cn("px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                  botFilter === f.id ? "bg-secondary text-foreground font-semibold shadow-xs" : "text-muted-foreground hover:text-foreground")}>
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* 2. 雙層高階版 (Dual-Layer) 矩陣表格 */}
-      {monitoring ? <BotMonitorTable {...monitoring} /> : <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto min-w-0 max-w-full">
-        <table className="w-full text-left border-collapse table-auto min-w-[520px]">
-          <thead className="border-b border-border/80 bg-background/40 text-[9.5px] font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto min-w-0 max-w-full">
+        <table className="w-full text-left border-collapse table-auto min-w-[540px]">
+          <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
             <tr>
-              <th className="py-2 pl-3 pr-1.5 font-medium">BOT / STRATEGY</th>
-              <th className="px-1.5 font-medium">POSITION / NOTIONAL</th>
-              <th className="px-1.5 text-right font-medium">UNREALIZED PnL</th>
-              <th className="px-1.5 text-right font-medium hidden sm:table-cell">DAILY / 7D</th>
-              <th className="px-1.5 font-medium hidden md:table-cell">MAX DD / 停損錨定</th>
-              <th className="py-2 pr-3 pl-1.5 text-right font-medium">TREND & ACT</th>
+              <th className="py-2.5 pl-3 pr-2 font-medium">實例 / 標的</th>
+              <th className="px-2 font-medium">策略模型 / 曝險</th>
+              <th className="px-2 text-right font-medium">風控期間損益</th>
+              <th className="px-2 text-right font-medium hidden sm:table-cell">權益</th>
+              <th className="px-2 font-medium hidden md:table-cell">風控狀態</th>
+              <th className="py-2.5 pr-3 pl-2 text-right font-medium">走勢與操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40 text-xs">
-            {bots.map((bot) => {
-              const pos = getPosMeta(bot);
-              const spark = getSparkline(bot);
-              const isPaused = bot.status === "paused";
-              const isHighlighted = isIntegratedPreview && highlightTarget.type === 'bot' && highlightTarget.id === bot.id;
-              const isSelected = selectedBotId === bot.id;
-              const isInlineExpanded = expandedInlineBotIds.includes(bot.id);
-
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground font-mono text-xs">{emptyText}</td></tr>
+            )}
+            {rows.map((bot) => {
+              const isActive = ACTIVE_STATES.has(bot.state);
+              const isSelected = selectedBotId === bot.bot_id;
+              const botRisk = risk && risk.bot_id === bot.bot_id ? risk : null;
+              const statusMeta = botRisk ? RISK_STATUS_META[botRisk.derived.status] : null;
+              const spark = sparkFor(bot);
+              const busyKey = controls.busy;
               return (
-                <Fragment key={bot.id}>
-                  <tr
-                    onClick={() => {
-                      selectBot(bot.id);
-                      toggleInlineExpand(bot.id);
-                    }}
-                    className={cn(
-                      "hover:bg-secondary/40 transition-all group cursor-pointer",
-                      focusedBotId === bot.id && "bg-secondary/50",
-                      isSelected && "bg-primary/10 border-l-2 border-primary shadow-[inset_2px_0_0_var(--color-primary)]",
-                      isPaused && "opacity-60 bg-background/20",
-                      isHighlighted && "ring-1 ring-primary bg-primary/10 shadow-[0_0_12px_rgba(232,180,94,0.3)] animate-pulse",
-                      flashBotId[bot.id] === "up" && "flash-up",
-                      flashBotId[bot.id] === "down" && "flash-down"
+                <tr key={bot.bot_id} onClick={() => selectBot(bot.bot_id)}
+                  className={cn("hover:bg-secondary/30 transition-all group cursor-pointer",
+                    isSelected && "bg-secondary/40", !isActive && "opacity-80")}
+                  title="點擊選取此實例">
+                  <td className="py-2.5 pl-3 pr-2">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("w-2 h-2 rounded-full shrink-0",
+                        isActive ? "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
+                        : bot.state === "failed" || bot.state === "recovery_required" ? "bg-rose-400" : "bg-muted-foreground/50")} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-t4 font-bold text-foreground leading-tight group-hover:text-primary transition-colors whitespace-nowrap">
+                          {bot.bot_id}
+                        </span>
+                        <div className="flex items-center gap-1 text-t1 font-mono text-muted-foreground leading-tight">
+                          <span className="text-primary font-semibold whitespace-nowrap">{bot.inst_id ?? "不適用"}</span>
+                          <span>{formatTimeframe(bot.timeframe_ms)}</span>
+                          <span>· {BOT_STATE_LABEL[bot.state] ?? bot.state}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td className="px-2 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-t3 font-semibold text-foreground leading-tight">{bot.strategy_name}</span>
+                      <span className="text-t1 font-mono text-muted-foreground leading-tight">
+                        {botRisk
+                          ? `名目 ${formatDecimal(botRisk.derived.notional, { prefix: "$" })} · 單幣上限 ${formatDecimal(botRisk.derived.symbol_budget, { prefix: "$" })}`
+                          : "尚無風控觀測"}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="px-2 py-2.5 text-right font-mono">
+                    <div className="flex flex-col items-end">
+                      <span className={cn("text-t4 font-bold leading-tight", toneOf(botRisk?.derived.period_pnl))}>
+                        {formatDecimal(botRisk?.derived.period_pnl, { sign: true, prefix: "$" })}
+                      </span>
+                      <span className={cn("text-t1 leading-tight font-semibold", toneOf(botRisk?.derived.period_pnl_ratio))}>
+                        {formatRatioPct(botRisk?.derived.period_pnl_ratio)}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="px-2 py-2.5 text-right font-mono hidden sm:table-cell">
+                    <div className="flex flex-col items-end">
+                      <span className="text-t3 font-bold leading-tight text-foreground">
+                        {formatDecimal(bot.equity, { prefix: "$" }, "未啟動")}
+                      </span>
+                      <span className="text-t1 text-muted-foreground leading-tight">
+                        {bot.account_source ? ACCOUNT_SOURCE_LABEL[bot.account_source] : "無帳戶觀測"}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="px-2 py-2.5 font-mono hidden md:table-cell">
+                    {statusMeta ? (
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        <span className={cn("px-1.5 py-0.2 rounded border text-t1 font-semibold whitespace-nowrap", statusMeta.className)}>
+                          {statusMeta.label} (槓桿 {formatDecimal(botRisk?.derived.effective_leverage, { digits: 2 })}x)
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-t2 text-muted-foreground">尚無觀測</span>
                     )}
-                    onMouseEnter={() => setFocusedBotId(bot.id)}
-                    onMouseLeave={() => setFocusedBotId(null)}
-                  >
-                    {/* 1. 機器人與策略 (雙層 + 策略名稱下一行簡短意圖) */}
-                    <td className="py-2.5 pl-3 pr-2">
-                      <div className="flex items-center gap-2">
-                        {/* 展開/收合箭頭指示 */}
-                        <div
-                          className="size-4 -ml-1 rounded flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors shrink-0"
-                          title={isInlineExpanded ? "點擊收合詳情" : "點擊展開策略執行鏈與防線"}
-                        >
-                          <ChevronRight className={cn("size-3 transition-transform duration-200", isInlineExpanded && "rotate-90 text-primary")} />
-                        </div>
-                        <span
-                          className={cn(
-                            "w-2 h-2 rounded-full shrink-0",
-                            isPaused ? "bg-muted-foreground/50" : pos.warning ? "bg-amber-400 shadow-[0_0_6px_var(--amber-400)]" : "bg-emerald-400 shadow-[0_0_6px_var(--emerald-400)]"
-                          )}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[12px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">
-                              {bot.name}
-                            </span>
-                            {isInlineExpanded && (
-                              <span className="text-[9px] text-primary font-mono font-bold">
-                                [已展開]
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 text-[9.5px] font-mono text-muted-foreground leading-tight">
-                            <span className="text-primary font-semibold">{bot.symbol}</span>
-                            <span>{bot.timeframe}</span>
-                            <span>· {bot.strategyId}</span>
-                          </div>
+                  </td>
 
-                          {/* 策略名稱下增加一行簡短意圖 */}
-                          {pos.intentSummary && (
-                            <div className="flex items-center gap-1 text-[9.5px] font-mono leading-tight mt-1 truncate">
-                              <span className={cn(
-                                "px-1 py-0.2 rounded text-[8.5px] font-bold shrink-0",
-                                pos.warning
-                                  ? "bg-amber-400/10 text-amber-300 border border-amber-400/30"
-                                  : "bg-primary/10 text-primary border border-primary/25"
-                              )}>
-                                意圖
-                              </span>
-                              <span className={cn("truncate max-w-[220px]", pos.warning ? "text-amber-200" : "text-muted-foreground")}>
-                                {pos.intentSummary}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 2. 持倉規模與態勢 */}
-                    <td className="px-2 py-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 rounded-[3px] border px-1.5 py-0.2 num text-[9px] font-mono font-bold tracking-tight",
-                              pos.side === "long"
-                                ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
-                                : pos.side === "short"
-                                ? "border-rose-400/30 bg-rose-400/10 text-rose-400"
-                                : "border-border bg-background/50 text-muted-foreground"
-                            )}
-                          >
-                            {pos.side === "long" ? "▲ LONG" : pos.side === "short" ? "▼ SHORT" : "○ FLAT"}
-                          </span>
-                          <span className="font-mono text-[11px] font-bold text-foreground">{pos.qtyText}</span>
-                        </div>
-                        <span className="text-[9.5px] font-mono text-muted-foreground">
-                          {pos.notional > 0 ? `$${pos.notional.toLocaleString()} · 3x Cross` : "無部位"}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 3. 未實現損益 (雙層棧 + 動態 NumberTicker 滾動) */}
-                    <td className="px-2 py-2.5 text-right font-mono">
-                      <div className="flex flex-col items-end">
-                        <NumberTicker
-                          value={Math.abs(pos.upnl)}
-                          prefix={pos.upnl >= 0 ? "+$" : "-$"}
-                          decimals={2}
-                          duration={400}
-                          className={cn("text-[11px] font-bold leading-tight", toneOf(pos.upnl))}
-                        />
-                        <span className={cn("text-[9.5px] leading-tight", toneOf(pos.upnl))}>
-                          {formatPct(pos.upnlPct)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 4. 今日損益與週期報酬 */}
-                    <td className="px-1.5 py-2 text-right font-mono hidden sm:table-cell">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10.5px] font-bold text-foreground leading-tight">+2.45%</span>
-                        <span className="text-[9px] text-emerald-400 leading-tight">+8.12% 7D</span>
-                      </div>
-                    </td>
-
-                    {/* 5. 最大回撤與停損錨定 */}
-                    <td className="px-1.5 py-2 font-mono hidden md:table-cell">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[9.5px] text-muted-foreground leading-tight">
-                            DD: <span className="text-rose-400 font-semibold">{pos.dd.toFixed(2)}%</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 text-[8.5px] text-muted-foreground leading-tight">
-                          <span className="text-primary font-semibold">
-                            停損: {pos.p6StopPrice}
-                          </span>
-                          {pos.p6Status === "ACTIVE" && (
-                            <span className="text-emerald-400">({pos.p6DistPct})</span>
-                          )}
-                          {pos.p6Status === "UPDATING" && (
-                            <span className="text-amber-400 font-semibold">(待確認)</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 6. Sparkline 走勢微圖與暫停/重啟按鈕 */}
-                    <td className="py-2.5 pr-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {spark.path ? (
-                          <svg width={64} height={18} className="overflow-visible shrink-0">
-                            <path
-                              d={spark.path}
-                              fill="none"
-                              stroke={spark.isGain ? "var(--primary)" : "#f43f5e"}
-                              strokeWidth={1.5}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={(e) => togglePause(bot.id, e)}
-                          title={isIntegratedPreview ? "本地模擬操作：更新本地狀態、運作數量與模擬日誌；暫停不代表平倉，啟用不得解除風控限制" : undefined}
-                          className={cn(
-                            "px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer flex items-center gap-1",
-                            isPaused
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                              : "border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                          )}
-                        >
-                          <span>{isPaused ? "重啟" : "暫停"}</span>
-                          {isIntegratedPreview && <span className="text-[8.5px] opacity-60">(模擬)</span>}
+                  <td className="py-2.5 pr-3 pl-2 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {spark.path ? (
+                        <svg width={56} height={16} className="overflow-visible shrink-0 hidden xl:block">
+                          <path d={spark.path} fill="none" stroke={spark.isGain ? "var(--primary)" : "#f43f5e"}
+                                strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : null}
+                      {isActive ? (
+                        <button type="button" disabled={!controls.canStop || busyKey !== null}
+                          onClick={(e) => { e.stopPropagation(); void controls.stop(bot); }}
+                          title={controls.canStop ? "完成當前事件後停止此 run" : "目前不可停止"}
+                          className="px-2 py-0.5 rounded text-t2 font-mono border border-border/80 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
+                          {busyKey === `stop:${bot.bot_id}` ? "送出中" : "暫停"}
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-
-                  {/* 方案 B：行內展開 Accordion 巢狀列 (定案固化) */}
-                  {isInlineExpanded && (
-                    <InlineBotRow
-                      botId={bot.id}
-                      colSpan={6}
-                      onCollapse={() => toggleInlineExpand(bot.id)}
-                    />
-                  )}
-                </Fragment>
+                      ) : (
+                        <button type="button" disabled={!controls.canStart || busyKey !== null}
+                          onClick={(e) => { e.stopPropagation(); void controls.start(bot); }}
+                          title={controls.canStart ? "以固定模板啟動新 run (POST /bots/start)" : "槽位占用、來源漂移或非本機模式時不可啟動"}
+                          className="px-2 py-0.5 rounded text-t2 font-mono border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
+                          {busyKey === `start:${bot.bot_id}` ? "送出中" : "恢復"}
+                        </button>
+                      )}
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); selectBot(bot.bot_id); navigate("/bots"); }}
+                        title="開啟實例監控頁"
+                        className="px-2 py-0.5 rounded text-t2 font-mono border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer flex items-center gap-0.5 whitespace-nowrap">
+                        <span>詳情</span>
+                        <ArrowUpRight className="size-2.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               );
             })}
           </tbody>
         </table>
-      </div>}
+        {controls.error && (
+          <div className="px-3 py-1.5 text-t1 font-mono text-rose-400 border-t border-border/60">命令失敗：{controls.error}</div>
+        )}
+      </div>
     </div>
   );
 }

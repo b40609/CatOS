@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, Search, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -8,8 +8,9 @@ import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { CommandPalette } from "@/components/catos/command-palette";
-import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { SimulationStatusStrip } from "@/components/catos/simulation-status-strip";
 import { cn } from "@/lib/utils";
+import pkg from "../../../package.json";
 
 
 interface NavigationItem {
@@ -56,7 +57,7 @@ const GROUPS: NavigationGroup[] = [
     titleEn: "EXECUTION & RISK",
     titleMono: "EXECUTION",
     items: [
-      { to: "/bots", name: "機器人管理", sub: "BOT MANAGER", icon: Bot, hasPulse: true },
+      { to: "/bots", name: "實例監控", sub: "FLEET MONITOR", icon: Bot, hasPulse: true },
       { to: "/risk", name: "風控中心", sub: "RISK CONTROL", icon: ShieldCheck },
     ],
   },
@@ -96,22 +97,6 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
   const { t, language } = useI18n();
 
   const [isResizing, setIsResizing] = useState(false);
-
-  // 啟動全域撮合心跳與資金費率倒數 (1 秒 1 Tick 驅動 10 分鐘真實微觀行情循環帶)
-  const { triggerManualTick, decrementCountdown, isRunning } = useLiveMarketStore();
-  useEffect(() => {
-    if (!isRunning) return;
-    const tickTimer = setInterval(() => {
-      triggerManualTick();
-    }, 1000);
-    const countdownTimer = setInterval(() => {
-      decrementCountdown();
-    }, 1000);
-    return () => {
-      clearInterval(tickTimer);
-      clearInterval(countdownTimer);
-    };
-  }, [isRunning, triggerManualTick, decrementCountdown]);
 
   // 使用 Refs 杜絕閉包陳舊問題，確保拖曳過程中有精確的段落感吸附與切換
   const collapsedRef = useRef(collapsed);
@@ -249,8 +234,8 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="text-lg font-semibold tracking-tight">
                 catOS<span className="ml-0.5 text-primary">.</span>
               </span>
-              <span className="font-mono text-[10px] text-muted-foreground/60">
-                v2.0
+              <span className="font-mono text-t2 text-muted-foreground/60" title="frontend package version">
+                v{pkg.version}
               </span>
             </div>
           )}
@@ -261,7 +246,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
           {GROUPS.map((group) => (
             <div key={group.key} className="space-y-0.5">
               {!collapsed && (
-                <p className="mb-1 mt-2.5 px-2.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground/60 truncate">
+                <p className="mb-1 mt-2.5 px-2.5 font-mono text-t1 font-semibold uppercase tracking-wider text-muted-foreground/60 truncate">
                   {group.titleMono}
                 </p>
               )}
@@ -293,10 +278,10 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
                     </span>
                     {!collapsed && (
                       <div className="flex flex-col min-w-0 flex-1 leading-tight">
-                        <span className="text-[13px] font-medium text-foreground tracking-wide truncate">
+                        <span className="text-t4 font-medium text-foreground tracking-wide truncate">
                           {language === "en" ? sub : name}
                         </span>
-                        <span className="text-[9.5px] font-mono font-semibold text-muted-foreground uppercase tracking-wider truncate mt-0.5">
+                        <span className="text-t1 font-mono font-semibold text-muted-foreground uppercase tracking-wider truncate mt-0.5">
                           {language === "en" ? name : sub}
                         </span>
                       </div>
@@ -341,21 +326,11 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
               <span className="hidden text-muted-foreground/40 sm:inline">/</span>
               <span className="font-medium text-foreground">{language === "en" ? (current?.sub ?? "Dashboard") : (current?.name ?? "系統總覽")}</span>
             </div>
+          </div>
 
-            {/* Ctrl+K 全域快捷指令台按鈕 (Linear / Cmdk 風格) */}
-            <button
-              type="button"
-              onClick={() => {
-                const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true });
-                document.dispatchEvent(event);
-              }}
-              className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground text-[10.5px] font-mono border border-border/70 transition-colors cursor-pointer ml-3"
-              title="快捷指令面板 (Ctrl + K)"
-            >
-              <Search className="size-3 text-primary" />
-              <span>搜尋或跳轉...</span>
-              <kbd className="px-1 py-0.2 rounded bg-background/80 border border-border/60 text-[9px] text-muted-foreground">Ctrl K</kbd>
-            </button>
+          {/* 頂部模擬服務狀態列 (v1 無行情來源；輪詢計時器由 stateAdapter 單一持有) */}
+          <div className="hidden md:flex items-center gap-2 shrink min-w-0 overflow-hidden">
+            <SimulationStatusStrip />
           </div>
 
           {/* 右側：工作台卡片庫與核心交易模式切換 */}
@@ -391,14 +366,14 @@ export function PageHead({
   return (
     <div className="mb-2 flex items-center justify-between gap-2 rounded border border-border/60 bg-secondary/20 px-2.5 py-1 backdrop-blur-xs text-xs">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.2 shrink-0">
+        <span className="font-mono text-t1 font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/25 rounded px-1.5 py-0.2 shrink-0">
           {code}
         </span>
         <span className="font-semibold text-foreground tracking-tight text-xs truncate">
           {title}
         </span>
         {desc && (
-          <span className="text-[10px] text-muted-foreground/75 hidden md:inline truncate">
+          <span className="text-t2 text-muted-foreground/75 hidden md:inline truncate">
             · {desc}
           </span>
         )}

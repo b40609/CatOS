@@ -1,54 +1,57 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import {
-  PERIODS,
-  PERIOD_LABEL,
-  timeAt,
-  formatPct,
-  formatTime,
-  formatUsd,
-  toneOf,
-  accountSeries,
-  summarize,
-  INITIAL_BOTS,
-  type Period,
-} from "@/lib/v0-engine";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
-import { NumberTicker } from "./motion/number-ticker";
 import { BorderBeam } from "./motion/border-beam";
-import { useLiveMarketStore } from "@/state/liveMarketStore";
+import { useCatStore } from "@/state/catStore";
+import { StateAdapter } from "@/state/stateAdapter";
+import { formatClock, formatDateTime, formatDecimal, formatRatioPct, toPlotNumber, toneOf, shortId } from "@/lib/format";
 
 interface AccountEquityBandProps {
   className?: string;
-  defaultPeriod?: Period;
   showHeader?: boolean;
 }
 
-export function AccountEquityBand({
-  className,
-  defaultPeriod = "7D",
-  showHeader = true,
-}: AccountEquityBandProps) {
-  const [period, setPeriod] = useState<Period>(defaultPeriod);
+const STATE_LABEL: Record<string, string> = {
+  starting: "啟動中", running: "運行中", stopping: "停止中", completed: "已完成",
+  stopped: "已停止", failed: "失敗", recovery_required: "待恢復",
+};
+
+/**
+ * 帳戶權益與損益 (AccountEquityBand)
+ * 資料來源：GET /state 的 summary（KPI）與 events 中最近一次 run 的 signal.account.equity 序列（曲線）。
+ * 金額全程為 Decimal 字串，只做格式化；曲線幾何以 toPlotNumber 轉換，標籤仍使用原字串。
+ */
+export function AccountEquityBand({ className, showHeader = true }: AccountEquityBandProps) {
+  const summary = useCatStore((s) => s.summary);
+  const risk = useCatStore((s) => s.risk);
+  const bots = useCatStore((s) => s.bots);
+  const events = useCatStore((s) => s.events);
+  const connection = useCatStore((s) => s.connection);
+
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [chartWidth, setChartWidth] = useState(600);
   const [chartHeight, setChartHeight] = useState(240);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const bandRef = useRef<HTMLDivElement>(null);
+  const [bandDimensions, setBandDimensions] = useState({ width: 600, height: 240 });
 
-  // 1. 取得即時市場撮合與帳戶波動 Store
-  const {
-    equity,
-    todayPnl,
-    todayPct,
-    totalUpnl,
-    realized,
-  } = useLiveMarketStore();
+  const bot = bots[0] ?? null;
+  const runId = bot?.current_run_id ?? null;
+  const curve = useMemo(() => StateAdapter.equityCurve(events, runId), [events, runId]);
 
-  // 取得帳戶整體 Series 與當前週期摘要
-  const totalSeries = useMemo(() => accountSeries(INITIAL_BOTS), []);
-  const periodSum = useMemo(() => summarize(totalSeries, period), [totalSeries, period]);
+  // 自適應容器尺寸監聽
+  useEffect(() => {
+    const el = bandRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setBandDimensions({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-  // 2. 自適應容器寬高 ResizeObserver (雙向響應式，根除高度硬編碼)
   useEffect(() => {
     const el = chartContainerRef.current;
     if (!el) return;
@@ -63,14 +66,24 @@ export function AccountEquityBand({
     return () => ro.disconnect();
   }, []);
 
-  // 3. 幾何座標與軸長運算 (動態自適應容器高度)
+  const isNarrow = bandDimensions.width < 500;
+  const isShort = bandDimensions.height < 170;
+  const isCompact = isNarrow || isShort;
+
+  // 幾何座標：以序列首點為 0%，純展示用途
   const height = Math.max(120, chartHeight);
-  const axisW = 54;
+  const axisW = isNarrow ? 40 : 54;
   const xAxisH = 20;
   const plotW = Math.max(1, chartWidth - axisW);
   const plotH = Math.max(1, height - xAxisH);
 
-  const n = periodSum.indices.length;
+  const points = useMemo(() => {
+    const values = curve.map((p) => toPlotNumber(p.equity));
+    const base = values.find((v) => !Number.isNaN(v));
+    if (base === undefined || base === 0) return values.map(() => Number.NaN);
+    return values.map((v) => (Number.isNaN(v) ? Number.NaN : (v / base - 1) * 100));
+  }, [curve]);
+  const n = points.length;
 
   const niceStep = (span: number) => {
     const raw = span / 3;
@@ -80,300 +93,209 @@ export function AccountEquityBand({
   };
 
   const yBounds = useMemo(() => {
-    const pts = periodSum.points.filter((v) => !Number.isNaN(v));
+    const pts = points.filter((v) => !Number.isNaN(v));
     let lo = Math.min(0, ...pts);
     let hi = Math.max(0, ...pts);
-    const span = hi - lo || 1;
-    hi += span * 0.14;
-    lo -= span * 0.14;
+    const span = hi - lo || 0.01;
+    hi += span * 0.16;
+    lo -= span * 0.16;
     const step = niceStep(hi - lo);
     const ticks: number[] = [];
-    for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
-      ticks.push(Number(t.toFixed(4)));
-    }
-    return { lo, hi, ticks, step };
-  }, [periodSum.points]);
+    for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(Number(t.toFixed(6)));
+    return { lo, hi, ticks };
+  }, [points]);
 
-  const getX = (k: number) => (n > 1 ? (k / (n - 1)) * plotW : 0);
-  const getY = (v: number) => {
-    const { lo, hi } = yBounds;
-    return 10 + ((hi - v) / (hi - lo)) * (plotH - 24);
-  };
+  const getX = (k: number) => (n > 1 ? (k / (n - 1)) * plotW : plotW / 2);
+  const getY = (v: number) => 10 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * (plotH - 24);
 
-  const generateLine = (vals: number[]) => {
+  const line = useMemo(() => {
     let d = "";
     let pen = false;
-    vals.forEach((v, k) => {
-      if (Number.isNaN(v)) {
-        pen = false;
-        return;
-      }
+    points.forEach((v, k) => {
+      if (Number.isNaN(v)) { pen = false; return; }
       d += `${pen ? "L" : "M"}${getX(k).toFixed(1)},${getY(v).toFixed(1)}`;
       pen = true;
     });
     return d;
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, plotW, plotH, yBounds]);
 
-  const eqLinePath = useMemo(() => generateLine(periodSum.points), [periodSum.points, plotW, yBounds]);
-
-  const eqAreaPath = useMemo(() => {
-    const firstK = periodSum.points.findIndex((v) => !Number.isNaN(v));
-    if (firstK < 0 || !eqLinePath) return "";
+  const areaPath = useMemo(() => {
+    const firstK = points.findIndex((v) => !Number.isNaN(v));
+    if (firstK < 0 || !line) return "";
     const zeroY = Math.min(plotH - 8, Math.max(8, getY(0)));
-    return `${eqLinePath}L${getX(n - 1).toFixed(1)},${zeroY.toFixed(1)}L${getX(firstK).toFixed(1)},${zeroY.toFixed(1)}Z`;
-  }, [eqLinePath, n, plotW, plotH, yBounds]);
+    return `${line}L${getX(n - 1).toFixed(1)},${zeroY.toFixed(1)}L${getX(firstK).toFixed(1)},${zeroY.toFixed(1)}Z`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [line, n, plotW, plotH, yBounds]);
 
   const xTicks = useMemo(() => {
+    if (n === 0) return [] as number[];
     const fractions = plotW < 320 ? [0, 1] : plotW < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
-    return fractions.map((f) => Math.round(f * (n - 1)));
+    return [...new Set(fractions.map((f) => Math.round(f * (n - 1))))];
   }, [n, plotW]);
 
-  const lastPoint = periodSum.points[n - 1] ?? 0;
-
-  // 滑鼠懸停互動
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainerRef.current || n === 0) return;
     const rect = chartContainerRef.current.getBoundingClientRect();
     const px = e.clientX - rect.left;
-    if (px > plotW || px < 0) {
-      setHoverIdx(null);
-      return;
-    }
+    if (px > plotW || px < 0) { setHoverIdx(null); return; }
     setHoverIdx(Math.max(0, Math.min(n - 1, Math.round((px / plotW) * (n - 1)))));
   };
 
-  const hoverData = useMemo(() => {
-    if (hoverIdx === null) return null;
-    const rawIdx = periodSum.indices[hoverIdx];
-    const timeStr = formatTime(timeAt(rawIdx), true);
-    const val = periodSum.points[hoverIdx];
-    return { timeStr, val };
-  }, [hoverIdx, periodSum]);
+  const hover = hoverIdx !== null && curve[hoverIdx] ? curve[hoverIdx] : null;
+  const hoverPct = hoverIdx !== null ? points[hoverIdx] : Number.NaN;
+  const fmtPctNumber = (v: number) => (Number.isNaN(v) ? "不適用" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
+
+  const emptyReason =
+    connection.status === "mode_not_open" ? "此模式未開放（demo/live 不在 v1 範圍）"
+    : connection.status === "unavailable" ? `模擬服務不可用：${connection.detail ?? "unknown"}`
+    : connection.status === "error" ? `無法連線：${connection.detail ?? "network_error"}`
+    : !bot ? "等待模擬服務…"
+    : !runId ? "尚未啟動模擬 run"
+    : curve.length === 0 ? "本次 run 尚無已收盤 K 線觀測"
+    : null;
+
+  const Kpi = ({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) => (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-t2 text-muted-foreground">{label}</span>
+      <span className={cn("text-xs font-semibold leading-tight", tone ?? "text-foreground")}>{value}</span>
+      {sub && <span className="text-t1 text-muted-foreground">{sub}</span>}
+    </div>
+  );
 
   return (
-    <div className={cn("flex flex-col h-full w-full select-none overflow-hidden", className)}>
-      {/* 1. Header 列：一體化標題 + 排版切換 + 週期快捷鍵 (單層結構，杜絕雙重標題) */}
+    <div ref={bandRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden", className)}>
       {showHeader && (
-        <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border/80 shrink-0">
-          <CardHeaderTitle
-            cardId="equity"
-            title="帳戶權益與損益"
-          />
-
-          <div className="flex items-center gap-2">
-            {/* 週期切換按鈕 */}
-            <div className="flex bg-background/60 border border-border/60 rounded p-0.5 gap-0.5">
-              {PERIODS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPeriod(p)}
-                  className={cn(
-                    "px-2 py-0.5 text-[11px] font-mono font-semibold rounded transition-colors cursor-pointer",
-                    period === p
-                      ? "bg-secondary text-primary border border-border"
-                      : "text-muted-foreground hover:text-foreground border border-transparent"
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+        <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
+          <CardHeaderTitle cardId="equity" title="帳戶權益與損益" />
+          <div className="flex items-center gap-0.5 bg-background/70 border border-border/70 rounded p-0.5 text-t1 font-mono shrink-0">
+            <span className="px-2 py-0.5 rounded bg-secondary text-foreground font-bold shadow-xs">
+              {bot ? bot.bot_id : "sim"}
+            </span>
+            <span className="px-1.5 py-0.5 text-muted-foreground whitespace-nowrap">
+              {runId ? `run ${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
+            </span>
           </div>
         </div>
       )}
 
-      {/* 2. 定案方案 B：Bloomberg AIM / TradingView (左側緊湊對齊側欄 + 右側 100% 自適應走勢圖) */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-          {/* 邊界微光流動 (Magic UI Border Beam) */}
-          <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
+        <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
 
-          {/* 左側緊湊 KPI 欄位 (移除 justify-between 撕裂，改為頂部自然緊湊對齊) */}
-          <div className="w-[195px] shrink-0 p-2.5 border-r border-border/80 flex flex-col gap-2 overflow-y-auto bg-surface/30">
+        {/* 左側 KPI 欄：全部來自 summary（後端 Decimal 計算） */}
+        <div className={cn(
+          "shrink-0 border-r border-border/80 flex flex-col justify-between overflow-y-auto bg-surface/30",
+          isNarrow ? "w-[130px] p-2 gap-1.5" : "w-[205px] p-2.5 gap-2"
+        )}>
+          <div className="flex flex-col gap-2">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
-                <span>帳戶權益</span>
-                <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  即時撮合中
-                </span>
+              <span className="text-t2 text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
+                <span>帳戶總權益</span>
+                {!isNarrow && (
+                  <span className={cn("text-t1 font-mono flex items-center gap-1",
+                    connection.status === "ok" ? "text-emerald-400" : "text-amber-400")}>
+                    <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400 animate-ping" : "bg-amber-400")} />
+                    {connection.status === "ok" ? "local-sim" : connection.status}
+                  </span>
+                )}
               </span>
-              <div className="font-mono text-2xl font-bold text-foreground tracking-tight">
-                <NumberTicker value={equity} prefix="$" decimals={2} />
+              <div className={cn("font-mono font-bold text-foreground tracking-tight", isNarrow ? "text-lg" : "text-2xl")}>
+                {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
               </div>
-              <div className={cn("font-mono text-[11px] font-semibold", toneOf(todayPnl))}>
-                <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} /> ({todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`})
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">今日損益</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(todayPnl))}>
-                  <NumberTicker value={Math.abs(todayPnl)} prefix={todayPnl >= 0 ? "+$" : "-$"} decimals={2} />
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{todayPct >= 0 ? `+${todayPct}%` : `${todayPct}%`}</span>
-              </div>
-
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">{period} 損益</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(periodSum.pnl))}>
-                  {formatUsd(periodSum.pnl, true)}
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">{formatPct(periodSum.ret)}</span>
-              </div>
-
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">未實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(totalUpnl))}>
-                  <NumberTicker value={Math.abs(totalUpnl)} prefix={totalUpnl >= 0 ? "+$" : "-$"} decimals={2} />
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">3 筆持倉聯動</span>
-              </div>
-
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground">已實現</span>
-                <span className={cn("font-mono text-xs font-semibold leading-tight", toneOf(realized))}>
-                  {formatUsd(realized, true)}
-                </span>
-                <span className="text-[9.5px] text-muted-foreground font-mono">OKX-SWAP</span>
+              <div className={cn("font-mono font-semibold", isNarrow ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
+                {summary?.period_pnl != null
+                  ? `${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(summary.period_pnl_ratio)})`
+                  : "風控期間損益 不適用"}
               </div>
             </div>
 
-
-          </div>
-
-          {/* 右側 SVG 走勢圖 (100% 響應垂直拉伸) */}
-          <div className="flex-1 flex flex-col min-w-0 p-2.5">
-            <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground h-5 shrink-0 px-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-[2px] bg-primary inline-block" />
-                <span>帳戶淨值走勢 · {PERIOD_LABEL[period]}</span>
-              </div>
-              {hoverData ? (
-                <span className="text-primary font-mono">
-                  [{hoverData.timeStr}] 累計報酬: {formatPct(hoverData.val)}
-                </span>
-              ) : (
-                <span className="text-muted-foreground/60 text-[10px]">
-                  移動游標可檢視時間節點損益
-                </span>
-              )}
-            </div>
-
-            <div
-              ref={chartContainerRef}
-              className="flex-1 w-full relative min-h-[140px] cursor-crosshair mt-1"
-              onPointerMove={handlePointerMove}
-              onPointerLeave={() => setHoverIdx(null)}
-            >
-              {chartWidth > 0 && chartHeight > 0 && (
-                <svg width={chartWidth} height={height} className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="v0EqGradReact2" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
-                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Y 軸水平輔助線與刻度 */}
-                  {yBounds.ticks.map((t) => (
-                    <g key={t}>
-                      <line
-                        x1={0}
-                        x2={plotW}
-                        y1={getY(t)}
-                        y2={getY(t)}
-                        stroke={t === 0 ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)"}
-                        strokeDasharray={t === 0 ? "3 3" : undefined}
-                        strokeWidth={1}
-                      />
-                      <text
-                        x={plotW + 6}
-                        y={getY(t) + 3.5}
-                        fill="rgba(255,255,255,0.4)"
-                        fontFamily="monospace"
-                        fontSize={9}
-                      >
-                        {formatPct(t, yBounds.step < 1 ? 1 : 0)}
-                      </text>
-                    </g>
-                  ))}
-
-                  {/* 面積微光與淨值折線 */}
-                  <path d={eqAreaPath} fill="url(#v0EqGradReact2)" />
-                  <path d={eqLinePath} fill="none" stroke="var(--primary)" strokeWidth={1.8} strokeLinejoin="round" />
-
-                  {/* X 軸時間戳記 */}
-                  {xTicks.map((k, idx) => (
-                    <text
-                      key={k}
-                      x={getX(k)}
-                      y={height - 3}
-                      textAnchor={idx === 0 ? "start" : idx === xTicks.length - 1 ? "end" : "middle"}
-                      fill="rgba(255,255,255,0.4)"
-                      fontFamily="monospace"
-                      fontSize={9}
-                    >
-                      {formatTime(timeAt(periodSum.indices[k]), period !== "24H")}
-                    </text>
-                  ))}
-
-                  {/* 滑鼠 Hover 十字線與節點圈 */}
-                  {hoverIdx !== null ? (
-                    <g style={{ pointerEvents: "none" }}>
-                      <line
-                        x1={getX(hoverIdx)}
-                        x2={getX(hoverIdx)}
-                        y1={0}
-                        y2={height - xAxisH}
-                        stroke="rgba(255,255,255,0.4)"
-                        strokeDasharray="2 2"
-                        strokeWidth={1}
-                      />
-                      <circle
-                        cx={getX(hoverIdx)}
-                        cy={getY(periodSum.points[hoverIdx])}
-                        r={4}
-                        fill="var(--primary)"
-                        stroke="#13161a"
-                        strokeWidth={2}
-                      />
-                    </g>
-                  ) : !Number.isNaN(lastPoint) ? (
-                    <g style={{ pointerEvents: "none" }}>
-                      <circle
-                        cx={getX(n - 1)}
-                        cy={getY(lastPoint)}
-                        r={3.5}
-                        fill={lastPoint >= 0 ? "var(--up)" : "var(--down)"}
-                      />
-                      <rect
-                        x={plotW + 2}
-                        y={getY(lastPoint) - 8}
-                        width={46}
-                        height={16}
-                        rx={2}
-                        fill={lastPoint >= 0 ? "var(--up)" : "var(--down)"}
-                      />
-                      <text
-                        x={plotW + 25}
-                        y={getY(lastPoint) + 3.5}
-                        fill="#0c0f12"
-                        fontFamily="monospace"
-                        fontSize={9.5}
-                        fontWeight={800}
-                        textAnchor="middle"
-                      >
-                        {formatPct(lastPoint)}
-                      </text>
-                    </g>
-                  ) : null}
-                </svg>
-              )}
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 font-mono">
+              <Kpi label="已實現損益" value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
+                   tone={summary ? toneOf(summary.realized_pnl) : undefined} sub="OKX 專用子帳戶 (模擬)" />
+              <Kpi label="未實現損益" value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
+                   tone={summary ? toneOf(summary.unrealized_pnl) : undefined} sub={risk?.snapshot ? `mark $${formatDecimal(risk.snapshot.mark)}` : "尚無 mark"} />
+              <Kpi label="風控期間基準" value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
+                   sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算 (合成基準)` : "尚無基準"} />
+              <Kpi label="手續費累計" value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
+                   tone={summary ? "text-rose-400" : undefined} sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined} />
             </div>
           </div>
         </div>
+
+        {/* 右側 SVG 走勢圖：本次 run 的權益曲線 */}
+        <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-1.5" : "p-2.5")}>
+          <div className="flex items-center justify-between gap-2 text-t3 font-mono text-muted-foreground h-5 shrink-0 px-1 min-w-0">
+            <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+              <span className="w-2.5 h-[2px] bg-primary inline-block" />
+              <span>{isNarrow ? `run 權益 · ${curve.length} 點` : `本次 run 權益曲線 · 合成時間 · ${curve.length} 點`}</span>
+            </div>
+            <div className="min-w-0 truncate text-right">
+              {hover ? (
+                <span className="text-foreground font-mono text-t2 whitespace-nowrap">
+                  [{formatClock(hover.time_ms, false)}] 權益 {formatDecimal(hover.equity, { prefix: "$" })} ·{" "}
+                  <span className="text-primary font-bold">{fmtPctNumber(hoverPct)}</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground/60 text-t2 whitespace-nowrap hidden lg:inline">游標懸停檢視各 bar 的權益</span>
+              )}
+            </div>
+          </div>
+
+          <div
+            ref={chartContainerRef}
+            className="flex-1 w-full relative min-h-[140px] cursor-crosshair mt-1"
+            onPointerMove={handlePointerMove}
+            onPointerLeave={() => setHoverIdx(null)}
+          >
+            {emptyReason ? (
+              <div className="absolute inset-0 flex items-center justify-center text-t3 font-mono text-muted-foreground">
+                {emptyReason}
+              </div>
+            ) : chartWidth > 0 && chartHeight > 0 && (
+              <svg width={chartWidth} height={height} className="w-full h-full overflow-visible">
+                <defs>
+                  <linearGradient id="v0EqGradReact2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+
+                {yBounds.ticks.map((t) => (
+                  <g key={t}>
+                    <line x1={0} x2={plotW} y1={getY(t)} y2={getY(t)} stroke="currentColor" className="text-border/40"
+                          strokeDasharray={t === 0 ? undefined : "3 3"} strokeWidth={t === 0 ? 1 : 0.75} />
+                    <text x={plotW + 6} y={getY(t) + 3} fill="currentColor"
+                          className={cn("text-t1 font-mono", t === 0 ? "text-primary font-bold" : "text-muted-foreground/60")}>
+                      {t > 0 ? `+${t.toFixed(2)}%` : `${t.toFixed(2)}%`}
+                    </text>
+                  </g>
+                ))}
+
+                {xTicks.map((idx) => (
+                  <text key={idx} x={getX(idx)} y={plotH + 13}
+                        textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
+                        fill="currentColor" className="text-t1 font-mono text-muted-foreground/60">
+                    {formatClock(curve[idx]?.time_ms, false)}
+                  </text>
+                ))}
+
+                {areaPath && <path d={areaPath} fill="url(#v0EqGradReact2)" />}
+                {line && <path d={line} fill="none" stroke="var(--primary)" strokeWidth={2} />}
+                {n === 1 && <circle cx={getX(0)} cy={getY(points[0])} r={3} fill="var(--primary)" />}
+
+                {hoverIdx !== null && (
+                  <g>
+                    <line x1={getX(hoverIdx)} x2={getX(hoverIdx)} y1={8} y2={plotH} stroke="var(--primary)"
+                          strokeWidth={1} strokeDasharray="2 2" opacity={0.8} />
+                    <circle cx={getX(hoverIdx)} cy={getY(points[hoverIdx] ?? 0)} r={3.5} fill="var(--primary)"
+                            stroke="var(--background)" strokeWidth={1.5} />
+                  </g>
+                )}
+              </svg>
+            )}
+          </div>
+        </div>
       </div>
+    </div>
   );
 }

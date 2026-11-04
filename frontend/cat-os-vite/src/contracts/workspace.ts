@@ -1,17 +1,13 @@
 /**
- * Workspace and Telemetry Contracts
+ * Workspace aggregate (GET /api/workspace/simulation/state) and the pieces it
+ * is assembled from. Domain versions let each store slice apply its own
+ * monotonic guard.
  */
-import type { BotMode } from './bot';
-
-export interface TelemetryState {
-  connected: boolean;
-  supervisor_pid: number;
-  latency_ms: number;
-  fixed_tag: '41cb53c54d6dABDE';
-  settlement_mode: 'cross_net_mode';
-  core_arithmetic: 'Decimal_SQLite_TEXT';
-  last_heartbeat: string;
-}
+import type { BotViewDTO } from './bot';
+import type { DecimalString } from './decimal';
+import type { PositionDTO, RiskSnapshotDTO, RiskStatus } from './risk';
+import type { RunDTO } from './run';
+import type { RegisteredStrategyDTO } from './strategy';
 
 export interface VersionDTO {
   contract: 'catos.simulation.v1';
@@ -20,19 +16,96 @@ export interface VersionDTO {
   current_build_id: string;
   restart_required: boolean;
   instance_id: string;
-  slot: string;
+  slot: 'idle' | 'starting' | 'running' | 'stopping' | 'recovery_required' | 'unavailable';
   active_run_id: string | null;
-  capabilities: {
-    start: boolean;
-    stop: boolean;
-  };
+  capabilities: { start: boolean; stop: boolean };
   unavailable_reason: string | null;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
-export interface WorkspaceState {
-  mode: BotMode;
-  telemetry: TelemetryState;
-  active_scenario: string;
+export interface SummaryDTO {
+  equity: DecimalString;
+  realized_pnl: DecimalString;
+  unrealized_pnl: DecimalString;
+  fees: DecimalString;
+  period_pnl: DecimalString | null;
+  period_pnl_ratio: DecimalString | null;
+  period_start_ms: number | null;
+  basis_equity: DecimalString | null;
+  running_bots: number;
+  total_bots: number;
+  risk_status: RiskStatus | null;
+  effective_leverage: DecimalString | null;
+  leverage_limit: DecimalString;
+  invariants: { fixed_tag: string; settlement: string; arithmetic: string };
 }
 
+export type EventKind =
+  | 'run_state'
+  | 'stop_requested'
+  | 'warmup'
+  | 'day_basis'
+  | 'signal'
+  | 'fill'
+  | 'final_account'
+  | 'stop'
+  | 'anomaly'
+  | (string & {});
+
+export type EventLevel = 'INFO' | 'WARN' | 'ERROR';
+export type EventCategory = 'SUPERVISOR' | 'WORKER' | 'RISK' | 'ORDER' | 'SYSTEM';
+
+export interface EventDTO {
+  seq: number;            // global sequence per data root, monotonic across runs
+  run_id: string;
+  bot_id: string;
+  kind: EventKind;
+  wall_time_ms: number | null;
+  synthetic_time_ms: number | null;
+  level: EventLevel;
+  category: EventCategory;
+  payload: Record<string, unknown>;
+}
+
+export interface EventsPageDTO {
+  items: EventDTO[];
+  next_since: number;
+  more: boolean;
+  version: number;
+  omitted: number;
+}
+
+export const STATE_DOMAINS = ['service', 'bots', 'risk', 'positions', 'events'] as const;
+export type StateDomain = (typeof STATE_DOMAINS)[number];
+
+export interface WorkspaceStateDTO {
+  contract: 'catos.simulation.v1';
+  version: number;
+  instance_id: string;
+  observed_at_ms: number;
+  unchanged: false;
+  service: VersionDTO;
+  strategies: RegisteredStrategyDTO[];
+  bots: BotViewDTO[];
+  risk: RiskSnapshotDTO | null;
+  positions: PositionDTO[];
+  summary: SummaryDTO | null;
+  events: { items: EventDTO[]; next_since: number; omitted: number };
+  domains: Record<StateDomain, number>;
+}
+
+export interface WorkspaceUnchangedDTO {
+  contract: 'catos.simulation.v1';
+  version: number;
+  instance_id: string;
+  observed_at_ms: number;
+  unchanged: true;
+}
+
+export type WorkspaceStateResponse = WorkspaceStateDTO | WorkspaceUnchangedDTO;
+
+export interface StartBotResponseDTO {
+  run: RunDTO;
+  bot: BotViewDTO;
+  version: number;
+}

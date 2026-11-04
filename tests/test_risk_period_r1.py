@@ -16,6 +16,7 @@ from catos.journal import Journal, JournalError
 from catos.fake_exchange import FakeExchange
 from catos.supervisor import LocalSupervisor, SupervisorUnavailable
 from test_ipc import config
+from test_risk import KNOWN
 from test_journal import proof
 from test_reconciliation_gate import BASE_TAIPEI_MS as MIDNIGHT, signed_report
 from test_supervisor import wait_flag
@@ -90,7 +91,7 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
 
     async def observe(self, report, *, position=D("0")):
         snapshot = risk.Snapshot(self.supervisor.risk_state.seq + 1, self.clock.now,
-            report["completed_ms"] + 1000, D("1"), D("1"), position, D("100"))
+            report["completed_ms"] + 1000, D("1"), D("1"), position, D("100"), **KNOWN)
         return await self.supervisor.observe_risk_period(report, snapshot, **self.qualification())
 
     async def test_morning_commit_observe_report_and_restart_fixed_denominator(self):
@@ -98,7 +99,7 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
         candidate = risk_period.candidate(report, "r1-fixture")
         with self.assertRaisesRegex(SupervisorUnavailable, "durably"):
             self.supervisor.observe_risk(risk.Snapshot(1, report["completed_ms"], self.clock.now + 100,
-                D("1000"), D("1000"), D("0"), D("100"), basis=candidate))
+                D("1000"), D("1000"), D("0"), D("100"), basis=candidate, **KNOWN))
         output, result = await self.observe(report)
         self.assertTrue(result.reconciled)
         self.assertFalse(result.trade_authorized)
@@ -119,7 +120,7 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
 
     async def test_initial_failure_is_retryable_and_does_not_latch_entire_day(self):
         absent = risk.Snapshot(1, self.clock.now - 50, self.clock.now + 1000,
-            D("1000"), D("1000"), D("0"), D("100"), valuation_known=False)
+            D("1000"), D("1000"), D("0"), D("100"), **{**KNOWN, "valuation_known": False})
         self.supervisor.observe_risk(absent)
         await self.supervisor.persist_controls()
         self.assertIsNone(self.supervisor.risk_state.basis_blocked_day)

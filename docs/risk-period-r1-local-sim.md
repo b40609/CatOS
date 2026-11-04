@@ -1,6 +1,6 @@
 # R1 風控期間基準：本機模擬交付
 
-日期：2026-10-20。狀態：**實作與開發自測完成；197／197 通過，待指定 GPT-6 Sol 獨立驗收。** 使用者已授權完成 R1 local-sim 工作包；政策依[精簡評估第 5 節](retail-v1-simplification-assessment-20261020.md#5-已定案金融變更r1-操作性風控基準)。
+日期：2026-10-20；2026-10-25 補正交付狀態。**開發自測 197／197 通過；2026-10-20 指定 GPT-6 Sol 已完成 local-sim 獨驗 PASS，見[原始獨驗報告](../reports/risk-period-r1-independent-acceptance-20261020-gpt6sol/acceptance.md)。** 下列保留 10/20 開發交付與驗證範圍，不把歷史測試當成本輪重跑。使用者已授權完成 R1 local-sim 工作包；政策依[精簡評估第 5 節](retail-v1-simplification-assessment-20261020.md#5-已定案金融變更r1-操作性風控基準)。
 
 ## 已完成行為
 
@@ -64,4 +64,4 @@ raise SystemExit(0 if result.wasSuccessful() else 1)
 
 尚未串入 HTTP API、正式服務啟動流程、前端或 Demo／Live；報告欄位已提供新語意，產品畫面尚未改動。舊 exact-midnight／Q1 producer 與 Demo 既有路徑保留，未擴大其適用範圍；舊明示 `basis_blocked_day` 不會被自動清除。未讀產品 DB／憑證、未採集、未交易、未操作 Git、未修改 Yaozi／並行前端，未執行前端 tsc／build 或全市場研究。
 
-下一成果為指定 GPT-6 Sol 對上述來源、原始證據與必要風險案例做獨立驗收及唯讀 Git 核對；本文件僅為開發自測交付。commit／push、真實採集與 Demo／Live 仍需另有授權。[接續入口](current-handoff.md)。
+10/20 指定獨驗已核對 17 個來源 hash、重跑 197 項並加驗 3 個邊界案例；本文件原「待獨驗」文字已過時。2026-10-25 指定 GPT-6 Sol 再核對 17／17 hash 一致、0 漂移，按風險重跑 R1 專屬 21／21 通過，未重跑全部歷史案例；命令與結果見[盤點接續核對末節](project-inventory-audit-20261024.md#2026-10-25前端完成前的後端接續核對)。不能推導 HTTP／UI／Demo／Live 已通過；目前串接待決項見[後端串接表第 6 節](backend-frontend-integration-map.md)。commit／push、真實採集與 Demo／Live 仍需另有授權。[接續入口](current-handoff.md)。

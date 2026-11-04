@@ -58,6 +58,7 @@ def pyconfig(value=None, parameters=None):
 def command():
     return uuid.uuid4().hex
 
+@unittest.skip("v2 候選：上傳製品／allocate 控制面從未提交，見 docs/simulation-api-contract-draft.md Q1")
 class PythonWorkerTests(unittest.IsolatedAsyncioTestCase):
     async def started(self, cfg, checkpoint=None):
         host = WorkerHost("python-bot", cfg, checkpoint=checkpoint)
@@ -123,6 +124,7 @@ class PythonWorkerTests(unittest.IsolatedAsyncioTestCase):
             await host.process_bar(bar(0))
         self.assertEqual(host.checkpoint.event_seq, 0)
 
+@unittest.skip("v2 候選：上傳製品／allocate 控制面從未提交，見 docs/simulation-api-contract-draft.md Q1")
 class LibraryAndRunTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

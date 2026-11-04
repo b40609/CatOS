@@ -58,18 +58,18 @@ const YAOZI_ALERTS: YaoziAlert[] = [
     severity: "high",
     trigger: "5 分鐘內單向爆倉額度 > 3,000,000 USDT",
     impact: "短線多單流動性踩踏，盤口滑價可能擴大至 5~10 bps",
-    actionGuide: "維持策略續抱，嚴守 OKX 交易所端 P6 災難停損防線，禁止手動搶反彈加倉。",
+    actionGuide: "維持策略續抱，嚴守 OKX 交易所端 交易所停損保護，禁止手動搶反彈加倉。",
   },
   {
     id: "alert-02",
     symbol: "SOL-USDT-SWAP",
     title: "資金費率顯著偏離 (OKX vs Binance)",
     time: "09:48:30 UTC",
-    summary: "SOL-USDT 永續 8H 資金費率出現偏離，OKX +0.038% vs Binance +0.012%，基差年化達 28.5%，套利窗口開啟。",
+    summary: "SOL-USDT 永續 4h 資金費率出現偏離，OKX +0.038% vs Binance +0.012%，基差年化達 28.5%，套利窗口開啟。",
     tag: "FUNDING_ARB",
     tagLabel: "費率套利",
     severity: "medium",
-    trigger: "跨所 8H 資金費率偏離基差 > 0.020% (年化 > 20%)",
+    trigger: "跨所資金費率偏離基差 > 0.020% (年化 > 20%)",
     impact: "多頭過度擁擠於 OKX，次根結算可能引發部分多頭平倉壓制價格",
     actionGuide: "可作為反轉訊號輔助權重，但策略核心決策仍依據 Closed Bar 訊號，不盲目跨所對沖。",
   },
@@ -100,10 +100,10 @@ interface FundingRateRow {
 }
 
 const FUNDING_RATES: FundingRateRow[] = [
-  { symbol: "BTC-USDT-SWAP", okxRate: "+0.0100%", binanceRate: "+0.0098%", basis: "+0.0002%", apr: "0.22%", signal: "平衡", settleCountdown: "03:42:15", okx8hCostPer10k: "1.00 USDT" },
-  { symbol: "ETH-USDT-SWAP", okxRate: "+0.0150%", binanceRate: "+0.0110%", basis: "+0.0040%", apr: "4.38%", signal: "套利機會", settleCountdown: "03:42:15", okx8hCostPer10k: "1.50 USDT" },
-  { symbol: "SOL-USDT-SWAP", okxRate: "+0.0380%", binanceRate: "+0.0120%", basis: "+0.0260%", apr: "28.47%", signal: "強烈訊號", settleCountdown: "03:42:15", okx8hCostPer10k: "3.80 USDT" },
-  { symbol: "DOGE-USDT-SWAP", okxRate: "-0.0050%", binanceRate: "+0.0020%", basis: "-0.0070%", apr: "7.66%", signal: "空頭擠壓", settleCountdown: "03:42:15", okx8hCostPer10k: "-0.50 USDT" },
+  { symbol: "BTC-USDT-SWAP", okxRate: "+0.0100% (8h)", binanceRate: "+0.0098%", basis: "+0.0002%", apr: "0.22%", signal: "平衡", settleCountdown: "05:08:07", okx8hCostPer10k: "1.00 USDT" },
+  { symbol: "ETH-USDT-SWAP", okxRate: "+0.0150% (8h)", binanceRate: "+0.0110%", basis: "+0.0040%", apr: "4.38%", signal: "套利機會", settleCountdown: "05:08:07", okx8hCostPer10k: "1.50 USDT" },
+  { symbol: "SOL-USDT-SWAP", okxRate: "+0.0380% (4h)", binanceRate: "+0.0120%", basis: "+0.0260%", apr: "28.47%", signal: "強烈訊號", settleCountdown: "01:08:07", okx8hCostPer10k: "3.80 USDT" },
+  { symbol: "DOGE-USDT-SWAP", okxRate: "-0.0050% (8h)", binanceRate: "+0.0020%", basis: "-0.0070%", apr: "7.66%", signal: "空頭擠壓", settleCountdown: "05:08:07", okx8hCostPer10k: "-0.50 USDT" },
 ];
 
 interface RadarMetric {
@@ -194,12 +194,12 @@ function MarketIntelPage() {
         right={
           <div className="flex items-center gap-2">
             {dbState === "connected" ? (
-              <span className="flex items-center gap-1.5 text-[11px] font-mono text-up bg-up/10 border border-up/25 rounded px-2 py-0.5">
+              <span className="flex items-center gap-1.5 text-t3 font-mono text-up bg-up/10 border border-up/25 rounded px-2 py-0.5">
                 <PulseBeacon size={4} variant="up" />
                 <span>YAOZI DB CONNECTED</span>
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground bg-secondary/80 border border-border/80 rounded px-2 py-0.5">
+              <span className="flex items-center gap-1.5 text-t3 font-mono text-muted-foreground bg-secondary/80 border border-border/80 rounded px-2 py-0.5">
                 <PulseBeacon size={4} />
                 <span>示範情報模式 ({dbReason})</span>
               </span>
@@ -221,12 +221,12 @@ function MarketIntelPage() {
               切換分頁不控制策略生命週期
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[10.5px]">
-            <span className="rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-primary font-semibold">
-              展示資料 · 本地情境模擬
+          <div className="flex items-center gap-2 text-t2">
+            <span className="rounded bg-warn/10 border border-warn/30 px-2 py-0.5 text-warn font-semibold">
+              v1 未啟用
             </span>
             <span className="text-muted-foreground hidden sm:inline">
-              (真實交易請待 market_intel.sqlite 採集掛載)
+              本頁為展示資料；市場情報線在 v1 凍結，無排程器、不主動更新（見 docs/market-intel.md）
             </span>
           </div>
         </div>
@@ -255,7 +255,7 @@ function MarketIntelPage() {
                     key={tag}
                     onClick={() => setAlertFilter(tag)}
                     className={cn(
-                      "px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors",
+                      "px-2 py-0.5 rounded text-t2 font-mono transition-colors",
                       alertFilter === tag
                         ? "bg-primary text-primary-foreground font-semibold"
                         : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -280,7 +280,7 @@ function MarketIntelPage() {
                     <div className="flex items-center gap-1.5">
                       <span
                         className={cn(
-                          "text-[9.5px] font-mono font-semibold px-1.5 py-0.5 rounded",
+                          "text-t1 font-mono font-semibold px-1.5 py-0.5 rounded",
                           alert.severity === "high"
                             ? "bg-down/15 text-down border border-down/30"
                             : alert.severity === "medium"
@@ -290,14 +290,14 @@ function MarketIntelPage() {
                       >
                         {alert.tagLabel}
                       </span>
-                      <span className="font-mono text-[10px] text-primary font-medium">{alert.symbol}</span>
+                      <span className="font-mono text-t2 text-primary font-medium">{alert.symbol}</span>
                     </div>
-                    <span className="font-mono text-[10px] text-muted-foreground">{alert.time}</span>
+                    <span className="font-mono text-t2 text-muted-foreground">{alert.time}</span>
                   </div>
                   <h3 className="mt-2 text-xs font-semibold text-foreground tracking-tight">{alert.title}</h3>
                   <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{alert.summary}</p>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between text-t2 font-mono text-muted-foreground">
                   <span>來源：Yaozi Sentinel</span>
                   <span className="text-primary font-medium flex items-center group-hover:underline">
                     點擊查看處置指引 <ArrowUpRight className="size-3 ml-0.5" />
@@ -313,7 +313,7 @@ function MarketIntelPage() {
           title={
             <div className="flex items-center gap-2">
               <TrendingUp className="size-3.5 text-primary" />
-              <span>資金費率偏離與跨所套利監測 (Funding Rate Matrix · 8H 結算)</span>
+              <span>資金費率與市場情緒監測矩陣 (Funding Rate & Sentiment Matrix)</span>
             </div>
           }
           meta={
@@ -324,7 +324,7 @@ function MarketIntelPage() {
                     key={sig}
                     onClick={() => setFundingFilter(sig)}
                     className={cn(
-                      "px-2 py-0.5 rounded text-[10px] font-mono transition-colors",
+                      "px-2 py-0.5 rounded text-t2 font-mono transition-colors",
                       fundingFilter === sig
                         ? "bg-primary text-primary-foreground font-semibold"
                         : "bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -341,7 +341,7 @@ function MarketIntelPage() {
                   placeholder="搜尋合約..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-6 w-28 rounded bg-background/80 pl-6 pr-2 font-mono text-[10px] text-foreground border border-border/60 focus:outline-none focus:border-primary"
+                  className="h-6 w-28 rounded bg-background/80 pl-6 pr-2 font-mono text-t2 text-foreground border border-border/60 focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
@@ -349,11 +349,11 @@ function MarketIntelPage() {
         >
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="border-b border-border text-[10px] font-mono text-muted-foreground bg-background/30">
+              <thead className="border-b border-border text-t2 font-mono text-muted-foreground bg-background/30">
                 <tr>
                   <th className="py-2 px-3 font-normal">標的合約</th>
-                  <th className="py-2 px-3 text-right font-normal">OKX 8H 費率</th>
-                  <th className="py-2 px-3 text-right font-normal">Binance 8H 費率</th>
+                  <th className="py-2 px-3 text-right font-normal">OKX 費率 / 週期</th>
+                  <th className="py-2 px-3 text-right font-normal">Binance 費率</th>
                   <th className="py-2 px-3 text-right font-normal">偏離基差 (Basis)</th>
                   <th className="py-2 px-3 text-right font-normal">年化 APR</th>
                   <th className="py-2 px-3 text-right font-normal">每萬 USDT 成本</th>
@@ -379,7 +379,7 @@ function MarketIntelPage() {
                     <td className="py-2.5 px-3 text-right">
                       <span
                         className={cn(
-                          "rounded px-1.5 py-0.5 text-[9px] font-semibold",
+                          "rounded px-1.5 py-0.5 text-t1 font-semibold",
                           row.signal === "強烈訊號"
                             ? "bg-primary/20 text-primary border border-primary/40"
                             : row.signal === "套利機會"
@@ -393,7 +393,7 @@ function MarketIntelPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-center">
-                      <span className="text-[10px] text-primary hover:underline">詳情</span>
+                      <span className="text-t2 text-primary hover:underline">詳情</span>
                     </td>
                   </tr>
                 ))}
@@ -412,7 +412,7 @@ function MarketIntelPage() {
                 <span>多維標的決策曲面 (Decision Surface · 示範)</span>
               </div>
             }
-            meta={<span className="text-[10px] font-mono text-muted-foreground">/intel/decision-surface</span>}
+            meta={<span className="text-t2 font-mono text-muted-foreground">/intel/decision-surface</span>}
           >
             <div className="space-y-2.5">
               {RADAR_METRICS.map((item) => (
@@ -423,25 +423,25 @@ function MarketIntelPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-bold text-foreground">{item.symbol}</span>
-                      <span className="rounded bg-secondary px-1.5 py-0.2 text-[9px] font-mono text-primary">
+                      <span className="rounded bg-secondary px-1.5 py-0.2 text-t1 font-mono text-primary">
                         {item.momentumLabel}
                       </span>
                     </div>
-                    <p className="font-mono text-[10px] text-muted-foreground">
+                    <p className="font-mono text-t2 text-muted-foreground">
                       波動狀態: {item.volatilityState} · DEX 異象: {item.dexAnomaly}
                     </p>
                   </div>
                   <div className="text-right font-mono">
                     <span className="text-sm font-bold text-primary">{item.momentumScore}</span>
-                    <span className="text-[10px] text-muted-foreground"> / 100</span>
-                    <p className={cn("text-[10px] font-semibold", item.flowDirection === "inflow" ? "text-up" : "text-down")}>
+                    <span className="text-t2 text-muted-foreground"> / 100</span>
+                    <p className={cn("text-t2 font-semibold", item.flowDirection === "inflow" ? "text-up" : "text-down")}>
                       24H {item.flow24hUsdt}
                     </p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-3 pt-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground flex items-center justify-between">
+            <div className="mt-3 pt-2 border-t border-border/40 text-t2 font-mono text-muted-foreground flex items-center justify-between">
               <span>契約邊界: 僅作為輔助情報流，非自動交易觸發依據</span>
               <span className="text-primary">本地 DB 就緒時自動切換</span>
             </div>
@@ -455,7 +455,7 @@ function MarketIntelPage() {
                 <span>資金流向與大戶籌碼 (Capital Flow & Dealer Activity)</span>
               </div>
             }
-            meta={<span className="text-[10px] font-mono text-muted-foreground">/intel/raw-flow</span>}
+            meta={<span className="text-t2 font-mono text-muted-foreground">/intel/raw-flow</span>}
           >
             <div className="space-y-3 text-xs">
               <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-2">
@@ -467,13 +467,13 @@ function MarketIntelPage() {
                   <div className="bg-up h-full" style={{ width: "68%" }} title="主動買盤 68%" />
                   <div className="bg-down h-full" style={{ width: "32%" }} title="主動賣盤 32%" />
                 </div>
-                <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                <div className="flex justify-between text-t2 font-mono text-muted-foreground">
                   <span>主動買單 68%</span>
                   <span>主動賣單 32%</span>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1.5 font-mono text-[11px]">
+              <div className="rounded-lg border border-border/60 bg-background/40 p-3 space-y-1.5 font-mono text-t3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">交易所冷錢包淨流出:</span>
                   <span className="text-foreground font-semibold">-2,180 BTC (流動性收緊)</span>
@@ -489,7 +489,7 @@ function MarketIntelPage() {
               </div>
             </div>
 
-            <div className="mt-3 pt-2 border-t border-border/40 text-[10px] font-mono text-muted-foreground flex items-center justify-between">
+            <div className="mt-3 pt-2 border-t border-border/40 text-t2 font-mono text-muted-foreground flex items-center justify-between">
               <span>儲存格式: SQLite (WAL) · 唯讀訪存</span>
               <span className="text-primary">嚴禁 Float 計算</span>
             </div>
@@ -505,7 +505,7 @@ function MarketIntelPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "text-[10px] font-mono font-semibold px-2 py-0.5 rounded",
+                    "text-t2 font-mono font-semibold px-2 py-0.5 rounded",
                     selectedAlert.severity === "high"
                       ? "bg-down/15 text-down border border-down/30"
                       : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
@@ -514,7 +514,7 @@ function MarketIntelPage() {
                   {selectedAlert.tagLabel}
                 </span>
                 <span className="font-mono text-xs text-primary font-bold">{selectedAlert.symbol}</span>
-                <span className="ml-auto font-mono text-[11px] text-muted-foreground">{selectedAlert.time}</span>
+                <span className="ml-auto font-mono text-t3 text-muted-foreground">{selectedAlert.time}</span>
               </div>
               <DialogTitle className="text-sm font-bold text-foreground mt-2">
                 {selectedAlert.title}
@@ -526,11 +526,11 @@ function MarketIntelPage() {
 
             <div className="space-y-3 py-2 text-xs">
               <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-1">
-                <span className="font-semibold text-foreground text-[11px]">情報摘要</span>
+                <span className="font-semibold text-foreground text-t3">情報摘要</span>
                 <p className="text-muted-foreground leading-relaxed">{selectedAlert.summary}</p>
               </div>
 
-              <div className="space-y-2 font-mono text-[11px]">
+              <div className="space-y-2 font-mono text-t3">
                 <div className="flex justify-between border-b border-border/40 pb-1.5">
                   <span className="text-muted-foreground">偵測觸發條件:</span>
                   <span className="text-foreground">{selectedAlert.trigger}</span>
@@ -542,7 +542,7 @@ function MarketIntelPage() {
               </div>
 
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1">
-                <span className="font-semibold text-primary text-[11px] flex items-center gap-1.5">
+                <span className="font-semibold text-primary text-t3 flex items-center gap-1.5">
                   <Info className="size-3.5" /> 策略與交易員處置指引
                 </span>
                 <p className="text-muted-foreground text-xs leading-relaxed">{selectedAlert.actionGuide}</p>
@@ -570,7 +570,7 @@ function MarketIntelPage() {
             <DialogHeader>
               <DialogTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <span>{selectedFunding.symbol}</span>
-                <span className="text-xs text-primary font-normal">8H 資金費率跨所套利試算</span>
+                <span className="text-xs text-primary font-normal">資金費率與持倉成本試算</span>
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
                 OKX 永續 SWAP vs Binance 永續合約基差
@@ -580,11 +580,11 @@ function MarketIntelPage() {
             <div className="space-y-3 py-2 text-xs font-mono">
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded border border-border/60 bg-background/50 p-2.5 text-center">
-                  <span className="text-[10px] text-muted-foreground block">OKX 8H 費率</span>
+                  <span className="text-t2 text-muted-foreground block">OKX 費率</span>
                   <span className="text-sm font-bold text-foreground mt-0.5 block">{selectedFunding.okxRate}</span>
                 </div>
                 <div className="rounded border border-border/60 bg-background/50 p-2.5 text-center">
-                  <span className="text-[10px] text-muted-foreground block">Binance 8H 費率</span>
+                  <span className="text-t2 text-muted-foreground block">Binance 費率</span>
                   <span className="text-sm font-bold text-muted-foreground mt-0.5 block">{selectedFunding.binanceRate}</span>
                 </div>
               </div>
@@ -599,7 +599,7 @@ function MarketIntelPage() {
                   <span className="font-bold text-foreground">{selectedFunding.apr}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">每 10,000 USDT 持倉成本:</span>
+                  <span className="text-muted-foreground">每 10,000 USDT 當期成本:</span>
                   <span className="font-bold text-foreground">{selectedFunding.okx8hCostPer10k}</span>
                 </div>
                 <div className="flex justify-between">
@@ -608,8 +608,8 @@ function MarketIntelPage() {
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                ※ 資金費率結算週期為 00:00 / 08:00 / 16:00 UTC。CatOS 策略以 Closed Bar 決策為主，跨所費率基差僅作為市場情緒與動態持倉成本參考，不進行未授權之自動雙邊對沖套利。
+              <p className="text-t2 text-muted-foreground leading-relaxed">
+                ※ OKX 永續合約依幣種具有獨立結算週期（BTC/ETH 為 8h，SOL 為 4h）。CatOS 策略以 Closed Bar 決策為主，費率基差僅作為市場情緒與動態持倉成本參考，不進行未授權之自動雙邊對沖。
               </p>
             </div>
 

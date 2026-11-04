@@ -1,5 +1,6 @@
 import type { CardId } from "@/state/layoutStore";
 import type { LayoutNode, LeafNode, SplitNode, SplitDirection, DropPosition } from "./types";
+import { CARD_DEFAULT_MIN_HEIGHTS } from "@/components/catos/card-registry";
 
 /**
  * 深度拷貝 LayoutNode 樹
@@ -19,39 +20,39 @@ export function cloneTree(node: LayoutNode): LayoutNode {
 }
 
 /**
- * 建立系統預設的「定案方案 2：上下分層 T-Split 解耦樹 (Row-First)」
- * 頂層水平分行 (col, 50:50)，上下兩層之垂直分割線徹底獨立解耦：
- * - 上半部：[帳戶權益 (equity)] ｜ [量化機器人 (bots)] ｜ [資產配置 Donut (allocation)]
- * - 下半部：[部位活動與在途防線 (positions)] ｜ [全域戰情日誌 (activity_deck)]
- * 垂直分割線互不綁架，持倉與在途盤口專注防線，獨立全域戰情日誌台彙總成交流與風控事件。
+ * 系統預設排版：使用者定案實戰佈局 (User Confirmed Gold Standard)
+ * - 頂層 (34% 高度，50:50 左右橫幅)：[帳戶權益 (equity)] ｜ [槓桿曝險 (allocation)]
+ * - 底層 (66% 高度，左 57% / 右 43%)：
+ *   - 左半部 (上下 50:50)：[策略機器人 (bots)] / [持倉與防線 (positions)]
+ *   - 右半部 (縱向全高)：[全域戰情日誌與對帳流水 (activity_deck)]
  */
 export function createDefaultTree(): LayoutNode {
   return {
     type: "split",
     id: "split-root",
-    direction: "col", // 上下分層
-    ratio: 0.5,
+    direction: "col",
+    ratio: 0.34,
     first: {
       type: "split",
       id: "split-top-tier",
-      direction: "row", // 上半部左右分欄
-      ratio: 0.72,
-      first: {
-        type: "split",
-        id: "split-top-left",
-        direction: "row",
-        ratio: 0.58,
-        first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
-        second: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-      },
+      direction: "row",
+      ratio: 0.5,
+      first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
       second: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
     },
     second: {
       type: "split",
       id: "split-bottom-tier",
-      direction: "row", // 下半部左右分欄：部位活動與在途防線 ｜ 全域戰情日誌台 (定案)
-      ratio: 0.52,
-      first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      direction: "row",
+      ratio: 0.57,
+      first: {
+        type: "split",
+        id: "split-bottom-left",
+        direction: "col",
+        ratio: 0.5,
+        first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
+        second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      },
       second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
     },
   };
@@ -116,42 +117,7 @@ export function createSentinelTree(): LayoutNode {
  * 下層：[部位防線 (40%)] ｜ [全域戰情日誌 (35%)] ｜ [即時成交流 (25%)]
  */
 export function createFlagshipTree(): LayoutNode {
-  return {
-    type: "split",
-    id: "split-flagship-root",
-    direction: "col",
-    ratio: 0.5,
-    first: {
-      type: "split",
-      id: "split-flagship-top",
-      direction: "row",
-      ratio: 0.33,
-      first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
-      second: {
-        type: "split",
-        id: "split-flagship-top-right",
-        direction: "row",
-        ratio: 0.5,
-        first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-        second: { type: "leaf", id: "leaf-market-watch", cardId: "market_watch" },
-      },
-    },
-    second: {
-      type: "split",
-      id: "split-flagship-bottom",
-      direction: "row",
-      ratio: 0.4,
-      first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
-      second: {
-        type: "split",
-        id: "split-flagship-bottom-right",
-        direction: "row",
-        ratio: 0.58,
-        first: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
-        second: { type: "leaf", id: "leaf-fills", cardId: "fills" },
-      },
-    },
-  };
+  return createDefaultTree();
 }
 
 /**
@@ -189,7 +155,7 @@ export function createMasterDetailTree(): LayoutNode {
 }
 
 /**
- * 對照排版 1：策略機器人 vs 策略意圖 (50:50 左右並排比對)
+ * 對照排版 1：策略機器人 vs 槓桿曝險 (50:50 左右並排比對)
  */
 export function createCompareIntentTree(): LayoutNode {
   return {
@@ -198,12 +164,12 @@ export function createCompareIntentTree(): LayoutNode {
     direction: "row",
     ratio: 0.5,
     first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-    second: { type: "leaf", id: "leaf-strategy-intents", cardId: "strategy_intents" },
+    second: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
   };
 }
 
 /**
- * 對照排版 2：交易日誌 vs 即時成交流水 + 風險警報 (左右並排比對)
+ * 對照排版 2：持倉明細 vs 全域戰情日誌與成交流水
  */
 export function createCompareActivityTree(): LayoutNode {
   return {
@@ -211,79 +177,16 @@ export function createCompareActivityTree(): LayoutNode {
     id: "split-compare-activity",
     direction: "row",
     ratio: 0.5,
-    first: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
-    second: {
-      type: "split",
-      id: "split-compare-activity-right",
-      direction: "col",
-      ratio: 0.5,
-      first: { type: "leaf", id: "leaf-fills", cardId: "fills" },
-      second: { type: "leaf", id: "leaf-incidents", cardId: "incidents" },
-    },
+    first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+    second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
   };
 }
 
 /**
- * 對照排版 3：全部 9 大卡片全景排版
+ * 對照排版 3：黃金 5 大核心卡片全景排版 (T-Split 定案：行情與資金費率已全域頂部化與持倉嵌入)
  */
 export function createFull9Tree(): LayoutNode {
-  return {
-    type: "split",
-    id: "split-full9-root",
-    direction: "col",
-    ratio: 0.33,
-    first: {
-      type: "split",
-      id: "split-full9-row1",
-      direction: "row",
-      ratio: 0.33,
-      first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
-      second: {
-        type: "split",
-        id: "split-full9-row1-right",
-        direction: "row",
-        ratio: 0.5,
-        first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-        second: { type: "leaf", id: "leaf-market-watch", cardId: "market_watch" },
-      },
-    },
-    second: {
-      type: "split",
-      id: "split-full9-bottom",
-      direction: "col",
-      ratio: 0.5,
-      first: {
-        type: "split",
-        id: "split-full9-row2",
-        direction: "row",
-        ratio: 0.35,
-        first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
-        second: {
-          type: "split",
-          id: "split-full9-row2-right",
-          direction: "row",
-          ratio: 0.5,
-          first: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
-          second: { type: "leaf", id: "leaf-strategy-intents", cardId: "strategy_intents" },
-        },
-      },
-      second: {
-        type: "split",
-        id: "split-full9-row3",
-        direction: "row",
-        ratio: 0.45,
-        first: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
-        second: {
-          type: "split",
-          id: "split-full9-row3-right",
-          direction: "row",
-          ratio: 0.5,
-          first: { type: "leaf", id: "leaf-fills", cardId: "fills" },
-          second: { type: "leaf", id: "leaf-incidents", cardId: "incidents" },
-        },
-      },
-    },
-  };
+  return createDefaultTree();
 }
 
 export function createFocusTree(cardId: CardId = "positions"): LayoutNode {
@@ -566,11 +469,9 @@ export function removeTabFromLeaf(
 }
 
 /**
- * 拖曳卡片操作 (VS Code 四向扇區分裂插入 ＋ 中央落點分頁堆疊)：
- * 依使用者確認徹底移除多餘的換位 (Swap)；
- * 來源節點移出後，原分支自動平滑合併填滿 (Auto-Merge)；
- * 目標位置若為 center，則堆疊為同一視窗容器之 Tab (Dock as Tab)；
- * 目標位置若為四周邊界，則依據扇區分裂展開 (Dock / Split ⊞)。
+ * 拖曳卡片操作 (四向扇區分裂插入 ＋ 中央落點卡片對調換位 Central Swap ⇄)：
+ * - 若落點為 center，觸發兩張卡片對調換位 (Swap ⇄) 或從卡片庫就地替換；
+ * - 若落點為四周邊界，來源節點移出後原分支自動平滑合併填滿 (Auto-Merge)，並在目標邊界分裂展開 (Dock / Split ⊞)。
  */
 export function moveAndSplit(
   root: LayoutNode,
@@ -583,28 +484,29 @@ export function moveAndSplit(
   if (sourceLeafId === targetLeafId) return root;
 
   const isGalleryNew = sourceLeafId.startsWith("gallery-new-");
-  let sourceCardId: CardId;
+  const sourceNode = isGalleryNew ? null : (findNode(root, sourceLeafId) as LeafNode | null);
+  const sourceCardId: CardId | undefined = isGalleryNew
+    ? (draggedCardId || (sourceLeafId.replace("gallery-new-", "") as CardId))
+    : sourceNode?.cardId;
+
+  if (!sourceCardId) return root;
+
+  // 1. 若落點為中央區域 (center)：觸發卡片對調換位 (Central Swap ⇄) 或自卡片庫就地替換
+  if (dropPosition === "center") {
+    if (isGalleryNew) {
+      return replaceLeafCard(root, targetLeafId, sourceCardId);
+    }
+    return swapLeaves(root, sourceLeafId, targetLeafId);
+  }
+
+  // 2. 四邊邊界分裂：先從原樹中剪除來源節點 (原分支平滑合併關閉)
   let treeAfterPrune: LayoutNode | null = root;
-
-  if (isGalleryNew) {
-    sourceCardId = draggedCardId || (sourceLeafId.replace("gallery-new-", "") as CardId);
-  } else {
-    // 1. 記錄來源卡片型別
-    const sourceNode = findNode(root, sourceLeafId);
-    if (!sourceNode || sourceNode.type !== "leaf") return root;
-    sourceCardId = sourceNode.cardId;
-
-    // 2. 先從原樹中剪除來源節點 (原分支平滑合併關閉，消除卡片移走後仍站著位置的BUG)
+  if (!isGalleryNew) {
     treeAfterPrune = removeLeaf(root, sourceLeafId);
     if (!treeAfterPrune) return root;
   }
 
-  // 3. 若落點為中央區域 (center)：觸發分頁堆疊合併 (Dock as Tab)
-  if (dropPosition === "center") {
-    return addTabToLeaf(treeAfterPrune, targetLeafId, sourceCardId);
-  }
-
-  // 4. 決定新分裂的方向與前後位置
+  // 3. 決定新分裂的方向與前後位置
   let direction: SplitDirection = "row";
   let side: "before" | "after" = "after";
 
@@ -627,7 +529,7 @@ export function moveAndSplit(
       break;
   }
 
-  // 5. 在剪枝後的樹中對目標節點進行分裂插入
+  // 4. 在剪枝後的樹中對目標節點進行分裂插入
   return splitLeaf(
     treeAfterPrune,
     targetLeafId,
@@ -637,6 +539,34 @@ export function moveAndSplit(
     newLeafId || (isGalleryNew ? `leaf-${sourceCardId}-${Date.now()}` : sourceLeafId)
   );
 }
+
+/**
+ * 遞迴計算 Layout Tree 在垂直方向上所需的最小安全閱讀高度 (px)
+ * 當樹狀分割層級過多導致所需高度大於視窗高度時，以此數值作為畫布高度，觸發外層平滑縱向滾動
+ */
+export function calculateTreeMinHeight(
+  node: LayoutNode | null | undefined,
+  minHeights: Partial<Record<CardId, number>> = CARD_DEFAULT_MIN_HEIGHTS
+): number {
+  if (!node) return 0;
+  if (node.type === "leaf") {
+    return minHeights[node.cardId] || 300;
+  }
+  const hFirst = calculateTreeMinHeight(node.first, minHeights);
+  const hSecond = calculateTreeMinHeight(node.second, minHeights);
+  if (node.direction === "row") {
+    // 左右並排：高度取二者之較大值
+    return Math.max(hFirst, hSecond);
+  } else {
+    // 上下垂直分割：二者高度相加 + 5px 間隙
+    const sumMin = hFirst + hSecond + 5;
+    const r = Math.max(0.1, Math.min(0.9, node.ratio));
+    const ratioFirst = Math.ceil(hFirst / r);
+    const ratioSecond = Math.ceil(hSecond / (1 - r));
+    return Math.max(sumMin, Math.min(ratioFirst, ratioSecond));
+  }
+}
+
 
 /**
  * 提交落位：將即時流體預演中的 preview-slot-* 節點正式轉化為永久葉子節點
@@ -661,3 +591,102 @@ export function finalizeTree(node: LayoutNode | null | undefined): LayoutNode | 
     second: finalizeTree(node.second),
   };
 }
+
+/**
+ * 依據啟用的卡片清單建立「卡位恆定」的穩定排版樹 (Slot-Stable Layout Tree)
+ * 徹底根治「每次開關卡片就會移位」的痛點：
+ * - 上半部固定卡位槽：equity (左) ｜ bots (中) ｜ allocation (右)
+ * - 下半部固定卡位槽：positions (左) ｜ activity_deck (右)
+ * 開關任何卡片，其他卡片永遠待在其固定槽位，絕不隨機分裂或亂跳！
+ */
+export function buildStableTreeFromCardIds(
+  activeCardIds: CardId[],
+  existingTree?: LayoutNode | null
+): LayoutNode {
+  // 提取既有樹之分割比例，保持使用者調整過之拖拉比例
+  const getNodeRatio = (id: string, defaultRatio: number) => {
+    if (!existingTree) return defaultRatio;
+    const n = findNode(existingTree, id);
+    return n && n.type === "split" ? n.ratio : defaultRatio;
+  };
+
+  const rootRatio = getNodeRatio("split-root", 0.34);
+  const topTierRatio = getNodeRatio("split-top-tier", 0.5);
+  const bottomTierRatio = getNodeRatio("split-bottom-tier", 0.57);
+  const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.5);
+
+  const hasEquity = activeCardIds.includes("equity");
+  const hasAllocation = activeCardIds.includes("allocation");
+  const hasBots = activeCardIds.includes("bots");
+  const hasPositions = activeCardIds.includes("positions");
+  const hasActivity = activeCardIds.includes("activity_deck");
+
+  // 1. 上半部 (equity | allocation 左右 50:50)
+  let topNode: LayoutNode | null = null;
+  if (hasEquity && hasAllocation) {
+    topNode = {
+      type: "split",
+      id: "split-top-tier",
+      direction: "row",
+      ratio: topTierRatio,
+      first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
+      second: { type: "leaf", id: "leaf-allocation", cardId: "allocation" },
+    };
+  } else if (hasEquity) {
+    topNode = { type: "leaf", id: "leaf-equity", cardId: "equity" };
+  } else if (hasAllocation) {
+    topNode = { type: "leaf", id: "leaf-allocation", cardId: "allocation" };
+  }
+
+  // 2. 下半部左欄 (bots / positions 上下 50:50)
+  let bottomLeftNode: LayoutNode | null = null;
+  if (hasBots && hasPositions) {
+    bottomLeftNode = {
+      type: "split",
+      id: "split-bottom-left",
+      direction: "col",
+      ratio: bottomLeftRatio,
+      first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
+      second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+    };
+  } else if (hasBots) {
+    bottomLeftNode = { type: "leaf", id: "leaf-bots", cardId: "bots" };
+  } else if (hasPositions) {
+    bottomLeftNode = { type: "leaf", id: "leaf-positions", cardId: "positions" };
+  }
+
+  // 3. 下半部 (bottomLeftNode | activity_deck 左右 57:43)
+  let bottomNode: LayoutNode | null = null;
+  if (bottomLeftNode && hasActivity) {
+    bottomNode = {
+      type: "split",
+      id: "split-bottom-tier",
+      direction: "row",
+      ratio: bottomTierRatio,
+      first: bottomLeftNode,
+      second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
+    };
+  } else if (bottomLeftNode) {
+    bottomNode = bottomLeftNode;
+  } else if (hasActivity) {
+    bottomNode = { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" };
+  }
+
+  // 4. 上下結合 (上層 34% / 下層 66%)
+  if (topNode && bottomNode) {
+    return {
+      type: "split",
+      id: "split-root",
+      direction: "col",
+      ratio: rootRatio,
+      first: topNode,
+      second: bottomNode,
+    };
+  }
+
+  if (topNode) return topNode;
+  if (bottomNode) return bottomNode;
+
+  return createDefaultTree();
+}
+

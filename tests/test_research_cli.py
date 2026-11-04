@@ -80,7 +80,9 @@ class ResearchCLITests(unittest.TestCase):
             "--strategy", "sma-trend",
             "--output", str(out_file),
         ]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        # Pin child and parent to UTF-8 so a cp950 Windows locale cannot break decoding.
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", env=env)
         self.assertEqual(proc.returncode, 0)
         self.assertIn("報告已成功輸出至", proc.stdout)
         self.assertIn("聲明：本報告為純記憶體研究結果", proc.stdout)
@@ -432,15 +434,16 @@ class ResearchCLITests(unittest.TestCase):
                 self.assertEqual(target.read_bytes(), original)
 
     def test_argparse_help_and_missing_arguments(self):
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
         # --help exits with 0
         cmd_help = [sys.executable, "-B", "-m", "catos.research_cli", "--help"]
-        proc_help = subprocess.run(cmd_help, capture_output=True, text=True)
+        proc_help = subprocess.run(cmd_help, capture_output=True, text=True, encoding="utf-8", env=env)
         self.assertEqual(proc_help.returncode, 0)
         self.assertIn("--csv", proc_help.stdout)
 
         # missing required arg exits with 2
         cmd_missing = [sys.executable, "-B", "-m", "catos.research_cli", "--csv", str(self.csv_path)]
-        proc_missing = subprocess.run(cmd_missing, capture_output=True, text=True)
+        proc_missing = subprocess.run(cmd_missing, capture_output=True, text=True, encoding="utf-8", env=env)
         self.assertEqual(proc_missing.returncode, 2)
 
         # unknown strategy option exits with 2
@@ -451,7 +454,7 @@ class ResearchCLITests(unittest.TestCase):
             "--strategy", "invalid-strat",
             "--output", str(self.output_path),
         ]
-        proc_bad_strat = subprocess.run(cmd_bad_strat, capture_output=True, text=True)
+        proc_bad_strat = subprocess.run(cmd_bad_strat, capture_output=True, text=True, encoding="utf-8", env=env)
         self.assertEqual(proc_bad_strat.returncode, 2)
 
 

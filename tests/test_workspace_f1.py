@@ -141,6 +141,8 @@ class EvidenceTests(unittest.TestCase):
             result = original(path)
             if path == self.directory:
                 class Reparse:
+                    # Path.is_symlink() reads st_mode from the same lstat result.
+                    st_mode = result.st_mode
                     st_file_attributes = 0x400
                 return Reparse()
             return result
