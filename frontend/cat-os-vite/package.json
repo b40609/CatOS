@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:tokens": "node scripts/check-tokens.mjs",
-    "test": "npm run check:tokens && node --test tests/state_adapter_test.mjs"
+    "test": "npm run check:tokens && node --test tests/state_adapter_test.mjs tests/validation_plan_test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

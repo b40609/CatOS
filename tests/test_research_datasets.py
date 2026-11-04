@@ -1,5 +1,6 @@
 """Fetched-dataset manifests: write, verify, resolve and run research on them (offline)."""
 
+from dataclasses import asdict, replace
 from decimal import Decimal
 import json
 from pathlib import Path
@@ -186,13 +187,98 @@ class CatalogAndRunTest(DatasetFixture):
         payload, _ = execute_optimization(optimization, source)
         self.assertEqual(payload["provenance"]["dataset"]["id"], dataset_id)
         self.assertIn("OKX 公開歷史 K 線", payload["data_notice"])
-        # Walk-forward output does not fit the output cap on fetched data yet; reject up front.
         validation = {**DEFAULT_VALIDATION,
                       "backtest": {**DEFAULT_VALIDATION["backtest"], "dataset_id": dataset_id}}
-        with self.assertRaisesRegex(ValueError, "validation_supports_synthetic_dataset_only"):
-            execute_validation(validation, source)
+        payload, _ = execute_validation(validation, source)
+        self.assertEqual(payload["provenance"]["dataset"]["id"], dataset_id)
+        self.assertIn("OKX 公開歷史 K 線", payload["data_notice"])
+        self.assertTrue(payload["evaluation_complete"])
         payload, _ = execute_validation(DEFAULT_VALIDATION, provenance())
         self.assertEqual(payload["provenance"]["dataset"]["id"], DATASET_ID)
+
+    def test_validation_on_large_fetched_dataset_is_compact_and_exact(self):
+        from catos.research import backtest
+        from catos.research_catalog import (
+            DEFAULT_VALIDATION, MAX_OUTPUT_BYTES, MAX_VALIDATION_CURVE_POINTS, drawdown_pcts,
+            json_text, load_registered_strategy,
+        )
+        from catos.research_validation_job import SCHEMA, execute_validation, validate_validation_request
+        count, test_bars, windows = 4_000, 900, 3
+        dataset_id = write_fixture(self.root, count=count).name
+        source = provenance(dataset_id)
+        request = {**DEFAULT_VALIDATION,
+                   "backtest": {**DEFAULT_VALIDATION["backtest"], "dataset_id": dataset_id, "warmup_bars": 8},
+                   "search_space": {"period": {"low": 2, "high": 8, "step": 3}},
+                   "plan": {"train_bars": 1_000, "test_bars": test_bars, "windows": windows}}
+        payload, report = execute_validation(request, source)
+        self.assertEqual(payload["schema"], SCHEMA)
+        self.assertLess(len(json_text({"payload": payload, "report": report}).encode("utf-8")),
+                        MAX_OUTPUT_BYTES)
+        result = payload["result"]
+        self.assertEqual(result["omitted_detail"], ["labels", "windows.evaluation.intervals"])
+        self.assertNotIn("labels", result)
+        self.assertEqual(sum(row["bar_count"] for row in result["label_counts"]), count)
+        _, config, quantity, bars, _, plan, _ = validate_validation_request(request)
+        strategy = load_registered_strategy(source)
+        for window, diagnostic in zip(result["validation"]["windows"], result["windows"]):
+            oos = window["out_of_sample"]
+            training = window["training"]
+            period = dict(training["trials"][training["selected_trial_number"]]["params"])["period"]
+            start = next(i for i, bar in enumerate(bars) if bar.open_time_ms == window["test_start_ms"])
+            window_bars = bars[start - plan.warmup_bars:start + test_bars]
+            first, last = window_bars[0].open_time_ms, window_bars[-1].open_time_ms + TF
+            window_config = replace(config, funding_events=tuple(
+                event for event in config.funding_events if first <= event.time_ms <= last))
+            replay = backtest(strategy=lambda: strategy(period, quantity), candles=window_bars,
+                              config=window_config, warmup_bars=plan.warmup_bars)
+            full = json.loads(json_text([asdict(point) for point in replay.equity_curve]))
+            sampled = oos["equity_curve"]
+            # Sampling thins only the curve: performance, trades and funding stay exact.
+            self.assertEqual(oos["performance"], json.loads(json_text(asdict(replay.performance))))
+            self.assertEqual(oos["trades"], json.loads(json_text([asdict(t) for t in replay.trades])))
+            self.assertEqual(oos["funding"], json.loads(json_text([asdict(f) for f in replay.funding])))
+            self.assertEqual(window["curve_sampling"], {
+                "total_points": test_bars + 1, "returned_points": len(sampled),
+                "method": "bucket_deepest_drawdown_keep_first"})
+            self.assertLessEqual(len(sampled), MAX_VALIDATION_CURVE_POINTS // windows)
+            by_time = {point["time_ms"]: point for point in full}
+            self.assertEqual([by_time[point["time_ms"]] for point in sampled], sampled)
+            self.assertEqual([point["time_ms"] for point in sampled],
+                             sorted({point["time_ms"] for point in sampled}))
+            drawdowns = drawdown_pcts(replay.equity_curve, config.initial_balance)
+            deepest = full[max(range(len(full)), key=lambda i: (drawdowns[i], -i))]
+            for point in (full[0], full[-1], deepest):
+                self.assertIn(point, sampled)
+            self.assertNotIn("intervals", diagnostic["evaluation"])
+            self.assertTrue(diagnostic["evaluation"]["reconciled"])
+            self.assertEqual(diagnostic["evaluation"]["total"]["bar_count"], test_bars)
+            self.assertEqual(diagnostic["evaluation"]["total"]["net_pnl"], oos["performance"]["net_pnl"])
+        # Fetched data stays in data/okx and is referenced by hash, never embedded.
+        reproduction = payload["reproduction"]
+        referenced = {item["path"]: item["sha256"] for item in reproduction["referenced_files"]}
+        self.assertEqual(referenced, dict(resolve_dataset(dataset_id).files))
+        self.assertFalse(any(item["path"] in referenced for item in reproduction["files"]))
+        self.assertIn("sha256", reproduction["notice"])
+        self.assertIn("<table>", report)
+        self.assertNotIn("<pre>", report)
+
+    def test_service_report_footer_names_the_fetched_source(self):
+        from catos.research_service import ResearchService
+        dataset_id = write_fixture(self.root).name
+        with tempfile.TemporaryDirectory() as directory:
+            service = ResearchService(directory)
+            service.start()
+            try:
+                reply = lambda envelope: {"payload": {"provenance": envelope["provenance"]},
+                                          "report": "<html><body></body></html>"}
+                with mock.patch.object(service, "_compute", side_effect=reply):
+                    run_id = service.submit(request_for(dataset_id), "fixture")["run_id"]
+                    service._thread.join(10)
+                report = service.report(run_id)
+            finally:
+                service.close()
+        self.assertIn("固定研究來源 · OKX 公開歷史資料", report)
+        self.assertNotIn("合成資料", report)
 
 
 if __name__ == "__main__":

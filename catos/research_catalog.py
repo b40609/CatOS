@@ -59,6 +59,16 @@ MAX_TRIALS = 20
 MAX_VALIDATION_CANDIDATES = 20
 MAX_VALIDATION_RUNS = 100
 MAX_VALIDATION_WINDOWS = 8
+# Walk-forward cost is the bars every training trial and OOS run replays
+# (~19-54k per second measured locally on the fetched 15m dataset, depending on
+# load), so a preflight bound keeps a submission well inside TIMEOUT_SECONDS.
+MAX_VALIDATION_BAR_EVALUATIONS = 250_000
+# The regime classifier sums its lookback window at every bar: (bars - L) x L
+# steps, ~2.4M per second locally. Capping L bounds it to ~10M steps even at
+# MAX_BARS (1.8 s for L = 512 on the fetched 8,640-bar dataset).
+MAX_VALIDATION_LOOKBACK_BARS = 512
+# Total OOS equity points kept in a validation payload, shared by its windows.
+MAX_VALIDATION_CURVE_POINTS = 1_000
 DEFAULT_OPTIMIZATION = {
     "backtest": {**DEFAULT_REQUEST, "warmup_bars": 8},
     "search_space": {"period": {"low": 2, "high": 8, "step": 1}},
@@ -320,8 +330,11 @@ def catalog():
         "validation": {"example_request": DEFAULT_VALIDATION,
                        "max_candidates": MAX_VALIDATION_CANDIDATES,
                        "max_runs": MAX_VALIDATION_RUNS, "max_windows": MAX_VALIDATION_WINDOWS,
+                       "max_bar_evaluations": MAX_VALIDATION_BAR_EVALUATIONS,
+                       "max_lookback_bars": MAX_VALIDATION_LOOKBACK_BARS,
+                       "max_curve_points": MAX_VALIDATION_CURVE_POINTS,
                        "score_name": "return_pct", "direction": "maximize",
-                       "notice": "合成資料；穩定區選參後做滾動 OOS 與分環境評估。門檻僅供示範，須明示。"},
+                       "notice": "穩定區選參後做滾動 OOS 與分環境評估；各 OOS 視窗獨立，不是連續投資組合。分類門檻僅供示範，須明示。"},
         "limits": {"concurrent_tasks": 1, "max_bars": MAX_BARS,
                    "timeout_seconds": TIMEOUT_SECONDS, "max_runs": MAX_RUNS,
                    "max_output_bytes": MAX_OUTPUT_BYTES},
@@ -382,6 +395,17 @@ def load_dataset_bars(dataset_id, config):
     return bars, config
 
 
+def drawdown_pcts(equity_curve, initial_balance):
+    """Decimal drawdown percent from the running peak, starting at the initial balance."""
+    with localcontext(research._CONTEXT):
+        peak = initial_balance
+        drawdowns = []
+        for point in equity_curve:
+            peak = max(peak, point.equity)
+            drawdowns.append((peak - point.equity) / peak * Decimal("100"))
+    return drawdowns
+
+
 def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
     """Indices kept for the payload chart: per bucket the deepest drawdown, plus the last point.
 
@@ -411,13 +435,8 @@ def execute_request(request, expected_source):
         strategy=lambda: RegisteredSMA(period, quantity), candles=bars,
         config=config, warmup_bars=snapshot["warmup_bars"],
     )
-    with localcontext(research._CONTEXT):
-        peak = config.initial_balance
-        drawdown = []
-        for point in result.equity_curve:
-            peak = max(peak, point.equity)
-            drawdown.append({"time_ms": point.time_ms,
-                             "drawdown_pct": (peak - point.equity) / peak * Decimal("100")})
+    drawdown = [{"time_ms": point.time_ms, "drawdown_pct": value} for point, value
+                in zip(result.equity_curve, drawdown_pcts(result.equity_curve, config.initial_balance))]
     result_payload = asdict(result)
     keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
     payload = {

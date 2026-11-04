@@ -254,9 +254,11 @@ class ResearchService:
                        "created_at": envelope["created_at"], "build_id": envelope["build_id"]}
             self._write_new(directory / "result.json", json_text(payload))
             binding = html.escape(json_text(envelope))
+            synthetic = envelope["provenance"]["dataset"]["source"] == "synthetic_closed_bars"
             footer = ('<section style="margin:24px;overflow-wrap:anywhere">'
-                      '<h2>固定研究來源 · 合成資料</h2>'
-                      '<p>不代表歷史市場績效。此報告綁定以下任務、版本、資料與設定。</p>'
+                      + ('<h2>固定研究來源 · 合成資料</h2><p>不代表歷史市場績效。' if synthetic else
+                         '<h2>固定研究來源 · OKX 公開歷史資料</h2><p>研究模型不代表實盤可得績效。')
+                      + '此報告綁定以下任務、版本、資料與設定。</p>'
                       f'<pre style="white-space:pre-wrap">{binding}</pre></section>')
             report = reply["report"].replace("</body>", footer + "</body>")
             self._write_new(directory / "report.html", report)
