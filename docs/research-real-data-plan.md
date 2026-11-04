@@ -170,7 +170,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 
 ## 第二個策略：Donchian 通道突破（2026-11-04，分支 `feat/research-second-strategy`）
 
-獨立驗收 7／7 PASS，附 7 項非阻斷觀察（`reports/research-second-strategy-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O3、O6、O7 補了預熱預檢、build_id 綁定、前端用語與文件，O4、O5 記在下方，這部分只有開發者自測。未 push、未 merge。
+獨立驗收 7／7 PASS，附 7 項非阻斷觀察（`reports/research-second-strategy-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O3、O6、O7 補了預熱預檢、build_id 綁定、前端用語與文件，O4、O5 記在下方，這部分只有開發者自測。已合併進 `main` 並推送。
 
 ### 為什麼換、怎麼選
 
