@@ -16,7 +16,11 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-chart";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
+import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
+import {
+  DONCHIAN_ID, donchianParams, formatParams, paramLabel, paramProblems, paramSpecs, pickStrategy, shortName,
+} from "@/lib/research-strategies";
 import {
   researchApi,
   ResearchApiError,
@@ -72,7 +76,8 @@ function BacktestPage() {
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
 
   // Form Fields
-  const [period, setPeriod] = useState<number>(2);
+  const [strategyId, setStrategyId] = useState<string | null>(null);
+  const [params, setParams] = useState<Record<string, number>>({ period: 2 });
   const [quantity, setQuantity] = useState<string>("2");
   const [initialBalance, setInitialBalance] = useState<string>("1000");
   const [feeRate, setFeeRate] = useState<string>("0.0005");
@@ -80,6 +85,7 @@ function BacktestPage() {
   const [warmupBars, setWarmupBars] = useState<number>(2);
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const dataset = pickDataset(catalog?.datasets, datasetId);
+  const strategy = pickStrategy(catalog?.strategies, strategyId);
 
   const selectedRunRef = useRef<ResearchRunStatus | null>(null);
   selectedRunRef.current = selectedRun;
@@ -236,8 +242,10 @@ function BacktestPage() {
       setRuns(rList);
 
       if (cat.defaults) {
-        setPeriod(cat.defaults.parameters.period);
-        setQuantity(cat.defaults.parameters.quantity);
+        const { quantity: defaultQuantity, ...defaultParams } = cat.defaults.parameters;
+        setStrategyId(cat.defaults.strategy_id);
+        setParams(defaultParams as Record<string, number>);
+        setQuantity(defaultQuantity);
         setInitialBalance(cat.defaults.initial_balance);
         setFeeRate(cat.defaults.fee_rate);
         setSlippageBps(cat.defaults.slippage_bps);
@@ -337,23 +345,19 @@ function BacktestPage() {
     setSubmitting(true);
     setErrorMsg(null);
 
-    // Strict validation
-    if (period < 2 || period > 32) {
-      setErrorMsg("period 必須為整數且介於 [2, 32]");
-      setSubmitting(false);
-      return;
-    }
-    if (warmupBars < period || warmupBars >= 64) {
-      setErrorMsg("warmup_bars 必須 >= period 且小於 64");
+    // Strict validation against the catalog bounds; the backend repeats every check.
+    const problems = strategy ? paramProblems(strategy, params, warmupBars) : ["策略清單尚未載入"];
+    if (!strategy || problems.length) {
+      setErrorMsg(problems[0]);
       setSubmitting(false);
       return;
     }
 
     const payload: BacktestRequest = {
-      strategy_id: catalog.strategies[0]?.id || "sma-trend",
+      strategy_id: strategy.id,
       dataset_id: dataset?.id || "synthetic-btc-15m-v1",
       parameters: {
-        period: Number(period),
+        ...Object.fromEntries(paramSpecs(strategy).map((spec) => [spec.name, Number(params[spec.name])])),
         quantity: String(quantity).trim(),
       },
       initial_balance: String(initialBalance).trim(),
@@ -395,6 +399,30 @@ function BacktestPage() {
   // Derive parameters from actual selected run / result
   const activeRequest = result?.request || selectedRun?.request;
   const perf = result?.result?.performance;
+  const activeStrategy = pickStrategy(catalog?.strategies, activeRequest?.strategy_id ?? strategy?.id ?? null);
+  const formProblems = strategy ? paramProblems(strategy, params, warmupBars) : [];
+
+  // Switching strategy (or the Donchian dataset) restores defaults that fit the bounds and data length.
+  const applyDefaults = (sid: string, target = dataset) => {
+    if (!catalog) return;
+    if (sid === DONCHIAN_ID) {
+      const preset = donchianParams(target);
+      setParams(preset.params);
+      setWarmupBars(preset.warmup);
+      return;
+    }
+    const defaults = Object.entries(catalog.defaults.parameters).filter(([name]) => name !== "quantity");
+    setParams(Object.fromEntries(defaults) as Record<string, number>);
+    setWarmupBars(catalog.defaults.warmup_bars);
+  };
+  const changeStrategy = (sid: string) => {
+    setStrategyId(sid);
+    applyDefaults(sid);
+  };
+  const changeDataset = (id: string) => {
+    setDatasetId(id);
+    if (strategy?.id === DONCHIAN_ID) applyDefaults(DONCHIAN_ID, pickDataset(catalog?.datasets, id));
+  };
   const isRunning = selectedRun?.status === "running" || selectedRun?.status === "queued";
   const isFailed = selectedRun?.status === "failed";
 
@@ -458,7 +486,7 @@ function BacktestPage() {
               {version ? "127.0.0.1:8770 ONLINE" : "OFFLINE / DISCONNECTED"}
             </span>
             <span className="text-muted-foreground">
-              策略: <strong className="text-foreground">{catalog?.strategies[0]?.name || "SMA 趨勢 (Long / Flat)"}</strong>
+              策略: <strong className="text-foreground">{activeStrategy?.name || "SMA 趨勢 (Long / Flat)"}</strong>
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
@@ -491,6 +519,7 @@ function BacktestPage() {
           data-selected-run-id={selectedRun?.run_id || ""}
           data-result-run-id={result?.run_id || ""}
           data-result-period={activeRequest?.parameters?.period ?? ""}
+          data-result-params={formatParams(activeRequest?.parameters)}
           data-result-net-pnl={perf?.net_pnl ?? ""}
           data-result-trade-count={perf?.trade_count ?? ""}
           className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-surface/90 px-3.5 py-2 text-xs font-mono shadow-xs backdrop-blur-md"
@@ -560,7 +589,7 @@ function BacktestPage() {
                 ) : (
                   backtestRuns.map((run) => {
                     const isSelected = selectedRun?.run_id === run.run_id;
-                    const periodVal = run.request?.parameters?.period;
+                    const paramsText = formatParams(run.request?.parameters);
                     const qtyVal = run.request?.parameters?.quantity;
                     return (
                       <div
@@ -585,7 +614,7 @@ function BacktestPage() {
                               <Clock className="size-3.5 text-amber-400 animate-spin" />
                             )}
                             <span className="font-medium text-xs text-foreground">
-                              SMA 回測 · period={periodVal || "?"}
+                              {shortName(run.request?.strategy_id)} 回測 · {paramsText || "?"}
                             </span>
                           </div>
                           <span className={cn(
@@ -615,8 +644,8 @@ function BacktestPage() {
                   <span className="font-mono text-foreground font-medium">Closed Bar（次根開盤市價撮合）</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
-                  <span className="text-muted-foreground">週期參數 (period)</span>
-                  <span className="font-mono text-foreground font-medium">{activeRequest?.parameters?.period ?? "--"}</span>
+                  <span className="text-muted-foreground">策略參數 ({shortName(activeRequest?.strategy_id)})</span>
+                  <span className="font-mono text-foreground font-medium">{formatParams(activeRequest?.parameters) || "--"}</span>
                 </div>
                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
                   <span className="text-muted-foreground">下單數量 (quantity)</span>
@@ -769,28 +798,30 @@ function BacktestPage() {
           <div className="space-y-3 py-1">
             <div className="space-y-1">
               <Label className="text-t3 font-mono text-muted-foreground">選擇登錄策略</Label>
-              <div className="px-2.5 py-1.5 rounded border border-border bg-background text-xs font-mono text-foreground">
-                {catalog?.strategies[0]?.name || "SMA 趨勢（Long / Flat）"} ({catalog?.strategies[0]?.id || "sma-trend"})
-              </div>
+              <StrategyPicker strategies={catalog?.strategies ?? []} value={strategy?.id ?? null} onChange={changeStrategy} />
             </div>
 
             <div className="space-y-1">
               <Label className="text-t3 font-mono text-muted-foreground">標的與資料集</Label>
-              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={setDatasetId} />
+              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={changeDataset} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-t3 font-mono text-muted-foreground">SMA 週期 (period: 2~32)</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  max={32}
-                  value={period}
-                  onChange={(e) => setPeriod(parseInt(e.target.value) || 2)}
-                  className="font-mono text-xs bg-background h-8"
-                />
-              </div>
+              {(strategy ? paramSpecs(strategy) : []).map((spec) => (
+                <div key={spec.name} className="space-y-1">
+                  <Label className="text-t3 font-mono text-muted-foreground">
+                    {paramLabel(spec.name)} ({spec.name}: {spec.min}~{spec.max})
+                  </Label>
+                  <Input
+                    type="number"
+                    min={spec.min}
+                    max={spec.max}
+                    value={params[spec.name] ?? spec.min}
+                    onChange={(e) => setParams((current) => ({ ...current, [spec.name]: parseInt(e.target.value) || spec.min }))}
+                    className="font-mono text-xs bg-background h-8"
+                  />
+                </div>
+              ))}
 
               <div className="space-y-1">
                 <Label className="text-t3 font-mono text-muted-foreground">下單張數 (quantity: 1~1000)</Label>
@@ -815,13 +846,15 @@ function BacktestPage() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-t3 font-mono text-muted-foreground">預熱根數 (warmup: &gt;= period)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">
+                  預熱根數 (warmup: &gt;= {strategy?.warmup.covers ?? "period"})
+                </Label>
                 <Input
                   type="number"
-                  min={period}
-                  max={63}
+                  min={strategy ? params[strategy.warmup.covers] : 2}
+                  max={strategy ? strategy.warmup.below - 1 : 63}
                   value={warmupBars}
-                  onChange={(e) => setWarmupBars(parseInt(e.target.value) || period)}
+                  onChange={(e) => setWarmupBars(parseInt(e.target.value) || (strategy ? params[strategy.warmup.covers] : 2))}
                   className="font-mono text-xs bg-background h-8"
                 />
               </div>
@@ -848,6 +881,12 @@ function BacktestPage() {
                 />
               </div>
             </div>
+
+            {formProblems.length > 0 && (
+              <ul className="space-y-0.5 text-t2 font-mono text-down">
+                {formProblems.map((problem) => <li key={problem}>· {problem}</li>)}
+              </ul>
+            )}
           </div>
 
           <DialogFooter>
@@ -864,7 +903,7 @@ function BacktestPage() {
               id="btn-confirm-submit-backtest"
               type="button"
               size="sm"
-              disabled={submitting}
+              disabled={submitting || formProblems.length > 0}
               onClick={handleSubmitBacktest}
               className="text-xs h-8 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer"
             >

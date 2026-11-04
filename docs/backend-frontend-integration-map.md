@@ -10,8 +10,8 @@
 
 | 前端功能 | 後端能力 | 接法 | 現況／限制 |
 | --- | --- | --- | --- |
-| 回測、權益／回撤、成交明細 | 已有 HTTP；Decimal 研究核心 | POST `/api/research/backtests`，共用 runs 查詢 | **React 已串接** version、catalog、提交、歷史、輪詢與結果；仍有第 7 節問題，未完成本輪互動驗收。只有登錄的 SMA／96 根合成 15m 資料 |
-| 參數搜尋 | 已有 HTTP；Optuna 樣本內搜尋 | POST `/api/research/optimizations` | **React 已接研究 HTTP**：提交、歷史、共用槽輪詢與結果；後端只搜 SMA period，以 return_pct 排序。另有明示「概念展示」的獨立視圖，不能當真實結果 |
+| 回測、權益／回撤、成交明細 | 已有 HTTP；Decimal 研究核心 | POST `/api/research/backtests`，共用 runs 查詢 | **React 已串接** version、catalog、提交、歷史、輪詢與結果；仍有第 7 節問題，未完成本輪互動驗收。策略可選 SMA 或 Donchian（2026-11-04，研究白名單），資料可選合成或已抓取的 OKX 資料集 |
+| 參數搜尋 | 已有 HTTP；Optuna 樣本內搜尋 | POST `/api/research/optimizations` | **React 已接研究 HTTP**：提交、歷史、共用槽輪詢與結果；後端搜尋 SMA period 或 Donchian entry_bars／exit_bars，以 return_pct 排序。另有明示「概念展示」的獨立視圖，不能當真實結果 |
 | 參數穩定區 | 已有 HTTP；候選網格與鄰域選參 | POST `/api/research/validations`，讀訓練結果 | **React 已串接**（2026-11-04，滾動驗證頁 `pages/validation.tsx`）；不是另一個 stability 端點。Python 核心另有可重用能力，不表示 HTTP 接受任意策略 |
 | Walk-Forward／樣本外 | 已有 HTTP；滾動訓練、固定參數後測試 | 同一 validations 任務，讀各窗 out_of_sample | **React 已串接**，合成與已登錄的 OKX 資料集皆可；各窗空倉獨立起跑，不能拼成連續帳戶績效 |
 | 分市場環境評估 | 已有 HTTP；七類環境損益／成本歸屬 | 同一 validations 結果的分環境區段 | **React 已串接**（各窗分環境表）；示範門檻，非自動部署通過規則 |

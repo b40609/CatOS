@@ -23,7 +23,15 @@ import { cn } from "@/lib/utils";
 import type { OptimizationRequest } from "@/adapters/research-api-adapter";
 import { useOptimizationResearch } from "@/hooks/use-optimization-research";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
+import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { formatDecimal } from "@/lib/format";
+import {
+  type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase,
+  gridProblems, gridWarmup, paramLabel, paramSpecs, pickStrategy, shortName,
+} from "@/lib/research-strategies";
+
+// SMA keeps its original 2~8 step 1 search and warm-up of at least 8 bars.
+const SMA_AXES: Record<string, Axis> = { period: { low: 2, high: 8, step: 1 } };
 
 export const Route = createFileRoute("/optimization")({
   head: () => ({
@@ -56,22 +64,38 @@ function OptimizationPage() {
   } = useOptimizationResearch();
 
   const [openDialog, setOpenDialog] = useState(false);
-  const [periodLow, setPeriodLow] = useState(2);
-  const [periodHigh, setPeriodHigh] = useState(8);
-  const [periodStep, setPeriodStep] = useState(1);
+  const [strategyId, setStrategyId] = useState<string | null>(null);
+  const [axes, setAxes] = useState<Record<string, Axis>>(SMA_AXES);
   const [nTrials, setNTrials] = useState(8);
   const [seed, setSeed] = useState(42);
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const dataset = pickDataset(catalog?.datasets, datasetId);
+  const strategy = pickStrategy(catalog?.strategies, strategyId);
+  const problems = strategy ? gridProblems(strategy, axes) : [];
+
+  const changeStrategy = (sid: string) => {
+    setStrategyId(sid);
+    setAxes(sid === DONCHIAN_ID ? donchianAxes(dataset) : SMA_AXES);
+  };
+  const changeDataset = (id: string) => {
+    setDatasetId(id);
+    if (strategy?.id === DONCHIAN_ID) setAxes(donchianAxes(pickDataset(catalog?.datasets, id)));
+  };
+  const setAxis = (name: string, key: keyof Axis, value: number) =>
+    setAxes((current) => ({ ...current, [name]: { ...current[name], [key]: value } }));
 
   const handleSubmitRealOpt = async () => {
+    if (!strategy || problems.length) return;
+    // SMA keeps its fixed period 2 base; Donchian starts from the lowest grid point.
+    const base = strategy.id === DONCHIAN_ID ? gridBase(strategy, axes) : { period: 2 };
+    const warmup = strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes));
     const req: OptimizationRequest = {
       backtest: {
-        strategy_id: "sma-trend", dataset_id: dataset?.id || "synthetic-btc-15m-v1",
-        parameters: { period: 2, quantity: "2" }, initial_balance: "1000",
-        fee_rate: "0.0005", slippage_bps: "2", warmup_bars: Math.max(8, periodHigh),
+        strategy_id: strategy.id, dataset_id: dataset?.id || "synthetic-btc-15m-v1",
+        parameters: { ...base, quantity: "2" }, initial_balance: "1000",
+        fee_rate: "0.0005", slippage_bps: "2", warmup_bars: warmup,
       },
-      search_space: { period: { low: periodLow, high: periodHigh, step: periodStep } },
+      search_space: Object.fromEntries(paramSpecs(strategy).map((spec) => [spec.name, { ...axes[spec.name] }])),
       n_trials: nTrials, seed,
     };
     if (await submit(req)) setOpenDialog(false);
@@ -95,7 +119,7 @@ function OptimizationPage() {
               className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer"
             >
               {isBusy ? <Loader2 className="size-3.5 mr-1 animate-spin" /> : <Sparkles className="size-3.5 mr-1" />}
-              {isBusy ? "後端計算中..." : "發起 SMA 優化任務"}
+              {isBusy ? "後端計算中..." : "發起優化任務"}
             </Button>
           </div>
         }
@@ -197,7 +221,7 @@ function OptimizationPage() {
                             建立時間: {formatUtc(r.created_at)}
                           </p>
                           <p className="text-t2 text-muted-foreground">
-                            搜尋範圍: SMA period {r.request?.search_space?.period?.low ?? 2}~{r.request?.search_space?.period?.high ?? 8} · {r.request?.n_trials ?? 8} 試驗
+                            搜尋範圍: {shortName(r.request?.backtest?.strategy_id)} {formatRanges(r.request?.search_space) || "--"} · {r.request?.n_trials ?? 8} 試驗
                           </p>
                         </div>
                       );
@@ -213,7 +237,7 @@ function OptimizationPage() {
                     <strong className="text-foreground">數值精確度:</strong> 原始帳務、淨損益、費用與報酬率一律強制使用 Decimal 字串儲存；僅交給 Optuna 進行尋優排序之數值轉為 Float，不得回流為帳務依據。
                   </p>
                   <p>
-                    <strong className="text-foreground">能力限制:</strong> 後端僅實作 SMA period 單參數樣本內搜尋，目標 return_pct 最大化；未提供 Sharpe 自訂目標、多 Worker 平行、多目標 Pareto 或未審計之策略檔匯出。
+                    <strong className="text-foreground">能力限制:</strong> 後端只搜尋固定白名單策略（SMA 週期、Donchian 進出場通道）的樣本內參數，目標 return_pct 最大化；未提供 Sharpe 自訂目標、多 Worker 平行、多目標 Pareto 或未審計之策略檔匯出。
                   </p>
                 </div>
               </Panel>
@@ -238,7 +262,7 @@ function OptimizationPage() {
                         Trial #{realResult.best_trial_number ?? "--"}
                       </span>
                       <span className="text-t1 text-muted-foreground">
-                        最佳週期: {realResult.trials.find((t) => t.number === realResult.best_trial_number)?.params.period ?? "--"}
+                        最佳參數: {formatParams(realResult.trials.find((t) => t.number === realResult.best_trial_number)?.params) || "--"}
                       </span>
                     </div>
 
@@ -291,7 +315,7 @@ function OptimizationPage() {
                           <tr>
                             <th className="py-2 px-3 font-normal">Trial #</th>
                             <th className="py-2 px-3 font-normal">狀態</th>
-                            <th className="py-2 px-3 text-right font-normal">SMA Period</th>
+                            <th className="py-2 px-3 text-right font-normal">參數</th>
                             <th className="py-2 px-3 text-right font-normal">Decimal 評分</th>
                             <th className="py-2 px-3 text-right font-normal">淨損益 (USDT)</th>
                             <th className="py-2 px-3 text-right font-normal">手續費</th>
@@ -324,7 +348,7 @@ function OptimizationPage() {
                                   <span className="text-t2 text-muted-foreground">{t.state}</span>
                                 </td>
                                 <td className="py-2.5 px-3 text-right font-semibold text-foreground">
-                                  {t.params.period}
+                                  {formatTrialParams(t.params)}
                                 </td>
                                 {/* 顯示取兩位小數；title 保留完整 Decimal 字串供核對 */}
                                 <td className="py-2.5 px-3 text-right font-bold text-primary" title={t.score_decimal ?? undefined}>
@@ -374,7 +398,7 @@ function OptimizationPage() {
         <DialogContent className="border-border bg-surface max-w-md">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" /> 發起 SMA 參數優化任務
+              <Sparkles className="size-4 text-primary" /> 發起策略參數優化任務
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               符合後端 POST /api/research/optimizations 契約 · 樣本內搜尋
@@ -382,50 +406,45 @@ function OptimizationPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-xs font-mono">
-            <div className="rounded border border-primary/25 bg-primary/5 p-2.5 space-y-1 text-t3">
-              <span className="text-primary font-semibold">固定登錄模型</span>
-              <p className="text-muted-foreground text-t2">策略: RegisteredSMA (sma-trend)</p>
+            <div className="space-y-1">
+              <Label className="text-t2 text-muted-foreground">策略</Label>
+              <StrategyPicker strategies={catalog?.strategies ?? []} value={strategy?.id ?? null} onChange={changeStrategy} />
             </div>
 
             <div className="space-y-1">
               <Label className="text-t2 text-muted-foreground">資料集</Label>
-              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={setDatasetId} />
+              <DatasetPicker datasets={catalog?.datasets ?? []} value={dataset?.id ?? null} onChange={changeDataset} />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label className="text-t2 text-muted-foreground">Period 最小值</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  max={32}
-                  value={periodLow}
-                  onChange={(e) => setPeriodLow(parseInt(e.target.value) || 2)}
-                  className="h-8 font-mono text-xs bg-background"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-t2 text-muted-foreground">Period 最大值</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  max={32}
-                  value={periodHigh}
-                  onChange={(e) => setPeriodHigh(parseInt(e.target.value) || 8)}
-                  className="h-8 font-mono text-xs bg-background"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-t2 text-muted-foreground">搜尋步進 (Step)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={periodStep}
-                  onChange={(e) => setPeriodStep(parseInt(e.target.value) || 1)}
-                  className="h-8 font-mono text-xs bg-background"
-                />
-              </div>
+            <div className="space-y-1">
+              <Label className="text-t2 text-muted-foreground">搜尋範圍（最小值 · 最大值 · 步進）</Label>
+              {(strategy ? paramSpecs(strategy) : []).map((spec) => (
+                <div key={spec.name} className="grid grid-cols-[5.5rem_1fr_1fr_1fr] items-center gap-2">
+                  <span className="text-t2 text-muted-foreground truncate" title={spec.name}>{paramLabel(spec.name)}</span>
+                  {(["low", "high", "step"] as const).map((key) => (
+                    <Input
+                      key={key}
+                      type="number"
+                      min={key === "step" ? 1 : spec.min}
+                      max={key === "step" ? spec.max - spec.min : spec.max}
+                      aria-label={`${paramLabel(spec.name)} ${key}`}
+                      value={axes[spec.name]?.[key] ?? 0}
+                      onChange={(e) => setAxis(spec.name, key, parseInt(e.target.value) || 0)}
+                      className="h-8 font-mono text-xs bg-background"
+                    />
+                  ))}
+                </div>
+              ))}
+              {strategy && (
+                <p className="text-t2 text-muted-foreground">
+                  預熱 {strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes))} 根（涵蓋最大{paramLabel(strategy.warmup.covers)}）
+                </p>
+              )}
+              {problems.length > 0 && (
+                <ul className="space-y-0.5 text-t2 text-down">
+                  {problems.map((problem) => <li key={problem}>· {problem}</li>)}
+                </ul>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -467,7 +486,7 @@ function OptimizationPage() {
             </Button>
             <Button
               size="sm"
-              disabled={submitting}
+              disabled={submitting || !strategy || problems.length > 0}
               onClick={handleSubmitRealOpt}
               className="text-xs font-mono h-8 bg-primary text-primary-foreground hover:bg-primary/90"
             >

@@ -9,10 +9,10 @@ v1 已於 2026-11-04 通過正式獨立驗收（`reports/v1-acceptance-20261104/
 | 項目 | v1 實況 |
 | --- | --- |
 | 執行環境 | 僅 local-sim：`catos/fake_exchange.py` 合成撮合，固定模板 8 根＋2 根預熱的合成 15m K 線 |
-| 策略 | 一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略 |
+| 策略 | Bot 只有一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略。研究另有 `donchian-breakout`／`donchian-parameters-v1`（Donchian 通道突破，多／空），manifest 在 Worker 不讀的 `catos/research_only_artifacts/`，Bot 選不到 |
 | Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
 | OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter）與研究資料抓取工具 `tools/fetch_okx_candles.py`（三個公開端點、不用金鑰）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
-| 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口、資金費完整的資料集，不符即拒絕。回測、優化與滾動驗證都可選資料集；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
+| 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口、資金費完整的資料集，不符即拒絕。回測、優化與滾動驗證都可選策略（SMA、Donchian）與資料集；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
 | 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
 | HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
 | 前端 | 戰情台、實例監控、風控中心、策略中心、系統日誌與側欄狀態列讀取控制面真資料；回測／優化／滾動驗證頁接研究 HTTP；設定頁讀取服務版本；策略覆盤與市場情報頁標示「v1 未啟用」 |
@@ -67,11 +67,13 @@ FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-l
 
 滾動驗證（walk-forward）可直接用這份資料：前端「滾動驗證」頁（`#/validation`）或 POST `/api/research/validations`。結果 schema 是 `catos.research.validation-result.v2`：逐根環境標籤改為各環境的 K 線數，逐根歸屬只留各環境彙總，各窗樣本外權益曲線超過上限時取樣，`data/okx` 的檔案在來源快照裡只記路徑與 sha256；績效與分環境合計仍以全部 K 線計算。送出時另檢查計算量 `windows × (候選數 × (warmup + train) + warmup + test) <= 250,000`，環境分類的回看根數上限 512，避免超過 30 秒逾時。本機以研究服務實測（6 窗、4 個候選、train 2000／test 1000）：4.35 秒，result.json 599,573 bytes。欄位見 `docs/research-validation-api.md`，方案比較與更多量測見 `docs/research-real-data-plan.md`。
 
+第二個策略 Donchian 通道突破（`donchian-breakout`，2026-11-04 使用者選定）：收盤突破前 `entry_bars` 根的最高價做多、跌破最低價做空，收盤跌破／突破前 `exit_bars` 根的反向極值就平倉。`entry_bars` 2～960、`exit_bars` 1～959 且須小於 `entry_bars`，預熱至少涵蓋最高的 `entry_bars`。三個研究頁的送出對話框都可選策略。研究服務實測 12 格點（entry 96~384/96 × exit 24~72/24）、train 2000／test 1000／6 窗：4.85 秒，result.json 556,397 bytes。和 SMA 同計畫比較，成交從 582 筆降到 55 筆、淨損從 338.51 降到 58.52 USDT，但扣成本前的價格損益仍為負，6 窗 2 窗為正。比較與量測見 `docs/research-real-data-plan.md` 的「第二個策略」。
+
 ## 測試
 
 以下每條指令都實際執行過（2026-11-04）。
 
-後端完整套件（約 4.5 分鐘；本輪結果 1393 tests、0 FAIL、0 ERROR、11 或 12 skipped：11 個是 v2 候選的 python_strategy 兩個模組，另 1 個是 `test_lot_scenario_demo` 在 Windows 無權建立 symlink（未開開發人員模式）時跳過）：
+後端完整套件（約 4 分鐘；本輪結果 1408 tests、0 FAIL、0 ERROR、11 或 12 skipped：11 個是 v2 候選的 python_strategy 兩個模組，另 1 個是 `test_lot_scenario_demo` 在 Windows 無權建立 symlink（未開開發人員模式）時跳過）：
 
 ```bash
 .venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"
@@ -97,7 +99,7 @@ npm --prefix frontend/cat-os-vite test
 npm --prefix frontend/cat-os-vite run build
 ```
 
-端到端整合測試（以 `.venv` 的 Python 在 18870 起真實 local-sim 後端、18890 起 Vite proxy，用 headless Chrome 讀戰情台、實例監控、風控中心、系統日誌、策略中心與策略覆盤頁，驗證 Decimal 字串、無 NaN 與無展示假值；最後經代理送出一次合成資料的滾動驗證，讀滾動驗證頁核對各窗淨損益）：
+端到端整合測試（以 `.venv` 的 Python 在 18870 起真實 local-sim 後端、18890 起 Vite proxy，用 headless Chrome 讀戰情台、實例監控、風控中心、系統日誌、策略中心與策略覆盤頁，驗證 Decimal 字串、無 NaN 與無展示假值；最後經代理送出一次合成資料的 SMA 滾動驗證、一次 Donchian 回測與一次 Donchian 滾動驗證，讀回測頁與滾動驗證頁核對參數、報酬與各窗淨損益；共 12 項）：
 
 ```bash
 node frontend/cat-os-vite/tests/simulation_integration_test.mjs

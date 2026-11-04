@@ -96,7 +96,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 
 ## 滾動驗證接上真實資料（2026-11-04，分支 `feat/research-validation-real-data`）
 
-獨立驗收 7／7 PASS，附 4 項非阻斷觀察（`reports/research-validation-real-data-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，這部分只有開發者自測。未 push、未 merge。
+獨立驗收 7／7 PASS，附 4 項非阻斷觀察（`reports/research-validation-real-data-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，這部分只有開發者自測。已合併進 `main`（`aa4def4`）並推送。
 
 ### 業界與開源 walk-forward 報告怎麼呈現
 
@@ -167,3 +167,80 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 - 計算量上限依本機速度訂定，沒有在另一台機器上量過。
 - 前端分類規則的預設值沿用合成示範門檻（高波動 250 bps），在 BTC 15m 上幾乎都會被分到低波動；門檻要使用者自行明示。
 - HTML 報表沒有前端入口（既有缺口）。
+
+## 第二個策略：Donchian 通道突破（2026-11-04，分支 `feat/research-second-strategy`）
+
+尚未獨立驗收。只有開發者自測，未 push、未 merge。
+
+### 為什麼換、怎麼選
+
+滾動驗證的 SMA 量測（上一節的量測設定）拆開來看，6 窗選出的週期都是允許上限 32；582 筆成交的手續費 236.39 USDT，加上估計滑價約 94.56（由手續費反推名目再乘 2 bps），交易成本約 331，佔淨損 338.51 的 98%，扣掉成本的價格損益約 -3.86。問題主要是交易太頻繁，不是方向判斷。
+
+候選比較（外部資料由研究子代理查找，其中 4 個關鍵來源另行開啟核對；選定前沒有在這 90 天資料上試跑任何候選，避免看過結果再挑）：
+
+| 候選 | 類型 | 外部證據 | 交易頻率 | 實作成本 |
+| --- | --- | --- | --- | --- |
+| A. Donchian 通道突破 | 順勢（突破） | 最強：多組回看期的 Donchian 集成扣費後 Sharpe > 1.5（[Zarattini、Pagani、Barbon 2025](https://ideas.repec.org/p/chf/rpseri/rp2580.html)）、區間突破在 7 種規則中最好（[Gerritsen 等 2020](https://research-portal.uu.nl/en/publications/the-profitability-of-technical-trading-rules-in-the-bitcoin-marke/)）；反例是上萬條規則在 BTC 樣本外沒有預測力（[Hudson & Urquhart 2021](https://ideas.repec.org/a/spr/annopr/v297y2021i1d10.1007_s10479-019-03357-1.html)）。證據都在日線 | 低 | 只比大小，Decimal 精確；不改研究核心 |
+| B. 布林通道均值回歸 | 逆勢 | 弱：BTC 下一根 15m 的反轉毛利最多約 1.3 bp／筆，低於來回成本（[Kitron & Wengrowicz，預印本](https://arxiv.org/html/2608.21888v1)） | 中高 | 平方比較，不必開根號 |
+| C. 時間序列動能 | 順勢（報酬門檻） | 中：日～週動能有證據，盤中結論不一致 | 低～中 | 精確；和 SMA 同家族 |
+| D. 資金費率逆勢 | 逆勢 | 弱：對下一個 8 小時報酬的 R² 約 0.001～0.017 | 很低 | 要把資金費交給策略，改研究核心介面 |
+
+開源框架的範例也有這類策略：Jesse 的 [Donchian、TurtleRules](https://github.com/jesse-ai/example-strategies)，NautilusTrader v1.231.0 的 [bb_mean_reversion](https://raw.githubusercontent.com/nautechsystems/nautilus_trader/v1.231.0/nautilus_trader/examples/strategies/bb_mean_reversion.py)（檔頭寫明沒有優勢、只供測試）。2026-11-04 使用者選定 A。
+
+### 規則
+
+每根收盤決策、下一根開盤加滑價成交，固定張數，淨部位多空（`catos/research_donchian.py`）：
+
+- 進場通道是前 `entry_bars` 根（不含正在決策的這一根）的最高價與最低價；收盤高於最高價做多、低於最低價做空，反向部位直接反手。
+- 出場通道是前 `exit_bars` 根的最低價（多單）或最高價（空單）；收盤跌破就平多、突破就平空。
+- 其餘情況維持部位。`exit_bars` 必須小於 `entry_bars`，所以出場一定比反手先觸發；預熱至少 `entry_bars` 根。
+- 通道用單調佇列維護，每根 O(1)，只做 Decimal 比大小，沒有任何算術捨入。
+
+### 實作
+
+- 研究端改成固定白名單兩個策略（`catos/research_catalog.py` 的 `STRATEGIES`）：各自釘住 id、version、entry、sha256、來源檔、manifest 與參數範圍。回測、優化、滾動驗證都依 `strategy_id` 驗證參數並載入對應策略；不是通用插件框架。
+- Donchian 參數：`entry_bars` 2～960（10 個 15m 天）、`exit_bars` 1～959；搜尋範圍要讓每個格點都合法，所以 `exit_bars` 的最大值須小於 `entry_bars` 的最小值。預熱 ≥ 最高的 `entry_bars`，計算量仍受 250,000 根次預算限制。SMA 的範圍與錯誤訊息不變。
+- manifest 放在 `catos/research_only_artifacts/`。Worker 登錄表 `catos/strategy_registry.py` 只讀 `catos/research_artifacts/*.json`，所以 local-sim Bot 與 IPC（`WorkerConfig.from_wire`）解析不到 Donchian，測試有涵蓋。
+- 研究服務送出時依請求的策略計算來源綁定，完成時再核對一次；請求與綁定的策略不同時以 `strategy_source_mismatch` 拒絕。
+- 優化與滾動驗證的 HTML 報表改為通用的「參數」「選定參數」欄；優化報表不再寫死「合成資料樣本內搜尋」，改用資料集的聲明（原本的已知缺口）。
+
+### 實測（本機，研究服務，真實資料集）
+
+`tests.integration_http_fixture` 起在隔離的 18870、獨立輸出目錄，以 HTTP 送出（與前端相同路徑），結束後確認埠已釋放。帳戶 1 張、本金 10,000、手續費率 0.0005、滑價 2 bps；最後一列是前端預設值，從瀏覽器送出。
+
+| 請求 | 任務耗時（started → finished） | result.json | report.html |
+| --- | --- | --- | --- |
+| 回測 entry 192／exit 48、預熱 192 | 0.75 秒 | 686,169 bytes | 151,629 bytes |
+| 優化 entry 96~384/96 × exit 24~72/24（12 格點）、20 trials | 4.26 秒 | 13,254 bytes | 25,782 bytes |
+| 滾動驗證，同上 12 格點、預熱 384、train 2000／test 1000／6 窗（與 SMA 量測同計畫） | 4.85 秒 | 556,397 bytes | 10,377 bytes |
+| 計算量邊緣：entry 96~960/96 × exit 24~48/24（20 格點）、預熱 960、train 4000／test 1800／2 窗（203,920） | 5.25 秒 | 471,763 bytes | 7,159 bytes |
+| 前端預設：12 格點、2 張、本金 1,000、train 2064／test 1032／6 窗（184,752） | 5.17 秒 | 562,531 bytes | 10,365 bytes |
+
+和 SMA 同計畫的比較（Donchian 預熱 384 根、SMA 32 根，所以 OOS 視窗起點晚 352 根，約 3.7 天，期間不完全相同）：
+
+| | SMA period 8~32/8 | Donchian 12 格點 |
+| --- | --- | --- |
+| 各窗選出參數 | 6 窗都是 32（範圍上限） | 288/24 ×3、96/24、96/72、384/24 |
+| 成交筆數 | 582 | 55 |
+| 手續費 | 236.39 | 24.28 |
+| 估計滑價 | 94.56 | 9.71 |
+| 資金費（正為支出） | 3.70 | -0.33 |
+| 扣成本前的價格損益（估計） | -3.86 | -24.86 |
+| 淨損益（6 窗合計，各窗獨立） | -338.51 | -58.52 |
+| 正報酬視窗 | 1／6 | 2／6 |
+
+Donchian 各窗 OOS 報酬：-0.015%、+0.140%、-0.075%、-0.281%、-0.393%、+0.038%。前端預設（2 張、本金 1,000）在瀏覽器送出：-0.72%、+10.07%、-8.42%、-6.64%、-2.30%、-1.07%，6 窗 1 窗為正。
+
+結論：Donchian 把交易成本降到 SMA 的約十分之一（331 → 34 USDT），淨損從 338.51 降到 58.52；但扣掉成本前的價格損益仍是負的，各窗選出的參數也不穩定（4 種組合）。在這 90 天、15m、單一合約的設定下，Donchian 沒有顯示出值得上線的優勢。
+
+### 前端
+
+回測、優化、滾動驗證三個送出對話框都加了策略選擇（`components/catos/strategy-picker.tsx`），參數欄位依 catalog 的參數表產生，切換策略或資料集時套用預設值。Donchian 在合成資料上用短通道（回測 6／3；搜尋 4~8/2 × 2~3/1），在 OKX 資料上用 1～4 天的進場通道、6～18 小時的出場通道（回測 192／48；搜尋 96~384/96 × 24~72/24）。三個對話框都會在送出前列出問題並停用送出（例如出場通道沒有小於進場通道）。任務清單、結果摘要與表格改顯示 `name=value` 的參數組。共用邏輯在 `lib/research-strategies.ts`；`lib/validation-plan.ts` 改為多軸格點。
+
+### 未涵蓋
+
+- 只有 90 天、單一合約、單一週期；每個 OOS 視窗只有 6～16 筆成交，雜訊大。
+- 這 90 天已經被 SMA 用過，不是全新的保留資料。
+- 固定張數，沒有依波動調整部位，也沒有停損、保證金與強平模型。
+- SMA 的週期上限 32 根沒有放寬；若要確認 SMA 是否只輸在週期太短，需要另外放寬再量。
+- 外部證據多在日線以上，這裡是在 15m K 線上做 1～4 天的通道。

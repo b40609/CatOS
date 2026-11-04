@@ -41,10 +41,10 @@ export interface ResearchStrategyMeta {
   entry: string;
   approval_state: string;
   name: string;
-  parameters: {
-    period: { min: number; max: number };
-    quantity: { unit: string };
-  };
+  // Integer parameters carry min/max (constructor order); quantity carries its unit.
+  parameters: Record<string, { min?: number; max?: number; unit?: string }>;
+  // warmup_bars >= the named parameter and < below.
+  warmup: { covers: string; below: number };
 }
 
 export interface ResearchDatasetMeta {
@@ -73,14 +73,19 @@ export interface ResearchDatasetMeta {
 export interface BacktestRequest {
   strategy_id: string;
   dataset_id: string;
-  parameters: {
-    period: number;
-    quantity: string; // Decimal string e.g. "2"
-  };
+  // The strategy's integer parameters (SMA: period; Donchian: entry_bars, exit_bars)
+  // plus quantity as a Decimal string e.g. "2".
+  parameters: { quantity: string; [name: string]: number | string };
   initial_balance: string; // Decimal string e.g. "1000"
   fee_rate: string; // Decimal string e.g. "0.0005"
   slippage_bps: string; // Decimal string e.g. "2"
-  warmup_bars: number; // integer >= period and < 64
+  warmup_bars: number; // integer >= the strategy's warmup.covers parameter and < warmup.below
+}
+
+export interface SearchRange {
+  low: number;
+  high: number;
+  step: number;
 }
 
 export interface ResearchCatalog {
@@ -121,9 +126,7 @@ export interface ResearchCatalog {
 
 export interface OptimizationRequest {
   backtest: BacktestRequest;
-  search_space: {
-    period: { low: number; high: number; step: number };
-  };
+  search_space: Record<string, SearchRange>; // one range per integer parameter
   n_trials: number;
   seed: number;
 }
@@ -209,9 +212,7 @@ export interface BacktestResultPayload {
 export interface OptimizationTrial {
   number: number;
   state: string;
-  params: {
-    period: number;
-  };
+  params: Record<string, number>;
   score_decimal: string; // Exact Decimal string
   performance: BacktestPerformance | null;
   error: string | null;
@@ -238,10 +239,8 @@ export interface OptimizationResultPayload {
 
 export interface ValidationRequest {
   backtest: BacktestRequest;
-  search_space: {
-    period: { low: number; high: number; step: number };
-  };
-  plan: { train_bars: number; test_bars: number; windows: number };
+  search_space: Record<string, SearchRange>; // one range per integer parameter
+  plan:{ train_bars: number; test_bars: number; windows: number };
   regime_rule: {
     lookback_bars: number;
     trend_efficiency: string; // Decimal string in (0, 1]
@@ -510,7 +509,7 @@ export const researchApi = {
    * Submit a new optimization search request
    * Strict invariants:
    * - Must supply X-CatOS-Build
-   * - Search space constrained by catalog (SMA period low/high/step)
+   * - Search space constrained by catalog (one low/high/step range per strategy parameter)
    * - Never creates fake run_id or auto-retries on failure
    */
   async submitOptimization(

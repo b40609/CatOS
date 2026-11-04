@@ -15,10 +15,9 @@ from catos.optimization import IntRange
 from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
     MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_LOOKBACK_BARS,
-    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, STRATEGY_FILES, STRATEGY_MANIFEST,
-    decimal_string,
-    drawdown_pcts, json_text, load_dataset_bars, load_registered_strategy, provenance,
-    resolve_dataset, sample_curve_indices, validate_request,
+    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, decimal_string,
+    drawdown_pcts, json_text, load_dataset_bars, provenance, registered_factory,
+    require_search_names, resolve_dataset, sample_curve_indices, strategy_spec, validate_request,
 )
 from catos.research_datasets import SOURCE as FETCHED_SOURCE, rel_path
 from catos.research_regimes import REGIMES, RegimeRule, regime_walk_forward, regimes_json
@@ -43,24 +42,30 @@ def validate_validation_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_VALIDATION):
         raise ValueError("validation: exact registered fields required")
     backtest, config, _, quantity = validate_request(value["backtest"])
+    spec = strategy_spec(backtest["strategy_id"])
     space = value["search_space"]
-    if type(space) is not dict or set(space) != {"period"}:
-        raise ValueError("search_space: only registered period range is supported")
-    period = space["period"]
-    if type(period) is not dict or set(period) != {"low", "high", "step"}:
-        raise ValueError("period: low, high and step required")
-    low = _integer(period["low"], "low", 2, 32)
-    high = _integer(period["high"], "high", 2, 32)
-    step = _integer(period["step"], "step", 1, 30)
-    if high <= low or (high - low) % step:
-        raise ValueError("period: at least two aligned candidates required")
-    count = (high - low) // step + 1
+    require_search_names(spec, space)
+    # A single-parameter grid keeps the original bare low/high/step field names.
+    single = len(spec.parameters) == 1
+    axes, count = {}, 1
+    for name, low_bound, high_bound in spec.parameters:
+        label = "" if single else f"{name}."
+        low = _integer(space[name]["low"], f"{label}low", low_bound, high_bound)
+        high = _integer(space[name]["high"], f"{label}high", low_bound, high_bound)
+        step = _integer(space[name]["step"], f"{label}step", 1, high_bound - low_bound)
+        if (high <= low if single else high < low) or (high - low) % step:
+            raise ValueError(f"{name}: at least two aligned candidates required" if single
+                             else f"{name}: aligned range required")
+        axes[name] = IntRange(low, high, step)
+        count *= (high - low) // step + 1
+    if count < 2:
+        raise ValueError("search_space: at least two candidates required")
     candidates = _integer(value["max_candidates"], "max_candidates", 2, MAX_VALIDATION_CANDIDATES)
     runs = _integer(value["max_runs"], "max_runs", 1, MAX_VALIDATION_RUNS)
     if count > candidates:
         raise ValueError("grid exceeds max_candidates before execution")
-    if backtest["warmup_bars"] < high:
-        raise ValueError("warmup_bars: must cover highest searched period")
+    check_search_grid(spec, {name: (axis.low, axis.high) for name, axis in axes.items()},
+                      backtest["warmup_bars"])
     plan = value["plan"]
     if type(plan) is not dict or set(plan) != {"train_bars", "test_bars", "windows"}:
         raise ValueError("plan: train_bars, test_bars and windows required")
@@ -87,7 +92,7 @@ def validate_validation_request(value):
         raise ValueError("insufficient candles for the explicit walk-forward plan")
     snapshot = json.loads(json_text(value))
     snapshot["backtest"] = backtest
-    return (snapshot, config, quantity, bars, IntRange(low, high, step),
+    return (snapshot, config, quantity, bars, axes,
             WalkForwardPlan(train, test, windows, backtest["warmup_bars"]),
             RegimeRule(lookback, efficiency, volatility))
 
@@ -98,10 +103,11 @@ def _reproduction(expected_source):
     # Fetched market data stays in git-ignored data/okx and is pinned by its
     # manifest hashes, so it is referenced by sha256 instead of embedded.
     dataset = resolve_dataset(expected_source["dataset"]["id"])
+    spec = strategy_spec(expected_source["strategy"]["id"])
+    manifest = spec.manifest.relative_to(ROOT).as_posix()
     data_files = tuple(path for path, _ in dataset.files)
     referenced = data_files if dataset.source == FETCHED_SOURCE else ()
-    names = tuple(dict.fromkeys((*ENGINE_FILES, *STRATEGY_FILES,
-                                 STRATEGY_MANIFEST.relative_to(ROOT).as_posix(),
+    names = tuple(dict.fromkeys((*ENGINE_FILES, *spec.files, manifest,
                                  *(path for path in data_files if path not in referenced))))
     files = []
     for name in names:
@@ -112,14 +118,13 @@ def _reproduction(expected_source):
                   for name in referenced]
     hashes = {item["path"]: item["sha256"] for item in (*files, *references)}
     for names, expected in ((ENGINE_FILES, expected_source["engine_sha256"]),
-                            (STRATEGY_FILES, expected_source["strategy"]["sha256"])):
+                            (spec.files, expected_source["strategy"]["sha256"])):
         actual = sha256(json_text([(name, hashes[name]) for name in names]).encode("utf-8")).hexdigest()
         if actual != expected:
             raise ValueError("source_changed_during_archive")
     if (any(hashes[path] != sha for path, sha in dataset.files)
             or hashes[rel_path(dataset.candles_path)] != expected_source["dataset"]["sha256"]
-            or hashes[STRATEGY_MANIFEST.relative_to(ROOT).as_posix()]
-            != expected_source["strategy"]["artifact_manifest"]["sha256"]):
+            or hashes[manifest] != expected_source["strategy"]["artifact_manifest"]["sha256"]):
         raise ValueError("source_changed_during_archive")
     notice = "研究來源快照；不是可自動執行的套件、環境鎖檔或 OS 安全沙箱。"
     if references:
@@ -200,7 +205,7 @@ def _report(payload):
             window["number"], window["status"],
             f"{_utc(window['train_start_ms'])} ~ {_utc(window['train_end_ms'])}",
             f"{_utc(window['test_start_ms'])} ~ {_utc(window['test_end_ms'])}",
-            dict(chosen["params"]).get("period", "—") if chosen else "—",
+            ", ".join(f"{name}={value}" for name, value in chosen["params"]) if chosen else "—",
             chosen["score"] if chosen else "—",
             *((performance[key] for key in ("return_pct", "net_pnl", "max_drawdown_pct", "fees",
                                             "funding_paid", "trade_count"))
@@ -214,7 +219,7 @@ def _report(payload):
     backtest = request["backtest"]
     settings = (
         ("資料集", backtest["dataset_id"]), ("策略", backtest["strategy_id"]),
-        ("候選週期", json_text(request["search_space"]["period"])),
+        ("搜尋範圍", json_text(request["search_space"])),
         ("計畫", json_text(request["plan"])), ("分類規則", json_text(request["regime_rule"])),
         ("本金／手續費率／滑價 bps",
          f"{backtest['initial_balance']} / {backtest['fee_rate']} / {backtest['slippage_bps']}"),
@@ -225,7 +230,7 @@ def _report(payload):
             + escape(payload["data_notice"]) + "</p>"
             + _table(("項目", "設定"), settings)
             + "<h2>各視窗（時間為 UTC；績效為各窗獨立的 OOS 回測）</h2>"
-            + _table(("視窗", "狀態", "訓練區間", "OOS 區間", "選定週期", "訓練評分 return_pct",
+            + _table(("視窗", "狀態", "訓練區間", "OOS 區間", "選定參數", "訓練評分 return_pct",
                       "OOS return_pct", "OOS 淨損益", "OOS 最大回撤 %", "手續費", "資金費",
                       "成交筆數", "錯誤"), rows)
             + "<h2>分環境歸屬（只列有樣本的環境）</h2>"
@@ -236,17 +241,17 @@ def _report(payload):
 
 def execute_validation(request, expected_source):
     snapshot, config, quantity, bars, space, plan, rule = validate_validation_request(request)
-    RegisteredSMA = load_registered_strategy(expected_source)
+    strategy_id = snapshot["backtest"]["strategy_id"]
+    build = registered_factory(expected_source, strategy_id, quantity)
     reproduction = _reproduction(expected_source)
     result = regime_walk_forward(
-        strategy_factory=lambda params: RegisteredSMA(params["period"], quantity),
-        search_space={"period": space}, candles=bars, config=config, rule=rule,
+        strategy_factory=build, search_space=space, candles=bars, config=config, rule=rule,
         score=lambda performance: performance.return_pct, score_name="return_pct",
         plan=plan, max_candidates=snapshot["max_candidates"], max_runs=snapshot["max_runs"],
         direction="maximize",
     )
     dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
-    if provenance(dataset.dataset_id) != expected_source:
+    if provenance(dataset.dataset_id, strategy_id) != expected_source:
         raise ValueError("source_changed_during_run")
     payload = {
         "schema": SCHEMA, "kind": "validation", "request": snapshot,

@@ -24,7 +24,11 @@ import type {
 } from "@/adapters/research-api-adapter";
 import { useResearchRuns } from "@/hooks/use-research-runs";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
+import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { compareDecimal, formatDecimal, formatDrawdownPct, signOf, toPlotNumber, toneOf } from "@/lib/format";
+import {
+  type Axis, formatRanges, formatTrialParams, paramLabel, paramSpecs, pickStrategy, shortName,
+} from "@/lib/research-strategies";
 import {
   VALIDATION_BACKTEST,
   barEvaluations,
@@ -88,9 +92,8 @@ function selectedTrial(window: ValidationWindow) {
   return number === null ? null : window.training.trials[number] ?? null;
 }
 
-function periodOf(params: [string, number | string][] | undefined): string {
-  const entry = params?.find(([name]) => name === "period");
-  return entry ? String(entry[1]) : NA;
+function paramsOf(params: [string, number | string][] | undefined): string {
+  return formatTrialParams(params) || NA;
 }
 
 const pct = (value: string | null | undefined) => formatDecimal(value, { digits: 2, sign: true, suffix: "%" }, NA);
@@ -107,10 +110,9 @@ function statusTone(status: string) {
 
 function runSummary(run: ResearchRunStatus) {
   const request = run.request as ValidationRequest | undefined;
-  const period = request?.search_space?.period;
   const plan = request?.plan;
-  if (!period || !plan) return NA;
-  return `SMA ${period.low}~${period.high}/${period.step} · ${plan.windows} 窗 · 訓練 ${plan.train_bars} / 測試 ${plan.test_bars} 根`;
+  if (!request?.search_space || !plan) return NA;
+  return `${shortName(request.backtest?.strategy_id)} ${formatRanges(request.search_space)} · ${plan.windows} 窗 · 訓練 ${plan.train_bars} / 測試 ${plan.test_bars} 根`;
 }
 
 function OosEquityChart({ window, initialBalance }: { window: ValidationWindow; initialBalance: string }) {
@@ -201,7 +203,7 @@ function WindowDetail({ result, window }: { result: ValidationResultPayload; win
             <table className="w-full text-left border-collapse text-xs">
               <thead className="border-b border-border text-t2 font-mono text-muted-foreground bg-background/30">
                 <tr>
-                  <th className="py-1.5 px-2 font-normal">週期</th>
+                  <th className="py-1.5 px-2 font-normal">參數</th>
                   <th className="py-1.5 px-2 text-right font-normal">訓練評分</th>
                   <th className="py-1.5 px-2 text-right font-normal">鄰域最差</th>
                   <th className="py-1.5 px-2 text-right font-normal">鄰域平均</th>
@@ -216,7 +218,7 @@ function WindowDetail({ result, window }: { result: ValidationResultPayload; win
                     <tr key={trial.number} className={cn(chosen && "bg-primary/10")}>
                       <td className="py-1.5 px-2">
                         <span className={cn("font-semibold", chosen ? "text-primary" : "text-foreground")}>
-                          {periodOf(trial.params)}
+                          {paramsOf(trial.params)}
                         </span>
                         {chosen && <span className="ml-1 bg-primary text-primary-foreground text-t1 px-1 rounded">選定</span>}
                         {trial.error && <span className="ml-1 text-t1 text-down" title={trial.error}>錯誤</span>}
@@ -296,34 +298,48 @@ function ValidationPage() {
 
   const [openDialog, setOpenDialog] = useState(false);
   const [datasetId, setDatasetId] = useState<string | null>(null);
+  const [strategyId, setStrategyId] = useState<string | null>(null);
   const [form, setForm] = useState<ValidationForm | null>(null);
   const [windowNumber, setWindowNumber] = useState(0);
   const dataset = pickDataset(catalog?.datasets, datasetId);
+  const strategy = pickStrategy(catalog?.strategies, strategyId);
   const limits = catalog?.validation;
 
   useEffect(() => { setWindowNumber(0); }, [realResult?.run_id]);
 
-  const resetForm = (id: string | null) => {
+  const resetForm = (id: string | null, sid: string | null) => {
     const target = pickDataset(catalog?.datasets, id);
-    if (target && limits) setForm(defaultValidationForm(target, limits.example_request));
+    const meta = pickStrategy(catalog?.strategies, sid);
+    if (target && meta && limits) setForm(defaultValidationForm(target, limits.example_request, meta));
   };
   const openSubmit = () => {
-    if (!form || form.datasetId !== dataset?.id) resetForm(dataset?.id ?? null);
+    if (!form || form.datasetId !== dataset?.id || form.strategyId !== strategy?.id) {
+      resetForm(dataset?.id ?? null, strategy?.id ?? null);
+    }
     setOpenDialog(true);
   };
   const changeDataset = (id: string) => {
     setDatasetId(id);
-    resetForm(id);
+    resetForm(id, strategy?.id ?? null);
+  };
+  const changeStrategy = (sid: string) => {
+    setStrategyId(sid);
+    resetForm(dataset?.id ?? null, sid);
   };
   const setField = <K extends keyof ValidationForm>(key: K, value: ValidationForm[K]) =>
     setForm((current) => current && { ...current, [key]: value });
   const intField = (key: IntegerField) => (event: ChangeEvent<HTMLInputElement>) =>
     setField(key, parseInt(event.target.value, 10) || 0);
+  const axisField = (name: string, key: keyof Axis) => (event: ChangeEvent<HTMLInputElement>) =>
+    setForm((current) => current && {
+      ...current, axes: { ...current.axes, [name]: { ...current.axes[name], [key]: parseInt(event.target.value, 10) || 0 } },
+    });
 
-  const problems = form ? validationProblems(form, dataset, limits) : [];
+  const problems = form && strategy ? validationProblems(form, dataset, limits, strategy) : [];
+  const count = form && strategy ? candidateCount(form, strategy) : null;
   const handleSubmit = async () => {
-    if (!form || problems.length) return;
-    if (await submit(buildValidationRequest(form))) setOpenDialog(false);
+    if (!form || !strategy || problems.length) return;
+    if (await submit(buildValidationRequest(form, strategy))) setOpenDialog(false);
   };
 
   const windows = realResult?.result.validation.windows ?? [];
@@ -333,9 +349,9 @@ function ValidationPage() {
   const positiveCount = oosReturns.filter((value) => signOf(value) === "positive").length;
   const best = oosReturns.reduce<string | null>((acc, v) => (acc === null || compareDecimal(v, acc) === 1 ? v : acc), null);
   const worst = oosReturns.reduce<string | null>((acc, v) => (acc === null || compareDecimal(v, acc) === -1 ? v : acc), null);
-  const periods = windows.reduce<Record<string, number>>((acc, w) => {
+  const chosenParams = windows.reduce<Record<string, number>>((acc, w) => {
     const trial = selectedTrial(w);
-    if (trial) acc[periodOf(trial.params)] = (acc[periodOf(trial.params)] ?? 0) + 1;
+    if (trial) acc[paramsOf(trial.params)] = (acc[paramsOf(trial.params)] ?? 0) + 1;
     return acc;
   }, {});
   const resultDataset = catalog?.datasets.find((d) => d.id === realResult?.request.backtest.dataset_id);
@@ -484,14 +500,15 @@ function ValidationPage() {
                     </span>
                   </div>
                   <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
-                    <span className="text-t2 text-muted-foreground block">選定週期（各窗）</span>
-                    <span className="text-base font-bold text-primary mt-0.5 block truncate">
-                      {Object.keys(periods).length
-                        ? Object.entries(periods).map(([period, count]) => `${period}×${count}`).join(" · ")
+                    <span className="text-t2 text-muted-foreground block">選定參數（各窗）</span>
+                    <span className="text-base font-bold text-primary mt-0.5 block truncate"
+                          title={Object.entries(chosenParams).map(([params, n]) => `${params} ×${n}`).join("\n")}>
+                      {Object.keys(chosenParams).length
+                        ? Object.entries(chosenParams).map(([params, n]) => `${params}×${n}`).join(" · ")
                         : NA}
                     </span>
-                    <span className="text-t1 text-muted-foreground">
-                      候選 SMA {realResult.request.search_space.period.low}~{realResult.request.search_space.period.high}／步進 {realResult.request.search_space.period.step}
+                    <span className="text-t1 text-muted-foreground block truncate">
+                      {shortName(realResult.request.backtest.strategy_id)} · {formatRanges(realResult.request.search_space)}
                     </span>
                   </div>
                   <div className="rounded-lg border border-border/80 bg-surface/90 p-3 shadow-xs">
@@ -532,7 +549,7 @@ function ValidationPage() {
                           <th className="py-2 px-2 font-normal">視窗</th>
                           <th className="py-2 px-2 font-normal">狀態</th>
                           <th className="py-2 px-2 font-normal">樣本外區間 (UTC)</th>
-                          <th className="py-2 px-2 text-right font-normal">選定週期</th>
+                          <th className="py-2 px-2 text-right font-normal">選定參數</th>
                           <th className="py-2 px-2 text-right font-normal">訓練評分</th>
                           <th className="py-2 px-2 text-right font-normal">OOS 報酬</th>
                           <th className="py-2 px-2 text-right font-normal">淨損益 (USDT)</th>
@@ -560,7 +577,7 @@ function ValidationPage() {
                                 </span>
                               </td>
                               <td className="py-2 px-2 text-muted-foreground whitespace-nowrap">{formatUtcRange(w.test_start_ms, w.test_end_ms)}</td>
-                              <td className="py-2 px-2 text-right font-semibold text-primary">{trial ? periodOf(trial.params) : NA}</td>
+                              <td className="py-2 px-2 text-right font-semibold text-primary">{trial ? paramsOf(trial.params) : NA}</td>
                               <td className="py-2 px-2 text-right text-muted-foreground" title={trial?.score ?? undefined}>{pct(trial?.score)}</td>
                               <td className={cn("py-2 px-2 text-right", toneOf(perf?.return_pct))} title={perf?.return_pct}>{pct(perf?.return_pct)}</td>
                               <td className="py-2 px-2 text-right text-foreground" title={perf?.net_pnl}>{usdt(perf?.net_pnl)}</td>
@@ -606,12 +623,13 @@ function ValidationPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {form && (
+          {form && strategy && (
             <div className="space-y-3 py-1 text-xs font-mono max-h-[65vh] overflow-y-auto pr-1">
-              <div className="rounded border border-primary/25 bg-primary/5 p-2.5 space-y-1 text-t3">
-                <span className="text-primary font-semibold">固定登錄模型</span>
+              <div className="space-y-1">
+                <Label className="text-t2 text-muted-foreground">策略</Label>
+                <StrategyPicker strategies={catalog?.strategies ?? []} value={strategy.id} onChange={changeStrategy} />
                 <p className="text-muted-foreground text-t2">
-                  策略: RegisteredSMA (sma-trend) · {VALIDATION_BACKTEST.quantity} 張 · 本金 {VALIDATION_BACKTEST.initial_balance} USDT · 手續費率 {VALIDATION_BACKTEST.fee_rate} · 滑價 {VALIDATION_BACKTEST.slippage_bps} bps
+                  固定帳戶：{VALIDATION_BACKTEST.quantity} 張 · 本金 {VALIDATION_BACKTEST.initial_balance} USDT · 手續費率 {VALIDATION_BACKTEST.fee_rate} · 滑價 {VALIDATION_BACKTEST.slippage_bps} bps
                 </p>
               </div>
 
@@ -622,23 +640,31 @@ function ValidationPage() {
 
               <div className="space-y-1">
                 <Label className="text-t2 text-muted-foreground">
-                  候選 SMA 週期（完整格點，{candidateCount(form) === null ? "候選未對齊" : `${candidateCount(form)} 個候選`}）
+                  候選參數（完整格點，{count === null ? "候選未對齊" : `${count} 個候選`}）
                 </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input type="number" min={2} max={32} aria-label="Period 最小值" value={form.periodLow}
-                         onChange={intField("periodLow")} className="h-8 font-mono text-xs bg-background" />
-                  <Input type="number" min={2} max={32} aria-label="Period 最大值" value={form.periodHigh}
-                         onChange={intField("periodHigh")} className="h-8 font-mono text-xs bg-background" />
-                  <Input type="number" min={1} max={30} aria-label="搜尋步進" value={form.periodStep}
-                         onChange={intField("periodStep")} className="h-8 font-mono text-xs bg-background" />
-                </div>
-                <p className="text-t2 text-muted-foreground">最小值 · 最大值 · 步進；預熱 {warmupBars(form)} 根（涵蓋最大週期）</p>
+                {paramSpecs(strategy).map((spec) => (
+                  <div key={spec.name} className="grid grid-cols-[5.5rem_1fr_1fr_1fr] items-center gap-2">
+                    <span className="text-t2 text-muted-foreground truncate" title={spec.name}>{paramLabel(spec.name)}</span>
+                    <Input type="number" min={spec.min} max={spec.max} aria-label={`${paramLabel(spec.name)}最小值`}
+                           value={form.axes[spec.name]?.low ?? 0} onChange={axisField(spec.name, "low")}
+                           className="h-8 font-mono text-xs bg-background" />
+                    <Input type="number" min={spec.min} max={spec.max} aria-label={`${paramLabel(spec.name)}最大值`}
+                           value={form.axes[spec.name]?.high ?? 0} onChange={axisField(spec.name, "high")}
+                           className="h-8 font-mono text-xs bg-background" />
+                    <Input type="number" min={1} max={spec.max - spec.min} aria-label={`${paramLabel(spec.name)}步進`}
+                           value={form.axes[spec.name]?.step ?? 0} onChange={axisField(spec.name, "step")}
+                           className="h-8 font-mono text-xs bg-background" />
+                  </div>
+                ))}
+                <p className="text-t2 text-muted-foreground">
+                  最小值 · 最大值 · 步進；預熱 {warmupBars(form, strategy)} 根（涵蓋最大{paramLabel(strategy.warmup.covers)}）
+                </p>
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <Label className="text-t2 text-muted-foreground">滾動計畫（K 線根數）</Label>
-                  <button type="button" onClick={() => resetForm(dataset?.id ?? null)}
+                  <button type="button" onClick={() => resetForm(dataset?.id ?? null, strategy.id)}
                           className="text-t2 text-primary hover:underline cursor-pointer">
                     依資料長度重設
                   </button>
@@ -652,10 +678,10 @@ function ValidationPage() {
                          onChange={intField("windows")} className="h-8 font-mono text-xs bg-background" />
                 </div>
                 <p className="text-t2 text-muted-foreground">
-                  訓練 · 測試 · 視窗數；使用 {barsUsed(form).toLocaleString()} / {dataset?.bars.toLocaleString() ?? NA} 根 ·{" "}
-                  {candidateCount(form) === null
-                    ? "候選週期未對齊，無法估算回測次數與計算量"
-                    : `需 ${requiredRuns(form)} 次回測 · 計算量 ${barEvaluations(form)?.toLocaleString()} / ${limits?.max_bar_evaluations.toLocaleString() ?? NA}`}
+                  訓練 · 測試 · 視窗數；使用 {barsUsed(form, strategy).toLocaleString()} / {dataset?.bars.toLocaleString() ?? NA} 根 ·{" "}
+                  {count === null
+                    ? "候選參數未對齊，無法估算回測次數與計算量"
+                    : `需 ${requiredRuns(form, strategy)} 次回測 · 計算量 ${barEvaluations(form, strategy)?.toLocaleString()} / ${limits?.max_bar_evaluations.toLocaleString() ?? NA}`}
                 </p>
               </div>
 

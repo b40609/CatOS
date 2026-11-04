@@ -1,0 +1,17 @@
+{
+  "schema": "catos.research.strategy-artifact",
+  "schema_version": 1,
+  "artifact_id": "donchian-breakout",
+  "version": "donchian-parameters-v1",
+  "sha256": "1596e3ace639379086f6fd5ff2ba73948697c2b34884366c3b32b15ba9ba6817",
+  "entry": "catos.research_donchian:RegisteredDonchian",
+  "source_files": [
+    "catos/research_donchian.py"
+  ],
+  "approval_state": "approved",
+  "provenance": {
+    "origin": "catos-research-donchian",
+    "approval_basis": "user-selected-inspected-local-artifact",
+    "scope": "research-only"
+  }
+}
