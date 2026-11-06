@@ -43,8 +43,8 @@ class FakeTime:
 class FakeOKX:
     """Serves history candles/funding newest first, strictly older than `after`."""
 
-    def __init__(self, time, *, days_of_data=5, drop=(), unclosed=(), funding_from=None, script=None,
-                 instrument=INSTRUMENT, break_cursor=False):
+    def __init__(self, time, *, days_of_data=5, drop=(), unclosed=(), funding_from=None, funding_until=END,
+                 script=None, instrument=INSTRUMENT, break_cursor=False):
         self.time = time
         self.calls = []
         self.script = list(script or [])
@@ -58,7 +58,7 @@ class FakeOKX:
         start_funding = first if funding_from is None else funding_from
         self.funding = [{"instId": "BTC-USDT-SWAP", "instType": "SWAP", "fundingTime": str(ms),
                          "fundingRate": "0.00012", "realizedRate": "0.0001", "method": "current_period"}
-                        for ms in range(start_funding, END, EIGHT_H)]
+                        for ms in range(start_funding, funding_until, EIGHT_H)]
 
     def __call__(self, url):
         parts = urlsplit(url)
@@ -114,14 +114,33 @@ class FetchToolTest(unittest.TestCase):
                                          / datasets.MANIFEST, self.root)
         self.assertEqual((dataset.start_ms, dataset.end_ms), (END - 3 * DAY, END))
 
-    def test_gap_or_short_funding_history_stops_without_writing(self):
+    def test_gap_or_funding_that_stops_early_stops_without_writing(self):
         code, _, err, _ = self.run_tool(FakeOKX(self.time, drop={END - 10 * TF}))
         self.assertEqual(code, 1)
         self.assertIn("dataset_has_gaps", err)
-        code, _, err, _ = self.run_tool(FakeOKX(self.time, funding_from=END - 3 * DAY + EIGHT_H))
+        code, _, err, _ = self.run_tool(FakeOKX(self.time, funding_until=END - EIGHT_H))
         self.assertEqual(code, 1)
-        self.assertIn("funding_incomplete", err)
+        self.assertIn("funding_stops_before_end", err)
         self.assertEqual(self.written(), [])
+
+    def test_short_funding_history_is_written_as_partial_and_disclosed(self):
+        # OKX keeps about three months of funding: the run starts late, never ends early.
+        code, out, err, _ = self.run_tool(FakeOKX(self.time, funding_from=END - DAY))
+        self.assertEqual(code, 0, err)
+        summary = json.loads(out)
+        target = self.root / "BTC-USDT-SWAP" / "15m" / summary["dataset_id"]
+        manifest = json.loads((target / datasets.MANIFEST).read_text(encoding="utf-8"))
+        self.assertEqual((manifest["funding"]["complete"], manifest["funding"]["events"]), (False, 3))
+        dataset = datasets.load_manifest(target / datasets.MANIFEST, self.root)
+        self.assertEqual(dataset.funding_summary(), {"source": "dataset", "complete": False,
+                                                     "from_ms": END - DAY, "interval_ms": EIGHT_H})
+        self.assertIn("資金費自", dataset.name)
+        self.assertIn("之前的期間未計資金費", dataset.notice)
+
+    def test_days_cap_follows_the_authorization(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            fetch.main(["--days", str(fetch.MAX_DAYS + 1)], client=object(), now_ms=END, root=self.root)
+        self.assertEqual(fetch.MAX_DAYS, 1_830)
 
     def test_unexpected_responses_stop_the_run(self):
         code, _, err, _ = self.run_tool(FakeOKX(self.time, unclosed={END - 5 * TF}))

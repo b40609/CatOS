@@ -82,13 +82,13 @@ class WriteAndVerifyTest(DatasetFixture):
         self.assertTrue((target / datasets.CANDLES).read_bytes().startswith(
             b"open_time_ms,open,high,low,close,closed\n"))
 
-    def test_writer_refuses_gaps_incomplete_funding_and_overwrite(self):
+    def test_writer_refuses_gaps_funding_that_stops_early_and_overwrite(self):
         bars = make_bars(192)
         with self.assertRaisesRegex(ValueError, "dataset_has_gaps"):
             write_fixture(self.root, candles=bars[:50] + bars[51:])
         end = START + 192 * TF
-        with self.assertRaisesRegex(ValueError, "funding_incomplete"):
-            write_fixture(self.root, funding=make_funding(START + EIGHT_H, end))
+        with self.assertRaisesRegex(ValueError, "funding_stops_before_end"):
+            write_fixture(self.root, funding=make_funding(START, end - EIGHT_H))
         with self.assertRaisesRegex(ValueError, "funding_interval_irregular"):
             funding = make_funding(START, end)
             write_fixture(self.root, funding=funding[:2] + funding[3:])

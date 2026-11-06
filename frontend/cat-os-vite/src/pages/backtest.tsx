@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-chart";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
+import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
 import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
 import {
   DONCHIAN_ID, donchianParams, formatParams, paramLabel, paramProblems, paramSpecs, pickStrategy, shortName,
@@ -580,6 +581,14 @@ function BacktestPage() {
           loading={resultLoading}
         />
 
+        {result && !resultLoading && (
+          <CostBreakdownPanel
+            view={result.costs ? costViewFromBreakdown(result.costs) : null}
+            meta="價格損益 = 淨損益 + 手續費 + 滑價 + 資金費"
+            testId="backtest-cost-breakdown"
+          />
+        )}
+
         {/* ==================== 主體分割：左欄回測歷史與約束，右欄模擬成交流 ==================== */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           {/* 左欄：回測任務列表 (5 欄) */}
@@ -674,7 +683,10 @@ function BacktestPage() {
                   <span className="text-muted-foreground">資金費與平倉</span>
                   <span className="font-mono text-foreground font-medium">
                     {activeRequest && activeRequest.dataset_id !== "synthetic-btc-15m-v1"
-                      ? `資料集實際費率${perf ? `（本次 ${formatDecimal(perf.funding_paid, { digits: 4, suffix: " USDT" })}）` : ""} · 期末估值平倉`
+                      ? `資料集實際費率${perf ? `（本次 ${formatDecimal(perf.funding_paid, { digits: 4, suffix: " USDT" })}）` : ""}${
+                          result?.funding_coverage && !result.funding_coverage.complete && result.funding_coverage.from_ms
+                            ? ` · 僅涵蓋 ${formatUtcTime(result.funding_coverage.from_ms)} 之後`
+                            : ""} · 期末估值平倉`
                       : "明示零資金費 · 期末估值平倉"}
                   </span>
                 </div>

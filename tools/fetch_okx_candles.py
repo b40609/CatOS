@@ -7,7 +7,9 @@ backoff on HTTP 429/5xx, OKX code 50011 and network errors, and capped by
 --max-requests (hard cap 150). Pages are checked against the cursor semantics this tool relies
 on (``after`` returns strictly older records, newest first); any surprise stops
 the run instead of guessing. Files are written last, by
-``catos.research_datasets.write_dataset``, which refuses gaps and incomplete funding.
+``catos.research_datasets.write_dataset``, which refuses gaps and funding that stops
+before the end; funding that starts late (OKX keeps about three months) is recorded
+as incomplete and disclosed per run.
 
 Usage (repo root):
     .venv/Scripts/python.exe -B tools/fetch_okx_candles.py --inst-id BTC-USDT-SWAP --bar 15m --days 90
@@ -33,6 +35,9 @@ PAGE_LIMIT = 100
 MAX_RETRIES = 3
 # Hard cap from the 2026-11-04 collection authorization (AGENTS.md); raising it needs a new one.
 MAX_REQUESTS_CAP = 150
+# Five years plus leap days, from the 2026-11-06 authorization (BTC-USDT-SWAP 4H). The
+# request cap still bounds every run, so a long range at a short bar stops early.
+MAX_DAYS = 1_830
 DAY_MS = 86_400_000
 USER_AGENT = "catOS-research/1.0"
 
@@ -191,8 +196,8 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     parser.add_argument("--end-ms", type=int, help="exclusive end (bar-aligned) to re-fetch a known range")
     parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS_CAP)
     args = parser.parse_args(argv)
-    if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= 365:
-        parser.error("inst-id must be <BASE>-USDT-SWAP and days in [1, 365]")
+    if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= MAX_DAYS:
+        parser.error(f"inst-id must be <BASE>-USDT-SWAP and days in [1, {MAX_DAYS}]")
     if not 1 <= args.max_requests <= MAX_REQUESTS_CAP:
         parser.error(f"max-requests must be in [1, {MAX_REQUESTS_CAP}] (authorized cap)")
     timeframe = datasets.BAR_MS[args.bar]

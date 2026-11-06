@@ -25,6 +25,7 @@ import type {
 import { useResearchRuns } from "@/hooks/use-research-runs";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
+import { CostBreakdownPanel, costViewFromTotal } from "@/components/catos/cost-breakdown-panel";
 import { compareDecimal, formatDecimal, formatDrawdownPct, signOf, toPlotNumber, toneOf } from "@/lib/format";
 import {
   type Axis, formatRanges, formatTrialParams, paramLabel, paramSpecs, pickStrategy, shortName,
@@ -552,7 +553,9 @@ function ValidationPage() {
                           <th className="py-2 px-2 text-right font-normal">選定參數</th>
                           <th className="py-2 px-2 text-right font-normal">訓練評分</th>
                           <th className="py-2 px-2 text-right font-normal">OOS 報酬</th>
+                          <th className="py-2 px-2 text-right font-normal" title="成本前，以成交 K 線開盤價計">價格損益</th>
                           <th className="py-2 px-2 text-right font-normal">淨損益 (USDT)</th>
+                          <th className="py-2 px-2 text-right font-normal" title="同期間、同張數做多不動；成本前">買進持有</th>
                           <th className="py-2 px-2 text-right font-normal">最大回撤</th>
                           <th className="py-2 px-2 text-right font-normal">手續費</th>
                           <th className="py-2 px-2 text-right font-normal">資金費</th>
@@ -563,6 +566,7 @@ function ValidationPage() {
                         {windows.map((w) => {
                           const trial = selectedTrial(w);
                           const perf = w.out_of_sample?.performance;
+                          const costs = realResult.costs?.windows.find((row) => row.number === w.number)?.costs;
                           const active = w.number === activeWindow.number;
                           return (
                             <tr
@@ -580,7 +584,9 @@ function ValidationPage() {
                               <td className="py-2 px-2 text-right font-semibold text-primary">{trial ? paramsOf(trial.params) : NA}</td>
                               <td className="py-2 px-2 text-right text-muted-foreground" title={trial?.score ?? undefined}>{pct(trial?.score)}</td>
                               <td className={cn("py-2 px-2 text-right", toneOf(perf?.return_pct))} title={perf?.return_pct}>{pct(perf?.return_pct)}</td>
+                              <td className={cn("py-2 px-2 text-right", toneOf(costs?.price_pnl))} title={costs?.price_pnl}>{usdt(costs?.price_pnl)}</td>
                               <td className="py-2 px-2 text-right text-foreground" title={perf?.net_pnl}>{usdt(perf?.net_pnl)}</td>
+                              <td className="py-2 px-2 text-right text-muted-foreground" title={costs?.buy_hold.pnl}>{usdt(costs?.buy_hold.pnl)}</td>
                               <td className="py-2 px-2 text-right text-muted-foreground" title={perf?.max_drawdown_pct}>
                                 {perf ? formatDrawdownPct(perf.max_drawdown_pct, NA) : NA}
                               </td>
@@ -598,6 +604,16 @@ function ValidationPage() {
                     <p>點選列查看該窗曲線、訓練格點與分環境歸屬 · 成交為 simulated fills，非往返交易 · 資金費正值為支出</p>
                   </div>
                 </Panel>
+
+                <CostBreakdownPanel
+                  title="成本拆解（各窗合計）"
+                  meta="各窗獨立回測相加，不是連續投資組合"
+                  testId="validation-cost-total"
+                  view={realResult.costs?.total
+                    ? costViewFromTotal(realResult.costs.total,
+                        realResult.costs.windows.find((row) => row.costs.funding_scenario)?.costs.funding_scenario?.notice ?? null)
+                    : null}
+                />
 
                 <WindowDetail result={realResult} window={activeWindow} />
               </>

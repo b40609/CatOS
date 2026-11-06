@@ -24,6 +24,7 @@ import type { OptimizationRequest } from "@/adapters/research-api-adapter";
 import { useOptimizationResearch } from "@/hooks/use-optimization-research";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
+import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
 import { formatDecimal } from "@/lib/format";
 import {
   type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase,
@@ -296,6 +297,13 @@ function OptimizationPage() {
                       </span>
                     </div>
                   </div>
+
+                  <CostBreakdownPanel
+                    title={`最佳試驗成本拆解（Trial #${realResult.best_trial_number ?? "--"}）`}
+                    meta="同參數重跑一次的精算；樣本內"
+                    testId="optimization-best-costs"
+                    view={realResult.best_costs ? costViewFromBreakdown(realResult.best_costs) : null}
+                  />
 
                   {/* 試驗詳細列表 */}
                   <Panel

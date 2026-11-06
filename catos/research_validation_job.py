@@ -1,7 +1,7 @@
 """Registered validation adapter over a registered dataset; persistence belongs to ResearchService."""
 
 from collections import Counter
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape
@@ -11,11 +11,13 @@ import platform
 import optuna
 import packaging
 
+from catos import research_costs
 from catos.optimization import IntRange
 from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
     MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_LOOKBACK_BARS,
-    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, decimal_string,
+    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, costs_for, costs_html,
+    decimal_string,
     drawdown_pcts, json_text, load_dataset_bars, provenance, registered_factory,
     require_search_names, resolve_dataset, sample_curve_indices, strategy_spec, validate_request,
 )
@@ -235,8 +237,45 @@ def _report(payload):
                       "成交筆數", "錯誤"), rows)
             + "<h2>分環境歸屬（只列有樣本的環境）</h2>"
             + _table(("視窗", "環境", "K 線數", "成交筆數", "淨損益", "手續費", "資金費"), regimes)
+            + _costs_report(payload["costs"])
             + "<p>完整結果見同一任務的 result.json；逐根環境標籤與逐根歸屬不保存，"
               "可由綁定的資料集與分類規則重算。</p></body></html>")
+
+
+COST_COLUMNS = ("price_pnl", "fees", "slippage", "funding_paid", "net_pnl", "fill_count",
+                "break_even_bps_per_side")
+
+
+def _costs_report(costs):
+    rows = [(row["number"], *(row["costs"][key] for key in COST_COLUMNS),
+             row["costs"]["buy_hold"]["pnl"],
+             (row["costs"]["funding_scenario"] or {}).get("net_pnl_with_assumption", "—"))
+            for row in costs["windows"]]
+    html = ("<h2>各視窗成本拆解（價格損益以成交 K 線開盤價計、成本前）</h2>"
+            + _table(("視窗", "價格損益", "手續費", "滑價", "資金費", "淨損益", "成交筆數",
+                      "每邊兩平 bps", "買進持有（成本前）", "淨損益（含假設資金費）"), rows))
+    total = costs["total"]
+    if total is not None:
+        html += costs_html([(label, total.get(key)) for key, label in (
+            ("price_pnl", "價格損益"), ("fees", "手續費"), ("slippage", "滑價"),
+            ("funding_paid", "資金費（實際）"), ("net_pnl", "淨損益"), ("traded_notional", "成交名目"),
+            ("fill_count", "成交筆數"), ("cost_bps_per_side", "每邊成本 bps"),
+            ("break_even_bps_per_side", "每邊兩平成本 bps"), ("buy_hold_pnl", "買進持有（各窗合計、成本前）"),
+            ("assumed_funding_paid", "假設資金費（未涵蓋期間）"))], "各視窗合計（各窗獨立，不是連續投資組合）")
+    return html
+
+
+def _window_costs(result, bars, quantity, dataset):
+    """Exact attribution of every completed OOS window, before curves are sampled."""
+    windows = []
+    for window in result.validation.windows:
+        if window.out_of_sample is not None:
+            windows.append((window.number, costs_for(window.out_of_sample, bars, quantity, dataset)))
+    # JSON round-trip: Decimal becomes the same strings as every other payload figure.
+    return json.loads(json_text({
+        "windows": [{"number": number, "costs": asdict(costs)} for number, costs in windows],
+        "total": research_costs.total([costs for _, costs in windows]),
+        "funding_coverage": dataset.funding_summary()}))
 
 
 def execute_validation(request, expected_source):
@@ -251,6 +290,7 @@ def execute_validation(request, expected_source):
         direction="maximize",
     )
     dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
+    costs = _window_costs(result, bars, quantity, dataset)
     if provenance(dataset.dataset_id, strategy_id) != expected_source:
         raise ValueError("source_changed_during_run")
     payload = {
@@ -259,6 +299,7 @@ def execute_validation(request, expected_source):
         "objective": {"name": "return_pct", "direction": "maximize",
                       "formula": "Decimal performance.return_pct; no float conversion"},
         "result": compact_result(result),
+        "costs": costs,
         "evaluation_complete": result.validation.complete,
         "data_notice": f"各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。{dataset.notice}",
     }

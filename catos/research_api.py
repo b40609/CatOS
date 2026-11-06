@@ -24,6 +24,7 @@ RUNTIME_FILES = (
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py", "catos/research_donchian.py",
+    "catos/research_costs.py",
     "catos/data_io.py", "catos/reporting.py", "catos/market_api.py", "catos/app_shell.py",
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
     "catos/research_only_artifacts/donchian-breakout-donchian-parameters-v1.json",

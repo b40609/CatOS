@@ -59,6 +59,8 @@ export interface ResearchDatasetMeta {
   start_ms?: number | null;
   end_ms?: number | null;
   funding?: boolean;
+  // How funding is counted: OKX keeps ~3 months, so a long dataset starts funding late.
+  funding_coverage?: FundingCoverage;
   notice?: string;
   files?: Record<string, string>;
   contract: {
@@ -184,7 +186,65 @@ export interface BacktestPerformance {
   trade_count: number; // Exact integer simulated fills, not round trips
 }
 
+export interface FundingCoverage {
+  source: 'dataset' | 'none';
+  complete: boolean;
+  from_ms: number | null; // first real funding event
+  interval_ms: number | null;
+}
+
+// catos/research_costs.py: price_pnl = net_pnl + fees + slippage + funding_paid, valued at fill-bar opens.
+export interface CostBreakdown {
+  price_pnl: string;
+  fees: string;
+  slippage: string;
+  funding_paid: string; // dataset funding actually applied; positive is a debit
+  net_pnl: string;
+  traded_notional: string;
+  fill_count: number;
+  cost_bps_per_side: string | null;
+  break_even_bps_per_side: string | null;
+  buy_hold: {
+    quantity: string;
+    entry_open: string;
+    exit_close: string;
+    pnl: string; // before costs and funding
+    underlying_return_pct: string;
+  };
+  // An assumption, never ledger data: fixed rate over the period real funding does not cover.
+  funding_scenario: {
+    rate: string;
+    interval_ms: number;
+    uncovered_start_ms: number;
+    uncovered_end_ms: number;
+    events: number;
+    assumed_paid: string;
+    net_pnl_with_assumption: string;
+    notice: string;
+  } | null;
+}
+
+// Sum of independent walk-forward OOS windows; ratios recomputed on the sums.
+export interface CostTotal {
+  windows: number;
+  price_pnl: string;
+  fees: string;
+  slippage: string;
+  funding_paid: string;
+  net_pnl: string;
+  traded_notional: string;
+  fill_count: number;
+  cost_bps_per_side: string | null;
+  break_even_bps_per_side: string | null;
+  buy_hold_pnl: string;
+  assumed_funding_paid: string | null;
+  assumed_funding_events: number | null;
+}
+
 export interface BacktestResultPayload {
+  // Absent on runs archived before cost attribution existed.
+  costs?: CostBreakdown;
+  funding_coverage?: FundingCoverage;
   run_id?: string;
   created_at?: string;
   build_id?: string;
@@ -231,6 +291,9 @@ export interface OptimizationResultPayload {
   };
   seed: number;
   optuna_version: string;
+  // Exact attribution of the best trial (one deterministic re-run); absent on older runs.
+  best_costs?: CostBreakdown | null;
+  funding_coverage?: FundingCoverage;
   data_notice: string;
   run_id?: string;
   created_at?: string;
@@ -351,6 +414,12 @@ export interface ValidationResultPayload {
     complete: boolean;
   };
   evaluation_complete: boolean;
+  // Exact attribution per completed OOS window and their sum; absent on older runs.
+  costs?: {
+    windows: { number: number; costs: CostBreakdown }[];
+    total: CostTotal | null;
+    funding_coverage: FundingCoverage;
+  };
   data_notice: string;
   run_id?: string;
   created_at?: string;

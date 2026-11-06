@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research, research_datasets
+from catos import research, research_costs, research_datasets
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -92,6 +92,7 @@ ENGINE_FILES = (
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py",
+    "catos/research_costs.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -498,6 +499,36 @@ def load_dataset_bars(dataset_id, config):
     return bars, config
 
 
+def costs_for(result, bars, quantity, dataset):
+    """Cost attribution and buy-and-hold baseline; a funding scenario only for partial funding."""
+    scenario_from = None if dataset.funding_path is None or dataset.funding_complete else dataset.funding_from_ms
+    interval = dataset.funding_interval_ms or research_costs.ASSUMED_FUNDING_INTERVAL_MS
+    return research_costs.cost_breakdown(result, bars, quantity, scenario_from, interval_ms=interval)
+
+
+def costs_html(rows, title="成本拆解"):
+    """A small read-only table for the HTML reports; rows are (label, value) pairs."""
+    from html import escape
+    body = "".join(f"<tr><th>{escape(label)}</th><td>{escape('—' if value is None else str(value))}</td></tr>"
+                   for label, value in rows)
+    return f"<h2>{escape(title)}</h2><table>{body}</table>"
+
+
+def cost_rows(costs):
+    """Report rows for one breakdown (dataclass or asdict form)."""
+    value = costs if isinstance(costs, dict) else asdict(costs)
+    rows = [(label, value[key]) for key, label in research_costs.REPORT_ROWS]
+    hold = value["buy_hold"]
+    rows.append((f"買進持有基準（同 {hold['quantity']} 張、成本前、未計資金費）", hold["pnl"]))
+    rows.append(("標的漲跌 %", hold["underlying_return_pct"]))
+    scenario = value["funding_scenario"]
+    if scenario is not None:
+        rows.append((f"假設資金費（{scenario['events']} 次，未涵蓋期間）", scenario["assumed_paid"]))
+        rows.append(("淨損益（含假設資金費）", scenario["net_pnl_with_assumption"]))
+        rows.append(("假設說明", scenario["notice"]))
+    return rows
+
+
 def drawdown_pcts(equity_curve, initial_balance):
     """Decimal drawdown percent from the running peak, starting at the initial balance."""
     with localcontext(research._CONTEXT):
@@ -542,9 +573,11 @@ def execute_request(request, expected_source):
                 in zip(result.equity_curve, drawdown_pcts(result.equity_curve, config.initial_balance))]
     result_payload = asdict(result)
     keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
+    costs = costs_for(result, bars, quantity, dataset)
     payload = {
         "request": snapshot, "provenance": expected_source,
         "result": result_payload, "drawdown_curve": drawdown,
+        "costs": asdict(costs), "funding_coverage": dataset.funding_summary(),
         "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }
@@ -554,6 +587,7 @@ def execute_request(request, expected_source):
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
                                      "method": "bucket_deepest_drawdown"}
     report = render_report(result)
+    report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report
