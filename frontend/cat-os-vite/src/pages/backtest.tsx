@@ -20,7 +20,8 @@ import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
 import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
 import {
-  DONCHIAN_ID, donchianParams, formatParams, paramLabel, paramProblems, paramSpecs, pickStrategy, shortName,
+  DONCHIAN_ID, donchianParams, formatParams, minWarmupBars, minWarmupProblems, paramLabel, paramProblems, paramSpecs,
+  pickStrategy, shortName,
   warmupBarsProblems,
 } from "@/lib/research-strategies";
 import {
@@ -349,7 +350,8 @@ function BacktestPage() {
 
     // Strict validation against the catalog bounds; the backend repeats every check.
     const problems = strategy
-      ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+      ? [...paramProblems(strategy, params, warmupBars), ...minWarmupProblems(strategy, warmupBars, dataset),
+         ...warmupBarsProblems(warmupBars, dataset)]
       : ["策略清單尚未載入"];
     if (!strategy || problems.length) {
       setErrorMsg(problems[0]);
@@ -405,12 +407,20 @@ function BacktestPage() {
   const perf = result?.result?.performance;
   const activeStrategy = pickStrategy(catalog?.strategies, activeRequest?.strategy_id ?? strategy?.id ?? null);
   const formProblems = strategy
-    ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+    ? [...paramProblems(strategy, params, warmupBars), ...minWarmupProblems(strategy, warmupBars, dataset),
+         ...warmupBarsProblems(warmupBars, dataset)]
     : [];
 
   // Switching strategy (or the Donchian dataset) restores defaults that fit the bounds and data length.
   const applyDefaults = (sid: string, target = dataset) => {
     if (!catalog) return;
+    const meta = pickStrategy(catalog.strategies, sid);
+    if (meta?.preset) {
+      setParams({ ...meta.preset.parameters });
+      setWarmupBars(minWarmupBars(meta, target));
+      setQuantity(meta.preset.quantity);
+      return;
+    }
     if (sid === DONCHIAN_ID) {
       const preset = donchianParams(target);
       setParams(preset.params);
@@ -427,7 +437,7 @@ function BacktestPage() {
   };
   const changeDataset = (id: string) => {
     setDatasetId(id);
-    if (strategy?.id === DONCHIAN_ID) applyDefaults(DONCHIAN_ID, pickDataset(catalog?.datasets, id));
+    if (strategy?.id === DONCHIAN_ID || strategy?.preset) applyDefaults(strategy.id, pickDataset(catalog?.datasets, id));
   };
   const isRunning = selectedRun?.status === "running" || selectedRun?.status === "queued";
   const isFailed = selectedRun?.status === "failed";
@@ -586,6 +596,7 @@ function BacktestPage() {
             view={result.costs ? costViewFromBreakdown(result.costs) : null}
             meta="價格損益 = 淨損益 + 手續費 + 滑價 + 資金費"
             testId="backtest-cost-breakdown"
+            equitySized={activeStrategy?.sizing === "vol_target"}
           />
         )}
 
@@ -843,7 +854,9 @@ function BacktestPage() {
               ))}
 
               <div className="space-y-1">
-                <Label className="text-t3 font-mono text-muted-foreground">下單張數 (quantity: 1~1000)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">
+                    {strategy?.sizing === "vol_target" ? "張數上限 (quantity: 1~1000，張數依權益與波動計算)" : "下單張數 (quantity: 1~1000)"}
+                  </Label>
                 <Input
                   type="text"
                   value={quantity}
@@ -866,7 +879,9 @@ function BacktestPage() {
 
               <div className="space-y-1">
                 <Label className="text-t3 font-mono text-muted-foreground">
-                  預熱根數 (warmup: &gt;= {strategy?.warmup.covers ?? "period"})
+                  {strategy?.warmup.min_days
+                    ? `預熱根數 (warmup: >= ${minWarmupBars(strategy, dataset)} 根，${strategy.warmup.min_days} 天)`
+                    : `預熱根數 (warmup: >= ${strategy?.warmup.covers ?? "period"})`}
                 </Label>
                 <Input
                   type="number"

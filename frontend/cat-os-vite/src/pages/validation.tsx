@@ -56,7 +56,7 @@ export const Route = createFileRoute("/validation")({
 
 const NA = "不適用";
 
-type IntegerField = { [K in keyof ValidationForm]: ValidationForm[K] extends number ? K : never }[keyof ValidationForm];
+type IntegerField = { [K in keyof ValidationForm]-?: ValidationForm[K] extends number ? K : never }[keyof ValidationForm];
 
 const REGIME_NAMES: Record<string, string> = {
   UNKNOWN: "未知（歷史不足）",
@@ -612,6 +612,7 @@ function ValidationPage() {
                   title="成本拆解（各窗合計）"
                   meta="各窗獨立回測相加，不是連續投資組合"
                   testId="validation-cost-total"
+                  equitySized={catalog?.strategies.find((s) => s.id === realResult.request.backtest.strategy_id)?.sizing === "vol_target"}
                   emptyText={realResult.costs && realResult.costs.total === null ? "沒有完成的樣本外視窗，沒有可以加總的成本。" : undefined}
                   view={realResult.costs?.total
                     ? costViewFromTotal(realResult.costs.total,

@@ -16,7 +16,7 @@ It is valid for strategies whose targets do not depend on balance or equity,
 which holds for the registered research strategies (fixed contract quantity).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, localcontext
 
 from catos import research
@@ -29,6 +29,9 @@ ASSUMED_FUNDING_RATE = Decimal("0.0001")
 ASSUMED_FUNDING_INTERVAL_MS = 28_800_000
 SCENARIO_NOTICE = ("假設情境，不是實際帳務：資金費歷史未涵蓋的期間，以每 {hours} 小時 {rate}% 固定費率、"
                    "多單支付／空單收取，按當時部位與 K 線開盤價估算。")
+
+
+EQUITY_SIZED_NOTICE = "部位依權益調整的策略，假設資金費會改變權益與之後的張數，這裡沿用實際部位，只是近似值。"
 
 
 @dataclass(frozen=True)
@@ -98,7 +101,7 @@ def _scenario(result, bars, uncovered_end_ms, rate, interval_ms):
 
 
 def cost_breakdown(result, bars, quantity, funding_from_ms=None, *,
-                   rate=ASSUMED_FUNDING_RATE, interval_ms=ASSUMED_FUNDING_INTERVAL_MS):
+                   rate=ASSUMED_FUNDING_RATE, interval_ms=ASSUMED_FUNDING_INTERVAL_MS, equity_sized=False):
     """Attribution of one run.
 
     bars: the candles the run used (warm-up included); quantity: the strategy's
@@ -133,6 +136,9 @@ def cost_breakdown(result, bars, quantity, funding_from_ms=None, *,
             scenario = _scenario(result, bars, funding_from_ms, rate, interval_ms)
             if not scenario.events:
                 scenario = None
+            elif equity_sized:
+                # Sizes follow equity, which the assumed funding would have changed slightly.
+                scenario = replace(scenario, notice=scenario.notice + EQUITY_SIZED_NOTICE)
         return CostBreakdown(price_pnl, performance.fees, slippage, performance.funding_paid,
                              performance.net_pnl, notional, len(result.trades), cost_bps, break_even,
                              buy_hold, scenario)

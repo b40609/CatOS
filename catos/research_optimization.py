@@ -30,12 +30,13 @@ def execute_optimization(request, expected_source):
     strategy_id = snapshot["backtest"]["strategy_id"]
     # Keep the strategy import in the calculation process and share the same
     # approved-artifact gate as backtests.
-    build = registered_factory(expected_source, strategy_id, quantity)
+    build = registered_factory(expected_source, strategy_id, quantity, config.contract)
     dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
     bars, config = load_dataset_bars(dataset.dataset_id, config)
     candidates = {}  # first COMPLETE result per distinct parameter set, in trial order
     result = optimize(
         on_result=lambda params, run: candidates.setdefault(params, run),
+        exhaustive_small_grid=True,
         strategy_factory=build,
         search_space={name: IntRange(**item) for name, item in snapshot["search_space"].items()},
         candles=bars, config=config,
@@ -53,7 +54,7 @@ def execute_optimization(request, expected_source):
                                   warmup_bars=snapshot["backtest"]["warmup_bars"])
         if rerun.performance != best.performance:
             raise ValueError("best_trial_rerun_mismatch")
-        best_costs = costs_for(rerun, bars, quantity, dataset)
+        best_costs = costs_for(rerun, bars, quantity, dataset, strategy_id)
     overfitting = None
     if result.best_trial_number is not None:
         overfitting = research_overfit.search_report(candidates, best.params, dataset.timeframe_ms)
@@ -69,6 +70,7 @@ def execute_optimization(request, expected_source):
                "objective": {"name": result.score_name, "direction": result.direction,
                              "formula": "Decimal performance.return_pct; Float only for Optuna ranking"},
                "seed": result.seed, "optuna_version": result.optuna_version,
+               "sampler": result.sampler,
                "best_costs": asdict(best_costs) if best_costs else None,
                "overfitting": overfitting,
                "funding_coverage": dataset.funding_summary(),

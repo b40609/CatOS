@@ -8,13 +8,15 @@ import type {
 } from '@/adapters/research-api-adapter';
 import { compareDecimal, signOf } from '@/lib/format';
 import {
-  type Axis, DONCHIAN_ID, donchianAxes, gridBase, gridCount, gridProblems, gridWarmup, paramSpecs,
+  type Axis, DONCHIAN_ID, donchianAxes, gridBase, gridCount, gridProblems, gridWarmup, minWarmupBars, paramSpecs,
+  presetAxes,
 } from '@/lib/research-strategies';
 
 export interface ValidationForm {
   datasetId: string;
   strategyId: string;
   axes: Record<string, Axis>; // one range per integer parameter of the strategy
+  minWarmup?: number; // whole-day warm-up of a daily strategy on this dataset, in bars
   trainBars: number;
   testBars: number;
   windows: number;
@@ -52,8 +54,8 @@ export function candidateCount(form: Pick<ValidationForm, 'axes'>, strategy: Res
 }
 
 /** Warm-up must cover the grid's highest look-back value (and stay below the catalog limit). */
-export function warmupBars(form: Pick<ValidationForm, 'axes'>, strategy: ResearchStrategyMeta): number {
-  return gridWarmup(strategy, form.axes);
+export function warmupBars(form: Pick<ValidationForm, 'axes' | 'minWarmup'>, strategy: ResearchStrategyMeta): number {
+  return Math.max(gridWarmup(strategy, form.axes), form.minWarmup ?? 0);
 }
 
 export function barsUsed(form: ValidationForm, strategy: ResearchStrategyMeta): number {
@@ -88,13 +90,14 @@ export function defaultValidationForm(
     highVolatilityBps: example.regime_rule.high_volatility_bps,
   };
   const synthetic = dataset.source === SYNTHETIC_SOURCE;
-  const axes = strategy.id === DONCHIAN_ID ? donchianAxes(dataset)
+  const axes = strategy.preset ? presetAxes(strategy) : strategy.id === DONCHIAN_ID ? donchianAxes(dataset)
     : synthetic ? { ...example.search_space } : { period: { low: 8, high: 32, step: 8 } };
-  const base = { datasetId: dataset.id, strategyId: strategy.id, axes, ...rule };
+  const minWarmup = minWarmupBars(strategy, dataset);
+  const base = { datasetId: dataset.id, strategyId: strategy.id, axes, minWarmup, ...rule };
   if (synthetic) {
     return { ...base, trainBars: example.plan.train_bars, testBars: example.plan.test_bars, windows: example.plan.windows };
   }
-  const testBars = Math.max(1, Math.floor((dataset.bars - gridWarmup(strategy, axes)) / (FETCHED_WINDOWS + 2)));
+  const testBars = Math.max(1, Math.floor((dataset.bars - warmupBars({ axes, minWarmup }, strategy)) / (FETCHED_WINDOWS + 2)));
   return { ...base, trainBars: 2 * testBars, testBars, windows: FETCHED_WINDOWS };
 }
 
@@ -155,7 +158,7 @@ export function buildValidationRequest(form: ValidationForm, strategy: ResearchS
     backtest: {
       strategy_id: strategy.id,
       dataset_id: form.datasetId,
-      parameters: { ...gridBase(strategy, form.axes), quantity: VALIDATION_BACKTEST.quantity },
+      parameters: { ...gridBase(strategy, form.axes), quantity: strategy.preset?.quantity ?? VALIDATION_BACKTEST.quantity },
       initial_balance: VALIDATION_BACKTEST.initial_balance,
       fee_rate: VALIDATION_BACKTEST.fee_rate,
       slippage_bps: VALIDATION_BACKTEST.slippage_bps,

@@ -43,8 +43,12 @@ export interface ResearchStrategyMeta {
   name: string;
   // Integer parameters carry min/max (constructor order); quantity carries its unit.
   parameters: Record<string, { min?: number; max?: number; unit?: string }>;
-  // warmup_bars >= the named parameter and < below.
-  warmup: { covers: string; below: number };
+  // warmup_bars >= the named parameter and < below; daily strategies also need min_days of bars.
+  warmup: { covers: string; below: number; min_days?: number };
+  // "vol_target": quantity caps contracts sized from equity; "fixed": quantity is traded as is.
+  sizing?: 'fixed' | 'vol_target';
+  // Preregistered strategies (package E) carry their frontend defaults.
+  preset?: { parameters: Record<string, number>; quantity: string; warmup_days: number } | null;
 }
 
 export interface ResearchDatasetMeta {

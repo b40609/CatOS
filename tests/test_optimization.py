@@ -151,3 +151,24 @@ class OptimizationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExhaustiveGridTests(unittest.TestCase):
+    def test_small_grid_is_covered_once_in_order_when_requested(self):
+        seen = []
+        result = search(exhaustive_small_grid=True, on_result=lambda params, run: seen.append(params))
+        self.assertEqual(result.sampler, "exhaustive_grid")
+        self.assertEqual([r.number for r in result.trials], [0, 1, 2, 3])
+        self.assertEqual([dict(r.params) for r in result.trials],
+                         [{"period": 2, "quantity": "1"}, {"period": 2, "quantity": "2"},
+                          {"period": 3, "quantity": "1"}, {"period": 3, "quantity": "2"}])
+        self.assertEqual(seen, [r.params for r in result.trials])
+        complete = [r for r in result.trials if r.state == "COMPLETE"]
+        best = max(complete, key=lambda r: (r.score_float, -r.number))
+        self.assertEqual(result.best_trial_number, best.number)
+
+    def test_tpe_is_kept_when_the_grid_is_larger_or_not_requested(self):
+        self.assertEqual(search().sampler, "tpe")
+        self.assertEqual(len(search().trials), 12)
+        larger = search(exhaustive_small_grid=True, n_trials=3)
+        self.assertEqual((larger.sampler, len(larger.trials)), ("tpe", 3))

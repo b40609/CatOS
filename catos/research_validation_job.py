@@ -273,12 +273,13 @@ def _edges_report(edges):
         + "</p>" + _table(("參數", "選在下限的視窗數", "選在上限的視窗數"), rows))
 
 
-def _window_costs(result, bars, quantity, dataset):
+def _window_costs(result, bars, quantity, dataset, strategy_id):
     """Exact attribution of every completed OOS window, before curves are sampled."""
     windows = []
     for window in result.validation.windows:
         if window.out_of_sample is not None:
-            windows.append((window.number, costs_for(window.out_of_sample, bars, quantity, dataset)))
+            windows.append((window.number, costs_for(window.out_of_sample, bars, quantity, dataset,
+                                                     strategy_id)))
     # JSON round-trip: Decimal becomes the same strings as every other payload figure.
     return json.loads(json_text({
         "windows": [{"number": number, "costs": asdict(costs)} for number, costs in windows],
@@ -289,7 +290,7 @@ def _window_costs(result, bars, quantity, dataset):
 def execute_validation(request, expected_source):
     snapshot, config, quantity, bars, space, plan, rule = validate_validation_request(request)
     strategy_id = snapshot["backtest"]["strategy_id"]
-    build = registered_factory(expected_source, strategy_id, quantity)
+    build = registered_factory(expected_source, strategy_id, quantity, config.contract)
     reproduction = _reproduction(expected_source)
     result = regime_walk_forward(
         strategy_factory=build, search_space=space, candles=bars, config=config, rule=rule,
@@ -298,7 +299,7 @@ def execute_validation(request, expected_source):
         direction="maximize",
     )
     dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
-    costs = _window_costs(result, bars, quantity, dataset)
+    costs = _window_costs(result, bars, quantity, dataset, strategy_id)
     if provenance(dataset.dataset_id, strategy_id) != expected_source:
         raise ValueError("source_changed_during_run")
     payload = {

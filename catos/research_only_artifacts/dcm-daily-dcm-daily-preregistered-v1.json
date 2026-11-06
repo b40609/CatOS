@@ -1,0 +1,17 @@
+{
+  "schema": "catos.research.strategy-artifact",
+  "schema_version": 1,
+  "artifact_id": "dcm-daily",
+  "version": "dcm-daily-preregistered-v1",
+  "sha256": "8f59036ce64615f3b2ebab0ecedf56e4808fa073f07f2153cc90ed970805dc85",
+  "entry": "catos.research_daily:DCMDaily",
+  "source_files": [
+    "catos/research_daily.py"
+  ],
+  "approval_state": "approved",
+  "provenance": {
+    "origin": "catos-research-daily-preregistered",
+    "approval_basis": "user-approved-preregistered-literature-rules",
+    "scope": "research-only"
+  }
+}

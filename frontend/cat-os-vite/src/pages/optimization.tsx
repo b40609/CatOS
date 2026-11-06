@@ -28,7 +28,8 @@ import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/co
 import { OverfittingPanel } from "@/components/catos/overfitting-panel";
 import { formatDecimal } from "@/lib/format";
 import {
-  type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase,
+  type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase, minWarmupBars,
+  presetAxes,
   gridProblems, gridWarmup, paramLabel, paramSpecs, pickStrategy, shortName, warmupBarsProblems,
 } from "@/lib/research-strategies";
 
@@ -75,12 +76,14 @@ function OptimizationPage() {
   const strategy = pickStrategy(catalog?.strategies, strategyId);
   // SMA keeps a warm-up of at least 8 bars; Donchian covers its highest entry channel.
   const warmup = !strategy ? 0
+    : strategy.preset ? minWarmupBars(strategy, dataset)
     : strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes));
   const problems = strategy ? [...gridProblems(strategy, axes), ...warmupBarsProblems(warmup, dataset)] : [];
 
   const changeStrategy = (sid: string) => {
     setStrategyId(sid);
-    setAxes(sid === DONCHIAN_ID ? donchianAxes(dataset) : SMA_AXES);
+    const meta = catalog?.strategies.find((s) => s.id === sid);
+    setAxes(meta?.preset ? presetAxes(meta) : sid === DONCHIAN_ID ? donchianAxes(dataset) : SMA_AXES);
   };
   const changeDataset = (id: string) => {
     setDatasetId(id);
@@ -92,11 +95,12 @@ function OptimizationPage() {
   const handleSubmitRealOpt = async () => {
     if (!strategy || problems.length) return;
     // SMA keeps its fixed period 2 base; Donchian starts from the lowest grid point.
-    const base = strategy.id === DONCHIAN_ID ? gridBase(strategy, axes) : { period: 2 };
+    const base = strategy.preset ? { ...strategy.preset.parameters }
+      : strategy.id === DONCHIAN_ID ? gridBase(strategy, axes) : { period: 2 };
     const req: OptimizationRequest = {
       backtest: {
         strategy_id: strategy.id, dataset_id: dataset?.id || "synthetic-btc-15m-v1",
-        parameters: { ...base, quantity: "2" }, initial_balance: "1000",
+        parameters: { ...base, quantity: strategy.preset?.quantity ?? "2" }, initial_balance: "1000",
         fee_rate: "0.0005", slippage_bps: "2", warmup_bars: warmup,
       },
       search_space: Object.fromEntries(paramSpecs(strategy).map((spec) => [spec.name, { ...axes[spec.name] }])),
@@ -303,6 +307,7 @@ function OptimizationPage() {
                     title={`最佳試驗成本拆解（Trial #${realResult.best_trial_number ?? "--"}）`}
                     meta="同參數重跑一次的精算；樣本內"
                     testId="optimization-best-costs"
+                    equitySized={catalog?.strategies.find((s) => s.id === realResult.request.backtest.strategy_id)?.sizing === "vol_target"}
                     emptyText={realResult.best_costs === null ? "沒有完成的試驗，沒有最佳試驗可以拆解。" : undefined}
                     view={realResult.best_costs ? costViewFromBreakdown(realResult.best_costs) : null}
                   />

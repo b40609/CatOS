@@ -66,8 +66,12 @@ function Row({ label, value, tone, hint }: { label: string; value: string; tone?
 export const LEGACY_COSTS_TEXT = "這筆結果沒有成本拆解（成本歸因上線前的舊紀錄）。";
 
 export function CostBreakdownPanel({
-  view, title = "成本拆解", meta, testId, emptyText = LEGACY_COSTS_TEXT,
-}: { view: CostView | null | undefined; title?: string; meta?: string; testId?: string; emptyText?: string }) {
+  view, title = "成本拆解", meta, testId, emptyText = LEGACY_COSTS_TEXT, equitySized = false,
+}: {
+  view: CostView | null | undefined; title?: string; meta?: string; testId?: string; emptyText?: string;
+  // Volatility-targeted strategies compare with 1x initial notional, not the same contracts.
+  equitySized?: boolean;
+}) {
   return (
     <Panel title={title} meta={meta ? <span className="text-t2 font-mono text-muted-foreground">{meta}</span> : undefined}>
       {!view ? (
@@ -90,8 +94,10 @@ export function CostBreakdownPanel({
               <Row label="每邊成本" value={formatDecimal(view.cost_bps_per_side, BPS)} hint="（手續費＋滑價）÷ 成交名目" />
               <Row label="每邊兩平成本" value={formatDecimal(view.break_even_bps_per_side, BPS)}
                 tone={toneOf(view.break_even_bps_per_side)} hint="淨損益為 0 時，每邊最多能承受的手續費＋滑價" />
-              <Row label="買進持有（同張數、成本前）" value={formatDecimal(view.buy_hold_pnl, USDT)} tone={toneOf(view.buy_hold_pnl)}
-                hint="同一評估期間、同張數做多不動；未計手續費與資金費" />
+              <Row label={equitySized ? "買進持有（期初 1 倍名目、成本前）" : "買進持有（同張數、成本前）"}
+                value={formatDecimal(view.buy_hold_pnl, USDT)} tone={toneOf(view.buy_hold_pnl)}
+                hint={equitySized ? "同一評估期間、以期初本金 1 倍名目做多不動；未計手續費與資金費"
+                  : "同一評估期間、同張數做多不動；未計手續費與資金費"} />
               {view.underlying_return_pct !== null && (
                 <Row label="標的漲跌" value={formatDecimal(view.underlying_return_pct, { digits: 2, sign: true, suffix: "%" })} />
               )}

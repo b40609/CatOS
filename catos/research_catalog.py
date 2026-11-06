@@ -50,6 +50,15 @@ DONCHIAN_PROVENANCE = {
 }
 # Channels up to ten 15m days (96 bars a day).
 DONCHIAN_MAX_BARS = 960
+# Package E (2026-11-06): three daily strategies preregistered before any real-data run.
+DAILY_FILES = ("catos/research_daily.py",)
+DAILY_SHA256 = "8f59036ce64615f3b2ebab0ecedf56e4808fa073f07f2153cc90ed970805dc85"
+DAILY_PROVENANCE = {"origin": "catos-research-daily-preregistered", "approval_basis": "user-approved-preregistered-literature-rules", "scope": "research-only"}
+DAILY_MANIFESTS = ROOT / "catos" / "research_only_artifacts"
+# 366 complete days for the longest look-back plus the partial first day.
+DAILY_WARMUP_DAYS = 367
+DAILY_WARMUP_LIMIT = 20_000
+DAY_MS = 86_400_000
 
 
 @dataclass(frozen=True)
@@ -66,6 +75,12 @@ class ResearchStrategy:
     parameters: tuple  # (name, low, high) integers, in constructor order before quantity
     lookback: str  # the parameter warmup_bars must cover
     warmup_limit: int  # warmup_bars must stay below this
+    # Daily strategies need whole days of warm-up whatever the bar size.
+    min_warmup_days: int = 0
+    # "fixed": quantity is the traded contracts; "vol_target": quantity caps the
+    # contracts sized from equity, and the strategy receives the contract spec.
+    sizing: str = "fixed"
+    preset: dict | None = None  # frontend defaults for preregistered strategies
 
 
 STRATEGIES = {spec.strategy_id: spec for spec in (
@@ -77,6 +92,18 @@ STRATEGIES = {spec.strategy_id: spec for spec in (
                      "Donchian 通道突破（Long / Short）",
                      (("entry_bars", 2, DONCHIAN_MAX_BARS), ("exit_bars", 1, DONCHIAN_MAX_BARS - 1)),
                      "entry_bars", DONCHIAN_MAX_BARS + 1),
+    *(ResearchStrategy(artifact_id, version, f"catos.research_daily:{entry}", DAILY_SHA256, DAILY_FILES,
+                       DAILY_MANIFESTS / f"{artifact_id}-{version}.json", DAILY_PROVENANCE, name,
+                       ((param, 0, 1),), param, DAILY_WARMUP_LIMIT, DAILY_WARMUP_DAYS, sizing,
+                       {"parameters": {param: default}, "quantity": quantity, "warmup_days": DAILY_WARMUP_DAYS})
+      for artifact_id, version, entry, name, param, default, sizing, quantity in (
+          ("donchian-ensemble", "donchian-ensemble-preregistered-v1", "DonchianEnsemble",
+           "Donchian 多週期集成（Long / Flat，日線）", "vol_scaling", 1, "vol_target", "1000"),
+          ("tsmom-multi", "tsmom-multi-preregistered-v1", "TimeSeriesMomentum",
+           "時間序列動能 1／3／12 月（Long / Short，日線）", "vol_scaling", 1, "vol_target", "1000"),
+          ("dcm-daily", "dcm-daily-preregistered-v1", "DCMDaily",
+           "DCM 日線版（Long / Short）", "score_filter", 0, "fixed", "10"),
+      )),
 )}
 
 
@@ -326,6 +353,9 @@ def validate_request(value):
     warmup = value["warmup_bars"]
     if type(warmup) is not int or not params[spec.lookback] <= warmup < spec.warmup_limit:
         raise ValueError(f"warmup_bars: integer >= {spec.lookback} and < {spec.warmup_limit} required")
+    if spec.min_warmup_days and warmup * dataset.timeframe_ms < spec.min_warmup_days * DAY_MS:
+        bars = -(-spec.min_warmup_days * DAY_MS // dataset.timeframe_ms)
+        raise ValueError(f"warmup_bars: at least {bars} bars ({spec.min_warmup_days} days) required")
     # Donchian warm-up can exceed the 96-bar fixture; reject before a task is queued.
     if warmup >= dataset.bars:
         raise ValueError(f"warmup_bars: must leave evaluation bars in the {dataset.bars}-bar dataset")
@@ -397,7 +427,9 @@ def catalog():
                         "parameters": {**{name: {"min": low, "max": high}
                                           for name, low, high in spec.parameters},
                                        "quantity": {"unit": "contracts"}},
-                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit}}
+                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit,
+                                   "min_days": spec.min_warmup_days},
+                        "sizing": spec.sizing, "preset": spec.preset}
                        for spec in STRATEGIES.values()],
         "datasets": [{**dataset.describe(), "contract": asdict(dataset.contract)}
                      for dataset in datasets()],
@@ -482,12 +514,20 @@ def load_registered_strategy(expected_source):
     return strategy
 
 
-def registered_factory(expected_source, strategy_id, quantity):
-    """The verified strategy bound to a run's quantity; the request must name the same strategy."""
+def registered_factory(expected_source, strategy_id, quantity, contract=None):
+    """The verified strategy bound to a run's quantity; the request must name the same strategy.
+
+    Volatility-targeted strategies size from equity, so they also get the contract spec.
+    """
     if expected_source["strategy"]["id"] != strategy_id:
         raise ValueError("strategy_source_mismatch")
+    spec = strategy_spec(strategy_id)
+    if spec.sizing == "vol_target" and contract is None:
+        raise ValueError("contract_required_for_vol_target")
     strategy = load_registered_strategy(expected_source)
-    names = [name for name, _, _ in strategy_spec(strategy_id).parameters]
+    names = [name for name, _, _ in spec.parameters]
+    if spec.sizing == "vol_target":
+        return lambda params: strategy(*(params[name] for name in names), quantity, contract)
     return lambda params: strategy(*(params[name] for name in names), quantity)
 
 
@@ -499,11 +539,24 @@ def load_dataset_bars(dataset_id, config):
     return bars, config
 
 
-def costs_for(result, bars, quantity, dataset):
+def buy_hold_quantity(strategy_id, quantity, result, bars):
+    """Fixed-size strategies compare with the same contracts; equity-sized ones with 1x initial notional."""
+    if strategy_id is None or strategy_spec(strategy_id).sizing != "vol_target":
+        return quantity
+    contract = result.config.contract
+    first = next(bar for bar in bars if bar.open_time_ms >= result.evaluation_start_ms)
+    with localcontext(research._CONTEXT):
+        raw = result.config.initial_balance / (first.open * contract.base_per_contract)
+        return (raw / contract.lot_size).to_integral_value(rounding="ROUND_DOWN") * contract.lot_size
+
+
+def costs_for(result, bars, quantity, dataset, strategy_id=None):
     """Cost attribution and buy-and-hold baseline; a funding scenario only for partial funding."""
     scenario_from = None if dataset.funding_path is None or dataset.funding_complete else dataset.funding_from_ms
     interval = dataset.funding_interval_ms or research_costs.ASSUMED_FUNDING_INTERVAL_MS
-    return research_costs.cost_breakdown(result, bars, quantity, scenario_from, interval_ms=interval)
+    sized = strategy_id is not None and strategy_spec(strategy_id).sizing == "vol_target"
+    return research_costs.cost_breakdown(result, bars, buy_hold_quantity(strategy_id, quantity, result, bars),
+                                         scenario_from, interval_ms=interval, equity_sized=sized)
 
 
 def costs_html(rows, title="成本拆解"):
@@ -562,7 +615,7 @@ def execute_request(request, expected_source):
     # The worker, not MCP/web, executes the fixed strategy. Source bytes are
     # snapshotted and hash-verified before execution so validation and code
     # execution cannot observe different strategy file contents.
-    build = registered_factory(expected_source, snapshot["strategy_id"], quantity)
+    build = registered_factory(expected_source, snapshot["strategy_id"], quantity, config.contract)
     dataset = resolve_dataset(snapshot["dataset_id"])
     bars, config = load_dataset_bars(dataset.dataset_id, config)
     result = research.backtest(
@@ -573,7 +626,7 @@ def execute_request(request, expected_source):
                 in zip(result.equity_curve, drawdown_pcts(result.equity_curve, config.initial_balance))]
     result_payload = asdict(result)
     keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
-    costs = costs_for(result, bars, quantity, dataset)
+    costs = costs_for(result, bars, quantity, dataset, snapshot["strategy_id"])
     payload = {
         "request": snapshot, "provenance": expected_source,
         "result": result_payload, "drawdown_curve": drawdown,
