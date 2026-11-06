@@ -63,13 +63,15 @@ function Row({ label, value, tone, hint }: { label: string; value: string; tone?
   );
 }
 
+export const LEGACY_COSTS_TEXT = "這筆結果沒有成本拆解（成本歸因上線前的舊紀錄）。";
+
 export function CostBreakdownPanel({
-  view, title = "成本拆解", meta, testId,
-}: { view: CostView | null | undefined; title?: string; meta?: string; testId?: string }) {
+  view, title = "成本拆解", meta, testId, emptyText = LEGACY_COSTS_TEXT,
+}: { view: CostView | null | undefined; title?: string; meta?: string; testId?: string; emptyText?: string }) {
   return (
     <Panel title={title} meta={meta ? <span className="text-t2 font-mono text-muted-foreground">{meta}</span> : undefined}>
       {!view ? (
-        <p className="py-3 text-center text-xs text-muted-foreground">這筆結果沒有成本拆解（成本歸因上線前的舊紀錄）。</p>
+        <p className="py-3 text-center text-xs text-muted-foreground">{emptyText}</p>
       ) : (
         <div data-testid={testId} data-price-pnl={view.price_pnl} data-net-pnl={view.net_pnl} className="text-xs">
           <p className="mb-2 rounded border border-border/60 bg-surface/40 px-2.5 py-1.5 text-muted-foreground">{costVerdict(view)}</p>

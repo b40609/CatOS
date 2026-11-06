@@ -123,10 +123,11 @@ class ValidationJobTests(unittest.TestCase):
                           if key not in ("label_counts", "omitted_detail")}, full)
         self.assertTrue(all("curve_sampling" not in row for row in compact["validation"]["windows"]))
         self.assertIn("<table>", report)
-        # Settings, windows, regimes, per-window costs and the 11-row cost total.
+        # Settings, windows, regimes, per-window costs, the 11-row cost total and the edge table.
         self.assertEqual(report.count("<tr>"), 1 + 8 + 1 + plan.windows + 1 + sum(
             1 for row in compact["windows"] for summary in row["evaluation"]["summaries"]
-            if summary["bar_count"]) + 1 + len(payload["costs"]["windows"]) + 11)
+            if summary["bar_count"]) + 1 + len(payload["costs"]["windows"]) + 11
+            + 1 + len(request["search_space"]))
         self.assertEqual([row["number"] for row in payload["costs"]["windows"]],
                          [row["number"] for row in compact["validation"]["windows"]
                           if row["out_of_sample"] is not None])

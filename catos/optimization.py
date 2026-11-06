@@ -13,7 +13,7 @@ from typing import Callable, Iterable, Mapping
 import optuna
 
 from catos.research import (
-    BacktestConfig, Candle, Performance, Strategy, _call, _decimal, _integer,
+    BacktestConfig, BacktestResult, Candle, Performance, Strategy, _call, _decimal, _integer,
     _validate, backtest,
 )
 
@@ -116,6 +116,7 @@ def optimize(
     config: BacktestConfig, score: Callable[[Performance], Decimal],
     score_name: str, n_trials: int, seed: int, warmup_bars: int = 0,
     direction: str = "maximize",
+    on_result: Callable[[tuple[tuple[str, int | str], ...], BacktestResult], None] | None = None,
 ) -> SearchResult:
     """Run exactly n_trials sequential ask/tell attempts (including failures).
 
@@ -123,6 +124,9 @@ def optimize(
     retains the strategy source and input data for replay. Seed alone does not
     guarantee identical studies across Optuna versions. Ordinary trial failures
     are recorded as FAIL and never ranked; interruptions propagate immediately.
+    on_result, when given, receives (params, BacktestResult) for every COMPLETE
+    trial after it is recorded, so callers can keep curves without re-running;
+    an exception there propagates and aborts the search.
     """
     _integer(n_trials, "n_trials", minimum=1)
     _integer(seed, "seed")
@@ -175,6 +179,8 @@ def optimize(
         study.tell(trial, converted)
         records.append(TrialRecord(trial.number, "COMPLETE", tuple(params.items()),
                                    raw_score, converted, performance, None))
+        if on_result is not None:
+            on_result(tuple(params.items()), result)
     best = study.best_trial.number if any(r.state == "COMPLETE" for r in records) else None
     return SearchResult(seed, direction, score_name, optuna.__version__, space,
                         config, warmup_bars, tuple(records), best)

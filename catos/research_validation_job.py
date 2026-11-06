@@ -11,7 +11,7 @@ import platform
 import optuna
 import packaging
 
-from catos import research_costs
+from catos import research_costs, research_overfit
 from catos.optimization import IntRange
 from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
@@ -238,6 +238,7 @@ def _report(payload):
             + "<h2>分環境歸屬（只列有樣本的環境）</h2>"
             + _table(("視窗", "環境", "K 線數", "成交筆數", "淨損益", "手續費", "資金費"), regimes)
             + _costs_report(payload["costs"])
+            + _edges_report(payload["selection_edges"])
             + "<p>完整結果見同一任務的 result.json；逐根環境標籤與逐根歸屬不保存，"
               "可由綁定的資料集與分類規則重算。</p></body></html>")
 
@@ -263,6 +264,13 @@ def _costs_report(costs):
             ("break_even_bps_per_side", "每邊兩平成本 bps"), ("buy_hold_pnl", "買進持有（各窗合計、成本前）"),
             ("assumed_funding_paid", "假設資金費（未涵蓋期間）"))], "各視窗合計（各窗獨立，不是連續投資組合）")
     return html
+
+
+def _edges_report(edges):
+    rows = [(name, counts["at_low"], counts["at_high"]) for name, counts in edges["params"].items()]
+    return ("<h2>選參落在搜尋範圍邊界</h2><p>" + escape(
+        f"{edges['windows_at_edge']} / {edges['windows_with_selection']} 個有選定參數的視窗落在邊界。{edges['notice']}")
+        + "</p>" + _table(("參數", "選在下限的視窗數", "選在上限的視窗數"), rows))
 
 
 def _window_costs(result, bars, quantity, dataset):
@@ -303,4 +311,9 @@ def execute_validation(request, expected_source):
         "evaluation_complete": result.validation.complete,
         "data_notice": f"各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。{dataset.notice}",
     }
+    payload["selection_edges"] = research_overfit.edge_selections(
+        [(row["number"], None if row["training"]["selected_trial_number"] is None
+          else row["training"]["trials"][row["training"]["selected_trial_number"]]["params"])
+         for row in payload["result"]["validation"]["windows"]],
+        snapshot["search_space"])
     return payload, _report(payload)

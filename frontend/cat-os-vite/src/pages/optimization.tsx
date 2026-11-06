@@ -25,6 +25,7 @@ import { useOptimizationResearch } from "@/hooks/use-optimization-research";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
+import { OverfittingPanel } from "@/components/catos/overfitting-panel";
 import { formatDecimal } from "@/lib/format";
 import {
   type Axis, DONCHIAN_ID, donchianAxes, formatParams, formatRanges, formatTrialParams, gridBase,
@@ -302,7 +303,16 @@ function OptimizationPage() {
                     title={`最佳試驗成本拆解（Trial #${realResult.best_trial_number ?? "--"}）`}
                     meta="同參數重跑一次的精算；樣本內"
                     testId="optimization-best-costs"
+                    emptyText={realResult.best_costs === null ? "沒有完成的試驗，沒有最佳試驗可以拆解。" : undefined}
                     view={realResult.best_costs ? costViewFromBreakdown(realResult.best_costs) : null}
+                  />
+
+                  <OverfittingPanel
+                    report={realResult.overfitting}
+                    earlierSearches={optRuns.filter((r) =>
+                      r.run_id !== realResult.run_id &&
+                      r.request?.backtest?.dataset_id === realResult.request.backtest.dataset_id &&
+                      r.request?.backtest?.strategy_id === realResult.request.backtest.strategy_id).length}
                   />
 
                   {/* 試驗詳細列表 */}

@@ -74,9 +74,16 @@ def _scenario(result, bars, uncovered_end_ms, rate, interval_ms):
     per_contract = result.config.contract.base_per_contract
     trades = result.trades
     index, position, paid, events = 0, ZERO, ZERO, 0
+    times = list(range(first, end, interval_ms))
+    # The engine also settles an event exactly at the last bar's close (the
+    # evaluation end) when the data has one there, e.g. a walk-forward window cut
+    # from a longer dataset; mirror it while that time is still uncovered.
+    last = result.evaluation_end_ms
+    if last < uncovered_end_ms and last % interval_ms == 0 and last in opens:
+        times.append(last)
     # The engine settles a funding time before the fill at the same bar open, so
     # the position at time t is the one left by fills strictly before t.
-    for time_ms in range(first, end, interval_ms):
+    for time_ms in times:
         while index < len(trades) and trades[index].time_ms < time_ms:
             position = trades[index].position_after
             index += 1

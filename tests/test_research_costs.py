@@ -95,6 +95,27 @@ class CostBreakdownTest(unittest.TestCase):
         self.assertEqual(scenario.net_pnl_with_assumption, charged.performance.net_pnl)
         self.assertNotEqual(scenario.assumed_paid, 0)
 
+    def test_scenario_includes_a_window_end_on_the_funding_grid(self):
+        # A walk-forward window cut from longer data: its last close (T) is on the
+        # 8h grid and the engine settles an event there with the next bar's open.
+        full = candles(240)
+        window = full[:96]
+        end = window[-1].open_time_ms + TF
+        self.assertEqual(end % EIGHT_H, 0)
+        opens = {bar.open_time_ms: bar.open for bar in full}
+        rate = research_costs.ASSUMED_FUNDING_RATE
+        events = tuple(research.FundingEvent(ms, rate, opens[ms]) for ms in range(START, end + 1, EIGHT_H))
+        plain = research.backtest(strategy=lambda: Flip(5), candles=window, config=config(), warmup_bars=3)
+        charged = research.backtest(strategy=lambda: Flip(5), candles=window, config=config(funding=events),
+                                    warmup_bars=3)
+        self.assertNotEqual(plain.trades[-1].position_after, 0)  # the end event carries a position
+        scenario = research_costs.cost_breakdown(plain, full, Decimal("2"), full[-1].open_time_ms).funding_scenario
+        self.assertEqual(scenario.events, len(charged.funding))
+        self.assertEqual(scenario.assumed_paid, charged.performance.funding_paid)
+        # Without the next bar's open (data ends at T) the engine has no event there either.
+        own = research_costs.cost_breakdown(plain, window, Decimal("2"), full[-1].open_time_ms).funding_scenario
+        self.assertEqual(own.events, len(charged.funding) - 1)
+
     def test_scenario_covers_only_times_before_real_funding_starts(self):
         bars = candles()
         result = research.backtest(strategy=Flip, candles=bars, config=config(), warmup_bars=3)

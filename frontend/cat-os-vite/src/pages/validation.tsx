@@ -26,6 +26,7 @@ import { useResearchRuns } from "@/hooks/use-research-runs";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromTotal } from "@/components/catos/cost-breakdown-panel";
+import { SelectionEdgesNote } from "@/components/catos/overfitting-panel";
 import { compareDecimal, formatDecimal, formatDrawdownPct, signOf, toPlotNumber, toneOf } from "@/lib/format";
 import {
   type Axis, formatRanges, formatTrialParams, paramLabel, paramSpecs, pickStrategy, shortName,
@@ -605,10 +606,13 @@ function ValidationPage() {
                   </div>
                 </Panel>
 
+                <SelectionEdgesNote edges={realResult.selection_edges} />
+
                 <CostBreakdownPanel
                   title="成本拆解（各窗合計）"
                   meta="各窗獨立回測相加，不是連續投資組合"
                   testId="validation-cost-total"
+                  emptyText={realResult.costs && realResult.costs.total === null ? "沒有完成的樣本外視窗，沒有可以加總的成本。" : undefined}
                   view={realResult.costs?.total
                     ? costViewFromTotal(realResult.costs.total,
                         realResult.costs.windows.find((row) => row.costs.funding_scenario)?.costs.funding_scenario?.notice ?? null)

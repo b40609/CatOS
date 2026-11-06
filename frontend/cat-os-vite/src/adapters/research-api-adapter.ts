@@ -241,6 +241,43 @@ export interface CostTotal {
   assumed_funding_events: number | null;
 }
 
+// catos/research_overfit.py: statistics only (fixed-digit strings), never money.
+export interface OverfittingReport {
+  method: string;
+  distinct_trials: number; // this run only; earlier searches on the same data are not counted
+  bars: number;
+  best: {
+    params: [string, number | string][];
+    sharpe_per_bar: string;
+    sharpe_annualized: string;
+    skew: string;
+    kurtosis: string; // non-excess
+  };
+  trial_sharpe_variance: string;
+  expected_max_sharpe_per_bar: string;
+  expected_max_sharpe_annualized: string;
+  psr_vs_zero: string | null;
+  dsr: string | null;
+  pbo: {
+    pbo: string;
+    logit_median: string;
+    prob_oos_loss: string;
+    splits: number;
+    blocks: number;
+    bars_per_block: number;
+  } | null;
+  trials: { params: [string, number | string][]; sharpe_annualized: string }[];
+  verdict: string;
+  notice: string;
+}
+
+export interface SelectionEdges {
+  windows_with_selection: number;
+  windows_at_edge: number;
+  params: Record<string, { at_low: number; at_high: number }>;
+  notice: string;
+}
+
 export interface BacktestResultPayload {
   // Absent on runs archived before cost attribution existed.
   costs?: CostBreakdown;
@@ -293,6 +330,8 @@ export interface OptimizationResultPayload {
   optuna_version: string;
   // Exact attribution of the best trial (one deterministic re-run); absent on older runs.
   best_costs?: CostBreakdown | null;
+  // DSR / PBO over the distinct parameter sets of this run; absent on older runs.
+  overfitting?: OverfittingReport | null;
   funding_coverage?: FundingCoverage;
   data_notice: string;
   run_id?: string;
@@ -420,6 +459,8 @@ export interface ValidationResultPayload {
     total: CostTotal | null;
     funding_coverage: FundingCoverage;
   };
+  // Walk-forward choices on the boundary of the searched range; absent on older runs.
+  selection_edges?: SelectionEdges;
   data_notice: string;
   run_id?: string;
   created_at?: string;

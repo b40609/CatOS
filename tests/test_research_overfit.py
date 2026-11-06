@@ -1,0 +1,139 @@
+"""DSR / PBO statistics and their wiring into optimization and walk-forward payloads (offline).
+
+The formulas were also cross-checked outside the repo against fynance 2.13.1
+(research.overfit.pbo, research.guards.deflated_sharpe_ratio) with scipy.stats;
+these tests pin the same behavior without those dependencies.
+"""
+
+from decimal import Decimal
+import random
+import unittest
+
+from catos import research, research_overfit as overfit
+from catos.optimization import IntRange, optimize
+from catos.research_catalog import provenance
+from catos.research_optimization import execute_optimization
+from catos.research_validation_job import execute_validation
+from test_research_costs import CONTRACT, Flip, candles, config
+from test_research_datasets import DatasetFixture, request_for, write_fixture
+
+
+class StatisticsTest(unittest.TestCase):
+    def test_expected_max_matches_the_published_bracket(self):
+        # N = 100 trials, unit variance: (1-g)·Φ⁻¹(0.99) + g·Φ⁻¹(1-1/(100e)) ≈ 2.531.
+        self.assertAlmostEqual(overfit.expected_max_sharpe(1.0, 100), 2.5306, places=4)
+        self.assertEqual(overfit.expected_max_sharpe(1.0, 1), 0.0)
+        self.assertEqual(overfit.expected_max_sharpe(0.0, 50), 0.0)
+        # More trials raise the bar for the same dispersion.
+        self.assertGreater(overfit.expected_max_sharpe(1e-4, 40), overfit.expected_max_sharpe(1e-4, 4))
+
+    def test_moments_of_a_hand_checked_series(self):
+        stats = overfit.moments([1.0, 2.0, 3.0, 4.0, 10.0])
+        self.assertAlmostEqual(stats.mean, 4.0)
+        self.assertAlmostEqual(stats.std, 3.5355339059, places=9)  # sample std, ddof=1
+        self.assertAlmostEqual(stats.skew, 1.1384199576, places=9)  # biased (population) skew
+        # Deviations -3,-2,-1,0,6: m2 = 50/5 = 10, m4 = 1394/5 = 278.8, kurtosis = 278.8/100 (non-excess).
+        self.assertAlmostEqual(stats.kurtosis, 2.788, places=9)
+        flat = overfit.moments([0.0] * 10)
+        self.assertEqual((flat.std, flat.kurtosis), (0.0, 3.0))
+        with self.assertRaises(ValueError):
+            overfit.moments([1.0, 2.0])
+
+    def test_psr_and_dsr_move_the_right_way(self):
+        rng = random.Random(3)
+        returns = [rng.gauss(0.001, 0.01) for _ in range(2000)]
+        stats = overfit.moments(returns)
+        sr = stats.mean / stats.std
+        psr = overfit.probabilistic_sharpe(sr, 0.0, stats)
+        dsr = overfit.probabilistic_sharpe(sr, overfit.expected_max_sharpe(1e-3, 50), stats)
+        self.assertGreater(psr, 0.99)
+        self.assertLess(dsr, psr)
+        self.assertAlmostEqual(overfit.probabilistic_sharpe(sr, sr, stats), 0.5)
+
+    def test_average_ranks_handle_ties(self):
+        self.assertEqual(overfit._average_ranks([3.0, 1.0, 3.0, 2.0]), [3.5, 1.0, 3.5, 2.0])
+
+    def test_pbo_is_zero_for_a_dominant_candidate_and_high_for_noise(self):
+        rng = random.Random(5)
+        noise = [[rng.gauss(0.0, 0.01) for _ in range(1600)] for _ in range(10)]
+        noisy = overfit.pbo_cscv(noise)
+        self.assertEqual((noisy["splits"], noisy["blocks"], noisy["bars_per_block"]), (70, 8, 200))
+        self.assertGreater(noisy["pbo"], 0.2)
+        dominant = [row[:] for row in noise]
+        dominant[4] = [value + 0.003 for value in dominant[4]]
+        result = overfit.pbo_cscv(dominant)
+        self.assertEqual(result["pbo"], 0.0)
+        self.assertEqual(result["prob_oos_loss"], 0.0)
+        # Too short for 8 blocks of 50 bars, or a single candidate: not computed.
+        self.assertIsNone(overfit.pbo_cscv([row[:399] for row in noise]))
+        self.assertIsNone(overfit.pbo_cscv(noise[:1]))
+
+    def test_pbo_drops_only_the_leading_remainder(self):
+        rng = random.Random(9)
+        series = [[rng.gauss(0.0, 0.01) for _ in range(805)] for _ in range(4)]
+        self.assertEqual(overfit.pbo_cscv(series), overfit.pbo_cscv([row[5:] for row in series]))
+
+    def test_edge_selections_count_boundaries(self):
+        space = {"entry_bars": {"low": 96, "high": 384, "step": 96}, "exit_bars": {"low": 24, "high": 72, "step": 24}}
+        windows = [(0, [["entry_bars", 384], ["exit_bars", 48]]), (1, [["entry_bars", 192], ["exit_bars", 24]]),
+                   (2, [["entry_bars", 192], ["exit_bars", 48]]), (3, None)]
+        edges = overfit.edge_selections(windows, space)
+        self.assertEqual((edges["windows_with_selection"], edges["windows_at_edge"]), (3, 2))
+        self.assertEqual(edges["params"], {"entry_bars": {"at_low": 0, "at_high": 1},
+                                           "exit_bars": {"at_low": 1, "at_high": 0}})
+
+
+class OptimizerCallbackTest(unittest.TestCase):
+    def test_on_result_sees_every_complete_trial_once_with_its_curve(self):
+        bars = candles(200)
+        seen = []
+        result = optimize(
+            strategy_factory=lambda params: Flip(params["every"]), search_space={"every": IntRange(3, 9, 2)},
+            candles=bars, config=config(), score=lambda p: p.return_pct, score_name="return_pct",
+            n_trials=6, seed=1, warmup_bars=3, on_result=lambda params, run: seen.append((params, run)))
+        complete = [trial for trial in result.trials if trial.state == "COMPLETE"]
+        self.assertEqual([params for params, _ in seen], [trial.params for trial in complete])
+        for (_, run), trial in zip(seen, complete):
+            self.assertIsInstance(run, research.BacktestResult)
+            self.assertEqual(run.performance, trial.performance)
+
+
+class PayloadTest(DatasetFixture):
+    def test_optimization_payload_reports_dsr_and_pbo_for_distinct_trials(self):
+        target = write_fixture(self.root, count=960)
+        backtest = request_for(target.name, warmup_bars=8, parameters={"period": 2, "quantity": "2"})
+        request = {"backtest": backtest, "search_space": {"period": {"low": 2, "high": 8, "step": 1}},
+                   "n_trials": 10, "seed": 42}
+        payload, report = execute_optimization(request, provenance(target.name))
+        report_data = payload["overfitting"]
+        distinct = {tuple(map(tuple, sorted(t["params"].items()))) for t in payload["trials"] if t["state"] == "COMPLETE"}
+        self.assertEqual(report_data["distinct_trials"], len(distinct))
+        self.assertEqual(len(report_data["trials"]), len(distinct))
+        best = next(t for t in payload["trials"] if t["number"] == payload["best_trial_number"])
+        self.assertEqual(dict(report_data["best"]["params"]), best["params"])
+        for key in ("dsr", "psr_vs_zero", "trial_sharpe_variance", "expected_max_sharpe_per_bar"):
+            self.assertRegex(report_data[key], r"^-?\d+\.\d+$")
+        self.assertEqual(report_data["pbo"]["splits"], 70)
+        self.assertIn("DSR", report_data["verdict"])
+        self.assertIn("過擬合檢查", report)
+
+    def test_validation_payload_flags_edge_selections(self):
+        target = write_fixture(self.root, count=480)
+        backtest = request_for(target.name, warmup_bars=4, parameters={"period": 2, "quantity": "2"})
+        request = {"backtest": backtest, "search_space": {"period": {"low": 2, "high": 4, "step": 1}},
+                   "plan": {"train_bars": 96, "test_bars": 64, "windows": 3},
+                   "regime_rule": {"lookback_bars": 4, "trend_efficiency": "0.5", "high_volatility_bps": "250"},
+                   "max_candidates": 3, "max_runs": 12}
+        payload, report = execute_validation(request, provenance(target.name))
+        edges = payload["selection_edges"]
+        chosen = [row["training"]["trials"][row["training"]["selected_trial_number"]]["params"][0][1]
+                  for row in payload["result"]["validation"]["windows"]
+                  if row["training"]["selected_trial_number"] is not None]
+        self.assertEqual(edges["windows_with_selection"], len(chosen))
+        self.assertEqual(edges["params"]["period"], {"at_low": chosen.count(2), "at_high": chosen.count(4)})
+        self.assertEqual(edges["windows_at_edge"], sum(value in (2, 4) for value in chosen))
+        self.assertIn("選參落在搜尋範圍邊界", report)
+
+
+if __name__ == "__main__":
+    unittest.main()

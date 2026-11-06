@@ -92,7 +92,7 @@ ENGINE_FILES = (
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py",
-    "catos/research_costs.py",
+    "catos/research_costs.py", "catos/research_overfit.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
