@@ -114,9 +114,11 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(manifest["sha256"], DONCHIAN_SHA256)
         self.assertEqual(manifest["provenance"]["scope"], "research-only")
         strategies = catalog()["strategies"]
-        # Package E (2026-11-06) appended three preregistered daily strategies after these two.
+        # Package E (2026-11-06) appended three preregistered daily strategies after these two,
+        # package F (2026-11-07) two intraday DCM strategies.
         self.assertEqual([item["id"] for item in strategies],
-                         ["sma-trend", DONCHIAN_ID, "donchian-ensemble", "tsmom-multi", "dcm-daily"])
+                         ["sma-trend", DONCHIAN_ID, "donchian-ensemble", "tsmom-multi", "dcm-daily",
+                          "dcm-fade", "dcm-pullback"])
         donchian = strategies[1]
         self.assertEqual(donchian["parameters"], {"entry_bars": {"min": 2, "max": 960},
                                                   "exit_bars": {"min": 1, "max": 959},

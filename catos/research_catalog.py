@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research, research_costs, research_datasets
+from catos import research, research_costs, research_datasets, research_trades
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,8 +57,13 @@ DAILY_PROVENANCE = {"origin": "catos-research-daily-preregistered", "approval_ba
 DAILY_MANIFESTS = ROOT / "catos" / "research_only_artifacts"
 # 366 complete days for the longest look-back plus the partial first day.
 DAILY_WARMUP_DAYS = 367
-DAILY_WARMUP_LIMIT = 20_000
+DAILY_WARMUP_LIMIT = 60_000
 DAY_MS = 86_400_000
+# Package F (2026-11-07): intraday DCM rules from the user's calibration, preregistered.
+INTRADAY_FILES = ("catos/research_intraday.py",)
+INTRADAY_SHA256 = "f9616a00c9e91bd0d575d95415c9466cca6bc992fd4442f1be0cf233907d9b43"
+INTRADAY_PROVENANCE = {"origin": "catos-research-intraday-preregistered", "approval_basis": "user-calibrated-preregistered-rules", "scope": "research-only"}
+INTRADAY_WARMUP_DAYS = 3
 
 
 @dataclass(frozen=True)
@@ -104,6 +109,16 @@ STRATEGIES = {spec.strategy_id: spec for spec in (
           ("dcm-daily", "dcm-daily-preregistered-v1", "DCMDaily",
            "DCM 日線版（Long / Short）", "score_filter", 0, "fixed", "10"),
       )),
+    *(ResearchStrategy(artifact_id, version, f"catos.research_intraday:{entry}", INTRADAY_SHA256,
+                       INTRADAY_FILES, DAILY_MANIFESTS / f"{artifact_id}-{version}.json", INTRADAY_PROVENANCE,
+                       name, ((param, low, high),), param, DAILY_WARMUP_LIMIT, INTRADAY_WARMUP_DAYS, "fixed",
+                       {"parameters": {param: default}, "quantity": "10", "warmup_days": INTRADAY_WARMUP_DAYS})
+      for artifact_id, version, entry, name, param, low, high, default in (
+          ("dcm-fade", "dcm-fade-preregistered-v1", "DCMFade",
+           "DCM 假突破反轉（Long / Short，短週期）", "exit_mode", 0, 1, 0),
+          ("dcm-pullback", "dcm-pullback-preregistered-v1", "DCMPullback",
+           "DCM 突破後回踩（Long，短週期）", "window_days", 1, 5, 3),
+      )),
 )}
 
 
@@ -119,7 +134,7 @@ ENGINE_FILES = (
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py",
-    "catos/research_costs.py", "catos/research_overfit.py",
+    "catos/research_costs.py", "catos/research_overfit.py", "catos/research_trades.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -129,7 +144,9 @@ DEFAULT_REQUEST = {
 }
 # The Decimal core runs ~45k bars/s locally; the binding limit is output size,
 # so equity/drawdown curves above MAX_CURVE_POINTS are sampled in the payload.
-MAX_BARS = 20_000
+# 2026-11-07: raised from 20,000 so six months of 5m bars (~52,700) fit one run;
+# fills are still listed in full, so very active strategies can hit the 2 MB cap.
+MAX_BARS = 60_000
 MAX_CURVE_POINTS = 2_000
 MAX_RUNS = 200
 TIMEOUT_SECONDS = 30
@@ -631,6 +648,7 @@ def execute_request(request, expected_source):
         "request": snapshot, "provenance": expected_source,
         "result": result_payload, "drawdown_curve": drawdown,
         "costs": asdict(costs), "funding_coverage": dataset.funding_summary(),
+        "trade_stats": research_trades.trade_stats(result),
         "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }

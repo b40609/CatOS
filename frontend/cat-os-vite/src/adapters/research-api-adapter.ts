@@ -286,7 +286,31 @@ export interface SelectionEdges {
   notice: string;
 }
 
+// catos/research_trades.py: closed round trips after fees, slippage and funding (Decimal strings).
+export interface TradeStats {
+  closed_trips: number;
+  wins: number;
+  losses: number;
+  breakeven: number;
+  win_rate: string | null;
+  average_win: string | null;
+  average_loss: string | null;
+  payoff_ratio: string | null;
+  profit_factor: string | null;
+  expectancy: string | null;
+  largest_win: string | null;
+  largest_loss: string | null;
+  max_consecutive_losses: number;
+  average_hold_hours: string | null;
+  long: { trips: number; wins: number; win_rate: string | null; net_pnl: string };
+  short: { trips: number; wins: number; win_rate: string | null; net_pnl: string };
+  open_trip: { side: number; open_time_ms: number; net_pnl_with_unrealized: string } | null;
+  notice: string;
+}
+
 export interface BacktestResultPayload {
+  // Absent on runs archived before round-trip statistics existed (2026-11-07).
+  trade_stats?: TradeStats;
   // Absent on runs archived before cost attribution existed.
   costs?: CostBreakdown;
   funding_coverage?: FundingCoverage;

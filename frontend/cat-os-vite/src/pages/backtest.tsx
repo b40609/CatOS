@@ -18,7 +18,8 @@ import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
-import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
+import { TradeStatsPanel } from "@/components/catos/trade-stats-panel";
+import { formatDecimal, formatDrawdownPct, formatRatioPct, signOf } from "@/lib/format";
 import {
   DONCHIAN_ID, donchianParams, formatParams, minWarmupBars, minWarmupProblems, paramLabel, paramProblems, paramSpecs,
   pickStrategy, shortName,
@@ -567,7 +568,19 @@ function BacktestPage() {
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              勝率: <span className="text-muted-foreground/60 italic text-t3">後端尚未提供 (無往返勝率)</span>
+              勝率:{" "}
+              {result?.trade_stats?.win_rate != null ? (
+                <strong className="text-foreground" title={result.trade_stats.notice}>
+                  {formatRatioPct(result.trade_stats.win_rate, { sign: false })}
+                  <span className="text-t2 text-muted-foreground/80 ml-1">
+                    ({result.trade_stats.wins}/{result.trade_stats.closed_trips} 筆往返)
+                  </span>
+                </strong>
+              ) : (
+                <span className="text-muted-foreground/60 italic text-t3">
+                  {result?.trade_stats ? "沒有已平倉的往返交易" : "舊紀錄沒有往返統計"}
+                </span>
+              )}
             </span>
           </div>
           <div className="flex items-center gap-2.5 text-t3 text-muted-foreground">
@@ -590,6 +603,10 @@ function BacktestPage() {
           sampling={result?.curve_sampling}
           loading={resultLoading}
         />
+
+        {result && !resultLoading && result.trade_stats && (
+          <TradeStatsPanel stats={result.trade_stats} />
+        )}
 
         {result && !resultLoading && (
           <CostBreakdownPanel

@@ -143,12 +143,24 @@ def fetch_instrument(client, inst_id):
 def fetch_candles(client, inst_id, bar, start_ms, end_ms):
     """Closed bars with open time in [start, end), ascending, as (ms, open, high, low, close)."""
     rows = {}
-    cursor = end_ms
+    fetch_candle_pages(client, inst_id, bar, start_ms, end_ms, rows)
+    return [rows[ms] for ms in sorted(rows)]
+
+
+def fetch_candle_pages(client, inst_id, bar, start_ms, cursor, rows, stop_at=None):
+    """Page older bars into rows from cursor; return (cursor, exhausted).
+
+    stop_at: stop before a page once client.requests reaches it, so a resumable
+    run keeps a reserve for the funding pages. exhausted is True when OKX returned
+    an empty page (no older data), which the gap check then reports.
+    """
     while cursor > start_ms:
+        if stop_at is not None and client.requests >= stop_at:
+            return cursor, False
         page = client.get(CANDLES_PATH, {"instId": inst_id, "bar": bar, "after": str(cursor),
                                          "limit": str(PAGE_LIMIT)})
         if not page:
-            break
+            return cursor, True
         if any(type(item) is not list or len(item) < 9 or not str(item[0]).isdigit() for item in page):
             raise FetchError("candle_row_shape_unexpected")
         times = [int(item[0]) for item in page]
@@ -163,7 +175,7 @@ def fetch_candles(client, inst_id, bar, start_ms, end_ms):
                 raise FetchError(f"invalid_ohlc_bounds: {ms}")
             rows[ms] = (ms, o, h, low, c)
         cursor = times[-1]
-    return [rows[ms] for ms in sorted(rows)]
+    return cursor, False
 
 
 def fetch_funding(client, inst_id, start_ms, end_ms):
@@ -195,6 +207,8 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     parser.add_argument("--days", type=int, required=True, help="whole days ending at the last closed bar")
     parser.add_argument("--end-ms", type=int, help="exclusive end (bar-aligned) to re-fetch a known range")
     parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS_CAP)
+    parser.add_argument("--resume", action="store_true",
+                        help="fetch a long range over several runs, each within --max-requests")
     args = parser.parse_args(argv)
     if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= MAX_DAYS:
         parser.error(f"inst-id must be <BASE>-USDT-SWAP and days in [1, {MAX_DAYS}]")
@@ -207,6 +221,8 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
         parser.error("end-ms must be bar-aligned and not in the future")
     start_ms = end_ms - args.days * DAY_MS
     client = client or Client(max_requests=args.max_requests)
+    if args.resume:
+        return _resumable(args, client, now_ms, root, start_ms, end_ms)
     try:
         instrument = fetch_instrument(client, args.inst_id)
         datasets.contract_from_instrument(instrument, args.inst_id)  # fail before paging candles
@@ -224,6 +240,69 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     print(json.dumps({"dataset_id": dataset.dataset_id, "path": datasets.rel_path(target),
                       "bars": dataset.bars, "funding_events": len(funding),
                       "requests": client.requests, "files": dict(dataset.files)}, ensure_ascii=False, indent=2))
+    return 0
+
+
+# Pages kept for funding (about 3 months of 8h events: 3 pages plus the empty one) on the last run.
+FUNDING_RESERVE = 6
+IN_PROGRESS = 3  # exit code: more runs are needed
+
+
+def _staging_path(root, inst_id, bar):
+    root = Path(root) if root is not None else datasets.DATA_ROOT
+    return root / ".staging" / f"{inst_id}-{bar}.json"
+
+
+def _resumable(args, client, now_ms, root, start_ms, end_ms):
+    """One run of a multi-run fetch; progress lives in data/okx/.staging/<inst>-<bar>.json.
+
+    The first run fixes the range (end from --end-ms or the last closed bar) and
+    the instrument record; later runs must ask for the same --days and continue
+    paging from the stored cursor. Only the last run fetches funding and writes
+    the dataset through write_dataset, so every existing check still applies.
+    """
+    path = _staging_path(root, args.inst_id, args.bar)
+    try:
+        if path.exists():
+            state = json.loads(path.read_text(encoding="utf-8"))
+            if (state["inst_id"], state["bar"], state["days"]) != (args.inst_id, args.bar, args.days) or (
+                    args.end_ms is not None and args.end_ms != state["end_ms"]):
+                raise FetchError("resume_range_mismatch: finish or remove the staged fetch first")
+            start_ms, end_ms = state["start_ms"], state["end_ms"]
+            rows = {row[0]: tuple(row) for row in state["candles"]}
+            instrument, cursor, previous = state["instrument"], state["cursor"], state["requests"]
+        else:
+            instrument = fetch_instrument(client, args.inst_id)
+            datasets.contract_from_instrument(instrument, args.inst_id)
+            rows, cursor, previous = {}, end_ms, 0
+        cursor, exhausted = fetch_candle_pages(client, args.inst_id, args.bar, start_ms, cursor, rows,
+                                               stop_at=client.max_requests - FUNDING_RESERVE)
+        if cursor > start_ms and not exhausted:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            state = {"inst_id": args.inst_id, "bar": args.bar, "days": args.days, "start_ms": start_ms,
+                     "end_ms": end_ms, "cursor": cursor, "requests": previous + client.requests,
+                     "instrument": instrument, "candles": [list(rows[ms]) for ms in sorted(rows)]}
+            path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            remaining = (cursor - start_ms) // datasets.BAR_MS[args.bar]
+            print(json.dumps({"status": "in_progress", "staged_bars": len(rows), "remaining_bars": remaining,
+                              "requests_this_run": client.requests, "requests_total": previous + client.requests},
+                             ensure_ascii=False))
+            return IN_PROGRESS
+        funding = fetch_funding(client, args.inst_id, start_ms, end_ms)
+        target = datasets.write_dataset(
+            root, inst_id=args.inst_id, bar=args.bar, start_ms=start_ms, end_ms=end_ms,
+            candles=[rows[ms] for ms in sorted(rows)], funding=funding, instrument=instrument,
+            fetched_at_ms=now_ms, requests=previous + client.requests,
+        )
+        dataset = datasets.load_manifest(target / datasets.MANIFEST, root)
+    except (FetchError, ValueError, FileExistsError, KeyError, json.JSONDecodeError) as error:
+        print(f"stopped after {client.requests} requests: {error}", file=sys.stderr)
+        return 1
+    path.unlink(missing_ok=True)
+    print(json.dumps({"dataset_id": dataset.dataset_id, "path": datasets.rel_path(target),
+                      "bars": dataset.bars, "funding_events": len(funding),
+                      "requests": previous + client.requests, "files": dict(dataset.files)},
+                     ensure_ascii=False, indent=2))
     return 0
 
 

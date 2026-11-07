@@ -185,3 +185,58 @@ class FetchToolTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResumableFetchTest(unittest.TestCase):
+    """2026-11-07: long ranges are fetched over several runs, each within the request cap."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "okx"
+        self.time = FakeTime()
+
+    def run_tool(self, okx, *args, max_requests=8):
+        client = fetch.Client(max_requests=max_requests, opener=okx, clock=self.time.clock,
+                              sleep=self.time.sleep, base_url="https://fake.invalid")
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = fetch.main(["--days", "3", "--end-ms", str(END), *args], client=client,
+                              now_ms=END + 5 * 60_000, root=self.root)
+        return code, out.getvalue(), err.getvalue(), client
+
+    def test_runs_continue_until_the_dataset_is_written_like_a_single_run(self):
+        okx = FakeOKX(self.time)
+        code, out, err, client = self.run_tool(okx, "--resume")
+        self.assertEqual(code, fetch.IN_PROGRESS, err)
+        self.assertEqual(client.requests, 2)  # instrument + one page; the rest is the funding reserve
+        staged = fetch._staging_path(self.root, "BTC-USDT-SWAP", "15m")
+        self.assertTrue(staged.exists())
+        self.assertEqual(datasets.list_datasets(self.root), ([], []))  # staging is not a dataset
+        code, out, err, client = self.run_tool(okx, "--resume")
+        self.assertEqual(code, 0, err)
+        self.assertFalse(staged.exists())
+        summary = json.loads(out)
+        self.assertEqual(summary["requests"], 5)
+        resumed = self.root / "BTC-USDT-SWAP" / "15m" / summary["dataset_id"]
+        single_root = Path(self.tmp.name) / "single"
+        client = fetch.Client(max_requests=50, opener=FakeOKX(self.time), clock=self.time.clock,
+                              sleep=self.time.sleep, base_url="https://fake.invalid")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(fetch.main(["--days", "3", "--end-ms", str(END)], client=client,
+                                        now_ms=END + 5 * 60_000, root=single_root), 0)
+        single = single_root / "BTC-USDT-SWAP" / "15m" / summary["dataset_id"]
+        for name in (datasets.CANDLES, datasets.FUNDING, datasets.INSTRUMENT):
+            self.assertEqual((resumed / name).read_bytes(), (single / name).read_bytes(), name)
+
+    def test_a_different_range_cannot_resume_a_staged_fetch(self):
+        okx = FakeOKX(self.time)
+        self.assertEqual(self.run_tool(okx, "--resume")[0], fetch.IN_PROGRESS)
+        client = fetch.Client(max_requests=8, opener=okx, clock=self.time.clock, sleep=self.time.sleep,
+                              base_url="https://fake.invalid")
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), redirect_stderr(err):
+            code = fetch.main(["--days", "2", "--end-ms", str(END), "--resume"], client=client,
+                              now_ms=END + 5 * 60_000, root=self.root)
+        self.assertEqual(code, 1)
+        self.assertIn("resume_range_mismatch", err.getvalue())

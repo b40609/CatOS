@@ -14,6 +14,7 @@ floats reported as fixed-digit strings and never feed back into the ledger.
   share of resamples whose mean is not positive.
 """
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 import random
@@ -58,11 +59,20 @@ def yearly(result, bars, buy_hold_quantity):
 
 
 class Delayed(research.Strategy):
-    """Emit each target one bar after the wrapped strategy decides it."""
+    """Emit each target one bar after the wrapped strategy decides it.
+
+    The wrapped strategy sees the position it has already decided on (as if its
+    target had filled at the next open, as without delay); only the real fill is
+    one bar later. Without this, a strategy that reads its own position (entry
+    and exit state machines, rebalancing bands) would see a stale position and
+    run different logic, which is not a delay test. Fixed 2026-11-07; earlier
+    delay numbers for position-reading strategies were affected.
+    """
 
     def __init__(self, inner):
         self.inner = inner
         self.pending = None
+        self.believed = None
 
     @property
     def ready(self):
@@ -72,7 +82,11 @@ class Delayed(research.Strategy):
         return self.inner.update_indicators(bar)
 
     def on_bar(self, bar, account):
-        decided = self.inner.on_bar(bar, account)
+        if self.believed is None:
+            self.believed = account.position
+        decided = self.inner.on_bar(bar, replace(account, position=self.believed))
+        if decided is not None:
+            self.believed = decided
         emitted, self.pending = self.pending, decided
         return emitted
 
