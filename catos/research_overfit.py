@@ -133,9 +133,11 @@ def pbo_cscv(series, blocks=PBO_BLOCKS):
     logits.sort()
     middle = len(logits) // 2
     median = logits[middle] if len(logits) % 2 else (logits[middle - 1] + logits[middle]) / 2
+    # lambda == 0 (winner exactly at the OOS median) counts as overfit, as in R pbo and
+    # fynance; its share is reported because with few candidates it moves PBO a lot.
     return {"pbo": sum(value <= 0 for value in logits) / len(logits), "logit_median": median,
             "prob_oos_loss": losses / len(logits), "splits": len(logits), "blocks": blocks,
-            "bars_per_block": size}
+            "bars_per_block": size, "logit_zero_share": sum(value == 0 for value in logits) / len(logits)}
 
 
 def _fmt(value, digits=4):
@@ -146,7 +148,10 @@ def _fmt(value, digits=4):
     return f"{value:.{digits}f}"
 
 
-def verdict(dsr, pbo):
+COARSE_TRIALS = 10  # Bailey et al. 2017 ask for many more candidates than this
+
+
+def verdict(dsr, pbo, trials=None):
     if dsr is None:
         return "樣本不足或報酬分布退化，無法計算 DSR。"
     parts = []
@@ -163,6 +168,9 @@ def verdict(dsr, pbo):
             parts.append("PBO 介於 0.2 與 0.5：選參過程有一定機率選到樣本外不佳的組合。")
         else:
             parts.append("PBO ≤ 0.2：樣本內冠軍在樣本外通常仍排在前段。")
+        if (trials is not None and trials < COARSE_TRIALS) or pbo["logit_zero_share"] >= 0.1:
+            parts.append(f"注意：只有 {trials} 組參數、或有 {pbo['logit_zero_share']:.0%} 的切法剛好落在中位數，"
+                         "PBO 粒度很粗；換一組試驗或改用完整格點，數字可能差很多，只能當參考。")
     return "".join(parts)
 
 
@@ -201,10 +209,11 @@ def search_report(candidates, best_params, timeframe_ms):
         "psr_vs_zero": _fmt(psr), "dsr": _fmt(dsr),
         "pbo": None if pbo is None else {**pbo, "pbo": _fmt(pbo["pbo"]),
                                          "logit_median": _fmt(pbo["logit_median"]),
-                                         "prob_oos_loss": _fmt(pbo["prob_oos_loss"])},
+                                         "prob_oos_loss": _fmt(pbo["prob_oos_loss"]),
+                                         "logit_zero_share": _fmt(pbo["logit_zero_share"])},
         "trials": [{"params": [[name, value] for name, value in params],
                     "sharpe_annualized": _fmt(sharpes[params] * per_year, 3)} for params in names],
-        "verdict": verdict(dsr, pbo),
+        "verdict": verdict(dsr, pbo, trials),
         "notice": NOTICE,
     }
 
@@ -214,8 +223,12 @@ def edge_selections(windows, search_space):
 
     windows: (number, selected params as (name, value) pairs or None). A choice on
     the boundary means the best value may lie outside the range, and widening the
-    range is another search on the same data.
+    range is another search on the same data. Parameters with at most two values
+    (an on/off switch) are always on a boundary, so they are listed as excluded.
     """
+    excluded = [name for name, bounds in search_space.items()
+                if (bounds["high"] - bounds["low"]) // bounds["step"] + 1 <= 2]
+    search_space = {name: bounds for name, bounds in search_space.items() if name not in excluded}
     counts = {name: {"at_low": 0, "at_high": 0} for name in search_space}
     selected = [(number, dict(params)) for number, params in windows if params]
     edge_windows = 0
@@ -230,4 +243,5 @@ def edge_selections(windows, search_space):
                 hit = True
         edge_windows += hit
     return {"windows_with_selection": len(selected), "windows_at_edge": edge_windows, "params": counts,
+            "excluded_switch_params": excluded,
             "notice": "選定參數落在搜尋範圍邊界時，最佳值可能在範圍外；放寬範圍等於在同一份資料上再搜尋一次，試驗數要累計。"}

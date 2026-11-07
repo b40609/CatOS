@@ -137,3 +137,27 @@ class PayloadTest(DatasetFixture):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AcceptanceFollowUpTest(unittest.TestCase):
+    """Package D/E acceptance observations O1 (coarse PBO) and O4 (switch parameters)."""
+
+    def test_switch_parameters_are_not_counted_as_edge_choices(self):
+        space = {"vol_scaling": {"low": 0, "high": 1, "step": 1}}
+        edges = overfit.edge_selections([(0, [["vol_scaling", 1]]), (1, [["vol_scaling", 0]])], space)
+        self.assertEqual((edges["windows_at_edge"], edges["params"], edges["excluded_switch_params"]),
+                         (0, {}, ["vol_scaling"]))
+        mixed = {**space, "period": {"low": 8, "high": 32, "step": 8}}
+        edges = overfit.edge_selections([(0, [["period", 32], ["vol_scaling", 1]])], mixed)
+        self.assertEqual((edges["windows_at_edge"], edges["params"]["period"]["at_high"]), (1, 1))
+
+    def test_coarse_pbo_is_flagged_in_the_verdict(self):
+        rng = random.Random(21)
+        series = [[rng.gauss(0.0, 0.01) for _ in range(800)] for _ in range(4)]
+        result = overfit.pbo_cscv(series)
+        self.assertIn("logit_zero_share", result)
+        self.assertTrue(0.0 <= result["logit_zero_share"] <= 1.0)
+        self.assertIn("粒度很粗", overfit.verdict(0.7, result, trials=4))
+        many = {**result, "logit_zero_share": 0.0}
+        self.assertNotIn("粒度很粗", overfit.verdict(0.7, many, trials=40))
+        self.assertIn("粒度很粗", overfit.verdict(0.7, {**many, "logit_zero_share": 0.2}, trials=40))

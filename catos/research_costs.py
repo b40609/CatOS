@@ -12,8 +12,11 @@ The funding scenario is an assumption, never ledger data: when a dataset's real
 funding starts after the evaluation start (OKX keeps about three months), the
 uncovered funding times are charged at a fixed rate on the position the engine
 held at each time, marked at that bar's open, mirroring ``research._Ledger.fund``.
-It is valid for strategies whose targets do not depend on balance or equity,
-which holds for the registered research strategies (fixed contract quantity).
+It is exact for strategies whose targets do not depend on balance or equity
+(fixed contract quantity: SMA, Donchian, DCM daily). For equity-sized strategies
+(sizing "vol_target") the assumed funding would have changed equity and later
+sizes, so the scenario keeps the actual positions and is only an approximation;
+results say so with EQUITY_SIZED_NOTICE.
 """
 
 from dataclasses import dataclass, replace

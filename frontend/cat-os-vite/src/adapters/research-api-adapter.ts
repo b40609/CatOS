@@ -269,6 +269,8 @@ export interface OverfittingReport {
     splits: number;
     blocks: number;
     bars_per_block: number;
+    // Share of splits whose winner sat exactly at the OOS median; absent before 2026-11-06 follow-up.
+    logit_zero_share?: string;
   } | null;
   trials: { params: [string, number | string][]; sharpe_annualized: string }[];
   verdict: string;
@@ -279,6 +281,8 @@ export interface SelectionEdges {
   windows_with_selection: number;
   windows_at_edge: number;
   params: Record<string, { at_low: number; at_high: number }>;
+  // On/off parameters (two values) are always on a boundary, so they are not counted.
+  excluded_switch_params?: string[];
   notice: string;
 }
 
