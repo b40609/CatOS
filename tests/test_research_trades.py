@@ -104,3 +104,37 @@ class ReconciliationTest(unittest.TestCase):
         self.assertLessEqual(abs(stats["rounding_residual"]), trades.TOLERANCE)
         closed, open_trip = trades.round_trips(result)
         self.assertGreaterEqual(len(closed), 5)
+
+    def test_output_has_no_trailing_zero_padding(self):
+        """F acceptance O9: 120-digit sums no longer leave strings padded with zeros; values unchanged."""
+        self.assertEqual(str(trades._compact(D("398.190100000"))), "398.1901")
+        self.assertEqual(str(trades._compact(D("100.000"))), "100")
+        self.assertEqual(str(trades._compact(D("0E-19"))), "0")
+        self.assertEqual(str(trades._compact(D("1.55010000E-45"))), "1.5501E-45")
+        self.assertEqual(trades._compact({"a": {"b": D("2.50")}, "n": 3, "s": "x", "z": None}),
+                         {"a": {"b": D("2.5")}, "n": 3, "s": "x", "z": None})
+        bars = candles(160)
+        plan = {3: D("3.17"), 9: D("-7.89"), 15: D("5.03"), 21: D("7.77"), 27: D("-1.11"), 33: D("2.29"),
+                40: D("0"), 46: D("-4.41"), 52: D("3.33"), 58: D("2.21")}
+        result = run(plan, bars)
+        stats = trades.trade_stats(result)
+
+        def decimals(value):
+            if isinstance(value, dict):
+                for item in value.values():
+                    yield from decimals(item)
+            elif isinstance(value, D):
+                yield value
+
+        values = list(decimals(stats))
+        self.assertGreater(len(values), 10)
+        for value in values:
+            text = str(value)
+            mantissa = text.split("E")[0]
+            self.assertFalse("." in mantissa and mantissa.endswith("0"), text)
+            self.assertLessEqual(len(value.as_tuple().digits), 120)
+        closed, open_trip = trades.round_trips(result)
+        self.assertIsNotNone(open_trip)
+        with localcontext(trades._WIDE):
+            self.assertEqual(stats["open_trip"]["net_pnl_with_unrealized"],
+                             open_trip.net_pnl + result.equity_curve[-1].unrealized_pnl)

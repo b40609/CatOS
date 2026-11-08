@@ -5,14 +5,15 @@ The formulas were also cross-checked outside the repo against fynance 2.13.1
 these tests pin the same behavior without those dependencies.
 """
 
+from dataclasses import replace
 from decimal import Decimal
 import random
 import unittest
 
-from catos import research, research_overfit as overfit
+from catos import research, research_overfit as overfit, research_robustness as robust
 from catos.optimization import IntRange, optimize
-from catos.research_catalog import provenance
-from catos.research_optimization import execute_optimization
+from catos.research_catalog import _wiped_out, provenance
+from catos.research_optimization import execute_optimization, overfit_rows
 from catos.research_validation_job import execute_validation
 from test_research_costs import CONTRACT, Flip, candles, config
 from test_research_datasets import DatasetFixture, request_for, write_fixture
@@ -161,3 +162,71 @@ class AcceptanceFollowUpTest(unittest.TestCase):
         many = {**result, "logit_zero_share": 0.0}
         self.assertNotIn("粒度很粗", overfit.verdict(0.7, many, trials=40))
         self.assertIn("粒度很粗", overfit.verdict(0.7, {**many, "logit_zero_share": 0.2}, trials=40))
+        # O1 (2026-11-08): name only the condition that fired.
+        ties_only = overfit.verdict(0.7, {**many, "logit_zero_share": 0.2}, trials=40)
+        self.assertIn("有 20% 的切法剛好落在中位數", ties_only)
+        self.assertNotIn("只有 40 組", ties_only)
+        few_only = overfit.verdict(0.7, many, trials=4)
+        self.assertIn("只有 4 組參數", few_only)
+        self.assertNotIn("0% 的切法", few_only)
+
+
+class WipedOutTest(unittest.TestCase):
+    """Equity <= 0 (no liquidation model): no ratio statistics for that run (F acceptance O5)."""
+
+    def setUp(self):
+        bars = candles(480)
+        self.runs = {(("every", every),): research.backtest(strategy=lambda every=every: Flip(every), candles=bars,
+                                                            config=config(), warmup_bars=3)
+                     for every in (3, 5, 7, 9)}
+
+    @staticmethod
+    def wipe(run, at=200):
+        curve = list(run.equity_curve)
+        curve[at:] = [replace(point, equity=point.equity - Decimal("20000")) for point in curve[at:]]
+        return replace(run, equity_curve=tuple(curve))
+
+    def test_bar_returns_and_daily_returns_refuse_non_positive_equity(self):
+        run = next(iter(self.runs.values()))
+        self.assertIsNone(overfit.first_non_positive(run.equity_curve))
+        wiped = self.wipe(run)
+        self.assertEqual(overfit.first_non_positive(wiped.equity_curve), 200)
+        with self.assertRaisesRegex(ValueError, "equity_not_positive"):
+            overfit.bar_returns(wiped.equity_curve)
+        with self.assertRaisesRegex(ValueError, "equity_not_positive"):
+            robust.daily_returns(wiped)
+        info = robust.wiped_out(wiped)
+        self.assertEqual(info["time_ms"], wiped.equity_curve[200].time_ms)
+        self.assertEqual(info["points_at_or_below_zero"], len(wiped.equity_curve) - 200)
+        self.assertIsNone(robust.wiped_out(run))
+        self.assertIsNone(_wiped_out(run))
+        self.assertEqual(_wiped_out(wiped)["min_equity"], min(point.equity for point in wiped.equity_curve))
+
+    def test_wiped_trial_counts_in_n_but_not_in_variance_or_pbo(self):
+        names = list(self.runs)
+        best = max(names[:3], key=lambda name: self.runs[name].performance.return_pct)
+        alive = {name: self.runs[name] for name in names[:3]}
+        mixed = {**alive, names[3]: self.wipe(self.runs[names[3]])}
+        reference = overfit.search_report(alive, best, 900_000)
+        report = overfit.search_report(mixed, best, 900_000)
+        self.assertEqual((report["distinct_trials"], report["wiped_out_trials"]), (4, 1))
+        self.assertEqual(report["trial_sharpe_variance"], reference["trial_sharpe_variance"])
+        self.assertEqual(report["pbo"], reference["pbo"])
+        variance = float(reference["trial_sharpe_variance"])
+        self.assertEqual(report["expected_max_sharpe_per_bar"], f"{overfit.expected_max_sharpe(variance, 4):.6f}")
+        self.assertEqual(report["trials"][3], {"params": [["every", 9]], "sharpe_annualized": None, "wiped_out": True})
+        self.assertFalse(report["best"]["wiped_out"])
+        self.assertIn("有 1 組參數權益跌破 0（爆倉）", report["verdict"])
+        self.assertIn("爆倉", report["notice"])
+        self.assertNotIn("爆倉", reference["verdict"] + reference["notice"])
+
+    def test_wiped_best_has_no_dsr(self):
+        names = list(self.runs)
+        mixed = {**self.runs, names[0]: self.wipe(self.runs[names[0]])}
+        report = overfit.search_report(mixed, names[0], 900_000)
+        self.assertTrue(report["best"]["wiped_out"])
+        self.assertEqual((report["dsr"], report["psr_vs_zero"], report["best"]["sharpe_annualized"]), (None, None, None))
+        self.assertTrue(report["verdict"].startswith("最佳參數權益跌破 0（爆倉），無法計算 DSR。"))
+        self.assertEqual(report["bars"], len(mixed[names[0]].equity_curve) - 1)
+        rows = dict(overfit_rows(report))
+        self.assertEqual((rows["最佳 Sharpe（年化）"], rows["權益跌破 0（爆倉）的參數組"]), ("爆倉，不計算", 1))

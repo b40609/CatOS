@@ -17,9 +17,11 @@ def overfit_rows(report):
     return [
         ("不同參數組數 N（只計本次）", report["distinct_trials"]), ("評估 K 線數", report["bars"]),
         ("最佳參數", ", ".join(f"{name}={value}" for name, value in report["best"]["params"])),
-        ("最佳 Sharpe（年化）", report["best"]["sharpe_annualized"]),
+        ("最佳 Sharpe（年化）", "爆倉，不計算" if report["best"].get("wiped_out")
+         else report["best"]["sharpe_annualized"]),
         ("N 組純運氣可期待的最大 Sharpe（年化）", report["expected_max_sharpe_annualized"]),
         ("PSR（真實 Sharpe > 0 的機率）", report["psr_vs_zero"]), ("DSR", report["dsr"]),
+        ("權益跌破 0（爆倉）的參數組", report.get("wiped_out_trials", 0)),
         ("PBO（CSCV）", "樣本不足" if pbo is None else f"{pbo['pbo']}（{pbo['blocks']} 區塊、{pbo['splits']} 種切法）"),
         ("判讀", report["verdict"]), ("說明", report["notice"]),
     ]

@@ -7,6 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
 from catos import research_datasets as datasets
@@ -240,3 +241,63 @@ class ResumableFetchTest(unittest.TestCase):
                               now_ms=END + 5 * 60_000, root=self.root)
         self.assertEqual(code, 1)
         self.assertIn("resume_range_mismatch", err.getvalue())
+
+    # F acceptance O10 (2026-11-08)
+    def test_resume_refuses_a_budget_that_never_advances(self):
+        for budget in ("6", "7"):
+            with self.subTest(budget=budget), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stop:
+                fetch.main(["--days", "3", "--end-ms", str(END), "--resume", "--max-requests", budget],
+                           now_ms=END + 5 * 60_000, root=self.root)
+            self.assertEqual(stop.exception.code, 2)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_tool(FakeOKX(self.time), "--resume", max_requests=fetch.MIN_RESUME_REQUESTS - 1)
+        self.assertFalse(fetch._staging_path(self.root, "BTC-USDT-SWAP", "15m").exists())
+        self.assertEqual(self.run_tool(FakeOKX(self.time), "--resume",
+                                       max_requests=fetch.MIN_RESUME_REQUESTS)[0], fetch.IN_PROGRESS)
+
+    def test_funding_failure_on_the_last_run_keeps_this_runs_candles(self):
+        okx = FakeOKX(self.time)
+        self.assertEqual(self.run_tool(okx, "--resume")[0], fetch.IN_PROGRESS)
+
+        class FailFundingOnce:
+            failed = False
+
+            def __call__(self, url):
+                if not self.failed and fetch.FUNDING_PATH in url:
+                    self.failed = True
+                    return 400, b"{}"
+                return okx(url)
+
+        code, _, err, _ = self.run_tool(FailFundingOnce(), "--resume")
+        self.assertEqual(code, 1)
+        self.assertIn("http_400", err)
+        staged = json.loads(fetch._staging_path(self.root, "BTC-USDT-SWAP", "15m").read_text(encoding="utf-8"))
+        self.assertLessEqual(staged["cursor"], staged["start_ms"])  # every candle is kept
+        self.assertEqual(staged["requests"], 2 + 3)  # run 1: instrument + page; run 2: 2 pages + failed funding
+        before = len(okx.calls)
+        code, out, err, _ = self.run_tool(okx, "--resume")
+        self.assertEqual(code, 0, err)
+        self.assertEqual([path for _, path, _ in okx.calls[before:]], [fetch.FUNDING_PATH])
+        self.assertEqual(json.loads(out)["requests"], 6)
+
+    def test_staging_write_is_atomic_and_runs_are_paced_across_processes(self):
+        clock = [100.0]
+        okx = FakeOKX(self.time)
+        with mock.patch.object(fetch, "wall_clock", lambda: clock[0]):
+            self.assertEqual(self.run_tool(okx, "--resume")[0], fetch.IN_PROGRESS)
+            path = fetch._staging_path(self.root, "BTC-USDT-SWAP", "15m")
+            self.assertEqual(sorted(item.name for item in path.parent.iterdir()), [path.name])
+            saved = path.read_bytes()
+            with mock.patch.object(fetch.os, "replace", side_effect=OSError("disk full")):
+                code, _, err, _ = self.run_tool(okx, "--resume")
+            self.assertEqual(code, 1)
+            self.assertIn("disk full", err)
+            self.assertEqual(path.read_bytes(), saved)  # an interrupted write leaves the previous file
+            clock[0] = 100.1
+            sleeps = len(self.time.sleeps)
+            calls = len(okx.calls)
+            self.assertEqual(self.run_tool(okx, "--resume")[0], 0)
+            self.assertAlmostEqual(self.time.sleeps[sleeps], fetch.MIN_INTERVAL_S - 0.1)
+            self.assertGreater(len(okx.calls), calls)
+            self.assertFalse(path.exists())
+            self.assertFalse(path.with_name(path.name + ".tmp").exists())

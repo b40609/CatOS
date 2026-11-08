@@ -44,8 +44,13 @@ export function OverfittingPanel({ report, earlierSearches }: { report: Overfitt
               <Row label="不同參數組數 N（只計本次）" value={`${report.distinct_trials} 組`}
                 hint="TPE 可能重複抽到同一組；N 只計實際評估過的不同組合" />
               <Row label="最佳參數" value={paramsText(report.best.params)} />
-              <Row label="最佳 Sharpe（年化）" value={report.best.sharpe_annualized}
-                hint={`每根 ${report.best.sharpe_per_bar} · 偏態 ${report.best.skew} · 峰態 ${report.best.kurtosis}`} />
+              {report.best.sharpe_annualized === null ? (
+                <Row label="最佳 Sharpe（年化）" value={report.best.wiped_out ? "爆倉，不計算" : "不適用"}
+                  tone="text-rose-400 font-semibold" />
+              ) : (
+                <Row label="最佳 Sharpe（年化）" value={report.best.sharpe_annualized}
+                  hint={`每根 ${report.best.sharpe_per_bar} · 偏態 ${report.best.skew} · 峰態 ${report.best.kurtosis}`} />
+              )}
               <Row label="純運氣可期待的最大 Sharpe（年化）" value={report.expected_max_sharpe_annualized}
                 hint="N 組都沒有優勢時，最好那組的 Sharpe 期望值" />
             </div>
@@ -56,6 +61,10 @@ export function OverfittingPanel({ report, earlierSearches }: { report: Overfitt
               <Row label="PBO（CSCV）" value={report.pbo ? `${report.pbo.pbo}（${report.pbo.splits} 種切法）` : "樣本不足"}
                 tone={pboTone(report.pbo?.pbo)} hint="樣本內冠軍在樣本外落到中位數以下的比例" />
               <Row label="樣本外虧損比例" value={report.pbo?.prob_oos_loss ?? "不適用"} />
+              {(report.wiped_out_trials ?? 0) > 0 && (
+                <Row label="權益跌破 0（爆倉）" value={`${report.wiped_out_trials} 組`} tone="text-rose-400 font-semibold"
+                  hint="沒有強平模型；這些組計入 N，但不計入 Sharpe 變異數與 PBO" />
+              )}
             </div>
           </div>
           <p className="mt-2 text-t2 text-muted-foreground">

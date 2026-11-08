@@ -182,6 +182,13 @@ export function formatDateTime(ms: number | null | undefined): string {
   return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`;
 }
 
+/** `YYYY/MM/DD HH:mm` in Asia/Taipei, for times in multi-year research data. */
+export function formatDateTimeWithYear(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return '不適用';
+  const year = new Intl.DateTimeFormat('en-GB', { timeZone: TAIPEI, year: 'numeric' }).format(new Date(ms));
+  return `${year}/${formatDateTime(ms)}`;
+}
+
 export function formatTimeframe(ms: number | null | undefined): string {
   if (!ms) return '不適用';
   if (ms % 3_600_000 === 0) return `${ms / 3_600_000}h`;

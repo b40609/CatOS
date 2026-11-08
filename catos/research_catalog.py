@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research, research_costs, research_datasets, research_trades
+from catos import research, research_costs, research_datasets, research_overfit, research_trades
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -142,15 +142,26 @@ DEFAULT_REQUEST = {
     "initial_balance": "1000", "fee_rate": "0.0005",
     "slippage_bps": "2", "warmup_bars": 2,
 }
-# The Decimal core runs ~45k bars/s locally; the binding limit is output size,
-# so equity/drawdown curves above MAX_CURVE_POINTS are sampled in the payload.
-# 2026-11-07: raised from 20,000 so six months of 5m bars (~52,700) fit one run;
-# fills are still listed in full, so very active strategies can hit the 2 MB cap.
+# The Decimal core runs ~45k bars/s locally; the binding limit is output size:
+# MAX_OUTPUT_BYTES caps the worker's stdout, which carries the payload AND the
+# HTML report. Equity/drawdown curves above MAX_CURVE_POINTS are sampled in
+# both, and the report lists at most REPORT_MAX_FILL_ROWS fills, so the report
+# stays roughly fixed in size; the payload still lists every fill (~160 bytes
+# each), so a 6-month 5m run tops out around 6,000-7,000 fills.
+# 2026-11-07: raised from 20,000 so six months of 5m bars (~52,700) fit one run.
 MAX_BARS = 60_000
 MAX_CURVE_POINTS = 2_000
+REPORT_MAX_FILL_ROWS = 400
 MAX_RUNS = 200
 TIMEOUT_SECONDS = 30
 MAX_OUTPUT_BYTES = 2_000_000
+# An optimization replays every bar once per trial plus one re-run of the best,
+# so it is bounded by construction at (MAX_TRIALS + 1) x MAX_BARS = 1.26M bar
+# evaluations; no separate preflight. Measured 2026-11-08 on the i7-14700 host:
+# 20 trials on 6 months of 5m (52,704 bars) take 14.1-14.5 s through the worker,
+# a single run 0.42-0.55 s in process, so the worst case is about 17 s of the
+# 30 s TIMEOUT_SECONDS. A machine more than ~1.7x slower can time out on the
+# longest datasets; lower n_trials there.
 MAX_TRIALS = 20
 MAX_VALIDATION_CANDIDATES = 20
 MAX_VALIDATION_RUNS = 100
@@ -627,6 +638,16 @@ def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
     return keep
 
 
+def _wiped_out(result):
+    """First time equity reached <= 0 (no liquidation model), or None."""
+    index = research_overfit.first_non_positive(result.equity_curve)
+    if index is None:
+        return None
+    return {"time_ms": result.equity_curve[index].time_ms,
+            "min_equity": min(point.equity for point in result.equity_curve),
+            "notice": research_overfit.WIPED_OUT_NOTICE}
+
+
 def execute_request(request, expected_source):
     snapshot, config, params, quantity = validate_request(request)
     # The worker, not MCP/web, executes the fixed strategy. Source bytes are
@@ -649,6 +670,7 @@ def execute_request(request, expected_source):
         "result": result_payload, "drawdown_curve": drawdown,
         "costs": asdict(costs), "funding_coverage": dataset.funding_summary(),
         "trade_stats": research_trades.trade_stats(result),
+        "equity_wiped_out": _wiped_out(result),
         "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }
@@ -657,7 +679,7 @@ def execute_request(request, expected_source):
         payload["drawdown_curve"] = [drawdown[i] for i in keep]
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
                                      "method": "bucket_deepest_drawdown"}
-    report = render_report(result)
+    report = render_report(result, curve_indices=keep, max_trade_rows=REPORT_MAX_FILL_ROWS)
     report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")

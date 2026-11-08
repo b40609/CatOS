@@ -12,6 +12,8 @@ floats reported as fixed-digit strings and never feed back into the ledger.
   resampled in contiguous blocks (moving-block bootstrap) to keep short-range
   dependence; reports a confidence interval for the mean daily return and the
   share of resamples whose mean is not positive.
+- wiped_out: the engine has no liquidation model, so equity can fall below 0;
+  such a run is reported as wiped out and gets no return statistics.
 """
 
 from dataclasses import replace
@@ -21,6 +23,7 @@ import random
 from math import sqrt
 
 from catos import research
+from catos.research_overfit import first_non_positive
 
 DAY_MS = 86_400_000
 ZERO = Decimal(0)
@@ -58,6 +61,17 @@ def yearly(result, bars, buy_hold_quantity):
     return rows
 
 
+def wiped_out(result):
+    """First close-marked point with equity <= 0 as {time_ms, equity, points_at_or_below_zero}, or None."""
+    index = first_non_positive(result.equity_curve)
+    if index is None:
+        return None
+    point = result.equity_curve[index]
+    return {"time_ms": point.time_ms, "equity": point.equity,
+            "points_at_or_below_zero": sum(item.equity <= 0 for item in result.equity_curve),
+            "min_equity": min(item.equity for item in result.equity_curve)}
+
+
 class Delayed(research.Strategy):
     """Emit each target one bar after the wrapped strategy decides it.
 
@@ -92,7 +106,13 @@ class Delayed(research.Strategy):
 
 
 def daily_returns(result):
-    """Simple returns between equity at consecutive UTC day ends (bar closes on midnight)."""
+    """Simple returns between equity at consecutive UTC day ends (bar closes on midnight).
+
+    Refuses a run whose equity ever reaches <= 0 (research_overfit.WIPED_OUT_NOTICE):
+    its Sharpe and bootstrap would be meaningless. Check with wiped_out() first.
+    """
+    if wiped_out(result) is not None:
+        raise ValueError("equity_not_positive")
     with localcontext(research._CONTEXT):
         marks = [point for point in result.equity_curve[1:] if point.time_ms % DAY_MS == 0]
         start = result.equity_curve[0]

@@ -18,6 +18,7 @@ Usage (repo root):
 import argparse
 from decimal import Decimal, InvalidOperation
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -222,6 +223,9 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     start_ms = end_ms - args.days * DAY_MS
     client = client or Client(max_requests=args.max_requests)
     if args.resume:
+        if client.max_requests < MIN_RESUME_REQUESTS:
+            parser.error(f"--resume needs max-requests >= {MIN_RESUME_REQUESTS} "
+                         f"({FUNDING_RESERVE} are kept for funding, so a smaller budget never advances)")
         return _resumable(args, client, now_ms, root, start_ms, end_ms)
     try:
         instrument = fetch_instrument(client, args.inst_id)
@@ -245,12 +249,27 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
 
 # Pages kept for funding (about 3 months of 8h events: 3 pages plus the empty one) on the last run.
 FUNDING_RESERVE = 6
+# The first run spends one request on the instrument; it must still page at least once.
+MIN_RESUME_REQUESTS = FUNDING_RESERVE + 2
 IN_PROGRESS = 3  # exit code: more runs are needed
+wall_clock = time.time  # seconds; pacing across runs (each run is a new process)
 
 
 def _staging_path(root, inst_id, bar):
     root = Path(root) if root is not None else datasets.DATA_ROOT
     return root / ".staging" / f"{inst_id}-{bar}.json"
+
+
+def _write_staging(path, state):
+    """Write the whole file next to the target, then swap it in, so an interrupted write leaves the old one."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def _resumable(args, client, now_ms, root, start_ms, end_ms):
@@ -260,8 +279,23 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
     the instrument record; later runs must ask for the same --days and continue
     paging from the stored cursor. Only the last run fetches funding and writes
     the dataset through write_dataset, so every existing check still applies.
+
+    Progress is saved after the candle pages of every run, including the last,
+    so a failure while fetching funding keeps this run's candles; on any failure
+    after a save (or after loading a staged fetch) the saved request count is
+    refreshed, so the manifest total also counts requests of failed runs. A run
+    started within MIN_INTERVAL_S of the previous run's last save waits out the
+    rest of the interval.
     """
     path = _staging_path(root, args.inst_id, args.bar)
+    staged = None
+
+    def save(state):
+        nonlocal staged
+        state = {**state, "requests": previous + client.requests, "saved_at_s": wall_clock()}
+        _write_staging(path, state)
+        staged = state
+
     try:
         if path.exists():
             state = json.loads(path.read_text(encoding="utf-8"))
@@ -271,18 +305,20 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
             start_ms, end_ms = state["start_ms"], state["end_ms"]
             rows = {row[0]: tuple(row) for row in state["candles"]}
             instrument, cursor, previous = state["instrument"], state["cursor"], state["requests"]
+            staged = state  # a failure while paging keeps the old cursor but still counts this run's requests
+            since = wall_clock() - state.get("saved_at_s", float("-inf"))
+            if 0 <= since < MIN_INTERVAL_S:
+                client.sleep(MIN_INTERVAL_S - since)
         else:
             instrument = fetch_instrument(client, args.inst_id)
             datasets.contract_from_instrument(instrument, args.inst_id)
             rows, cursor, previous = {}, end_ms, 0
         cursor, exhausted = fetch_candle_pages(client, args.inst_id, args.bar, start_ms, cursor, rows,
                                                stop_at=client.max_requests - FUNDING_RESERVE)
+        save({"inst_id": args.inst_id, "bar": args.bar, "days": args.days, "start_ms": start_ms,
+              "end_ms": end_ms, "cursor": cursor, "instrument": instrument,
+              "candles": [list(rows[ms]) for ms in sorted(rows)]})
         if cursor > start_ms and not exhausted:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            state = {"inst_id": args.inst_id, "bar": args.bar, "days": args.days, "start_ms": start_ms,
-                     "end_ms": end_ms, "cursor": cursor, "requests": previous + client.requests,
-                     "instrument": instrument, "candles": [list(rows[ms]) for ms in sorted(rows)]}
-            path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
             remaining = (cursor - start_ms) // datasets.BAR_MS[args.bar]
             print(json.dumps({"status": "in_progress", "staged_bars": len(rows), "remaining_bars": remaining,
                               "requests_this_run": client.requests, "requests_total": previous + client.requests},
@@ -295,7 +331,12 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
             fetched_at_ms=now_ms, requests=previous + client.requests,
         )
         dataset = datasets.load_manifest(target / datasets.MANIFEST, root)
-    except (FetchError, ValueError, FileExistsError, KeyError, json.JSONDecodeError) as error:
+    except (FetchError, ValueError, OSError, KeyError, json.JSONDecodeError) as error:
+        if staged is not None:
+            try:
+                save(staged)  # keep the candles and count the requests spent before the failure
+            except OSError:
+                pass
         print(f"stopped after {client.requests} requests: {error}", file=sys.stderr)
         return 1
     path.unlink(missing_ok=True)

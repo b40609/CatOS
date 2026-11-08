@@ -36,8 +36,22 @@ NOTICE = ("統計量以浮點計算，只供研究判讀，不是金額。N 只�
           "同一份資料過去的搜尋沒有計入，所以 DSR 是上限、實際應更低。")
 
 
+WIPED_OUT_NOTICE = ("權益曾跌破 0（爆倉）：研究引擎沒有保證金與強平模型，跌破 0 之後的損益只是算術延伸；"
+                    "報酬率改變正負號或除以接近 0 的權益，Sharpe、PSR／DSR、PBO、bootstrap 等比率統計都沒有意義，所以不計算。")
+
+
+def first_non_positive(equity_curve):
+    """Index of the first close-marked equity point <= 0 (account wiped out), or None."""
+    return next((index for index, point in enumerate(equity_curve) if point.equity <= 0), None)
+
+
 def bar_returns(equity_curve):
-    """Simple returns between consecutive close-marked equity points (Decimal ratio, then float)."""
+    """Simple returns between consecutive close-marked equity points (Decimal ratio, then float).
+
+    Refuses a curve whose equity ever reaches <= 0 (see WIPED_OUT_NOTICE).
+    """
+    if first_non_positive(equity_curve) is not None:
+        raise ValueError("equity_not_positive")
     with localcontext(research._CONTEXT):
         return [float(after.equity / before.equity - 1)
                 for before, after in zip(equity_curve, equity_curve[1:])]
@@ -151,9 +165,13 @@ def _fmt(value, digits=4):
 COARSE_TRIALS = 10  # Bailey et al. 2017 ask for many more candidates than this
 
 
-def verdict(dsr, pbo, trials=None):
+def verdict(dsr, pbo, trials=None, wiped_out=0, best_wiped_out=False):
+    wiped = (f"有 {wiped_out} 組參數權益跌破 0（爆倉），它們的比率統計沒有意義，不計入 Sharpe 變異數與 PBO，"
+             "但仍計入試驗數 N。") if wiped_out else ""
+    if best_wiped_out:
+        return "最佳參數權益跌破 0（爆倉），無法計算 DSR。" + wiped
     if dsr is None:
-        return "樣本不足或報酬分布退化，無法計算 DSR。"
+        return "樣本不足或報酬分布退化，無法計算 DSR。" + wiped
     parts = []
     if dsr >= 0.95:
         parts.append("DSR ≥ 0.95：扣掉多重試驗與非常態後，最佳參數的 Sharpe 仍顯著高於純運氣可得的最大值。")
@@ -168,10 +186,14 @@ def verdict(dsr, pbo, trials=None):
             parts.append("PBO 介於 0.2 與 0.5：選參過程有一定機率選到樣本外不佳的組合。")
         else:
             parts.append("PBO ≤ 0.2：樣本內冠軍在樣本外通常仍排在前段。")
-        if (trials is not None and trials < COARSE_TRIALS) or pbo["logit_zero_share"] >= 0.1:
-            parts.append(f"注意：只有 {trials} 組參數、或有 {pbo['logit_zero_share']:.0%} 的切法剛好落在中位數，"
-                         "PBO 粒度很粗；換一組試驗或改用完整格點，數字可能差很多，只能當參考。")
-    return "".join(parts)
+        reasons = []
+        if trials is not None and trials < COARSE_TRIALS:
+            reasons.append(f"只有 {trials} 組參數")
+        if pbo["logit_zero_share"] >= 0.1:
+            reasons.append(f"有 {pbo['logit_zero_share']:.0%} 的切法剛好落在中位數")
+        if reasons:
+            parts.append(f"注意：{'、'.join(reasons)}，PBO 粒度很粗；換一組試驗或改用完整格點，數字可能差很多，只能當參考。")
+    return "".join(parts) + wiped
 
 
 def search_report(candidates, best_params, timeframe_ms):
@@ -179,30 +201,45 @@ def search_report(candidates, best_params, timeframe_ms):
 
     candidates: {params tuple: BacktestResult} for every distinct completed trial,
     all run on the same bars and warm-up. best_params: the selected trial.
+
+    A trial whose equity reaches <= 0 is wiped out: it still counts in N (it was
+    tried), but its Sharpe is not computed and it is left out of the cross-trial
+    Sharpe variance and of PBO. If the selected trial itself is wiped out, DSR
+    and PSR are None.
     """
     names = list(candidates)
-    returns = {params: bar_returns(candidates[params].equity_curve) for params in names}
-    lengths = {len(item) for item in returns.values()}
+    lengths = {len(candidates[params].equity_curve) for params in names}
     if len(lengths) != 1:
         raise ValueError("trials must share the same evaluation bars")
-    stats = {params: moments(returns[params]) for params in names}
+    wiped = {params for params in names if first_non_positive(candidates[params].equity_curve) is not None}
+    alive = [params for params in names if params not in wiped]
+    returns = {params: bar_returns(candidates[params].equity_curve) for params in alive}
+    stats = {params: moments(returns[params]) for params in alive}
     sharpes = {params: (item.mean / item.std if item.std else 0.0) for params, item in stats.items()}
     trials = len(names)
-    mean_sr = sum(sharpes.values()) / trials
-    variance = sum((value - mean_sr) ** 2 for value in sharpes.values()) / (trials - 1) if trials > 1 else 0.0
-    best = sharpes[best_params]
+    mean_sr = sum(sharpes.values()) / len(alive) if alive else 0.0
+    variance = (sum((value - mean_sr) ** 2 for value in sharpes.values()) / (len(alive) - 1)
+                if len(alive) > 1 else 0.0)
     benchmark = expected_max_sharpe(variance, trials)
-    best_stats = stats[best_params]
-    dsr = probabilistic_sharpe(best, benchmark, best_stats)
-    psr = probabilistic_sharpe(best, 0.0, best_stats)
-    pbo = pbo_cscv([returns[params] for params in names]) if trials >= 2 else None
+    best = sharpes.get(best_params)
+    best_stats = stats.get(best_params)
+    dsr = None if best is None else probabilistic_sharpe(best, benchmark, best_stats)
+    psr = None if best is None else probabilistic_sharpe(best, 0.0, best_stats)
+    pbo = pbo_cscv([returns[params] for params in alive]) if len(alive) >= 2 else None
     per_year = sqrt(YEAR_MS / timeframe_ms)
+
+    def annualized(value):
+        return None if value is None else _fmt(value * per_year, 3)
+
     return {
         "method": "deflated_sharpe_bailey_lopez_de_prado_2014; pbo_cscv_bailey_et_al_2017",
-        "distinct_trials": trials, "bars": best_stats.count,
+        "distinct_trials": trials, "bars": lengths.pop() - 1,
+        "wiped_out_trials": len(wiped),
         "best": {"params": [[name, value] for name, value in best_params],
-                 "sharpe_per_bar": _fmt(best, 6), "sharpe_annualized": _fmt(best * per_year, 3),
-                 "skew": _fmt(best_stats.skew, 3), "kurtosis": _fmt(best_stats.kurtosis, 3)},
+                 "wiped_out": best_params in wiped,
+                 "sharpe_per_bar": _fmt(best, 6), "sharpe_annualized": annualized(best),
+                 "skew": None if best_stats is None else _fmt(best_stats.skew, 3),
+                 "kurtosis": None if best_stats is None else _fmt(best_stats.kurtosis, 3)},
         "trial_sharpe_variance": _fmt(variance, 8),
         "expected_max_sharpe_per_bar": _fmt(benchmark, 6),
         "expected_max_sharpe_annualized": _fmt(benchmark * per_year, 3),
@@ -212,9 +249,10 @@ def search_report(candidates, best_params, timeframe_ms):
                                          "prob_oos_loss": _fmt(pbo["prob_oos_loss"]),
                                          "logit_zero_share": _fmt(pbo["logit_zero_share"])},
         "trials": [{"params": [[name, value] for name, value in params],
-                    "sharpe_annualized": _fmt(sharpes[params] * per_year, 3)} for params in names],
-        "verdict": verdict(dsr, pbo, trials),
-        "notice": NOTICE,
+                    "sharpe_annualized": annualized(sharpes.get(params)),
+                    "wiped_out": params in wiped} for params in names],
+        "verdict": verdict(dsr, pbo, trials, len(wiped), best_params in wiped),
+        "notice": NOTICE + (WIPED_OUT_NOTICE if wiped else ""),
     }
 
 

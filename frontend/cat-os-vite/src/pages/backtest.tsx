@@ -19,7 +19,7 @@ import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
 import { TradeStatsPanel } from "@/components/catos/trade-stats-panel";
-import { formatDecimal, formatDrawdownPct, formatRatioPct, signOf } from "@/lib/format";
+import { formatDateTimeWithYear, formatDecimal, formatDrawdownPct, formatRatioPct, signOf } from "@/lib/format";
 import {
   DONCHIAN_ID, donchianParams, formatParams, minWarmupBars, minWarmupProblems, paramLabel, paramProblems, paramSpecs,
   pickStrategy, shortName,
@@ -570,15 +570,23 @@ function BacktestPage() {
             <span className="text-muted-foreground">
               勝率:{" "}
               {result?.trade_stats?.win_rate != null ? (
-                <strong className="text-foreground" title={result.trade_stats.notice}>
+                <strong className="text-foreground" title={result.trade_stats.notice} data-testid="backtest-header-win-rate">
                   {formatRatioPct(result.trade_stats.win_rate, { sign: false })}
                   <span className="text-t2 text-muted-foreground/80 ml-1">
                     ({result.trade_stats.wins}/{result.trade_stats.closed_trips} 筆往返)
                   </span>
+                  <span className="text-t2 font-normal text-muted-foreground ml-1.5">
+                    賺賠比 {formatDecimal(result.trade_stats.payoff_ratio, { digits: 2 })} · 每筆期望值{" "}
+                    <span className={cn(signOf(result.trade_stats.expectancy) === "negative" ? "text-down" : "text-up")}>
+                      {formatDecimal(result.trade_stats.expectancy, { digits: 2, sign: true, suffix: " USDT" })}
+                    </span>
+                  </span>
                 </strong>
+              ) : !result ? (
+                "--"
               ) : (
                 <span className="text-muted-foreground/60 italic text-t3">
-                  {result?.trade_stats ? "沒有已平倉的往返交易" : "舊紀錄沒有往返統計"}
+                  {result.trade_stats ? "沒有已平倉的往返交易" : "舊紀錄沒有往返統計"}
                 </span>
               )}
             </span>
@@ -591,6 +599,17 @@ function BacktestPage() {
             <span className="text-amber-400/90 text-t2">期末估值，未強制平倉</span>
           </div>
         </div>
+
+        {result && !resultLoading && result.equity_wiped_out && (
+          <p data-testid="backtest-wiped-out"
+             className="rounded border border-rose-400/40 bg-rose-400/5 px-3 py-1.5 text-xs text-rose-400">
+            <strong className="font-semibold">
+              權益在 {formatDateTimeWithYear(result.equity_wiped_out.time_ms)}（台北）跌破 0（最低{" "}
+              {formatDecimal(result.equity_wiped_out.min_equity, { digits: 2, suffix: " USDT" })}）。
+            </strong>{" "}
+            {result.equity_wiped_out.notice}
+          </p>
+        )}
 
         {/* ==================== 定案：水下載回撤圖與月度收益熱力矩陣 ==================== */}
         <BacktestUnderwaterChart

@@ -250,12 +250,17 @@ export interface OverfittingReport {
   method: string;
   distinct_trials: number; // this run only; earlier searches on the same data are not counted
   bars: number;
+  // Trials whose equity reached <= 0 (no liquidation model): counted in N, left out of
+  // the Sharpe variance and PBO. Absent before the 2026-11-08 F follow-up.
+  wiped_out_trials?: number;
   best: {
     params: [string, number | string][];
-    sharpe_per_bar: string;
-    sharpe_annualized: string;
-    skew: string;
-    kurtosis: string; // non-excess
+    wiped_out?: boolean;
+    // null when the selected trial itself was wiped out
+    sharpe_per_bar: string | null;
+    sharpe_annualized: string | null;
+    skew: string | null;
+    kurtosis: string | null; // non-excess
   };
   trial_sharpe_variance: string;
   expected_max_sharpe_per_bar: string;
@@ -272,7 +277,7 @@ export interface OverfittingReport {
     // Share of splits whose winner sat exactly at the OOS median; absent before 2026-11-06 follow-up.
     logit_zero_share?: string;
   } | null;
-  trials: { params: [string, number | string][]; sharpe_annualized: string }[];
+  trials: { params: [string, number | string][]; sharpe_annualized: string | null; wiped_out?: boolean }[];
   verdict: string;
   notice: string;
 }
@@ -308,9 +313,18 @@ export interface TradeStats {
   notice: string;
 }
 
+// First close where equity reached <= 0; the engine has no liquidation model.
+export interface EquityWipedOut {
+  time_ms: number;
+  min_equity: string;
+  notice: string;
+}
+
 export interface BacktestResultPayload {
   // Absent on runs archived before round-trip statistics existed (2026-11-07).
   trade_stats?: TradeStats;
+  // null when equity stayed above 0; absent on runs archived before 2026-11-08.
+  equity_wiped_out?: EquityWipedOut | null;
   // Absent on runs archived before cost attribution existed.
   costs?: CostBreakdown;
   funding_coverage?: FundingCoverage;

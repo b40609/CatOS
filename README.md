@@ -12,7 +12,7 @@ v1 已於 2026-11-04 通過正式獨立驗收（`reports/v1-acceptance-20261104/
 | 策略 | Bot 只有一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略。研究另有 `donchian-breakout`／`donchian-parameters-v1`（Donchian 通道突破，多／空），以及 2026-11-06 預先登錄的三個日線策略（`catos/research_daily.py`：`donchian-ensemble` Donchian 多週期集成、`tsmom-multi` 時間序列動能、`dcm-daily` DCM 日線版）、2026-11-07 預先登錄的兩個短週期策略（`catos/research_intraday.py`：`dcm-fade` DCM 假突破反轉、`dcm-pullback` DCM 突破後回踩），manifest 都在 Worker 不讀的 `catos/research_only_artifacts/`，Bot 選不到 |
 | Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
 | OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter）與研究資料抓取工具 `tools/fetch_okx_candles.py`（三個公開端點、不用金鑰）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
-| 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口的資料集，不符即拒絕；資金費必須連續到最後一根，可以晚於第一根開始（OKX 只保留約 3 個月），這時結果會明示之前未計資金費，並另列固定費率的假設情境。回測、優化與滾動驗證都有成本拆解（價格損益、手續費、滑價、資金費、每邊兩平成本）與買進持有基準（`catos/research_costs.py`）。回測、優化與滾動驗證都可選上述七個研究策略與資料集；回測另有往返交易統計（勝率、賺賠比、獲利因子、期望值，`catos/research_trades.py`）；單次回測上限 60,000 根；優化結果附過擬合檢查（DSR、PSR、PBO，`catos/research_overfit.py`），滾動驗證附邊界選參統計，研究優化在格點點數 ≤ n_trials 時窮舉；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
+| 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口的資料集，不符即拒絕；資金費必須連續到最後一根，可以晚於第一根開始（OKX 只保留約 3 個月），這時結果會明示之前未計資金費，並另列固定費率的假設情境。回測、優化與滾動驗證都有成本拆解（價格損益、手續費、滑價、資金費、每邊兩平成本）與買進持有基準（`catos/research_costs.py`）。回測、優化與滾動驗證都可選上述七個研究策略與資料集；回測另有往返交易統計（勝率、賺賠比、獲利因子、期望值，`catos/research_trades.py`）；單次回測上限 60,000 根，報告的權益圖抽樣、成交明細最多列 400 筆（完整的在 result.json）；權益跌破 0 的執行標成爆倉（引擎沒有強平模型），不算 Sharpe 等比率統計；優化結果附過擬合檢查（DSR、PSR、PBO，`catos/research_overfit.py`），滾動驗證附邊界選參統計，研究優化在格點點數 ≤ n_trials 時窮舉；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
 | 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
 | HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
 | 前端 | 戰情台、實例監控、風控中心、策略中心、系統日誌與側欄狀態列讀取控制面真資料；回測／優化／滾動驗證頁接研究 HTTP；設定頁讀取服務版本；策略覆盤與市場情報頁標示「v1 未啟用」 |
@@ -63,7 +63,7 @@ FastAPI 只綁定 `127.0.0.1`。`start-laptop-dev.bat`（呼叫 `scripts/start-l
 .venv/Scripts/python.exe -B tools/fetch_okx_candles.py --inst-id BTC-USDT-SWAP --bar 15m --days 90 --end-ms 1793764800000
 ```
 
-工具每次請求至少間隔 0.25 秒、單次最多 150 次請求，遇到缺口、未收盤 K 線、分頁行為不符或資金費在結束前中斷就停止，不寫入任何檔案；`--days` 上限 1,830。範圍超過單次 150 次請求時用 `--resume` 分多次接續（進度暫存在 `data/okx/.staging/`，最後一次才寫入資料集）。
+工具每次請求至少間隔 0.25 秒、單次最多 150 次請求，遇到缺口、未收盤 K 線、分頁行為不符或資金費在結束前中斷就停止，不寫入任何檔案；`--days` 上限 1,830。範圍超過單次 150 次請求時用 `--resume` 分多次接續（`--max-requests` 至少 8；進度暫存在 `data/okx/.staging/`，每次抓完 K 線就先存，最後一次才寫入資料集）。
 
 滾動驗證（walk-forward）可直接用這份資料：前端「滾動驗證」頁（`#/validation`）或 POST `/api/research/validations`。結果 schema 是 `catos.research.validation-result.v2`：逐根環境標籤改為各環境的 K 線數，逐根歸屬只留各環境彙總，各窗樣本外權益曲線超過上限時取樣，`data/okx` 的檔案在來源快照裡只記路徑與 sha256；績效與分環境合計仍以全部 K 線計算。送出時另檢查計算量 `windows × (候選數 × (warmup + train) + warmup + test) <= 250,000`，環境分類的回看根數上限 512，避免超過 30 秒逾時。本機以研究服務實測（6 窗、4 個候選、train 2000／test 1000）：4.35 秒，result.json 599,573 bytes（上一個工作包量測；之後來源快照內嵌的引擎原始碼變大，同一請求的 result.json 會略大，結果本體相同）。欄位見 `docs/research-validation-api.md`，方案比較與更多量測見 `docs/research-real-data-plan.md`。
 

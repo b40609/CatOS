@@ -31,7 +31,8 @@ export function TradeStatsPanel({ stats }: { stats: TradeStats }) {
             hint="總賺 ÷ 總賠；大於 1 才是賺錢" />
           <Cell label="每筆期望值" value={formatDecimal(stats.expectancy, USDT)} tone={toneOf(stats.expectancy)} />
           <Cell label="最大連虧" value={`${stats.max_consecutive_losses} 筆`} />
-          <Cell label="平均持倉" value={`${formatDecimal(stats.average_hold_hours, { digits: 1 })} 小時`} />
+          <Cell label="平均持倉" value={stats.average_hold_hours === null ? "不適用"
+            : `${formatDecimal(stats.average_hold_hours, { digits: 1 })} 小時`} />
           <Cell label="最大單筆賺／賠" value={`${formatDecimal(stats.largest_win, USDT)} ／ ${formatDecimal(stats.largest_loss, USDT)}`} />
         </div>
         <p className="font-mono text-t2 text-muted-foreground">{side("多單", stats.long)} ｜ {side("空單", stats.short)}</p>

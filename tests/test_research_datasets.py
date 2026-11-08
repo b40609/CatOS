@@ -4,6 +4,7 @@ from dataclasses import asdict, replace
 from decimal import Decimal
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -150,6 +151,7 @@ class CatalogAndRunTest(DatasetFixture):
         self.assertIn("OKX 公開歷史 K 線", payload["data_notice"])
         self.assertGreater(len(payload["result"]["funding"]), 0)
         self.assertNotIn("curve_sampling", payload)
+        self.assertIsNone(payload["equity_wiped_out"])
         self.assertEqual(len(payload["drawdown_curve"]), len(payload["result"]["equity_curve"]))
         self.assertIn("<", report)
         with self.assertRaisesRegex(ValueError, "source_changed"):
@@ -158,8 +160,12 @@ class CatalogAndRunTest(DatasetFixture):
     def test_large_dataset_curve_is_sampled_keeping_the_deepest_drawdown(self):
         count = MAX_CURVE_POINTS + 400
         dataset_id = write_fixture(self.root, count=count).name
-        payload, _ = execute_request(request_for(dataset_id), provenance(dataset_id))
+        payload, report = execute_request(request_for(dataset_id), provenance(dataset_id))
         sampling = payload["curve_sampling"]
+        # The HTML report draws the same sampled points (worker stdout carries both).
+        drawn = re.search(r'<polyline points="([^"]+)"', report).group(1).split()
+        self.assertEqual(len(drawn), sampling["returned_points"])
+        self.assertIn(f"圖表取樣 {sampling['returned_points']}／{sampling['total_points']} 點", report)
         self.assertGreater(sampling["total_points"], MAX_CURVE_POINTS)
         self.assertLessEqual(sampling["total_points"], count)
         self.assertLessEqual(sampling["returned_points"], MAX_CURVE_POINTS)

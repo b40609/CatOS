@@ -83,6 +83,16 @@ def round_trips(result):
     return closed, current
 
 
+def _compact(value):
+    """Drop trailing zeros the 120-digit sums leave behind; the value is unchanged."""
+    if isinstance(value, dict):
+        return {key: _compact(item) for key, item in value.items()}
+    if not isinstance(value, Decimal) or not value.is_finite() or value.as_tuple().exponent >= 0:
+        return value
+    stripped = value.normalize(_WIDE)
+    return stripped if stripped.as_tuple().exponent < 0 else value.quantize(Decimal(1), context=_WIDE)
+
+
 def _ratio(numerator, denominator):
     """Ratios in the engine's 50-digit context; only sums need the wide one."""
     with localcontext(research._CONTEXT):
@@ -115,7 +125,7 @@ def trade_stats(result):
 
         average_win = _ratio(sum(wins, ZERO), Decimal(len(wins)))
         average_loss = _ratio(sum(losses, ZERO), Decimal(len(losses)))
-        return {
+        return _compact({
             "closed_trips": len(closed), "wins": len(wins), "losses": len(losses),
             "breakeven": len(pnls) - len(wins) - len(losses),
             "win_rate": _ratio(Decimal(len(wins)), Decimal(len(pnls))),
@@ -133,4 +143,4 @@ def trade_stats(result):
             "rounding_residual": residual,
             "notice": ("勝率以已平倉的往返交易計，扣手續費、滑價與資金費；期末未平倉的部位另列，不算勝負。"
                        "勝率高不代表賺錢，要同時看平均賺賠比與期望值。"),
-        }
+        })
