@@ -230,3 +230,27 @@ class WipedOutTest(unittest.TestCase):
         self.assertEqual(report["bars"], len(mixed[names[0]].equity_curve) - 1)
         rows = dict(overfit_rows(report))
         self.assertEqual((rows["最佳 Sharpe（年化）"], rows["權益跌破 0（爆倉）的參數組"]), ("爆倉，不計算", 1))
+
+    # F fix acceptance N5 (2026-11-08)
+    def test_a_single_surviving_trial_gets_no_dsr(self):
+        names = list(self.runs)
+        mixed = {name: (self.runs[name] if name == names[0] else self.wipe(self.runs[name])) for name in names}
+        report = overfit.search_report(mixed, names[0], 900_000)
+        self.assertEqual((report["distinct_trials"], report["wiped_out_trials"]), (4, 3))
+        self.assertFalse(report["best"]["wiped_out"])
+        self.assertIsNone(report["dsr"])  # variance from one trial is 0, so DSR would equal PSR and ignore N
+        self.assertIsNotNone(report["psr_vs_zero"])
+        self.assertIsNotNone(report["best"]["sharpe_annualized"])
+        self.assertIsNone(report["pbo"])
+        self.assertTrue(report["verdict"].startswith("沒爆倉的參數組不到 2 組，無法估計 Sharpe 變異數，DSR 不計算。"))
+        self.assertIn("有 3 組參數權益跌破 0", report["verdict"])
+        single = overfit.search_report({names[0]: self.runs[names[0]]}, names[0], 900_000)
+        self.assertIsNotNone(single["dsr"])  # one trial and no search: DSR is PSR against 0, as before
+
+    def test_coarse_note_counts_only_trials_that_entered_pbo(self):
+        names = list(self.runs)
+        mixed = {**self.runs, names[3]: self.wipe(self.runs[names[3]])}
+        report = overfit.search_report(mixed, names[0], 900_000)
+        self.assertIsNotNone(report["pbo"])
+        self.assertIn("只有 3 組參數", report["verdict"])
+        self.assertNotIn("只有 4 組參數", report["verdict"])

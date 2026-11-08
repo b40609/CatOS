@@ -280,6 +280,23 @@ class ResumableFetchTest(unittest.TestCase):
         self.assertEqual([path for _, path, _ in okx.calls[before:]], [fetch.FUNDING_PATH])
         self.assertEqual(json.loads(out)["requests"], 6)
 
+    # F fix acceptance N4 (2026-11-08)
+    def test_a_first_run_paging_failure_still_counts_its_requests(self):
+        okx = FakeOKX(self.time, script=[200, 400])  # instrument ok, first candle page fails
+        code, _, err, client = self.run_tool(okx, "--resume")
+        self.assertEqual((code, client.requests), (1, 2), err)
+        staged = json.loads(fetch._staging_path(self.root, "BTC-USDT-SWAP", "15m").read_text(encoding="utf-8"))
+        self.assertEqual((staged["requests"], staged["cursor"], staged["candles"]), (2, staged["end_ms"], []))
+        spent = 2
+        for _ in range(10):
+            code, out, err, client = self.run_tool(okx, "--resume")
+            spent += client.requests
+            if code != fetch.IN_PROGRESS:
+                break
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["requests"], spent)
+        self.assertEqual([path for _, path, _ in okx.calls].count(fetch.INSTRUMENTS_PATH), 1)
+
     def test_staging_write_is_atomic_and_runs_are_paced_across_processes(self):
         clock = [100.0]
         okx = FakeOKX(self.time)

@@ -166,10 +166,13 @@ COARSE_TRIALS = 10  # Bailey et al. 2017 ask for many more candidates than this
 
 
 def verdict(dsr, pbo, trials=None, wiped_out=0, best_wiped_out=False):
+    """trials: candidates that entered PBO (wiped-out trials excluded); only used for the coarse-PBO note."""
     wiped = (f"有 {wiped_out} 組參數權益跌破 0（爆倉），它們的比率統計沒有意義，不計入 Sharpe 變異數與 PBO，"
              "但仍計入試驗數 N。") if wiped_out else ""
     if best_wiped_out:
         return "最佳參數權益跌破 0（爆倉），無法計算 DSR。" + wiped
+    if dsr is None and wiped_out and trials is not None and trials < 2:
+        return "沒爆倉的參數組不到 2 組，無法估計 Sharpe 變異數，DSR 不計算。" + wiped
     if dsr is None:
         return "樣本不足或報酬分布退化，無法計算 DSR。" + wiped
     parts = []
@@ -205,7 +208,9 @@ def search_report(candidates, best_params, timeframe_ms):
     A trial whose equity reaches <= 0 is wiped out: it still counts in N (it was
     tried), but its Sharpe is not computed and it is left out of the cross-trial
     Sharpe variance and of PBO. If the selected trial itself is wiped out, DSR
-    and PSR are None.
+    and PSR are None. If fewer than two trials survive out of two or more, the
+    variance cannot be estimated, so DSR is None as well (it would otherwise fall
+    back to PSR against 0 and ignore N; acceptance N5, 2026-11-08).
     """
     names = list(candidates)
     lengths = {len(candidates[params].equity_curve) for params in names}
@@ -223,7 +228,8 @@ def search_report(candidates, best_params, timeframe_ms):
     benchmark = expected_max_sharpe(variance, trials)
     best = sharpes.get(best_params)
     best_stats = stats.get(best_params)
-    dsr = None if best is None else probabilistic_sharpe(best, benchmark, best_stats)
+    variance_known = len(alive) >= 2 or trials < 2
+    dsr = None if best is None or not variance_known else probabilistic_sharpe(best, benchmark, best_stats)
     psr = None if best is None else probabilistic_sharpe(best, 0.0, best_stats)
     pbo = pbo_cscv([returns[params] for params in alive]) if len(alive) >= 2 else None
     per_year = sqrt(YEAR_MS / timeframe_ms)
@@ -251,7 +257,7 @@ def search_report(candidates, best_params, timeframe_ms):
         "trials": [{"params": [[name, value] for name, value in params],
                     "sharpe_annualized": annualized(sharpes.get(params)),
                     "wiped_out": params in wiped} for params in names],
-        "verdict": verdict(dsr, pbo, trials, len(wiped), best_params in wiped),
+        "verdict": verdict(dsr, pbo, len(alive), len(wiped), best_params in wiped),
         "notice": NOTICE + (WIPED_OUT_NOTICE if wiped else ""),
     }
 

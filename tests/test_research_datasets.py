@@ -181,6 +181,13 @@ class CatalogAndRunTest(DatasetFixture):
         self.assertIn(10, keep)
         self.assertEqual(keep[-1], len(values) - 1)
         self.assertEqual(sample_curve_indices(values[:4], limit=5), [0, 1, 2, 3])
+        # F fix acceptance N6: the chart starts at the first point and stays within the limit.
+        for total in range(6, 60):
+            for limit in (3, 4, 5, 7):
+                keep = sample_curve_indices([Decimal(i % 5) for i in range(total)], limit=limit)
+                self.assertEqual((keep[0], keep[-1]), (0, total - 1), (total, limit))
+                self.assertLessEqual(len(keep), limit, (total, limit))
+                self.assertEqual(keep, sorted(set(keep)))
 
     def test_optimization_and_validation_use_the_requested_dataset(self):
         from catos.research_catalog import DEFAULT_OPTIMIZATION, DEFAULT_VALIDATION

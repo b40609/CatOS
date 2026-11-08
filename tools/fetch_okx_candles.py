@@ -281,9 +281,11 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
     the dataset through write_dataset, so every existing check still applies.
 
     Progress is saved after the candle pages of every run, including the last,
-    so a failure while fetching funding keeps this run's candles; on any failure
+    so a failure while fetching funding keeps this run's candles. The first run
+    also saves right after the instrument check, before paging. On any failure
     after a save (or after loading a staged fetch) the saved request count is
-    refreshed, so the manifest total also counts requests of failed runs. A run
+    refreshed, so the manifest total also counts requests of failed runs; only a
+    first run that fails before the instrument check passes leaves no record. A run
     started within MIN_INTERVAL_S of the previous run's last save waits out the
     rest of the interval.
     """
@@ -295,6 +297,11 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
         state = {**state, "requests": previous + client.requests, "saved_at_s": wall_clock()}
         _write_staging(path, state)
         staged = state
+
+    def progress(cursor):
+        return {"inst_id": args.inst_id, "bar": args.bar, "days": args.days, "start_ms": start_ms,
+                "end_ms": end_ms, "cursor": cursor, "instrument": instrument,
+                "candles": [list(rows[ms]) for ms in sorted(rows)]}
 
     try:
         if path.exists():
@@ -313,11 +320,10 @@ def _resumable(args, client, now_ms, root, start_ms, end_ms):
             instrument = fetch_instrument(client, args.inst_id)
             datasets.contract_from_instrument(instrument, args.inst_id)
             rows, cursor, previous = {}, end_ms, 0
+            save(progress(cursor))  # a paging failure in this first run still counts its requests
         cursor, exhausted = fetch_candle_pages(client, args.inst_id, args.bar, start_ms, cursor, rows,
                                                stop_at=client.max_requests - FUNDING_RESERVE)
-        save({"inst_id": args.inst_id, "bar": args.bar, "days": args.days, "start_ms": start_ms,
-              "end_ms": end_ms, "cursor": cursor, "instrument": instrument,
-              "candles": [list(rows[ms]) for ms in sorted(rows)]})
+        save(progress(cursor))
         if cursor > start_ms and not exhausted:
             remaining = (cursor - start_ms) // datasets.BAR_MS[args.bar]
             print(json.dumps({"status": "in_progress", "staged_bars": len(rows), "remaining_bars": remaining,

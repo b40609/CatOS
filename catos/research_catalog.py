@@ -622,17 +622,21 @@ def drawdown_pcts(equity_curve, initial_balance):
 
 
 def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
-    """Indices kept for the payload chart: per bucket the deepest drawdown, plus the last point.
+    """Indices kept for the payload chart: per bucket the deepest drawdown, plus the first and last points.
 
     Performance figures are computed on every bar before sampling; only the
     returned chart points are thinned so large datasets stay under the output cap.
+    The first point (initial equity) is kept so the chart starts where the run
+    starts (acceptance N6, 2026-11-08); at most `limit` indices are returned.
     """
     total = len(drawdowns)
     if total <= limit:
         return list(range(total))
-    size = -(-total // (limit - 1))
+    size = -(-total // (limit - 2))
     keep = [max(range(start, min(start + size, total)), key=lambda i: (drawdowns[i], -i))
             for start in range(0, total, size)]
+    if keep[0] != 0:
+        keep.insert(0, 0)
     if keep[-1] != total - 1:
         keep.append(total - 1)
     return keep
