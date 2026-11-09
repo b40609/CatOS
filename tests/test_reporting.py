@@ -401,6 +401,42 @@ class ReportingTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "result must be BacktestResult"):
             render_report("not_a_result")
 
+    def test_sampled_curve_keeps_original_x_and_full_axis_labels(self):
+        base = make_sample_result().equity_curve[0]
+        values = ("100", "103", "109", "101", "95", "102", "104", "99", "98", "100")
+        curve = tuple(replace(base, time_ms=i * 900_000, equity=D(v)) for i, v in enumerate(values))
+        result = make_sample_result(equity_curve=curve)
+        full = render_report(result)
+        sampled = render_report(result, curve_indices=[0, 4, 9])
+        points = re.search(r'<polyline points="([^"]+)"', sampled).group(1).split()
+        self.assertEqual(len(points), 3)
+        full_points = re.search(r'<polyline points="([^"]+)"', full).group(1).split()
+        self.assertEqual(points, [full_points[0], full_points[4], full_points[9]])
+        # Axis labels come from the full curve: 109 (index 2) is not drawn but is the top label.
+        self.assertIn(">109</text>", sampled)
+        self.assertIn("圖表取樣 3／10 點", sampled)
+        self.assertNotIn("圖表取樣", full)
+        self.assertNotIn("圖表取樣", render_report(result, curve_indices=range(10)))
+        for bad in ([0, 0, 1], [3, 1], [0, 10], [-1, 2]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                render_report(result, curve_indices=bad)
+
+    def test_fill_rows_capped_with_omission_note(self):
+        first = make_sample_result().trades[0]
+        trades = tuple(replace(first, time_ms=1_000 + i, price=D(100 + i)) for i in range(7))
+        result = make_sample_result(trades=trades)
+        capped = render_report(result, max_trade_rows=4)
+        shown = [i for i in range(7) if f"<td>{1_000 + i}</td>" in capped]
+        self.assertEqual(shown, [0, 1, 5, 6])
+        self.assertIn("中間省略 3 筆；完整成交明細在 result.json 的 result.trades", capped)
+        self.assertIn("模擬逐筆成交明細 (7)", capped)
+        uncapped = render_report(result, max_trade_rows=7)
+        self.assertEqual([i for i in range(7) if f"<td>{1_000 + i}</td>" in uncapped], list(range(7)))
+        self.assertNotIn("中間省略", uncapped)
+        for bad in (1, 0, "4"):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                render_report(result, max_trade_rows=bad)
+
 
 if __name__ == "__main__":
     unittest.main()

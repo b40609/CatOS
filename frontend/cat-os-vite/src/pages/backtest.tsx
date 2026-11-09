@@ -17,9 +17,12 @@ import { cn } from "@/lib/utils";
 import { BacktestUnderwaterChart } from "@/components/catos/backtest-underwater-chart";
 import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
-import { formatDecimal, formatDrawdownPct, signOf } from "@/lib/format";
+import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
+import { TradeStatsPanel } from "@/components/catos/trade-stats-panel";
+import { formatDateTimeWithYear, formatDecimal, formatDrawdownPct, formatRatioPct, signOf } from "@/lib/format";
 import {
-  DONCHIAN_ID, donchianParams, formatParams, paramLabel, paramProblems, paramSpecs, pickStrategy, shortName,
+  DONCHIAN_ID, donchianParams, formatParams, minWarmupBars, minWarmupProblems, paramLabel, paramProblems, paramSpecs,
+  pickStrategy, shortName,
   warmupBarsProblems,
 } from "@/lib/research-strategies";
 import {
@@ -348,7 +351,8 @@ function BacktestPage() {
 
     // Strict validation against the catalog bounds; the backend repeats every check.
     const problems = strategy
-      ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+      ? [...paramProblems(strategy, params, warmupBars), ...minWarmupProblems(strategy, warmupBars, dataset),
+         ...warmupBarsProblems(warmupBars, dataset)]
       : ["策略清單尚未載入"];
     if (!strategy || problems.length) {
       setErrorMsg(problems[0]);
@@ -404,12 +408,20 @@ function BacktestPage() {
   const perf = result?.result?.performance;
   const activeStrategy = pickStrategy(catalog?.strategies, activeRequest?.strategy_id ?? strategy?.id ?? null);
   const formProblems = strategy
-    ? [...paramProblems(strategy, params, warmupBars), ...warmupBarsProblems(warmupBars, dataset)]
+    ? [...paramProblems(strategy, params, warmupBars), ...minWarmupProblems(strategy, warmupBars, dataset),
+         ...warmupBarsProblems(warmupBars, dataset)]
     : [];
 
   // Switching strategy (or the Donchian dataset) restores defaults that fit the bounds and data length.
   const applyDefaults = (sid: string, target = dataset) => {
     if (!catalog) return;
+    const meta = pickStrategy(catalog.strategies, sid);
+    if (meta?.preset) {
+      setParams({ ...meta.preset.parameters });
+      setWarmupBars(minWarmupBars(meta, target));
+      setQuantity(meta.preset.quantity);
+      return;
+    }
     if (sid === DONCHIAN_ID) {
       const preset = donchianParams(target);
       setParams(preset.params);
@@ -426,7 +438,7 @@ function BacktestPage() {
   };
   const changeDataset = (id: string) => {
     setDatasetId(id);
-    if (strategy?.id === DONCHIAN_ID) applyDefaults(DONCHIAN_ID, pickDataset(catalog?.datasets, id));
+    if (strategy?.id === DONCHIAN_ID || strategy?.preset) applyDefaults(strategy.id, pickDataset(catalog?.datasets, id));
   };
   const isRunning = selectedRun?.status === "running" || selectedRun?.status === "queued";
   const isFailed = selectedRun?.status === "failed";
@@ -556,7 +568,27 @@ function BacktestPage() {
             </span>
             <span className="text-border">|</span>
             <span className="text-muted-foreground">
-              勝率: <span className="text-muted-foreground/60 italic text-t3">後端尚未提供 (無往返勝率)</span>
+              勝率:{" "}
+              {result?.trade_stats?.win_rate != null ? (
+                <strong className="text-foreground" title={result.trade_stats.notice} data-testid="backtest-header-win-rate">
+                  {formatRatioPct(result.trade_stats.win_rate, { sign: false })}
+                  <span className="text-t2 text-muted-foreground/80 ml-1">
+                    ({result.trade_stats.wins}/{result.trade_stats.closed_trips} 筆往返)
+                  </span>
+                  <span className="text-t2 font-normal text-muted-foreground ml-1.5">
+                    賺賠比 {formatDecimal(result.trade_stats.payoff_ratio, { digits: 2 })} · 每筆期望值{" "}
+                    <span className={cn(signOf(result.trade_stats.expectancy) === "negative" ? "text-down" : "text-up")}>
+                      {formatDecimal(result.trade_stats.expectancy, { digits: 2, sign: true, suffix: " USDT" })}
+                    </span>
+                  </span>
+                </strong>
+              ) : !result ? (
+                "--"
+              ) : (
+                <span className="text-muted-foreground/60 italic text-t3">
+                  {result.trade_stats ? "沒有已平倉的往返交易" : "舊紀錄沒有往返統計"}
+                </span>
+              )}
             </span>
           </div>
           <div className="flex items-center gap-2.5 text-t3 text-muted-foreground">
@@ -567,6 +599,17 @@ function BacktestPage() {
             <span className="text-amber-400/90 text-t2">期末估值，未強制平倉</span>
           </div>
         </div>
+
+        {result && !resultLoading && result.equity_wiped_out && (
+          <p data-testid="backtest-wiped-out"
+             className="rounded border border-rose-400/40 bg-rose-400/5 px-3 py-1.5 text-xs text-rose-400">
+            <strong className="font-semibold">
+              權益在 {formatDateTimeWithYear(result.equity_wiped_out.time_ms)}（台北）跌破 0（最低{" "}
+              {formatDecimal(result.equity_wiped_out.min_equity, { digits: 2, suffix: " USDT" })}）。
+            </strong>{" "}
+            {result.equity_wiped_out.notice}
+          </p>
+        )}
 
         {/* ==================== 定案：水下載回撤圖與月度收益熱力矩陣 ==================== */}
         <BacktestUnderwaterChart
@@ -579,6 +622,19 @@ function BacktestPage() {
           sampling={result?.curve_sampling}
           loading={resultLoading}
         />
+
+        {result && !resultLoading && result.trade_stats && (
+          <TradeStatsPanel stats={result.trade_stats} />
+        )}
+
+        {result && !resultLoading && (
+          <CostBreakdownPanel
+            view={result.costs ? costViewFromBreakdown(result.costs) : null}
+            meta="價格損益 = 淨損益 + 手續費 + 滑價 + 資金費"
+            testId="backtest-cost-breakdown"
+            equitySized={activeStrategy?.sizing === "vol_target"}
+          />
+        )}
 
         {/* ==================== 主體分割：左欄回測歷史與約束，右欄模擬成交流 ==================== */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -674,7 +730,10 @@ function BacktestPage() {
                   <span className="text-muted-foreground">資金費與平倉</span>
                   <span className="font-mono text-foreground font-medium">
                     {activeRequest && activeRequest.dataset_id !== "synthetic-btc-15m-v1"
-                      ? `資料集實際費率${perf ? `（本次 ${formatDecimal(perf.funding_paid, { digits: 4, suffix: " USDT" })}）` : ""} · 期末估值平倉`
+                      ? `資料集實際費率${perf ? `（本次 ${formatDecimal(perf.funding_paid, { digits: 4, suffix: " USDT" })}）` : ""}${
+                          result?.funding_coverage && !result.funding_coverage.complete && result.funding_coverage.from_ms
+                            ? ` · 僅涵蓋 ${formatUtcTime(result.funding_coverage.from_ms)} 之後`
+                            : ""} · 期末估值平倉`
                       : "明示零資金費 · 期末估值平倉"}
                   </span>
                 </div>
@@ -831,7 +890,9 @@ function BacktestPage() {
               ))}
 
               <div className="space-y-1">
-                <Label className="text-t3 font-mono text-muted-foreground">下單張數 (quantity: 1~1000)</Label>
+                <Label className="text-t3 font-mono text-muted-foreground">
+                    {strategy?.sizing === "vol_target" ? "張數上限 (quantity: 1~1000，張數依權益與波動計算)" : "下單張數 (quantity: 1~1000)"}
+                  </Label>
                 <Input
                   type="text"
                   value={quantity}
@@ -854,7 +915,9 @@ function BacktestPage() {
 
               <div className="space-y-1">
                 <Label className="text-t3 font-mono text-muted-foreground">
-                  預熱根數 (warmup: &gt;= {strategy?.warmup.covers ?? "period"})
+                  {strategy?.warmup.min_days
+                    ? `預熱根數 (warmup: >= ${minWarmupBars(strategy, dataset)} 根，${strategy.warmup.min_days} 天)`
+                    : `預熱根數 (warmup: >= ${strategy?.warmup.covers ?? "period"})`}
                 </Label>
                 <Input
                   type="number"

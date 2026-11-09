@@ -20,8 +20,18 @@ export interface Axis {
   step: number;
 }
 
-const LABELS: Record<string, string> = { period: 'SMA 週期', entry_bars: '進場通道', exit_bars: '出場通道' };
-const SHORT_NAMES: Record<string, string> = { [SMA_ID]: 'SMA', [DONCHIAN_ID]: 'Donchian' };
+const LABELS: Record<string, string> = {
+  period: 'SMA 週期', entry_bars: '進場通道', exit_bars: '出場通道',
+  vol_scaling: '波動目標（1 開／0 關）', score_filter: '評分濾網（1 開／0 關）',
+};
+const SHORT_NAMES: Record<string, string> = {
+  [SMA_ID]: 'SMA', [DONCHIAN_ID]: 'Donchian', 'donchian-ensemble': 'Donchian 集成',
+  'tsmom-multi': '時序動能', 'dcm-daily': 'DCM 日線',
+};
+const TIMEFRAME_MS: Record<string, number> = {
+  '1m': 60_000, '5m': 300_000, '15m': 900_000, '1H': 3_600_000, '4H': 14_400_000,
+};
+const DAY_MS = 86_400_000;
 // [lower, upper]: every parameter set keeps lower strictly below upper (a Donchian exit
 // channel shorter than its entry channel), so every grid point is a valid request.
 const ORDERED: Record<string, [string, string][]> = { [DONCHIAN_ID]: [['exit_bars', 'entry_bars']] };
@@ -60,6 +70,24 @@ export function formatTrialParams(params?: [string, unknown][] | Record<string, 
 export function formatRanges(space?: Record<string, Axis> | null): string {
   if (!space) return '';
   return Object.entries(space).map(([name, axis]) => `${name} ${axis.low}~${axis.high}/${axis.step}`).join(' · ');
+}
+
+/** Bars covering a daily strategy's required whole days on this dataset; 0 when none are required. */
+export function minWarmupBars(meta: ResearchStrategyMeta, dataset: ResearchDatasetMeta | null): number {
+  const days = meta.warmup.min_days ?? 0;
+  const timeframe = dataset ? TIMEFRAME_MS[dataset.timeframe] : undefined;
+  return days && timeframe ? Math.ceil((days * DAY_MS) / timeframe) : 0;
+}
+
+/** Problems with a warm-up shorter than the whole days a daily strategy needs. */
+export function minWarmupProblems(meta: ResearchStrategyMeta, warmup: number, dataset: ResearchDatasetMeta | null): string[] {
+  const bars = minWarmupBars(meta, dataset);
+  return bars && warmup < bars ? [`預熱根數需至少 ${bars} 根（${meta.warmup.min_days} 天）`] : [];
+}
+
+/** The full 0~1 axis for each switch parameter of a preregistered strategy. */
+export function presetAxes(meta: ResearchStrategyMeta): Record<string, Axis> {
+  return Object.fromEntries(paramSpecs(meta).map((spec) => [spec.name, { low: spec.min, high: spec.max, step: 1 }]));
 }
 
 /** Problems with a warm-up that would leave no evaluation bar in the dataset. */

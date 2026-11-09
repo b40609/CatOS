@@ -1,7 +1,7 @@
 """Registered validation adapter over a registered dataset; persistence belongs to ResearchService."""
 
 from collections import Counter
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape
@@ -11,11 +11,13 @@ import platform
 import optuna
 import packaging
 
+from catos import research_costs, research_overfit
 from catos.optimization import IntRange
 from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
     MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_LOOKBACK_BARS,
-    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, decimal_string,
+    MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, costs_for, costs_html,
+    decimal_string,
     drawdown_pcts, json_text, load_dataset_bars, provenance, registered_factory,
     require_search_names, resolve_dataset, sample_curve_indices, strategy_spec, validate_request,
 )
@@ -141,10 +143,8 @@ def _sampled_curve(result, limit):
     """Kept indices for one OOS equity curve, or None when it already fits the limit."""
     if len(result.equity_curve) <= limit:
         return None
-    keep = sample_curve_indices(drawdown_pcts(result.equity_curve, result.config.initial_balance),
-                                limit - 1)
-    # Each window starts flat at the initial balance; keep that anchor point too.
-    return keep if keep[0] == 0 else [0, *keep]
+    # sample_curve_indices keeps the first point (each window's initial balance) and the last.
+    return sample_curve_indices(drawdown_pcts(result.equity_curve, result.config.initial_balance), limit)
 
 
 def compact_result(result):
@@ -161,7 +161,7 @@ def compact_result(result):
         if keep is not None:
             sampling[window.number] = {"total_points": len(oos.equity_curve),
                                        "returned_points": len(keep),
-                                       "method": "bucket_deepest_drawdown_keep_first"}
+                                       "method": "bucket_deepest_drawdown_keep_first_last"}
             oos = replace(oos, equity_curve=tuple(oos.equity_curve[index] for index in keep))
         windows.append(replace(window, out_of_sample=oos))
     slim = replace(result, labels=(), validation=replace(result.validation, windows=tuple(windows)),
@@ -235,14 +235,60 @@ def _report(payload):
                       "成交筆數", "錯誤"), rows)
             + "<h2>分環境歸屬（只列有樣本的環境）</h2>"
             + _table(("視窗", "環境", "K 線數", "成交筆數", "淨損益", "手續費", "資金費"), regimes)
+            + _costs_report(payload["costs"])
+            + _edges_report(payload["selection_edges"])
             + "<p>完整結果見同一任務的 result.json；逐根環境標籤與逐根歸屬不保存，"
               "可由綁定的資料集與分類規則重算。</p></body></html>")
+
+
+COST_COLUMNS = ("price_pnl", "fees", "slippage", "funding_paid", "net_pnl", "fill_count",
+                "break_even_bps_per_side")
+
+
+def _costs_report(costs):
+    rows = [(row["number"], *(row["costs"][key] for key in COST_COLUMNS),
+             row["costs"]["buy_hold"]["pnl"],
+             (row["costs"]["funding_scenario"] or {}).get("net_pnl_with_assumption", "—"))
+            for row in costs["windows"]]
+    html = ("<h2>各視窗成本拆解（價格損益以成交 K 線開盤價計、成本前）</h2>"
+            + _table(("視窗", "價格損益", "手續費", "滑價", "資金費", "淨損益", "成交筆數",
+                      "每邊兩平 bps", "買進持有（成本前）", "淨損益（含假設資金費）"), rows))
+    total = costs["total"]
+    if total is not None:
+        html += costs_html([(label, total.get(key)) for key, label in (
+            ("price_pnl", "價格損益"), ("fees", "手續費"), ("slippage", "滑價"),
+            ("funding_paid", "資金費（實際）"), ("net_pnl", "淨損益"), ("traded_notional", "成交名目"),
+            ("fill_count", "成交筆數"), ("cost_bps_per_side", "每邊成本 bps"),
+            ("break_even_bps_per_side", "每邊兩平成本 bps"), ("buy_hold_pnl", "買進持有（各窗合計、成本前）"),
+            ("assumed_funding_paid", "假設資金費（未涵蓋期間）"))], "各視窗合計（各窗獨立，不是連續投資組合）")
+    return html
+
+
+def _edges_report(edges):
+    rows = [(name, counts["at_low"], counts["at_high"]) for name, counts in edges["params"].items()]
+    return ("<h2>選參落在搜尋範圍邊界</h2><p>" + escape(
+        f"{edges['windows_at_edge']} / {edges['windows_with_selection']} 個有選定參數的視窗落在邊界。{edges['notice']}")
+        + "</p>" + _table(("參數", "選在下限的視窗數", "選在上限的視窗數"), rows))
+
+
+def _window_costs(result, bars, quantity, dataset, strategy_id):
+    """Exact attribution of every completed OOS window, before curves are sampled."""
+    windows = []
+    for window in result.validation.windows:
+        if window.out_of_sample is not None:
+            windows.append((window.number, costs_for(window.out_of_sample, bars, quantity, dataset,
+                                                     strategy_id)))
+    # JSON round-trip: Decimal becomes the same strings as every other payload figure.
+    return json.loads(json_text({
+        "windows": [{"number": number, "costs": asdict(costs)} for number, costs in windows],
+        "total": research_costs.total([costs for _, costs in windows]),
+        "funding_coverage": dataset.funding_summary()}))
 
 
 def execute_validation(request, expected_source):
     snapshot, config, quantity, bars, space, plan, rule = validate_validation_request(request)
     strategy_id = snapshot["backtest"]["strategy_id"]
-    build = registered_factory(expected_source, strategy_id, quantity)
+    build = registered_factory(expected_source, strategy_id, quantity, config.contract)
     reproduction = _reproduction(expected_source)
     result = regime_walk_forward(
         strategy_factory=build, search_space=space, candles=bars, config=config, rule=rule,
@@ -251,6 +297,7 @@ def execute_validation(request, expected_source):
         direction="maximize",
     )
     dataset = resolve_dataset(snapshot["backtest"]["dataset_id"])
+    costs = _window_costs(result, bars, quantity, dataset, strategy_id)
     if provenance(dataset.dataset_id, strategy_id) != expected_source:
         raise ValueError("source_changed_during_run")
     payload = {
@@ -259,7 +306,13 @@ def execute_validation(request, expected_source):
         "objective": {"name": "return_pct", "direction": "maximize",
                       "formula": "Decimal performance.return_pct; no float conversion"},
         "result": compact_result(result),
+        "costs": costs,
         "evaluation_complete": result.validation.complete,
         "data_notice": f"各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。{dataset.notice}",
     }
+    payload["selection_edges"] = research_overfit.edge_selections(
+        [(row["number"], None if row["training"]["selected_trial_number"] is None
+          else row["training"]["trials"][row["training"]["selected_trial_number"]]["params"])
+         for row in payload["result"]["validation"]["windows"]],
+        snapshot["search_space"])
     return payload, _report(payload)

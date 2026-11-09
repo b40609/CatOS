@@ -138,3 +138,29 @@ test('backtest parameter checks follow the catalog bounds and the Donchian order
   assert.ok(strategies.warmupBarsProblems(96, SYNTHETIC).some((p) => p.includes('需少於資料集的 96 根')));
   assert.deepEqual(strategies.warmupBarsProblems(960, FETCHED), []);
 });
+
+// Package E: preregistered daily strategies carry presets and a whole-day warm-up.
+const ENSEMBLE = { id: 'donchian-ensemble', sizing: 'vol_target',
+  parameters: { vol_scaling: { min: 0, max: 1 }, quantity: { unit: 'contracts' } },
+  warmup: { covers: 'vol_scaling', below: 20000, min_days: 367 },
+  preset: { parameters: { vol_scaling: 1 }, quantity: '1000', warmup_days: 367 } };
+const FOUR_HOUR = { id: 'okx-btc-usdt-swap-4h-20211106-20261106', source: 'okx_public_history', bars: 10956, timeframe: '4H' };
+
+test('daily strategies need whole days of warm-up on the dataset timeframe', () => {
+  assert.equal(strategies.minWarmupBars(ENSEMBLE, FOUR_HOUR), 2202);
+  assert.equal(strategies.minWarmupBars(ENSEMBLE, { ...FOUR_HOUR, timeframe: '15m' }), 35232);
+  assert.equal(strategies.minWarmupBars(SMA, FOUR_HOUR), 0);
+  assert.deepEqual(strategies.minWarmupProblems(ENSEMBLE, 2201, FOUR_HOUR), ['預熱根數需至少 2202 根（367 天）']);
+  assert.deepEqual(strategies.minWarmupProblems(ENSEMBLE, 2202, FOUR_HOUR), []);
+  assert.deepEqual(strategies.presetAxes(ENSEMBLE), { vol_scaling: { low: 0, high: 1, step: 1 } });
+});
+
+test('walk-forward defaults for a preset strategy keep its warm-up and quantity', () => {
+  const form = plan.defaultValidationForm(FOUR_HOUR, EXAMPLE, ENSEMBLE);
+  assert.equal(form.minWarmup, 2202);
+  const request = plan.buildValidationRequest(form, ENSEMBLE);
+  assert.equal(request.backtest.warmup_bars, 2202);
+  assert.equal(request.backtest.parameters.quantity, '1000');
+  assert.deepEqual(request.search_space, { vol_scaling: { low: 0, high: 1, step: 1 } });
+  assert.ok(plan.barsUsed(form, ENSEMBLE) <= FOUR_HOUR.bars);
+});

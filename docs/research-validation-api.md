@@ -74,7 +74,7 @@ POST `/api/research/validations`，Content-Type 為 application/json，標頭 `X
 | --- | --- |
 | `result.validation.windows[n].training` | 格點、各候選原績效／錯誤、鄰域、固定選擇與排序規則 |
 | `result.validation.windows[n].out_of_sample` | 當窗完整 OOS 回測：績效、成交、資金費、權益與末筆意圖；權益曲線超過每窗上限時取樣 |
-| `result.validation.windows[n].curve_sampling` | 只在取樣時出現：total_points、returned_points、method（`bucket_deepest_drawdown_keep_first`） |
+| `result.validation.windows[n].curve_sampling` | 只在取樣時出現：total_points、returned_points、method（`bucket_deepest_drawdown_keep_first_last`；2026-11-09 前產出的結果是 `bucket_deepest_drawdown_keep_first`） |
 | `result.windows[n].evaluation.summaries` | UNKNOWN／上漲／下跌／震盪 × 波動組別，含零樣本組 |
 | `result.windows[n].evaluation.total` | 當窗損益、成本、K 線數與成交數 |
 | `result.windows[n].evaluation.reconciled` | 分環境歸屬與原 OOS 帳務核對 |

@@ -6,6 +6,7 @@ Each trial invokes the existing backtest with a fresh strategy and fixed data.
 
 from dataclasses import dataclass
 from decimal import Decimal
+from itertools import product
 from math import isfinite
 from types import MappingProxyType
 from typing import Callable, Iterable, Mapping
@@ -13,7 +14,7 @@ from typing import Callable, Iterable, Mapping
 import optuna
 
 from catos.research import (
-    BacktestConfig, Candle, Performance, Strategy, _call, _decimal, _integer,
+    BacktestConfig, BacktestResult, Candle, Performance, Strategy, _call, _decimal, _integer,
     _validate, backtest,
 )
 
@@ -60,6 +61,8 @@ class SearchResult:
     warmup_bars: int
     trials: tuple[TrialRecord, ...]
     best_trial_number: int | None
+    # "tpe" (Optuna TPESampler) or "exhaustive_grid" when the whole grid fits in n_trials.
+    sampler: str = "tpe"
 
     @property
     def best_trial(self) -> TrialRecord | None:
@@ -99,6 +102,12 @@ def _validate_space(space: Mapping[str, Parameter]) -> tuple[tuple[str, Paramete
     return items
 
 
+def _grid_values(spec: Parameter) -> tuple[int | str, ...]:
+    if isinstance(spec, IntRange):
+        return tuple(range(spec.low, spec.high + 1, spec.step))
+    return spec.values
+
+
 def _score_float(value: Decimal) -> float:
     if not isinstance(value, Decimal):
         raise TypeError("score callback must return a dimensionless Decimal score")
@@ -116,6 +125,8 @@ def optimize(
     config: BacktestConfig, score: Callable[[Performance], Decimal],
     score_name: str, n_trials: int, seed: int, warmup_bars: int = 0,
     direction: str = "maximize",
+    on_result: Callable[[tuple[tuple[str, int | str], ...], BacktestResult], None] | None = None,
+    exhaustive_small_grid: bool = False,
 ) -> SearchResult:
     """Run exactly n_trials sequential ask/tell attempts (including failures).
 
@@ -123,6 +134,14 @@ def optimize(
     retains the strategy source and input data for replay. Seed alone does not
     guarantee identical studies across Optuna versions. Ordinary trial failures
     are recorded as FAIL and never ranked; interruptions propagate immediately.
+    With exhaustive_small_grid, when the whole grid has no more points than
+    n_trials, every point is evaluated exactly once in sorted order instead
+    (sampler "exhaustive_grid"):
+    TPE would otherwise repeat points and leave others untried, so the run would
+    neither cover the space nor count its trials honestly.
+    on_result, when given, receives (params, BacktestResult) for every COMPLETE
+    trial after it is recorded, so callers can keep curves without re-running;
+    an exception there propagates and aborts the search.
     """
     _integer(n_trials, "n_trials", minimum=1)
     _integer(seed, "seed")
@@ -137,6 +156,11 @@ def optimize(
     space = _call(_validate_space, search_space)
     bars = tuple(candles)
     _call(_validate, config, bars, warmup_bars)
+    grid = [dict(zip((name for name, _ in space), values))
+            for values in product(*(_grid_values(spec) for _, spec in space))]
+    if exhaustive_small_grid and len(grid) <= n_trials:
+        return _exhaustive(grid, strategy_factory, bars, config, score, score_name, seed,
+                           direction, space, warmup_bars, on_result)
     study = optuna.create_study(
         study_name="catos-memory", direction=direction,
         sampler=optuna.samplers.TPESampler(seed=seed),
@@ -175,6 +199,41 @@ def optimize(
         study.tell(trial, converted)
         records.append(TrialRecord(trial.number, "COMPLETE", tuple(params.items()),
                                    raw_score, converted, performance, None))
+        if on_result is not None:
+            on_result(tuple(params.items()), result)
     best = study.best_trial.number if any(r.state == "COMPLETE" for r in records) else None
     return SearchResult(seed, direction, score_name, optuna.__version__, space,
                         config, warmup_bars, tuple(records), best)
+
+
+def _exhaustive(grid, strategy_factory, bars, config, score, score_name, seed, direction,
+                space, warmup_bars, on_result):
+    """Every grid point once, numbered in order; ties keep the first point, as Optuna does."""
+    records = []
+    best = None
+    for number, params in enumerate(grid):
+        decoded = MappingProxyType({name: Decimal(value) if isinstance(value, str) else value
+                                    for name, value in params.items()})
+        raw_score = None
+        performance = None
+        try:
+            result = backtest(strategy=lambda: strategy_factory(decoded), candles=bars,
+                              config=config, warmup_bars=warmup_bars)
+            performance = result.performance
+            candidate = _call(score, performance)
+            if isinstance(candidate, Decimal):
+                raw_score = candidate
+            converted = _score_float(candidate)
+        except Exception as exc:
+            records.append(TrialRecord(number, "FAIL", tuple(params.items()), raw_score, None,
+                                       performance, f"{type(exc).__name__}: {exc}"))
+            continue
+        records.append(TrialRecord(number, "COMPLETE", tuple(params.items()), raw_score,
+                                   converted, performance, None))
+        if on_result is not None:
+            on_result(tuple(params.items()), result)
+        if best is None or (converted > best[1] if direction == "maximize" else converted < best[1]):
+            best = (number, converted)
+    return SearchResult(seed, direction, score_name, optuna.__version__, space, config,
+                        warmup_bars, tuple(records), None if best is None else best[0],
+                        "exhaustive_grid")

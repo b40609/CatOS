@@ -1,0 +1,17 @@
+{
+  "schema": "catos.research.strategy-artifact",
+  "schema_version": 1,
+  "artifact_id": "dcm-pullback",
+  "version": "dcm-pullback-preregistered-v1",
+  "sha256": "f9616a00c9e91bd0d575d95415c9466cca6bc992fd4442f1be0cf233907d9b43",
+  "entry": "catos.research_intraday:DCMPullback",
+  "source_files": [
+    "catos/research_intraday.py"
+  ],
+  "approval_state": "approved",
+  "provenance": {
+    "origin": "catos-research-intraday-preregistered",
+    "approval_basis": "user-calibrated-preregistered-rules",
+    "scope": "research-only"
+  }
+}

@@ -4,6 +4,7 @@ from dataclasses import asdict, replace
 from decimal import Decimal
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest import mock
@@ -82,13 +83,13 @@ class WriteAndVerifyTest(DatasetFixture):
         self.assertTrue((target / datasets.CANDLES).read_bytes().startswith(
             b"open_time_ms,open,high,low,close,closed\n"))
 
-    def test_writer_refuses_gaps_incomplete_funding_and_overwrite(self):
+    def test_writer_refuses_gaps_funding_that_stops_early_and_overwrite(self):
         bars = make_bars(192)
         with self.assertRaisesRegex(ValueError, "dataset_has_gaps"):
             write_fixture(self.root, candles=bars[:50] + bars[51:])
         end = START + 192 * TF
-        with self.assertRaisesRegex(ValueError, "funding_incomplete"):
-            write_fixture(self.root, funding=make_funding(START + EIGHT_H, end))
+        with self.assertRaisesRegex(ValueError, "funding_stops_before_end"):
+            write_fixture(self.root, funding=make_funding(START, end - EIGHT_H))
         with self.assertRaisesRegex(ValueError, "funding_interval_irregular"):
             funding = make_funding(START, end)
             write_fixture(self.root, funding=funding[:2] + funding[3:])
@@ -150,6 +151,7 @@ class CatalogAndRunTest(DatasetFixture):
         self.assertIn("OKX 公開歷史 K 線", payload["data_notice"])
         self.assertGreater(len(payload["result"]["funding"]), 0)
         self.assertNotIn("curve_sampling", payload)
+        self.assertIsNone(payload["equity_wiped_out"])
         self.assertEqual(len(payload["drawdown_curve"]), len(payload["result"]["equity_curve"]))
         self.assertIn("<", report)
         with self.assertRaisesRegex(ValueError, "source_changed"):
@@ -158,8 +160,12 @@ class CatalogAndRunTest(DatasetFixture):
     def test_large_dataset_curve_is_sampled_keeping_the_deepest_drawdown(self):
         count = MAX_CURVE_POINTS + 400
         dataset_id = write_fixture(self.root, count=count).name
-        payload, _ = execute_request(request_for(dataset_id), provenance(dataset_id))
+        payload, report = execute_request(request_for(dataset_id), provenance(dataset_id))
         sampling = payload["curve_sampling"]
+        # The HTML report draws the same sampled points (worker stdout carries both).
+        drawn = re.search(r'<polyline points="([^"]+)"', report).group(1).split()
+        self.assertEqual(len(drawn), sampling["returned_points"])
+        self.assertIn(f"圖表取樣 {sampling['returned_points']}／{sampling['total_points']} 點", report)
         self.assertGreater(sampling["total_points"], MAX_CURVE_POINTS)
         self.assertLessEqual(sampling["total_points"], count)
         self.assertLessEqual(sampling["returned_points"], MAX_CURVE_POINTS)
@@ -175,6 +181,17 @@ class CatalogAndRunTest(DatasetFixture):
         self.assertIn(10, keep)
         self.assertEqual(keep[-1], len(values) - 1)
         self.assertEqual(sample_curve_indices(values[:4], limit=5), [0, 1, 2, 3])
+        # F fix acceptance N6: the chart starts at the first point and stays within the limit.
+        for total in range(6, 60):
+            for limit in (3, 4, 5, 7):
+                keep = sample_curve_indices([Decimal(i % 5) for i in range(total)], limit=limit)
+                self.assertEqual((keep[0], keep[-1]), (0, total - 1), (total, limit))
+                self.assertLessEqual(len(keep), limit, (total, limit))
+                self.assertEqual(keep, sorted(set(keep)))
+        # N fix acceptance P4: a limit below 3 cannot hold first, last and one bucket.
+        for limit in (0, 1, 2):
+            with self.assertRaisesRegex(ValueError, "at least 3"):
+                sample_curve_indices(values, limit=limit)
 
     def test_optimization_and_validation_use_the_requested_dataset(self):
         from catos.research_catalog import DEFAULT_OPTIMIZATION, DEFAULT_VALIDATION
@@ -239,8 +256,10 @@ class CatalogAndRunTest(DatasetFixture):
             self.assertEqual(oos["funding"], json.loads(json_text([asdict(f) for f in replay.funding])))
             self.assertEqual(window["curve_sampling"], {
                 "total_points": test_bars + 1, "returned_points": len(sampled),
-                "method": "bucket_deepest_drawdown_keep_first"})
+                "method": "bucket_deepest_drawdown_keep_first_last"})
             self.assertLessEqual(len(sampled), MAX_VALIDATION_CURVE_POINTS // windows)
+            # N fix acceptance P3: the window's own sampling keeps first and last, with no extra anchor.
+            self.assertEqual((sampled[0], sampled[-1]), (full[0], full[-1]))
             by_time = {point["time_ms"]: point for point in full}
             self.assertEqual([by_time[point["time_ms"]] for point in sampled], sampled)
             self.assertEqual([point["time_ms"] for point in sampled],

@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research, research_datasets
+from catos import research, research_costs, research_datasets, research_overfit, research_trades
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -50,6 +50,20 @@ DONCHIAN_PROVENANCE = {
 }
 # Channels up to ten 15m days (96 bars a day).
 DONCHIAN_MAX_BARS = 960
+# Package E (2026-11-06): three daily strategies preregistered before any real-data run.
+DAILY_FILES = ("catos/research_daily.py",)
+DAILY_SHA256 = "8f59036ce64615f3b2ebab0ecedf56e4808fa073f07f2153cc90ed970805dc85"
+DAILY_PROVENANCE = {"origin": "catos-research-daily-preregistered", "approval_basis": "user-approved-preregistered-literature-rules", "scope": "research-only"}
+DAILY_MANIFESTS = ROOT / "catos" / "research_only_artifacts"
+# 366 complete days for the longest look-back plus the partial first day.
+DAILY_WARMUP_DAYS = 367
+DAILY_WARMUP_LIMIT = 60_000
+DAY_MS = 86_400_000
+# Package F (2026-11-07): intraday DCM rules from the user's calibration, preregistered.
+INTRADAY_FILES = ("catos/research_intraday.py",)
+INTRADAY_SHA256 = "f9616a00c9e91bd0d575d95415c9466cca6bc992fd4442f1be0cf233907d9b43"
+INTRADAY_PROVENANCE = {"origin": "catos-research-intraday-preregistered", "approval_basis": "user-calibrated-preregistered-rules", "scope": "research-only"}
+INTRADAY_WARMUP_DAYS = 3
 
 
 @dataclass(frozen=True)
@@ -66,6 +80,12 @@ class ResearchStrategy:
     parameters: tuple  # (name, low, high) integers, in constructor order before quantity
     lookback: str  # the parameter warmup_bars must cover
     warmup_limit: int  # warmup_bars must stay below this
+    # Daily strategies need whole days of warm-up whatever the bar size.
+    min_warmup_days: int = 0
+    # "fixed": quantity is the traded contracts; "vol_target": quantity caps the
+    # contracts sized from equity, and the strategy receives the contract spec.
+    sizing: str = "fixed"
+    preset: dict | None = None  # frontend defaults for preregistered strategies
 
 
 STRATEGIES = {spec.strategy_id: spec for spec in (
@@ -77,6 +97,28 @@ STRATEGIES = {spec.strategy_id: spec for spec in (
                      "Donchian 通道突破（Long / Short）",
                      (("entry_bars", 2, DONCHIAN_MAX_BARS), ("exit_bars", 1, DONCHIAN_MAX_BARS - 1)),
                      "entry_bars", DONCHIAN_MAX_BARS + 1),
+    *(ResearchStrategy(artifact_id, version, f"catos.research_daily:{entry}", DAILY_SHA256, DAILY_FILES,
+                       DAILY_MANIFESTS / f"{artifact_id}-{version}.json", DAILY_PROVENANCE, name,
+                       ((param, 0, 1),), param, DAILY_WARMUP_LIMIT, DAILY_WARMUP_DAYS, sizing,
+                       {"parameters": {param: default}, "quantity": quantity, "warmup_days": DAILY_WARMUP_DAYS})
+      for artifact_id, version, entry, name, param, default, sizing, quantity in (
+          ("donchian-ensemble", "donchian-ensemble-preregistered-v1", "DonchianEnsemble",
+           "Donchian 多週期集成（Long / Flat，日線）", "vol_scaling", 1, "vol_target", "1000"),
+          ("tsmom-multi", "tsmom-multi-preregistered-v1", "TimeSeriesMomentum",
+           "時間序列動能 1／3／12 月（Long / Short，日線）", "vol_scaling", 1, "vol_target", "1000"),
+          ("dcm-daily", "dcm-daily-preregistered-v1", "DCMDaily",
+           "DCM 日線版（Long / Short）", "score_filter", 0, "fixed", "10"),
+      )),
+    *(ResearchStrategy(artifact_id, version, f"catos.research_intraday:{entry}", INTRADAY_SHA256,
+                       INTRADAY_FILES, DAILY_MANIFESTS / f"{artifact_id}-{version}.json", INTRADAY_PROVENANCE,
+                       name, ((param, low, high),), param, DAILY_WARMUP_LIMIT, INTRADAY_WARMUP_DAYS, "fixed",
+                       {"parameters": {param: default}, "quantity": "10", "warmup_days": INTRADAY_WARMUP_DAYS})
+      for artifact_id, version, entry, name, param, low, high, default in (
+          ("dcm-fade", "dcm-fade-preregistered-v1", "DCMFade",
+           "DCM 假突破反轉（Long / Short，短週期）", "exit_mode", 0, 1, 0),
+          ("dcm-pullback", "dcm-pullback-preregistered-v1", "DCMPullback",
+           "DCM 突破後回踩（Long，短週期）", "window_days", 1, 5, 3),
+      )),
 )}
 
 
@@ -92,6 +134,7 @@ ENGINE_FILES = (
     "catos/research_optimization.py", "catos/optimization.py",
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py",
+    "catos/research_costs.py", "catos/research_overfit.py", "catos/research_trades.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -99,13 +142,26 @@ DEFAULT_REQUEST = {
     "initial_balance": "1000", "fee_rate": "0.0005",
     "slippage_bps": "2", "warmup_bars": 2,
 }
-# The Decimal core runs ~45k bars/s locally; the binding limit is output size,
-# so equity/drawdown curves above MAX_CURVE_POINTS are sampled in the payload.
-MAX_BARS = 20_000
+# The Decimal core runs ~45k bars/s locally; the binding limit is output size:
+# MAX_OUTPUT_BYTES caps the worker's stdout, which carries the payload AND the
+# HTML report. Equity/drawdown curves above MAX_CURVE_POINTS are sampled in
+# both, and the report lists at most REPORT_MAX_FILL_ROWS fills, so the report
+# stays roughly fixed in size; the payload still lists every fill (~160 bytes
+# each), so a 6-month 5m run tops out around 6,000-7,000 fills.
+# 2026-11-07: raised from 20,000 so six months of 5m bars (~52,700) fit one run.
+MAX_BARS = 60_000
 MAX_CURVE_POINTS = 2_000
+REPORT_MAX_FILL_ROWS = 400
 MAX_RUNS = 200
 TIMEOUT_SECONDS = 30
 MAX_OUTPUT_BYTES = 2_000_000
+# An optimization replays every bar once per trial plus one re-run of the best,
+# so it is bounded by construction at (MAX_TRIALS + 1) x MAX_BARS = 1.26M bar
+# evaluations; no separate preflight. Measured 2026-11-08 on the i7-14700 host:
+# 20 trials on 6 months of 5m (52,704 bars) take 14.1-14.5 s through the worker,
+# a single run 0.42-0.55 s in process, so the worst case is about 17 s of the
+# 30 s TIMEOUT_SECONDS. A machine more than ~1.7x slower can time out on the
+# longest datasets; lower n_trials there.
 MAX_TRIALS = 20
 MAX_VALIDATION_CANDIDATES = 20
 MAX_VALIDATION_RUNS = 100
@@ -325,6 +381,9 @@ def validate_request(value):
     warmup = value["warmup_bars"]
     if type(warmup) is not int or not params[spec.lookback] <= warmup < spec.warmup_limit:
         raise ValueError(f"warmup_bars: integer >= {spec.lookback} and < {spec.warmup_limit} required")
+    if spec.min_warmup_days and warmup * dataset.timeframe_ms < spec.min_warmup_days * DAY_MS:
+        bars = -(-spec.min_warmup_days * DAY_MS // dataset.timeframe_ms)
+        raise ValueError(f"warmup_bars: at least {bars} bars ({spec.min_warmup_days} days) required")
     # Donchian warm-up can exceed the 96-bar fixture; reject before a task is queued.
     if warmup >= dataset.bars:
         raise ValueError(f"warmup_bars: must leave evaluation bars in the {dataset.bars}-bar dataset")
@@ -396,7 +455,9 @@ def catalog():
                         "parameters": {**{name: {"min": low, "max": high}
                                           for name, low, high in spec.parameters},
                                        "quantity": {"unit": "contracts"}},
-                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit}}
+                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit,
+                                   "min_days": spec.min_warmup_days},
+                        "sizing": spec.sizing, "preset": spec.preset}
                        for spec in STRATEGIES.values()],
         "datasets": [{**dataset.describe(), "contract": asdict(dataset.contract)}
                      for dataset in datasets()],
@@ -481,12 +542,20 @@ def load_registered_strategy(expected_source):
     return strategy
 
 
-def registered_factory(expected_source, strategy_id, quantity):
-    """The verified strategy bound to a run's quantity; the request must name the same strategy."""
+def registered_factory(expected_source, strategy_id, quantity, contract=None):
+    """The verified strategy bound to a run's quantity; the request must name the same strategy.
+
+    Volatility-targeted strategies size from equity, so they also get the contract spec.
+    """
     if expected_source["strategy"]["id"] != strategy_id:
         raise ValueError("strategy_source_mismatch")
+    spec = strategy_spec(strategy_id)
+    if spec.sizing == "vol_target" and contract is None:
+        raise ValueError("contract_required_for_vol_target")
     strategy = load_registered_strategy(expected_source)
-    names = [name for name, _, _ in strategy_spec(strategy_id).parameters]
+    names = [name for name, _, _ in spec.parameters]
+    if spec.sizing == "vol_target":
+        return lambda params: strategy(*(params[name] for name in names), quantity, contract)
     return lambda params: strategy(*(params[name] for name in names), quantity)
 
 
@@ -496,6 +565,49 @@ def load_dataset_bars(dataset_id, config):
     if len(bars) > MAX_BARS:
         raise ValueError("dataset_bar_limit")
     return bars, config
+
+
+def buy_hold_quantity(strategy_id, quantity, result, bars):
+    """Fixed-size strategies compare with the same contracts; equity-sized ones with 1x initial notional."""
+    if strategy_id is None or strategy_spec(strategy_id).sizing != "vol_target":
+        return quantity
+    contract = result.config.contract
+    first = next(bar for bar in bars if bar.open_time_ms >= result.evaluation_start_ms)
+    with localcontext(research._CONTEXT):
+        raw = result.config.initial_balance / (first.open * contract.base_per_contract)
+        return (raw / contract.lot_size).to_integral_value(rounding="ROUND_DOWN") * contract.lot_size
+
+
+def costs_for(result, bars, quantity, dataset, strategy_id=None):
+    """Cost attribution and buy-and-hold baseline; a funding scenario only for partial funding."""
+    scenario_from = None if dataset.funding_path is None or dataset.funding_complete else dataset.funding_from_ms
+    interval = dataset.funding_interval_ms or research_costs.ASSUMED_FUNDING_INTERVAL_MS
+    sized = strategy_id is not None and strategy_spec(strategy_id).sizing == "vol_target"
+    return research_costs.cost_breakdown(result, bars, buy_hold_quantity(strategy_id, quantity, result, bars),
+                                         scenario_from, interval_ms=interval, equity_sized=sized)
+
+
+def costs_html(rows, title="成本拆解"):
+    """A small read-only table for the HTML reports; rows are (label, value) pairs."""
+    from html import escape
+    body = "".join(f"<tr><th>{escape(label)}</th><td>{escape('—' if value is None else str(value))}</td></tr>"
+                   for label, value in rows)
+    return f"<h2>{escape(title)}</h2><table>{body}</table>"
+
+
+def cost_rows(costs):
+    """Report rows for one breakdown (dataclass or asdict form)."""
+    value = costs if isinstance(costs, dict) else asdict(costs)
+    rows = [(label, value[key]) for key, label in research_costs.REPORT_ROWS]
+    hold = value["buy_hold"]
+    rows.append((f"買進持有基準（同 {hold['quantity']} 張、成本前、未計資金費）", hold["pnl"]))
+    rows.append(("標的漲跌 %", hold["underlying_return_pct"]))
+    scenario = value["funding_scenario"]
+    if scenario is not None:
+        rows.append((f"假設資金費（{scenario['events']} 次，未涵蓋期間）", scenario["assumed_paid"]))
+        rows.append(("淨損益（含假設資金費）", scenario["net_pnl_with_assumption"]))
+        rows.append(("假設說明", scenario["notice"]))
+    return rows
 
 
 def drawdown_pcts(equity_curve, initial_balance):
@@ -510,20 +622,36 @@ def drawdown_pcts(equity_curve, initial_balance):
 
 
 def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
-    """Indices kept for the payload chart: per bucket the deepest drawdown, plus the last point.
+    """Indices kept for the payload chart: per bucket the deepest drawdown, plus the first and last points.
 
     Performance figures are computed on every bar before sampling; only the
     returned chart points are thinned so large datasets stay under the output cap.
+    The first point (initial equity) is kept so the chart starts where the run
+    starts (acceptance N6, 2026-11-08); at most `limit` indices are returned.
     """
+    if limit < 3:
+        raise ValueError("curve sampling limit must be at least 3 (first, last and one bucket)")
     total = len(drawdowns)
     if total <= limit:
         return list(range(total))
-    size = -(-total // (limit - 1))
+    size = -(-total // (limit - 2))
     keep = [max(range(start, min(start + size, total)), key=lambda i: (drawdowns[i], -i))
             for start in range(0, total, size)]
+    if keep[0] != 0:
+        keep.insert(0, 0)
     if keep[-1] != total - 1:
         keep.append(total - 1)
     return keep
+
+
+def _wiped_out(result):
+    """First time equity reached <= 0 (no liquidation model), or None."""
+    index = research_overfit.first_non_positive(result.equity_curve)
+    if index is None:
+        return None
+    return {"time_ms": result.equity_curve[index].time_ms,
+            "min_equity": min(point.equity for point in result.equity_curve),
+            "notice": research_overfit.WIPED_OUT_NOTICE}
 
 
 def execute_request(request, expected_source):
@@ -531,7 +659,7 @@ def execute_request(request, expected_source):
     # The worker, not MCP/web, executes the fixed strategy. Source bytes are
     # snapshotted and hash-verified before execution so validation and code
     # execution cannot observe different strategy file contents.
-    build = registered_factory(expected_source, snapshot["strategy_id"], quantity)
+    build = registered_factory(expected_source, snapshot["strategy_id"], quantity, config.contract)
     dataset = resolve_dataset(snapshot["dataset_id"])
     bars, config = load_dataset_bars(dataset.dataset_id, config)
     result = research.backtest(
@@ -542,9 +670,13 @@ def execute_request(request, expected_source):
                 in zip(result.equity_curve, drawdown_pcts(result.equity_curve, config.initial_balance))]
     result_payload = asdict(result)
     keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
+    costs = costs_for(result, bars, quantity, dataset, snapshot["strategy_id"])
     payload = {
         "request": snapshot, "provenance": expected_source,
         "result": result_payload, "drawdown_curve": drawdown,
+        "costs": asdict(costs), "funding_coverage": dataset.funding_summary(),
+        "trade_stats": research_trades.trade_stats(result),
+        "equity_wiped_out": _wiped_out(result),
         "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }
@@ -552,8 +684,9 @@ def execute_request(request, expected_source):
         result_payload["equity_curve"] = [result_payload["equity_curve"][i] for i in keep]
         payload["drawdown_curve"] = [drawdown[i] for i in keep]
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
-                                     "method": "bucket_deepest_drawdown"}
-    report = render_report(result)
+                                     "method": "bucket_deepest_drawdown_keep_first_last"}
+    report = render_report(result, curve_indices=keep, max_trade_rows=REPORT_MAX_FILL_ROWS)
+    report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report

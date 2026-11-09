@@ -43,8 +43,12 @@ export interface ResearchStrategyMeta {
   name: string;
   // Integer parameters carry min/max (constructor order); quantity carries its unit.
   parameters: Record<string, { min?: number; max?: number; unit?: string }>;
-  // warmup_bars >= the named parameter and < below.
-  warmup: { covers: string; below: number };
+  // warmup_bars >= the named parameter and < below; daily strategies also need min_days of bars.
+  warmup: { covers: string; below: number; min_days?: number };
+  // "vol_target": quantity caps contracts sized from equity; "fixed": quantity is traded as is.
+  sizing?: 'fixed' | 'vol_target';
+  // Preregistered strategies (package E) carry their frontend defaults.
+  preset?: { parameters: Record<string, number>; quantity: string; warmup_days: number } | null;
 }
 
 export interface ResearchDatasetMeta {
@@ -59,6 +63,8 @@ export interface ResearchDatasetMeta {
   start_ms?: number | null;
   end_ms?: number | null;
   funding?: boolean;
+  // How funding is counted: OKX keeps ~3 months, so a long dataset starts funding late.
+  funding_coverage?: FundingCoverage;
   notice?: string;
   files?: Record<string, string>;
   contract: {
@@ -184,7 +190,145 @@ export interface BacktestPerformance {
   trade_count: number; // Exact integer simulated fills, not round trips
 }
 
+export interface FundingCoverage {
+  source: 'dataset' | 'none';
+  complete: boolean;
+  from_ms: number | null; // first real funding event
+  interval_ms: number | null;
+}
+
+// catos/research_costs.py: price_pnl = net_pnl + fees + slippage + funding_paid, valued at fill-bar opens.
+export interface CostBreakdown {
+  price_pnl: string;
+  fees: string;
+  slippage: string;
+  funding_paid: string; // dataset funding actually applied; positive is a debit
+  net_pnl: string;
+  traded_notional: string;
+  fill_count: number;
+  cost_bps_per_side: string | null;
+  break_even_bps_per_side: string | null;
+  buy_hold: {
+    quantity: string;
+    entry_open: string;
+    exit_close: string;
+    pnl: string; // before costs and funding
+    underlying_return_pct: string;
+  };
+  // An assumption, never ledger data: fixed rate over the period real funding does not cover.
+  funding_scenario: {
+    rate: string;
+    interval_ms: number;
+    uncovered_start_ms: number;
+    uncovered_end_ms: number;
+    events: number;
+    assumed_paid: string;
+    net_pnl_with_assumption: string;
+    notice: string;
+  } | null;
+}
+
+// Sum of independent walk-forward OOS windows; ratios recomputed on the sums.
+export interface CostTotal {
+  windows: number;
+  price_pnl: string;
+  fees: string;
+  slippage: string;
+  funding_paid: string;
+  net_pnl: string;
+  traded_notional: string;
+  fill_count: number;
+  cost_bps_per_side: string | null;
+  break_even_bps_per_side: string | null;
+  buy_hold_pnl: string;
+  assumed_funding_paid: string | null;
+  assumed_funding_events: number | null;
+}
+
+// catos/research_overfit.py: statistics only (fixed-digit strings), never money.
+export interface OverfittingReport {
+  method: string;
+  distinct_trials: number; // this run only; earlier searches on the same data are not counted
+  bars: number;
+  // Trials whose equity reached <= 0 (no liquidation model): counted in N, left out of
+  // the Sharpe variance and PBO. Absent before the 2026-11-08 F follow-up.
+  wiped_out_trials?: number;
+  best: {
+    params: [string, number | string][];
+    wiped_out?: boolean;
+    // null when the selected trial itself was wiped out
+    sharpe_per_bar: string | null;
+    sharpe_annualized: string | null;
+    skew: string | null;
+    kurtosis: string | null; // non-excess
+  };
+  // null when fewer than two trials survived a search, so the variance is unknown
+  trial_sharpe_variance: string | null;
+  expected_max_sharpe_per_bar: string | null;
+  expected_max_sharpe_annualized: string | null;
+  psr_vs_zero: string | null;
+  dsr: string | null;
+  pbo: {
+    pbo: string;
+    logit_median: string;
+    prob_oos_loss: string;
+    splits: number;
+    blocks: number;
+    bars_per_block: number;
+    // Share of splits whose winner sat exactly at the OOS median; absent before 2026-11-06 follow-up.
+    logit_zero_share?: string;
+  } | null;
+  trials: { params: [string, number | string][]; sharpe_annualized: string | null; wiped_out?: boolean }[];
+  verdict: string;
+  notice: string;
+}
+
+export interface SelectionEdges {
+  windows_with_selection: number;
+  windows_at_edge: number;
+  params: Record<string, { at_low: number; at_high: number }>;
+  // On/off parameters (two values) are always on a boundary, so they are not counted.
+  excluded_switch_params?: string[];
+  notice: string;
+}
+
+// catos/research_trades.py: closed round trips after fees, slippage and funding (Decimal strings).
+export interface TradeStats {
+  closed_trips: number;
+  wins: number;
+  losses: number;
+  breakeven: number;
+  win_rate: string | null;
+  average_win: string | null;
+  average_loss: string | null;
+  payoff_ratio: string | null;
+  profit_factor: string | null;
+  expectancy: string | null;
+  largest_win: string | null;
+  largest_loss: string | null;
+  max_consecutive_losses: number;
+  average_hold_hours: string | null;
+  long: { trips: number; wins: number; win_rate: string | null; net_pnl: string };
+  short: { trips: number; wins: number; win_rate: string | null; net_pnl: string };
+  open_trip: { side: number; open_time_ms: number; net_pnl_with_unrealized: string } | null;
+  notice: string;
+}
+
+// First close where equity reached <= 0; the engine has no liquidation model.
+export interface EquityWipedOut {
+  time_ms: number;
+  min_equity: string;
+  notice: string;
+}
+
 export interface BacktestResultPayload {
+  // Absent on runs archived before round-trip statistics existed (2026-11-07).
+  trade_stats?: TradeStats;
+  // null when equity stayed above 0; absent on runs archived before 2026-11-08.
+  equity_wiped_out?: EquityWipedOut | null;
+  // Absent on runs archived before cost attribution existed.
+  costs?: CostBreakdown;
+  funding_coverage?: FundingCoverage;
   run_id?: string;
   created_at?: string;
   build_id?: string;
@@ -231,6 +375,11 @@ export interface OptimizationResultPayload {
   };
   seed: number;
   optuna_version: string;
+  // Exact attribution of the best trial (one deterministic re-run); absent on older runs.
+  best_costs?: CostBreakdown | null;
+  // DSR / PBO over the distinct parameter sets of this run; absent on older runs.
+  overfitting?: OverfittingReport | null;
+  funding_coverage?: FundingCoverage;
   data_notice: string;
   run_id?: string;
   created_at?: string;
@@ -351,6 +500,14 @@ export interface ValidationResultPayload {
     complete: boolean;
   };
   evaluation_complete: boolean;
+  // Exact attribution per completed OOS window and their sum; absent on older runs.
+  costs?: {
+    windows: { number: number; costs: CostBreakdown }[];
+    total: CostTotal | null;
+    funding_coverage: FundingCoverage;
+  };
+  // Walk-forward choices on the boundary of the searched range; absent on older runs.
+  selection_edges?: SelectionEdges;
   data_notice: string;
   run_id?: string;
   created_at?: string;

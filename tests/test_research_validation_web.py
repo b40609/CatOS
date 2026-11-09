@@ -123,9 +123,19 @@ class ValidationJobTests(unittest.TestCase):
                           if key not in ("label_counts", "omitted_detail")}, full)
         self.assertTrue(all("curve_sampling" not in row for row in compact["validation"]["windows"]))
         self.assertIn("<table>", report)
+        # Settings, windows, regimes, per-window costs, the 11-row cost total and the edge table.
         self.assertEqual(report.count("<tr>"), 1 + 8 + 1 + plan.windows + 1 + sum(
             1 for row in compact["windows"] for summary in row["evaluation"]["summaries"]
-            if summary["bar_count"]))
+            if summary["bar_count"]) + 1 + len(payload["costs"]["windows"]) + 11
+            + 1 + len(request["search_space"]))
+        self.assertEqual([row["number"] for row in payload["costs"]["windows"]],
+                         [row["number"] for row in compact["validation"]["windows"]
+                          if row["out_of_sample"] is not None])
+        self.assertEqual(payload["costs"]["total"]["net_pnl"], str(sum(
+            Decimal(row["out_of_sample"]["performance"]["net_pnl"])
+            for row in compact["validation"]["windows"] if row["out_of_sample"] is not None)))
+        # The synthetic fixture states funding is explicitly empty: no assumption is made.
+        self.assertIsNone(payload["costs"]["total"]["assumed_funding_paid"])
 
     def test_bar_evaluation_budget_is_checked_before_strategy_load(self):
         # Default plan: 3 windows x (3 candidates x (4 warm-up + 24 train) + 4 + 16) = 312.

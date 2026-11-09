@@ -1,9 +1,12 @@
 """Fetched OKX research datasets, used only through a hash-checked manifest.
 
 Each dataset lives in ``data/okx/<instId>/<bar>/<dataset_id>/`` with fixed file
-names. ``write_dataset`` is the only producer: it refuses gaps, irregular or
-incomplete funding and overwrites. Resolving a dataset re-hashes every file the
-manifest names; a hash mismatch, a gap, incomplete funding, an unknown field or
+names. ``write_dataset`` is the only producer: it refuses gaps, irregular
+funding, funding that stops before the end, and overwrites. Funding may start
+after the first bar (OKX keeps only about three months of funding history); the
+manifest then records ``complete: false`` and every run states that funding before
+the first event is not counted. Resolving a dataset re-hashes every file the
+manifest names; a hash mismatch, a gap, a funding mismatch, an unknown field or
 an unsupported instrument rejects it (fail-closed), the same rule the strategy
 registry applies to strategy sources. Nothing here touches the network:
 ``tools/fetch_okx_candles.py`` fetches, then calls ``write_dataset``.
@@ -54,6 +57,7 @@ SHA256 = re.compile(r"[0-9a-f]{64}")
 INST_ID = re.compile(r"[A-Z0-9]+-USDT-SWAP")
 NOTICE = ("OKX 公開歷史 K 線（已收盤）與實際資金費率；資金費以結算當下 K 線開盤價近似 mark price。"
           "本根收盤決策、下一根開盤加滑價成交，沒有訂單簿、保證金與強平模型，不代表實盤可得績效。")
+PARTIAL_FUNDING_NOTICE = "資金費只涵蓋 {first} UTC 之後；之前的期間未計資金費（OKX 只保留約 3 個月的資金費歷史）。"
 
 
 def sha256_file(path):
@@ -116,7 +120,13 @@ def find_gaps(times, start_ms, end_ms, timeframe_ms):
 
 
 def funding_coverage(times, start_ms, end_ms, timeframe_ms):
-    """(interval_ms, complete) for ascending funding times; irregular spacing is an error."""
+    """(interval_ms, complete) for ascending funding times; irregular spacing is an error.
+
+    complete means the events cover [start, end); a run of events that reaches the
+    end but starts late is allowed (complete False) and is disclosed per run.
+    Events that stop before the end are an error: the missing tail is not a
+    history limit, so it is never silently treated as zero.
+    """
     if not times:
         raise ValueError("funding_empty")
     if any(ms % timeframe_ms or not start_ms <= ms < end_ms for ms in times):
@@ -125,7 +135,9 @@ def funding_coverage(times, start_ms, end_ms, timeframe_ms):
     if len(gaps) != 1 or min(gaps) <= 0:
         raise ValueError("funding_interval_irregular")
     interval = gaps.pop()
-    return interval, times[0] - start_ms < interval and end_ms - times[-1] <= interval
+    if end_ms - times[-1] > interval:
+        raise ValueError(f"funding_stops_before_end: last {times[-1]}")
+    return interval, times[0] - start_ms < interval
 
 
 def _strict_json(path):
@@ -161,7 +173,9 @@ def write_dataset(root=None, *, inst_id, bar, start_ms, end_ms, candles, funding
     candles: ascending (open_time_ms, open, high, low, close) strings covering [start, end)
     funding: ascending (funding_time_ms, realized_rate, funding_rate) strings in [start, end)
     instrument: the raw OKX instrument record
-    Gaps, incomplete or irregular funding, and an existing dataset directory are errors.
+    Gaps, irregular funding, funding that stops before the end, and an existing
+    dataset directory are errors; funding that starts after ``start_ms`` is
+    recorded as ``complete: false``.
     """
     root = Path(root) if root is not None else DATA_ROOT
     timeframe = BAR_MS[bar]
@@ -173,8 +187,6 @@ def write_dataset(root=None, *, inst_id, bar, start_ms, end_ms, candles, funding
         raise ValueError(f"dataset_has_gaps: {len(gaps)} missing, first {gaps[:3]}")
     funding_times = [row[0] for row in funding]
     interval, complete = funding_coverage(funding_times, start_ms, end_ms, timeframe)
-    if not complete:
-        raise ValueError(f"funding_incomplete: first {funding_times[0]}, last {funding_times[-1]}")
     contract = contract_from_instrument(instrument, inst_id)
     dataset_id = dataset_id_for(inst_id, bar, start_ms, end_ms)
     parent = root / inst_id / bar
@@ -221,6 +233,21 @@ class Dataset:
     files: tuple[tuple[str, str], ...]
     funding_path: Path | None
     notice: str
+    # First funding event and spacing; None for a dataset without funding.
+    funding_from_ms: int | None = None
+    funding_interval_ms: int | None = None
+
+    @property
+    def funding_complete(self):
+        return (self.funding_path is not None
+                and self.funding_from_ms - self.start_ms < self.funding_interval_ms)
+
+    def funding_summary(self):
+        """How funding is counted in a run, for payloads and reports."""
+        if self.funding_path is None:
+            return {"source": "none", "complete": False, "from_ms": None, "interval_ms": None}
+        return {"source": "dataset", "complete": self.funding_complete,
+                "from_ms": self.funding_from_ms, "interval_ms": self.funding_interval_ms}
 
     def provenance(self):
         entry = {"id": self.dataset_id, "source": self.source,
@@ -233,7 +260,8 @@ class Dataset:
         return {**self.provenance(), "name": self.name, "symbol": self.contract.inst_id,
                 "timeframe": next(bar for bar, ms in BAR_MS.items() if ms == self.timeframe_ms),
                 "bars": self.bars, "start_ms": self.start_ms, "end_ms": self.end_ms,
-                "funding": self.funding_path is not None, "notice": self.notice}
+                "funding": self.funding_path is not None,
+                "funding_coverage": self.funding_summary(), "notice": self.notice}
 
     def load(self, config):
         """Closed bars plus funding events; funding mark = the bar open at the funding time."""
@@ -260,6 +288,20 @@ class Dataset:
                     raise ValueError("funding_rate_invalid") from None
                 events.append(research.FundingEvent(time_ms, rate, opens[time_ms]))
         return bars, replace(config, funding_events=tuple(events))
+
+
+def _funding_times(path):
+    """Funding times from a hash-checked funding.csv; rates are rechecked on load."""
+    with open(path, encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle, strict=True)
+        if tuple(next(reader, ())) != FUNDING_COLUMNS:
+            raise ValueError("funding_header_mismatch")
+        times = []
+        for row in reader:
+            if len(row) != len(FUNDING_COLUMNS) or not row[0].isdigit():
+                raise ValueError("funding_row_invalid")
+            times.append(int(row[0]))
+    return times
 
 
 def load_manifest(path, root=None):
@@ -295,10 +337,10 @@ def load_manifest(path, root=None):
     funding = value["funding"]
     if type(funding) is not dict or set(funding) != FUNDING_FIELDS:
         raise ValueError("funding_fields_mismatch")
-    if (funding["rate_field"], funding["mark_price_source"], funding["complete"]) != (
-        RATE_FIELD, MARK_PRICE_SOURCE, True,
-    ) or type(funding["events"]) is not int or type(funding["interval_ms"]) is not int:
-        raise ValueError("funding_incomplete_or_unsupported")
+    if ((funding["rate_field"], funding["mark_price_source"]) != (RATE_FIELD, MARK_PRICE_SOURCE)
+            or type(funding["complete"]) is not bool or type(funding["events"]) is not int
+            or type(funding["interval_ms"]) is not int):
+        raise ValueError("funding_unsupported")
     files = value["files"]
     if type(files) is not dict or set(files) != set(FILES):
         raise ValueError("dataset_files_mismatch")
@@ -308,6 +350,12 @@ def load_manifest(path, root=None):
             raise ValueError("dataset_file_missing")
         if type(files[name]) is not str or not SHA256.fullmatch(files[name]) or sha256_file(target) != files[name]:
             raise ValueError("dataset_hash_mismatch")
+    # Recompute coverage from the hashed file: the manifest flag is a claim, not a source.
+    funding_times = _funding_times(directory / FUNDING)
+    if (len(funding_times) != funding["events"] or funding_times != sorted(set(funding_times))
+            or funding_coverage(funding_times, start, end, timeframe) != (
+                funding["interval_ms"], funding["complete"])):
+        raise ValueError("funding_manifest_mismatch")
     contract = value["contract"]
     if type(contract) is not dict or set(contract) != CONTRACT_FIELDS:
         raise ValueError("contract_fields_mismatch")
@@ -315,11 +363,14 @@ def load_manifest(path, root=None):
         raise ValueError("contract_instrument_mismatch")
     spec = research.ContractSpec(inst_id, *(Decimal(contract[key]) for key in (
         "base_per_contract", "tick_size", "lot_size", "min_size")))
-    first, last = (datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
-                   for ms in (start, end - timeframe))
+    first, last, funding_first = (datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+                                  for ms in (start, end - timeframe, funding_times[0]))
+    funding_label = "含資金費" if funding["complete"] else f"資金費自 {funding_first} 起"
+    notice = NOTICE if funding["complete"] else NOTICE + PARTIAL_FUNDING_NOTICE.format(
+        first=datetime.fromtimestamp(funding_times[0] / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"))
     return Dataset(
         dataset_id=dataset_id,
-        name=f"OKX {inst_id} {bar} · {first} ~ {last} · {bars:,} 根已收盤 K 線（含資金費）",
+        name=f"OKX {inst_id} {bar} · {first} ~ {last} · {bars:,} 根已收盤 K 線（{funding_label}）",
         source=SOURCE,
         candles_path=directory / CANDLES,
         contract=spec,
@@ -330,7 +381,9 @@ def load_manifest(path, root=None):
         files=((rel_path(path), sha256_file(path)),
                *((rel_path(directory / name), files[name]) for name in FILES)),
         funding_path=directory / FUNDING,
-        notice=NOTICE,
+        notice=notice,
+        funding_from_ms=funding_times[0],
+        funding_interval_ms=funding["interval_ms"],
     )
 
 

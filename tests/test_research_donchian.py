@@ -114,14 +114,18 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(manifest["sha256"], DONCHIAN_SHA256)
         self.assertEqual(manifest["provenance"]["scope"], "research-only")
         strategies = catalog()["strategies"]
-        self.assertEqual([item["id"] for item in strategies], ["sma-trend", DONCHIAN_ID])
+        # Package E (2026-11-06) appended three preregistered daily strategies after these two,
+        # package F (2026-11-07) two intraday DCM strategies.
+        self.assertEqual([item["id"] for item in strategies],
+                         ["sma-trend", DONCHIAN_ID, "donchian-ensemble", "tsmom-multi", "dcm-daily",
+                          "dcm-fade", "dcm-pullback"])
         donchian = strategies[1]
         self.assertEqual(donchian["parameters"], {"entry_bars": {"min": 2, "max": 960},
                                                   "exit_bars": {"min": 1, "max": 959},
                                                   "quantity": {"unit": "contracts"}})
-        self.assertEqual(donchian["warmup"], {"covers": "entry_bars", "below": 961})
+        self.assertEqual(donchian["warmup"], {"covers": "entry_bars", "below": 961, "min_days": 0})
         self.assertEqual(donchian["entry"], "catos.research_donchian:RegisteredDonchian")
-        self.assertEqual(strategies[0]["warmup"], {"covers": "period", "below": 64})
+        self.assertEqual(strategies[0]["warmup"], {"covers": "period", "below": 64, "min_days": 0})
 
     def test_manifest_fields_are_pinned(self):
         manifest = json.loads(DONCHIAN_MANIFEST.read_text(encoding="utf-8"))

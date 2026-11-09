@@ -25,8 +25,12 @@ def _format_decimal(val: Decimal | int | str) -> str:
     return str(val)
 
 
-def _render_svg(curve: tuple[AccountView, ...]) -> str:
-    """Render an embedded SVG equity curve using only Decimal and integer arithmetic."""
+def _render_svg(curve: tuple[AccountView, ...], indices=None) -> str:
+    """Render an embedded SVG equity curve using only Decimal and integer arithmetic.
+
+    indices (optional, ascending) draws only those points, each at its original
+    x position; the axis labels still use the full curve's minimum and maximum.
+    """
     with localcontext(_CONTEXT):
         width = Decimal("800")
         height = Decimal("300")
@@ -73,13 +77,14 @@ def _render_svg(curve: tuple[AccountView, ...]) -> str:
         max_eq = max(equities)
         n = len(curve)
         divisor = Decimal(n - 1)
+        drawn = range(n) if indices is None else indices
 
         # Handle horizontal curve (constant equity)
         if min_eq == max_eq:
             y_mid = pad_top + plot_h / Decimal("2")
             y_str = str(y_mid.quantize(Decimal("0.1")))
             pts = []
-            for i in range(n):
+            for i in drawn:
                 x = pad_left + (Decimal(i) * plot_w) / divisor
                 pts.append(f"{x.quantize(Decimal('0.1'))},{y_str}")
             points_attr = " ".join(pts)
@@ -96,7 +101,8 @@ def _render_svg(curve: tuple[AccountView, ...]) -> str:
         # Normal curve with range > 0 (supports negative and positive equity)
         eq_range = max_eq - min_eq
         pts = []
-        for i, pt in enumerate(curve):
+        for i in drawn:
+            pt = curve[i]
             x = pad_left + (Decimal(i) * plot_w) / divisor
             y = pad_top + plot_h - ((pt.equity - min_eq) * plot_h) / eq_range
             pts.append(f"{x.quantize(Decimal('0.1'))},{y.quantize(Decimal('0.1'))}")
@@ -138,12 +144,21 @@ def _render_svg(curve: tuple[AccountView, ...]) -> str:
         )
 
 
-def _render_trades_table(trades: tuple[Trade, ...]) -> str:
+def _render_trades_table(trades: tuple[Trade, ...], max_rows=None) -> str:
     if not trades:
         return '<tr><td colspan="7" class="text-center empty-cell">無模擬成交紀錄</td></tr>'
 
     rows = []
-    for t in trades:
+    shown = list(enumerate(trades))
+    if max_rows is not None and len(trades) > max_rows:
+        head = max_rows // 2
+        shown = shown[:head] + shown[len(trades) - (max_rows - head):]
+    for position, (index, t) in enumerate(shown):
+        if position and index != shown[position - 1][0] + 1:
+            rows.append(
+                f'<tr><td colspan="7" class="text-center empty-cell">'
+                f'中間省略 {index - shown[position - 1][0] - 1} 筆；完整成交明細在 result.json 的 result.trades</td></tr>'
+            )
         rows.append(
             f"<tr>"
             f"<td>{html.escape(str(t.time_ms))}</td>"
@@ -176,13 +191,19 @@ def _render_funding_table(funding: tuple[FundingPayment, ...]) -> str:
     return "\n".join(rows)
 
 
-def render_report(result: BacktestResult) -> str:
+def render_report(result: BacktestResult, *, curve_indices=None, max_trade_rows=None) -> str:
     """Render a self-contained Traditional Chinese HTML research backtest report.
 
     Parameters
     ----------
     result : BacktestResult
         The backtest execution result object.
+    curve_indices : sequence of int, optional
+        Ascending equity-curve indices to draw (the research service passes the
+        payload's sampled indices so the report size does not grow with bars).
+    max_trade_rows : int, optional
+        Show at most this many fills (first and last halves) and note the rest;
+        the full list stays in the run's result.json.
 
     Returns
     -------
@@ -191,6 +212,13 @@ def render_report(result: BacktestResult) -> str:
     """
     if not isinstance(result, BacktestResult):
         raise TypeError("result must be BacktestResult")
+    if curve_indices is not None:
+        curve_indices = list(curve_indices)
+        if any(not isinstance(i, int) or not 0 <= i < len(result.equity_curve) for i in curve_indices) \
+                or curve_indices != sorted(set(curve_indices)):
+            raise ValueError("curve_indices must be ascending, distinct and within the equity curve")
+    if max_trade_rows is not None and (not isinstance(max_trade_rows, int) or max_trade_rows < 2):
+        raise ValueError("max_trade_rows must be an integer >= 2")
 
     cfg = result.config
     spec = cfg.contract
@@ -206,8 +234,12 @@ def render_report(result: BacktestResult) -> str:
             f"(決策時間: {html.escape(str(result.pending_intent.decision_time_ms))})"
         )
 
-    svg_chart = _render_svg(result.equity_curve)
-    trades_rows = _render_trades_table(result.trades)
+    svg_chart = _render_svg(result.equity_curve, curve_indices)
+    trades_rows = _render_trades_table(result.trades, max_trade_rows)
+    sampling_note = ""
+    if curve_indices is not None and len(curve_indices) < len(result.equity_curve):
+        sampling_note = (f"<p>圖表取樣 {len(curve_indices)}／{len(result.equity_curve)} 點"
+                         "（保留第一點、最後一點，以及每個區間回撤最深的一點）；績效數字以全部 K 線計算。</p>")
     funding_rows = _render_funding_table(result.funding)
 
     assumptions_items = "\n".join(
@@ -476,6 +508,7 @@ footer {{
 
 <h2 class="section-title">收盤權益曲線</h2>
 <p>窄視窗可左右捲動圖表與下方明細表。</p>
+{sampling_note}
 <div class="chart-container">
   {svg_chart}
 </div>
