@@ -262,9 +262,10 @@ export interface OverfittingReport {
     skew: string | null;
     kurtosis: string | null; // non-excess
   };
-  trial_sharpe_variance: string;
-  expected_max_sharpe_per_bar: string;
-  expected_max_sharpe_annualized: string;
+  // null when fewer than two trials survived a search, so the variance is unknown
+  trial_sharpe_variance: string | null;
+  expected_max_sharpe_per_bar: string | null;
+  expected_max_sharpe_annualized: string | null;
   psr_vs_zero: string | null;
   dsr: string | null;
   pbo: {

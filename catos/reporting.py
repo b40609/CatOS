@@ -239,7 +239,7 @@ def render_report(result: BacktestResult, *, curve_indices=None, max_trade_rows=
     sampling_note = ""
     if curve_indices is not None and len(curve_indices) < len(result.equity_curve):
         sampling_note = (f"<p>圖表取樣 {len(curve_indices)}／{len(result.equity_curve)} 點"
-                         "（每個區間保留回撤最深的一點）；績效數字以全部 K 線計算。</p>")
+                         "（保留第一點、最後一點，以及每個區間回撤最深的一點）；績效數字以全部 K 線計算。</p>")
     funding_rows = _render_funding_table(result.funding)
 
     assumptions_items = "\n".join(

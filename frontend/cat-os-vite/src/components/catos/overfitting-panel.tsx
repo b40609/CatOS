@@ -51,7 +51,7 @@ export function OverfittingPanel({ report, earlierSearches }: { report: Overfitt
                 <Row label="最佳 Sharpe（年化）" value={report.best.sharpe_annualized}
                   hint={`每根 ${report.best.sharpe_per_bar} · 偏態 ${report.best.skew} · 峰態 ${report.best.kurtosis}`} />
               )}
-              <Row label="純運氣可期待的最大 Sharpe（年化）" value={report.expected_max_sharpe_annualized}
+              <Row label="純運氣可期待的最大 Sharpe（年化）" value={report.expected_max_sharpe_annualized ?? "不適用"}
                 hint="N 組都沒有優勢時，最好那組的 Sharpe 期望值" />
             </div>
             <div>

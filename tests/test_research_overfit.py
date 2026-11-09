@@ -243,9 +243,14 @@ class WipedOutTest(unittest.TestCase):
         self.assertIsNotNone(report["best"]["sharpe_annualized"])
         self.assertIsNone(report["pbo"])
         self.assertTrue(report["verdict"].startswith("沒爆倉的參數組不到 2 組，無法估計 Sharpe 變異數，DSR 不計算。"))
+        # N fix acceptance P2: an unknown variance is shown as unknown, not as 0.
+        self.assertEqual((report["trial_sharpe_variance"], report["expected_max_sharpe_per_bar"],
+                          report["expected_max_sharpe_annualized"]), (None, None, None))
+        self.assertEqual(dict(overfit_rows(report))["N 組純運氣可期待的最大 Sharpe（年化）"], "不適用")
         self.assertIn("有 3 組參數權益跌破 0", report["verdict"])
         single = overfit.search_report({names[0]: self.runs[names[0]]}, names[0], 900_000)
         self.assertIsNotNone(single["dsr"])  # one trial and no search: DSR is PSR against 0, as before
+        self.assertEqual(single["expected_max_sharpe_annualized"], "0.000")
 
     def test_coarse_note_counts_only_trials_that_entered_pbo(self):
         names = list(self.runs)

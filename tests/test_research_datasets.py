@@ -188,6 +188,10 @@ class CatalogAndRunTest(DatasetFixture):
                 self.assertEqual((keep[0], keep[-1]), (0, total - 1), (total, limit))
                 self.assertLessEqual(len(keep), limit, (total, limit))
                 self.assertEqual(keep, sorted(set(keep)))
+        # N fix acceptance P4: a limit below 3 cannot hold first, last and one bucket.
+        for limit in (0, 1, 2):
+            with self.assertRaisesRegex(ValueError, "at least 3"):
+                sample_curve_indices(values, limit=limit)
 
     def test_optimization_and_validation_use_the_requested_dataset(self):
         from catos.research_catalog import DEFAULT_OPTIMIZATION, DEFAULT_VALIDATION
@@ -252,8 +256,10 @@ class CatalogAndRunTest(DatasetFixture):
             self.assertEqual(oos["funding"], json.loads(json_text([asdict(f) for f in replay.funding])))
             self.assertEqual(window["curve_sampling"], {
                 "total_points": test_bars + 1, "returned_points": len(sampled),
-                "method": "bucket_deepest_drawdown_keep_first"})
+                "method": "bucket_deepest_drawdown_keep_first_last"})
             self.assertLessEqual(len(sampled), MAX_VALIDATION_CURVE_POINTS // windows)
+            # N fix acceptance P3: the window's own sampling keeps first and last, with no extra anchor.
+            self.assertEqual((sampled[0], sampled[-1]), (full[0], full[-1]))
             by_time = {point["time_ms"]: point for point in full}
             self.assertEqual([by_time[point["time_ms"]] for point in sampled], sampled)
             self.assertEqual([point["time_ms"] for point in sampled],

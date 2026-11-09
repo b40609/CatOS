@@ -143,10 +143,8 @@ def _sampled_curve(result, limit):
     """Kept indices for one OOS equity curve, or None when it already fits the limit."""
     if len(result.equity_curve) <= limit:
         return None
-    keep = sample_curve_indices(drawdown_pcts(result.equity_curve, result.config.initial_balance),
-                                limit - 1)
-    # Each window starts flat at the initial balance; keep that anchor point too.
-    return keep if keep[0] == 0 else [0, *keep]
+    # sample_curve_indices keeps the first point (each window's initial balance) and the last.
+    return sample_curve_indices(drawdown_pcts(result.equity_curve, result.config.initial_balance), limit)
 
 
 def compact_result(result):
@@ -163,7 +161,7 @@ def compact_result(result):
         if keep is not None:
             sampling[window.number] = {"total_points": len(oos.equity_curve),
                                        "returned_points": len(keep),
-                                       "method": "bucket_deepest_drawdown_keep_first"}
+                                       "method": "bucket_deepest_drawdown_keep_first_last"}
             oos = replace(oos, equity_curve=tuple(oos.equity_curve[index] for index in keep))
         windows.append(replace(window, out_of_sample=oos))
     slim = replace(result, labels=(), validation=replace(result.validation, windows=tuple(windows)),

@@ -90,7 +90,7 @@
 - 之後以 `main` 為基底，每個工作包開一條短分支，獨驗通過再合併 `main`（合併和 push 要你下指令）。
 - 同一時間只在一台機器改前端；開工前先拉 `main` 最新版。
 - 獨立驗收由沒參與該工作包開發的另一個 Claude 會話執行。
-8. **工作包 F：短週期研究基礎與預先登錄短週期策略**（2026-11-07 使用者同意，含 1H 3 年、15m 1 年、5m 6 個月的採集授權；分支 `feat/research-overfitting` 上接續；已 commit `2f839a36`，2026-11-08 獨立驗收 PASS 9／9，報告在 `reports/research-shortterm-acceptance-20261107/acceptance.md`。驗收的 12 項觀察 O1～O11 已在 `b8eb1280` 修正，2026-11-08 第二輪獨立驗收 PASS 11／11，報告在 `reports/research-shortterm-fix-acceptance-20261108/acceptance.md`；第二輪的 6 項非阻斷觀察 N1～N6 的修正見 `docs/research-real-data-plan.md` 工作包 F 末尾表格，只有開發者自測）：
+8. **工作包 F：短週期研究基礎與預先登錄短週期策略**（2026-11-07 使用者同意，含 1H 3 年、15m 1 年、5m 6 個月的採集授權；分支 `feat/research-overfitting` 上接續；已 commit `2f839a36`，2026-11-08 獨立驗收 PASS 9／9，報告在 `reports/research-shortterm-acceptance-20261107/acceptance.md`。驗收的 12 項觀察 O1～O11 已在 `b8eb1280` 修正，2026-11-08 第二輪獨立驗收 PASS 11／11，報告在 `reports/research-shortterm-fix-acceptance-20261108/acceptance.md`；第二輪的 6 項非阻斷觀察 N1～N6 在 `7b7f743c` 修正，第三輪獨立驗收 PASS 6／6，報告在 `reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`；第三輪的 5 項觀察 P1～P5 的處理見 `docs/research-real-data-plan.md` 工作包 F 末尾表格，只有開發者自測）：
    - 完成的基礎：分次接續抓取、回測上限 60,000 根、往返交易統計（勝率、賺賠比、獲利因子、期望值），回測頁顯示勝率與統計面板。
    - 修正兩個問題：延遲測試包裝（工作包 E 重跑後數字不變）、往返統計對帳的捨入殘差。
    - 結果：

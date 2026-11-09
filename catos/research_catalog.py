@@ -629,6 +629,8 @@ def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
     The first point (initial equity) is kept so the chart starts where the run
     starts (acceptance N6, 2026-11-08); at most `limit` indices are returned.
     """
+    if limit < 3:
+        raise ValueError("curve sampling limit must be at least 3 (first, last and one bucket)")
     total = len(drawdowns)
     if total <= limit:
         return list(range(total))
@@ -682,7 +684,7 @@ def execute_request(request, expected_source):
         result_payload["equity_curve"] = [result_payload["equity_curve"][i] for i in keep]
         payload["drawdown_curve"] = [drawdown[i] for i in keep]
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
-                                     "method": "bucket_deepest_drawdown"}
+                                     "method": "bucket_deepest_drawdown_keep_first_last"}
     report = render_report(result, curve_indices=keep, max_trade_rows=REPORT_MAX_FILL_ROWS)
     report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:

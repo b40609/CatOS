@@ -19,7 +19,8 @@ def overfit_rows(report):
         ("最佳參數", ", ".join(f"{name}={value}" for name, value in report["best"]["params"])),
         ("最佳 Sharpe（年化）", "爆倉，不計算" if report["best"].get("wiped_out")
          else report["best"]["sharpe_annualized"]),
-        ("N 組純運氣可期待的最大 Sharpe（年化）", report["expected_max_sharpe_annualized"]),
+        ("N 組純運氣可期待的最大 Sharpe（年化）", "不適用" if report["expected_max_sharpe_annualized"] is None
+         else report["expected_max_sharpe_annualized"]),
         ("PSR（真實 Sharpe > 0 的機率）", report["psr_vs_zero"]), ("DSR", report["dsr"]),
         ("權益跌破 0（爆倉）的參數組", report.get("wiped_out_trials", 0)),
         ("PBO（CSCV）", "樣本不足" if pbo is None else f"{pbo['pbo']}（{pbo['blocks']} 區塊、{pbo['splits']} 種切法）"),

@@ -775,3 +775,13 @@ Donchian 各窗 OOS：
 | N4 `--resume` 第一次執行在 K 線分頁失敗時請求不計入 | 第一次執行在合約檢查通過後、開始分頁前先存一次進度，之後的失敗都計入總數；只有合約資料就失敗的第一次執行（最多 1 次請求加重試）不留紀錄，寫在 docstring。另更正：`b8eb1280` 的 commit 訊息寫「每頁 K 線抓完即存」，實際是每次執行抓完該次的 K 線頁才存一次 |
 | N5 只剩 1 組沒爆倉時 N 不起作用 | 兩組以上的搜尋裡，沒爆倉的不到 2 組時無法估計 Sharpe 變異數，DSR 改為不計算並在判讀寫明；PBO 粒度提醒的「只有 N 組參數」改用實際進入 PBO 的組數。只跑一組（沒有搜尋）時維持 DSR 等於對 0 的 PSR。真實資料的數字不受影響 |
 | N6 抽樣後的權益圖不一定從第一個點開始 | `sample_curve_indices` 一律保留第一點與最後一點，總數仍不超過 2,000；payload 與報告的圖從初始權益開始 |
+
+這批修正 commit `7b7f743c`，2026-11-08 第三輪獨立驗收 PASS 6／6（報告：`reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`），沒有阻斷缺陷；5 項非阻斷觀察處理如下：
+
+| 觀察 | 處理 |
+| --- | --- |
+| P1 N1 的位元組數是 `b8eb1280` 的，`7b7f743c` 多 256 bytes | 不改：文件已註明是 `b8eb1280` 的數字；之後的抽樣與欄位名稱變動都會讓輸出差幾百 bytes，不逐版重量。上限落點（每天約 32～43 筆）不變 |
+| P2 DSR 不計算時，純運氣最大 Sharpe 與變異數仍顯示 0 | 變異數無法估計時，`trial_sharpe_variance`、`expected_max_sharpe_per_bar`、`expected_max_sharpe_annualized` 一併回 None，HTML 報告與前端面板顯示「不適用」；只跑一組參數時維持 0 |
+| P3 滾動驗證的抽樣多補一次第一點 | `research_validation_job._sampled_curve` 直接用 `sample_curve_indices(…, limit)`，不再傳 `limit - 1` 再補 0 |
+| P4 `sample_curve_indices` 在 limit = 2 時除以 0；方法名稱沒提頭尾點 | limit < 3 時丟 ValueError；payload 與滾動驗證的 `method` 改為 `bucket_deepest_drawdown_keep_first_last`，報告說明改寫成「保留第一點、最後一點，以及每個區間回撤最深的一點」 |
+| P5 next-steps 的「只有開發者自測」在驗收後過時 | 更新為 `7b7f743c` 已獨驗 PASS 與報告路徑 |

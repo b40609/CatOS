@@ -246,9 +246,10 @@ def search_report(candidates, best_params, timeframe_ms):
                  "sharpe_per_bar": _fmt(best, 6), "sharpe_annualized": annualized(best),
                  "skew": None if best_stats is None else _fmt(best_stats.skew, 3),
                  "kurtosis": None if best_stats is None else _fmt(best_stats.kurtosis, 3)},
-        "trial_sharpe_variance": _fmt(variance, 8),
-        "expected_max_sharpe_per_bar": _fmt(benchmark, 6),
-        "expected_max_sharpe_annualized": _fmt(benchmark * per_year, 3),
+        # None when fewer than two trials survive a search: the variance is unknown, not 0 (acceptance P2).
+        "trial_sharpe_variance": _fmt(variance, 8) if variance_known else None,
+        "expected_max_sharpe_per_bar": _fmt(benchmark, 6) if variance_known else None,
+        "expected_max_sharpe_annualized": _fmt(benchmark * per_year, 3) if variance_known else None,
         "psr_vs_zero": _fmt(psr), "dsr": _fmt(dsr),
         "pbo": None if pbo is None else {**pbo, "pbo": _fmt(pbo["pbo"]),
                                          "logit_median": _fmt(pbo["logit_median"]),
