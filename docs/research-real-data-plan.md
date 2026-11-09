@@ -118,7 +118,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 | --- | --- | --- |
 | 逐根環境標籤 | 改為七類環境的 K 線數（`label_counts`） | 實測改成區間（run-length）也有 3,540 段（lookback 4），不夠小；逐根標籤可由綁定的資料與規則重算 |
 | 逐根分環境歸屬 | 只留各環境彙總與核對結果 | 彙總就是報告要呈現的內容；核對仍以全部 K 線計算 |
-| 各窗 OOS 權益曲線 | 超過 1,000 ÷ 視窗數點才取樣，沿用 `sample_curve_indices`，另保留起點 | 與回測曲線取樣同一方法；合成資料不會觸發 |
+| 各窗 OOS 權益曲線 | 超過 1,000 ÷ 視窗數點才取樣，沿用 `sample_curve_indices`（保留起點與終點） | 與回測曲線取樣同一方法；合成資料不會觸發 |
 | 來源快照 | `data/okx` 下的檔案只記路徑與 sha256 | 原本每份結果都內嵌 400 KB 的 K 線；資料已由 manifest 雜湊固定 |
 | HTML 報表 | 改成摘要表 | 原本把整份 JSON 轉義後塞進報表，比結果本身還大 |
 | 成交、資金費、訓練格點 | 不動 | 是 OOS 結果的證據；最壞情況量過仍在上限內 |
@@ -785,3 +785,10 @@ Donchian 各窗 OOS：
 | P3 滾動驗證的抽樣多補一次第一點 | `research_validation_job._sampled_curve` 直接用 `sample_curve_indices(…, limit)`，不再傳 `limit - 1` 再補 0 |
 | P4 `sample_curve_indices` 在 limit = 2 時除以 0；方法名稱沒提頭尾點 | limit < 3 時丟 ValueError；payload 與滾動驗證的 `method` 改為 `bucket_deepest_drawdown_keep_first_last`，報告說明改寫成「保留第一點、最後一點，以及每個區間回撤最深的一點」 |
 | P5 next-steps 的「只有開發者自測」在驗收後過時 | 更新為 `7b7f743c` 已獨驗 PASS 與報告路徑 |
+
+這批處理 commit `45c12512`，2026-11-09 第四輪獨立驗收 PASS 5／5（報告：`reports/research-shortterm-pfix-acceptance-20261109/acceptance.md`），沒有阻斷缺陷；2 項非阻斷觀察：
+
+| 觀察 | 處理 |
+| --- | --- |
+| Q1 `docs/research-validation-api.md` 仍寫舊的抽樣 method 名稱 | 改為 `bucket_deepest_drawdown_keep_first_last`，並註明 2026-11-09 前產出的結果是舊名稱；本文件滾動驗證取樣一列補上「保留起點與終點」 |
+| Q2 更正 P3 的影響幅度 | 只是更正描述：修正前舊版用 `limit - 1` 會讓桶大小跳一級，每窗可能少畫約 40 點（例如 limit 125 時 82～84 點，修正後 123～124 點），不只 1 點。不改程式 |
