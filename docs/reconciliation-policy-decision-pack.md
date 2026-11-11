@@ -1,10 +1,10 @@
 # Reconciliation 政策／Identity 決策包
 
-更新：2026-09-22。E1、P6 `algoId` JSON 與 `posId` P1 已完成。subtypes／分類證據見 [唯讀證據](reconciliation-readonly-evidence-20260922.md)；後續 [F1 freshness 補證](reconciliation-f1-freshness-evidence-20260922.md) 已完成並固定四個門檻。分類仍未完整，snapshot semantics 仍獨立 fail closed。
+更新：2026-09-22。E1、P6 `algoId` JSON 與 `posId` P1 已完成。subtypes／分類證據見 唯讀證據（已移至 `archive/dev-history` 分支：`docs/reconciliation-readonly-evidence-20260922.md`）；後續 F1 freshness 補證（已移至 `archive/dev-history` 分支：`docs/reconciliation-f1-freshness-evidence-20260922.md`） 已完成並固定四個門檻。分類仍未完整，snapshot semantics 仍獨立 fail closed。
 
 ## 2026-09-22 evidence 結論（取代「尚未取得 subtypes」的舊現況）
 
-- Demo subtypes GET 成功：32 類、185 組，完整非敏感目錄／SHA-256 已保存。後續逐組審查已把 52 組官方語意明確的交易／交割／強平／conversion activity 補為 `internal`；目前 63 組已分類、122 組 unknown、complete=false。上一輪 174 組 unknown 可再分成 52 組已解、19 組官方語意不足、103 組需新帳務／equity 邊界政策。詳見 [分類與 freshness 審查](reconciliation-classification-freshness-review-20260922.md)。
+- Demo subtypes GET 成功：32 類、185 組，完整非敏感目錄／SHA-256 已保存。後續逐組審查已把 52 組官方語意明確的交易／交割／強平／conversion activity 補為 `internal`；目前 63 組已分類、122 組 unknown、complete=false。上一輪 174 組 unknown 可再分成 52 組已解、19 組官方語意不足、103 組需新帳務／equity 邊界政策。詳見 分類與 freshness 審查（已移至 `archive/dev-history` 分支：`docs/reconciliation-classification-freshness-review-20260922.md`）。
 - F1 後續補證新增 4 次正常 production plan：20159–20216 ms；gate-adjacent report age 132–170 ms、clock sample age 66–85 ms、midpoint offset +2837～+2848 ms。另有真實 360 GET／179993 ms pagination stress，由 runtime deadline fail closed。
 - F1 固定為 policy ID `f1-demo-2026-09-22`：`max_report_age_ms=1000`、`max_batch_span_ms=31000`、`max_clock_skew_ms=3000`、`max_clock_sample_age_ms=500`。gate 仍不藏 default，Supervisor 必須明示注入。
 - 本輪 139/139 PASS；read-only 授權已執行完畢，沒有 Demo 交易／Live／帳戶修改／DB schema 變更／commit／push。分類剩餘清單與實際帳戶 gate 差異見 evidence，不把 collection_complete 當 reconciled。

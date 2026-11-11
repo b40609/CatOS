@@ -36,8 +36,7 @@ secrets/
 *.log
 /logs/
 
-# One-off run artifacts, research jobs and evidence snapshots (v1 cleanup: directory untracked;
-# files still tracked here are referenced by catos/, tests/ or docs/ and stay versioned)
+# One-off run artifacts, research jobs and evidence snapshots; nothing under it is versioned.
 /outputs/
 
 # Immutable local public-market snapshots and DCM research evidence

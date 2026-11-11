@@ -131,8 +131,8 @@ R1 已同步固化至 `AGENTS.md`，影響 `risk`、baseline producer／provider
 - [正式 gate：evaluate／_day_blockers](../catos/reconciliation_gate.py)
 - [帳戶報告與實際流水分類](../catos/account_report.py)
 - [風控契約](risk.md)、[執行契約](execution.md)、[對帳契約](reconciliation-gate-contract.md)
-- [日初基準政策沿革](reconciliation-policy-decision-pack.md)、[Verified E0 歷史驗收](verified-e0-lifecycle-review.md)、[Q1 專用 Demo 等價方案](demo-e0-quiescent-equivalence-decision-20260924.md)
-- [S9 範圍](lot-fee-completion-handoff.md)、[S10 範圍](lot-fee-correction-handoff.md)
+- [日初基準政策沿革](reconciliation-policy-decision-pack.md)、Verified E0 歷史驗收（已移至 `archive/dev-history` 分支：`docs/verified-e0-lifecycle-review.md`）、[Q1 專用 Demo 等價方案](demo-e0-quiescent-equivalence-decision-20260924.md)
+- S9 範圍（已移至 `archive/dev-history` 分支：`docs/lot-fee-completion-handoff.md`）、S10 範圍（已移至 `archive/dev-history` 分支：`docs/lot-fee-correction-handoff.md`）
 
 已靜態核對的測試入口，不代表本輪執行：
 

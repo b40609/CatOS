@@ -1,6 +1,6 @@
 # R4 local-sim 啟動交接
 
-更新：2026-09-30 20:23 台灣時間。使用者已授權啟動 R4，並選擇短程驗證後立即連續跑 8 小時；原由 6.1 Sol 完成實作與短程驗證。**狀態：8 小時正式 verifier PASS，進入限定範圍 Git 收尾。** 唯一 run `347282b9d0d9433db6a0276209936f60` 實際 28800.073 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、worker_closed=true。5.6 Sol (Web) 已依正式 CLI 驗收；基線 `7c346f2`，契約見 [R4 spec](frontend-research-r4-spec-20260930.md)。以下啟動與早期驗證紀錄保留為歷史。
+更新：2026-09-30 20:23 台灣時間。使用者已授權啟動 R4，並選擇短程驗證後立即連續跑 8 小時；原由 6.1 Sol 完成實作與短程驗證。**狀態：8 小時正式 verifier PASS，進入限定範圍 Git 收尾。** 唯一 run `347282b9d0d9433db6a0276209936f60` 實際 28800.073 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、worker_closed=true。5.6 Sol (Web) 已依正式 CLI 驗收；基線 `7c346f2`，契約見 R4 spec（已移至 `archive/dev-history` 分支：`docs/frontend-research-r4-spec-20260930.md`）。以下啟動與早期驗證紀錄保留為歷史。
 
 ## 完成內容與證據
 
@@ -27,7 +27,7 @@
 
 等待期間新增 `catos/local_sim_r4_verify.py`，其專屬 `test_local_sim_r4_verify.py` 9/9 通過（9.114 秒）。涵蓋只讀完成驗收、running 不開 DB、時長不足、存活 Worker、runtime digest 漂移、費用證據不一致、未決委託不釋放、journal content hash 及固定 artifact config。測試僅使用新建暫存 smoke／自己的副本，不改長跑 source 或 DB。
 
-2026-09-30 11:13 台灣時間，以正式 CLI 對已保存最終 smoke 獨立核對：`SMOKE_PASS`、8 根／4 fills／0 anomalies、費用 `0.00404010`、權益 `999.91375990`、read-only DB、runtime digest 未變。對 8 小時 run 回 `PENDING`，2 根訊號／2 fills／0 anomalies，status 心跳 11:13:13；這是進度，尚非 8 小時驗收。驗收器不在凍結 source list，未影響 running。前端策略中心可並行操作；Bot／Risk／Logs 等頁面仍為原型，詳見 [等待期間前端盤點](frontend-readiness-parallel-20260930.md)。
+2026-09-30 11:13 台灣時間，以正式 CLI 對已保存最終 smoke 獨立核對：`SMOKE_PASS`、8 根／4 fills／0 anomalies、費用 `0.00404010`、權益 `999.91375990`、read-only DB、runtime digest 未變。對 8 小時 run 回 `PENDING`，2 根訊號／2 fills／0 anomalies，status 心跳 11:13:13；這是進度，尚非 8 小時驗收。驗收器不在凍結 source list，未影響 running。前端策略中心可並行操作；Bot／Risk／Logs 等頁面仍為原型，詳見 等待期間前端盤點（已移至 `archive/dev-history` 分支：`docs/frontend-readiness-parallel-20260930.md`）。
 
 等實際 8 小時完成再讀 status/events/manifest，並對本 run 的 DB 使用 read-only SQLite（含 WAL），核對實際時長 >= 28800 秒、32 根正式 + 2 根無意圖預熱、所有 fill/tag/Decimal 費用與 execution_fills 相符、0 anomalies、無 unresolved／reservations、Worker 已終止、source digest 未漂移、journal integrity 與保存訊號完整。running／stopped／failed 不可改寫 PASS；不自動清理 DB／釋放 UNKNOWN／重送／re-arm／啟第二 runner。
 

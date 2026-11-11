@@ -1,6 +1,6 @@
 # Demo Trade Authorization 決策包
 
-2026-09-23 B1 follow-up：見 [額度決策與實作](demo-trade-budget-decision.md)及[審查紀錄](demo-trade-authorization-review.md)。原 `max_entry_reservation_usdt` 已改為 `max_entry_mark_notional_usdt`，採每 grant 一次新增曝險 transport 嘗試；已 consumed ID 可由既有 execution order metadata 跨 restart 恢復，active grant 仍不恢復。本輪專屬 17/17、直接受影響七模組 120/120 OK。原 11/11 與 reservation 額度敘述只保留為 B1 前歷史，不得當目前契約。
+2026-09-23 B1 follow-up：見 [額度決策與實作](demo-trade-budget-decision.md)及審查紀錄（已移至 `archive/dev-history` 分支：`docs/demo-trade-authorization-review.md`）。原 `max_entry_reservation_usdt` 已改為 `max_entry_mark_notional_usdt`，採每 grant 一次新增曝險 transport 嘗試；已 consumed ID 可由既有 execution order metadata 跨 restart 恢復，active grant 仍不恢復。本輪專屬 17/17、直接受影響七模組 120/120 OK。原 11/11 與 reservation 額度敘述只保留為 B1 前歷史，不得當目前契約。
 
 日期：2026-09-22；2026-09-23 定案並完成 local synthetic 實作。範圍：第一個 OKX Demo 自動策略閉環的寫入授權契約。本文件與本次實作不授權 OKX network、credential、Demo POST、下單、撤單、帳戶修改、既有 trading DB、commit 或 push。
 

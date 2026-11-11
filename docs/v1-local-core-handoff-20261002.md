@@ -10,7 +10,7 @@
 
 前端新增 `v1.js`／`v1-core.css`，接入 home／desk HTML、workspace asset/build 清單；調整舊 JS 掛載及 simulation 成果摘要匯出。LOGO 旁模式選擇、策略檢查／匯入／信任／分配、啟停、歷史成果皆可操作。模式切換／刷新／換頁只改顯示，不控制 Bot。Demo／Live 明示未開放；回測／參數優化／Yaozi 保留入口並明示開發中。沒有內建 AI 聊天、想法輸入或模型 Key。
 
-Antigravity 的 `frontend/workspace/v1-theme.css` 與 [視覺交接](v1-frontend-handoff-20261002.md)已存在，於最終 fixture 啟動前接入；未由本輪改寫。第一份 fixture 期間 theme 發生外部漂移，該基線保留，不當成最終來源驗證。後續改動均在第一份 fixture 關閉後，最終兩份 fixture 期間來源與輸入 47 項 hash 未變。
+Antigravity 的 `frontend/workspace/v1-theme.css` 與 視覺交接（已移至 `archive/dev-history` 分支：`docs/v1-frontend-handoff-20261002.md`）已存在，於最終 fixture 啟動前接入；未由本輪改寫。第一份 fixture 期間 theme 發生外部漂移，該基線保留，不當成最終來源驗證。後續改動均在第一份 fixture 關閉後，最終兩份 fixture 期間來源與輸入 47 項 hash 未變。
 
 策略版本／Bot／命令帳使用 Supervisor 寫入的原子 JSON metadata；已有 pending／損壞時拒絕寫入，不自動解除。SQLite 沿用既有 schema，未做 migration／產品 DB 修改。版本庫上限 100、Bot 100、命令 500、metadata 4 MB；需擴充另評估，不靜默丟棄重送紀錄。版本建立、Bot 分配與控制命令同 request_id 同內容重送還原原結果，跨操作／不同內容衝突拒絕。
 

@@ -6,7 +6,7 @@
 
 2026-09-17 修正交接：使用者回報首次驗收純帳務 11/11 OK、儲存 35 errors、程序 4 errors，未 commit。根因為 `_key()` 向限定頂層 object 的 S2 `_json()` 傳入 list；靜態檢查另發現 `_write_id()` 同類問題。本次只將兩處輸入改成具名 object，不修改 S2／IPC helper 或 Schema。新增兩個不依賴 DB setup 的身份回歸及一個綁定→首次成交→重送→重啟回歸。修正後尚未執行驗證，請 Sol 從三個 S3 模組重新驗收，再執行必要回歸；前次錯誤阻斷的流程不能視為已驗證。
 
-S2 `690d8549dd4d078d5e62a12acf536ba0f768bdcb`／447 項通過來自使用者驗收回報，不能沿用為 S3 結果。規格見 [S3 設計](../outputs/catos-s3-fill-accounting-spec.md)。
+S2 `690d8549dd4d078d5e62a12acf536ba0f768bdcb`／447 項通過來自使用者驗收回報，不能沿用為 S3 結果。規格見 S3 設計（已移至 `archive/dev-history` 分支：`outputs/catos-s3-fill-accounting-spec.md`）。
 
 ## 交付內容
 

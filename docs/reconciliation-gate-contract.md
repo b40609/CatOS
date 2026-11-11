@@ -4,9 +4,9 @@
 
 ## 2026-09-22 當期 evidence 與未解除條件
 
-- [當期唯讀證據](reconciliation-readonly-evidence-20260922.md)：當時 subtypes 32 類／185 組已取得，11 組明確分類、174 組仍 unknown，新版本與既有靜態 Transfer 版本均為 complete=false。此為 9/22 歷史狀態；當時的全目錄 completeness 阻斷要求已由 9/23 分類縮減政策取代。
-- 後續 [F1 freshness 補證](reconciliation-f1-freshness-evidence-20260922.md) 已完成：4 次正常 13-source／41-GET collection 為 20159–20216 ms；gate-adjacent report age 132–170 ms、clock sample age 66–85 ms、midpoint offset +2837～+2848 ms。另有 360 GET／179993 ms 真實 pagination stress 由 deadline fail closed。F1 四值已定案；snapshot semantics 仍未獲新證明。
-- 2026-09-22 後續審查已把 clock sample age 從 clock offset 拆開：`max_clock_skew_ms` 只約束 server/local offset，新增 `max_clock_sample_age_ms` 約束 sample 到 `checked_at_ms` 的年齡；不藉放寬 skew 吸收批次耗時。詳見 [分類與 freshness 審查](reconciliation-classification-freshness-review-20260922.md)。
+- 當期唯讀證據（已移至 `archive/dev-history` 分支：`docs/reconciliation-readonly-evidence-20260922.md`）：當時 subtypes 32 類／185 組已取得，11 組明確分類、174 組仍 unknown，新版本與既有靜態 Transfer 版本均為 complete=false。此為 9/22 歷史狀態；當時的全目錄 completeness 阻斷要求已由 9/23 分類縮減政策取代。
+- 後續 F1 freshness 補證（已移至 `archive/dev-history` 分支：`docs/reconciliation-f1-freshness-evidence-20260922.md`） 已完成：4 次正常 13-source／41-GET collection 為 20159–20216 ms；gate-adjacent report age 132–170 ms、clock sample age 66–85 ms、midpoint offset +2837～+2848 ms。另有 360 GET／179993 ms 真實 pagination stress 由 deadline fail closed。F1 四值已定案；snapshot semantics 仍未獲新證明。
+- 2026-09-22 後續審查已把 clock sample age 從 clock offset 拆開：`max_clock_skew_ms` 只約束 server/local offset，新增 `max_clock_sample_age_ms` 約束 sample 到 `checked_at_ms` 的年齡；不藉放寬 skew 吸收批次耗時。詳見 分類與 freshness 審查（已移至 `archive/dev-history` 分支：`docs/reconciliation-classification-freshness-review-20260922.md`）。
 - 本輪 collection_complete=true，但 reconciled=false、trade_authorized=false；balance adjEq missing 與既有 attribution／E_0／P6／foreign／window 等實際差異仍保留。詳見 evidence；未使用真實帳戶資料作單元測試。
 
 ## 1. 目的與邊界
@@ -85,7 +85,7 @@ Demo F1 已定案為 policy ID `f1-demo-2026-09-22`：`max_report_age_ms=1000`�
 
 現有 collection `source_ms` 是本機 transport receive time，不是 OKX 帳戶狀態的遠端 snapshot timestamp；balance/order/position 的 `uTime` 也只是 record update time。兩者都不能單獨證明整批 snapshot freshness。
 
-S1 已定義 `s1-bounded-sequential.v1`：現有 collection 不宣稱 exchange-atomic snapshot，而是驗證同一 `collect_plan()` 內有界、依 manifest 順序完成的 sequential observation。account report 必須明示 `atomic_snapshot=false`、`record_update_time_is_snapshot_fence=false`、`transport_time_is_snapshot_fence=false`。詳細條件見 [S1 snapshot semantics 契約](reconciliation-s1-snapshot-semantics-20260922.md)。
+S1 已定義 `s1-bounded-sequential.v1`：現有 collection 不宣稱 exchange-atomic snapshot，而是驗證同一 `collect_plan()` 內有界、依 manifest 順序完成的 sequential observation。account report 必須明示 `atomic_snapshot=false`、`record_update_time_is_snapshot_fence=false`、`transport_time_is_snapshot_fence=false`。詳細條件見 S1 snapshot semantics 契約（已移至 `archive/dev-history` 分支：`docs/reconciliation-s1-snapshot-semantics-20260922.md`）。
 
 正式 freshness evidence 必須同時證明：
 
@@ -106,7 +106,7 @@ fills／bills 的目標窗口仍採 collection scope 的 inclusive `[window_star
 - request filter／cursor 證據足以證明窗口起點到終點已覆蓋，而非「目前拿到的資料剛好都在窗口內」。
 - fills、bills 任一來源 coverage 無法證明時，分別回傳 `fill_window_coverage_unverified` 或 `bill_window_coverage_unverified`。
 
-W1 已定義 `w1-exact-window-pagination.v1`：`DemoReadTransport` 對 fills/fills_history/bills/bills_archive 保存與 scope 完全相等的 `begin/end`、`ts` event-time 與 `after=billId` cursor semantics；collector 僅在每個接受頁 evidence 一致時保存 endpoint window evidence。gate 直接驗 request evidence、完整 terminal page chain 與 report event `ts`，不再接受 caller 提供 `WindowEvidence(True, True)`。詳細條件見 [W1 window coverage 契約](reconciliation-w1-window-coverage-20260922.md)。
+W1 已定義 `w1-exact-window-pagination.v1`：`DemoReadTransport` 對 fills/fills_history/bills/bills_archive 保存與 scope 完全相等的 `begin/end`、`ts` event-time 與 `after=billId` cursor semantics；collector 僅在每個接受頁 evidence 一致時保存 endpoint window evidence。gate 直接驗 request evidence、完整 terminal page chain 與 report event `ts`，不再接受 caller 提供 `WindowEvidence(True, True)`。詳細條件見 W1 window coverage 契約（已移至 `archive/dev-history` 分支：`docs/reconciliation-w1-window-coverage-20260922.md`）。
 
 歷史 2026-09-22 Demo/F1 摘要沒有保存 W1 新欄位，因此不能以既有 timing 摘要補成 window pass；本片未因此重跑真實採集。
 

@@ -64,4 +64,4 @@ raise SystemExit(0 if result.wasSuccessful() else 1)
 
 尚未串入 HTTP API、正式服務啟動流程、前端或 Demo／Live；報告欄位已提供新語意，產品畫面尚未改動。舊 exact-midnight／Q1 producer 與 Demo 既有路徑保留，未擴大其適用範圍；舊明示 `basis_blocked_day` 不會被自動清除。未讀產品 DB／憑證、未採集、未交易、未操作 Git、未修改 Yaozi／並行前端，未執行前端 tsc／build 或全市場研究。
 
-10/20 指定獨驗已核對 17 個來源 hash、重跑 197 項並加驗 3 個邊界案例；本文件原「待獨驗」文字已過時。2026-10-25 指定 GPT-6 Sol 再核對 17／17 hash 一致、0 漂移，按風險重跑 R1 專屬 21／21 通過，未重跑全部歷史案例；命令與結果見[盤點接續核對末節](project-inventory-audit-20261024.md#2026-10-25前端完成前的後端接續核對)。不能推導 HTTP／UI／Demo／Live 已通過；目前串接待決項見[後端串接表第 6 節](backend-frontend-integration-map.md)。commit／push、真實採集與 Demo／Live 仍需另有授權。[接續入口](current-handoff.md)。
+10/20 指定獨驗已核對 17 個來源 hash、重跑 197 項並加驗 3 個邊界案例；本文件原「待獨驗」文字已過時。2026-10-25 指定 GPT-6 Sol 再核對 17／17 hash 一致、0 漂移，按風險重跑 R1 專屬 21／21 通過，未重跑全部歷史案例；命令與結果見盤點接續核對末節（已移至 `archive/dev-history` 分支：`docs/project-inventory-audit-20261024.md`）。不能推導 HTTP／UI／Demo／Live 已通過；目前串接待決項見[後端串接表第 6 節](backend-frontend-integration-map.md)。commit／push、真實採集與 Demo／Live 仍需另有授權。[接續入口](current-handoff.md)。
