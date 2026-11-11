@@ -361,7 +361,7 @@ class APITests(unittest.TestCase):
         self.root = Path(self.temp.name)
 
     def app(self, runner=held_runner):
-        app = create_app(output_dir=self.root / "research", market_db=self.root / "missing.sqlite",
+        app = create_app(output_dir=self.root / "research",
                          evidence_root=self.root / "r4", simulation_root=self.root / "simulation")
         app.state.simulation.runner = runner
         return app

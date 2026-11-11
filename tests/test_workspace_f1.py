@@ -1,4 +1,4 @@
-"""F1 evidence boundaries and shared-owner research integration."""
+"""Evidence reader boundaries, built-UI serving and the integrated research app."""
 
 from datetime import datetime, timedelta, timezone
 import json
@@ -9,7 +9,6 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from fastapi.responses import JSONResponse
 
 from catos.workspace_api import create_app
 from catos.workspace_snapshot import LocalSimReader, SnapshotError, MAX_METADATA
@@ -151,123 +150,92 @@ class EvidenceTests(unittest.TestCase):
             self.reader.snapshot(RUN)
 
 
-class WorkspaceAPITests(unittest.TestCase):
-    def test_expanded_pages_keep_fixed_local_routes_and_no_second_writer(self):
-        with patch("catos.research_service.ResearchService.start",
-                   side_effect=AssertionError("second writer")):
-            with TestClient(create_app(preview=True), base_url="http://127.0.0.1") as client:
-                for page in ("research", "execution", "risk", "events", "yaozi", "settings"):
-                    response = client.get("/workspace/" + page)
-                    self.assertEqual(response.status_code, 200)
-                    self.assertIn("desk.js", response.text)
-                    self.assertIn("script-src 'self'", response.headers["Content-Security-Policy"])
-                    self.assertEqual(client.get("/workspace/" + page,
-                        headers={"Host": "external.invalid"}).status_code, 403)
-                self.assertEqual(client.get("/workspace/private").status_code, 404)
-                self.assertEqual(client.post("/workspace/execution", json={}).status_code, 405)
-                for asset in ("desk.js", "desk.css"):
-                    self.assertEqual(client.get("/workspace/assets/" + asset).status_code, 200)
-                self.assertNotIn("research", client.app.state._state)
+def write_dist(root):
+    dist = root / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text(
+        '<!doctype html><div id="root"></div>'
+        '<script type="module" src="/assets/app.js"></script>', encoding="utf-8")
+    (dist / "assets" / "app.js").write_text("export {};", encoding="utf-8")
+    (dist / "assets" / "tool.exe").write_bytes(b"x")
+    (dist / "favicon.ico").write_bytes(b"ico")
+    (root / "secret.txt").write_text("outside dist", encoding="utf-8")
+    return dist
 
-    def test_home_comparison_keeps_script_policy_and_local_assets(self):
-        with TestClient(create_app(preview=True), base_url="http://127.0.0.1") as client:
-            page = client.get("/workspace/home")
+
+class WorkspaceAPITests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def app(self):
+        return create_app(output_dir=self.root / "research", evidence_root=self.root / "evidence",
+                          simulation_root=self.root / "simulation", ui_dist=self.root / "dist")
+
+    def test_built_ui_is_served_from_the_api_port(self):
+        write_dist(self.root)
+        with TestClient(self.app(), base_url="http://127.0.0.1") as client:
+            page = client.get("/")
             self.assertEqual(page.status_code, 200)
+            self.assertIn('id="root"', page.text)
+            self.assertTrue(page.headers["Content-Type"].startswith("text/html"))
             self.assertIn("script-src 'self';", page.headers["Content-Security-Policy"])
             self.assertIn("no-store", page.headers["Cache-Control"])
-            self.assertIn("Gemini 原版", page.text)
-            self.assertNotIn("mock-data.js", page.text)
-            for asset in ("home.js", "home.css", "home-layout.js", "home-layout.css"):
-                self.assertEqual(client.get("/workspace/assets/" + asset).status_code, 200)
-            self.assertEqual(client.get("/workspace/home", headers={"Host": "external.invalid"}).status_code, 403)
+            script = client.get("/assets/app.js")
+            self.assertEqual(script.status_code, 200)
+            self.assertTrue(script.headers["Content-Type"].startswith("text/javascript"))
+            self.assertEqual(script.headers["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(client.get("/favicon.ico").status_code, 200)
+            self.assertEqual(client.get("/api/workspace/version").json()["ui"], "ready")
+            self.assertEqual(client.get("/", headers={"Host": "external.invalid"}).status_code, 403)
 
-    def test_comparison_images_are_fixed_local_references(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            images = root / "outputs" / "frontend-design-review-20260930"
-            images.mkdir(parents=True)
-            image = b"\x89PNG\r\n\x1a\nlocal-reference"
-            (images / "gemini-home.png").write_bytes(image)
-            app = create_app(preview=True)
-            with TestClient(app, base_url="http://127.0.0.1") as client:
-                with patch("catos.workspace_api.ROOT", root):
-                    response = client.get("/workspace/reference/gemini")
-                    self.assertEqual(response.status_code, 200)
-                    self.assertEqual(response.content, image)
-                    self.assertEqual(response.headers["Content-Type"], "image/png")
-                    self.assertEqual(client.get("/workspace/reference/previous").status_code, 404)
-                    for path in ("unknown", "private.png", "..%2Fprivate", "C:%5Cprivate"):
-                        self.assertEqual(client.get("/workspace/reference/" + path).status_code, 404)
+    def test_ui_files_are_limited_to_listed_types_inside_dist(self):
+        write_dist(self.root)
+        with TestClient(self.app(), base_url="http://127.0.0.1") as client:
+            for path in ("/assets/unknown.js", "/assets/tool.exe", "/assets/..%2F..%2Fsecret.txt",
+                         "/assets/C:%5Csecret.txt", "/..%5Csecret.txt", "/.env", "/secret.txt",
+                         "/workspace", "/research", "/quant", "/yaozi"):
+                self.assertEqual(client.get(path).status_code, 404, path)
+            self.assertEqual(client.post("/", json={}).status_code, 405)
 
-    def test_preview_has_no_writer_and_restricts_proxy(self):
-        with patch("catos.research_service.ResearchService.start", side_effect=AssertionError("second writer")):
-            app = create_app(preview=True)
-            with TestClient(app, base_url="http://127.0.0.1:8771") as client:
-                self.assertNotIn("research", app.state._state)
-                self.assertTrue(client.get("/api/workspace/version").json()["preview"])
-                self.assertEqual(client.get("/api/research/runs/secret").status_code, 404)
-                self.assertEqual(client.post("/api/research/version", json={}).status_code, 405)
-                self.assertEqual(client.post("/api/workspace/local-sim/runs/" + RUN).status_code, 405)
-                self.assertEqual(client.post("/api/research/backtests", json={},
-                    headers={"Origin": "https://external.invalid"}).status_code, 403)
-                self.assertEqual(client.post("/api/research/backtests", content="x").status_code, 415)
-                self.assertEqual(client.post("/api/research/backtests", content=b"x" * 8193,
-                    headers={"Content-Type": "application/json"}).status_code, 413)
-                self.assertEqual(client.get("/api/research/runs?root=C:/private").status_code, 422)
-
-    def test_proxy_preserves_request_build_and_fixed_route(self):
-        with TestClient(create_app(preview=True), base_url="http://127.0.0.1:8771") as client:
-            with patch("catos.workspace_api.relay", return_value=JSONResponse({"run_id": RUN}, status_code=202)) as relay:
-                response = client.post("/api/research/backtests", content=b'{"fake":"bounded"}',
-                    headers={"Content-Type": "application/json", "X-CatOS-Build": "fixed", "Origin": "http://127.0.0.1:8771"})
-                self.assertEqual(response.status_code, 202)
-                relay.assert_called_once_with("POST", "/api/research/backtests", b'{"fake":"bounded"}', "fixed")
-
-    def test_host_assets_and_page_contract(self):
-        with TestClient(create_app(preview=True), base_url="http://127.0.0.1") as client:
-            self.assertEqual(client.get("/workspace/", headers={"Host": "external.invalid"}).status_code, 403)
-            page = client.get("/workspace/")
-            self.assertEqual(page.status_code, 200)
-            self.assertIn("script-src 'self'", page.headers["Content-Security-Policy"])
-            self.assertIn("no-store", page.headers["Cache-Control"])
-            self.assertIn("戰情總覽", page.text)
-            self.assertIn("運行與異常", client.get("/workspace/legacy").text)
-            self.assertNotIn("mock-data.js", page.text)
-            self.assertEqual(client.get("/workspace/assets/unknown.js").status_code, 404)
-            self.assertEqual(client.get("/workspace/assets/workspace.js").status_code, 200)
-            self.assertEqual(client.get("/api/workspace/local-sim/runs/"+RUN+"?limit=201").status_code, 422)
+    def test_missing_build_explains_itself_and_keeps_apis(self):
+        with TestClient(self.app(), base_url="http://127.0.0.1") as client:
+            page = client.get("/")
+            self.assertEqual(page.status_code, 503)
+            self.assertIn("尚未建置", page.text)
+            self.assertEqual(client.get("/assets/app.js").status_code, 404)
+            self.assertEqual(client.get("/api/workspace/version").json()["ui"], "not_built")
+            self.assertEqual(client.get("/api/research/version").status_code, 200)
+            self.assertEqual(
+                client.get("/api/workspace/local-sim/runs/" + RUN + "?limit=201").status_code, 422)
 
     def test_integrated_app_uses_same_research_service_and_decimal_result(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            app = create_app(output_dir=root / "research", market_db=root / "missing.sqlite",
-                             evidence_root=root / "evidence", simulation_root=root / "simulation")
-            with TestClient(app, base_url="http://127.0.0.1") as client:
-                for entry in ("/", "/quant", "/workspace", "/workspace/"):
-                    page = client.get(entry)
-                    self.assertEqual(page.status_code, 200)
-                    self.assertIn("戰情總覽", page.text)
-                version = client.get("/api/research/version").json()
-                self.assertFalse(client.get("/api/workspace/version").json()["preview"])
-                request = client.get("/api/research/catalog").json()["defaults"]
-                response = client.post("/api/research/backtests", json=request,
-                                       headers={"X-CatOS-Build": version["build_id"]})
-                self.assertEqual(response.status_code, 202, response.text)
-                run_id = response.json()["run_id"]
-                deadline = time.monotonic() + 10
-                while time.monotonic() < deadline:
-                    task = client.get("/api/research/runs/" + run_id).json()
-                    if task["status"] in ("complete", "failed"):
-                        break
-                    time.sleep(0.02)
-                self.assertEqual(task["status"], "complete", task)
-                result = client.get("/api/research/runs/" + run_id + "/result").json()
-                self.assertEqual(result["result"]["performance"]["net_pnl"], "-0.79532090")
-                self.assertIsInstance(result["result"]["trades"][0]["fee"], str)
-                self.assertEqual(app.state.research.task(run_id), task)
-                self.assertIn(run_id, [item["run_id"] for item in client.get("/api/research/runs").json()["items"]])
-                self.assertEqual(client.get("/api/research/runs/" + run_id + "/report").status_code, 200)
-                self.assertEqual(client.get("/api/workspace/local-sim/runs").json()["state"], "empty")
+        app = self.app()
+        with TestClient(app, base_url="http://127.0.0.1") as client:
+            version = client.get("/api/research/version").json()
+            self.assertNotIn("market_status", version)
+            request = client.get("/api/research/catalog").json()["defaults"]
+            response = client.post("/api/research/backtests", json=request,
+                                   headers={"X-CatOS-Build": version["build_id"]})
+            self.assertEqual(response.status_code, 202, response.text)
+            run_id = response.json()["run_id"]
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                task = client.get("/api/research/runs/" + run_id).json()
+                if task["status"] in ("complete", "failed"):
+                    break
+                time.sleep(0.02)
+            self.assertEqual(task["status"], "complete", task)
+            result = client.get("/api/research/runs/" + run_id + "/result").json()
+            self.assertEqual(result["result"]["performance"]["net_pnl"], "-0.79532090")
+            self.assertIsInstance(result["result"]["trades"][0]["fee"], str)
+            self.assertEqual(app.state.research.task(run_id), task)
+            self.assertIn(run_id, [item["run_id"] for item in client.get("/api/research/runs").json()["items"]])
+            self.assertEqual(client.get("/api/research/runs/" + run_id + "/report").status_code, 200)
+            self.assertEqual(client.get("/api/workspace/local-sim/runs").json()["state"], "empty")
 
 
 if __name__ == "__main__":

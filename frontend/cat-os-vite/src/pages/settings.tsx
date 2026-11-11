@@ -21,8 +21,7 @@ interface WorkspaceVersion {
   build_id: string;
   current_build_id: string;
   restart_required: boolean;
-  preview: boolean;
-  research_owner: string;
+  ui: string;
   observed_at: string;
 }
 
@@ -102,7 +101,7 @@ function SettingsPage() {
             )
           }
         >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
             <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">
               <span className="text-t2 text-muted-foreground block">研究核心模式</span>
               <span className="text-xs font-bold text-foreground block">
@@ -119,14 +118,6 @@ function SettingsPage() {
               <span className="text-t1 text-muted-foreground">
                 {researchVer?.restart_required ? "源碼已異動 (需重啟)" : "最新版本同步中"}
               </span>
-            </div>
-
-            <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">
-              <span className="text-t2 text-muted-foreground block">Yaozi 情報庫狀態</span>
-              <span className="text-xs font-bold text-amber-400 block truncate">
-                {researchVer?.market_status || "market_intel_not_found"}
-              </span>
-              <span className="text-t1 text-muted-foreground">前端切換至示範情報流</span>
             </div>
 
             <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">

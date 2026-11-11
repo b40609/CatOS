@@ -272,7 +272,7 @@ class ValidationServiceTests(unittest.TestCase):
 class ValidationApiTests(unittest.TestCase):
     def test_http_submission_gates_and_existing_query_endpoints(self):
         with tempfile.TemporaryDirectory() as directory:
-            app = create_app(output_dir=Path(directory) / "research", market_db=Path(directory) / "missing.sqlite")
+            app = create_app(output_dir=Path(directory) / "research")
             with TestClient(app, base_url="http://127.0.0.1:8770") as client:
                 version = client.get("/api/research/version").json()
                 headers = {"X-CatOS-Build": version["build_id"], "Origin": "http://127.0.0.1:8770"}
@@ -301,21 +301,6 @@ class ValidationApiTests(unittest.TestCase):
                 self.assertEqual(result.json()["schema"], SCHEMA)
                 self.assertTrue(result.json()["evaluation_complete"])
                 self.assertEqual(client.get(f"/api/research/runs/{run_id}/report").status_code, 200)
-                self.assertFalse((Path(directory) / "missing.sqlite").exists())
-
-    def test_preview_relays_validation_to_existing_writer_only(self):
-        from catos.workspace_api import create_app as workspace_app
-        from starlette.responses import JSONResponse
-        with tempfile.TemporaryDirectory() as directory:
-            app = workspace_app(preview=True, evidence_root=Path(directory) / "missing")
-            with TestClient(app, base_url="http://127.0.0.1:8771") as client:
-                with patch("catos.workspace_api.relay", return_value=JSONResponse({"run_id": "fixture"}, status_code=202)) as relay:
-                    response = client.post("/api/research/validations", json=request_copy(),
-                                           headers={"X-CatOS-Build": "fixture", "Origin": "http://127.0.0.1:8771"})
-                self.assertEqual(response.status_code, 202)
-                self.assertEqual(relay.call_args.args[0:2], ("POST", "/api/research/validations"))
-                self.assertEqual(json.loads(relay.call_args.args[2]), request_copy())
-                self.assertFalse(hasattr(app.state, "research"))
 
 
 if __name__ == "__main__":

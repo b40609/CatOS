@@ -4,6 +4,8 @@
 
 > 2026-11-04 註：前端各頁目前的資料來源以 README「v1 範圍」表與 `docs/simulation-api-contract-draft.md` 第 9、10 節為準。`mock-adapter` 已於第 4 步移除，本文件第 1 節「現況」欄中關於 mock、「R1 未接 HTTP／UI」與展示資料的敘述已過時，本文件只作後端契約索引。
 
+> 2026-11-11 註：Yaozi 市場情報已拆成獨立專案，`/intel/*` 路由、`market_api.py`、舊的 `/research/`、`/workspace/` 頁面與 8771 preview 都已從本 repo 移除（原第 9 節一併刪除）；React 介面建置後由 8770 直接提供。文中提到這些的段落是當時的狀態。路由現況以服務啟動後的 `http://127.0.0.1:8770/docs` 為準。
+
 本文件保留既有契約索引。2026-10-24 整合基線曾執行隔離 18870／18890 的 HTTP／Vite／React 自測；當時正式 8770／8771 僅唯讀核對及改名所需維護，實際命令、證據與限制見[整合基線交付](integration-baseline-20261024.md)。2026-10-25 在 `748713c` 加既有未提交修正上核對後端契約與合成請求，未操作前端、8890 或正式服務，未取得另一台 PC 的未推送前端。下列「已有 HTTP」指程式掛載路由；後端自測不等於目前 React 已完成串接或驗收。
 
 ## 1. 先看功能與可用程度
@@ -423,24 +425,6 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 2026-10-25 以臨時資料根與程序內 TestClient 核對：13 個 JSON 範例可解析，3 組完整預設請求與程式一致且通過驗值；研究 9 條、本地模擬 5 條路由存在。4 個策略／Bot 路徑及設定／風控根路徑的 GET／POST 均為 404；後兩者只是缺口探測，不代表已定案的 API 網址。未提交任務，外部 socket connect 與 preview relay 被測試攔截，未建立指定的市場 DB。這是後端契約核對，不是前端互動或獨立驗收。
 
 既有附件缺件仍見盤點報告 INV-08；未重建歷史 DCM 附件，也未改動其他並行工作，不能把失效附件當作目前可開啟的證據。
-
-## 9. 情報頁：保留唯讀路由索引，逐卡另核對
-
-此節保留既有索引，不擴大成每張情報卡已完成契約核對。路由與 MarketIntelReader 均在 [market_api.py](../catos/market_api.py)，資料模型在 [market_intel.py](../catos/market_intel.py)；[market-intel.tsx](../frontend/cat-os-vite/src/pages/market-intel.tsx) 仍有固定 YAOZI_ALERTS／FUNDING_RATES。下列皆 GET：
-
-| 功能 | 路徑 |
-| --- | --- |
-| 總覽、決策與雷達 | `/intel/today`、`/intel/decision-surface`、`/intel/decision-surface/{symbol}`、`/intel/decision-compare`、`/intel/radar` |
-| 標的與 K 線 | `/intel/picks`、`/intel/picks/{symbol}`、`/intel/picks/{symbol}/candles` |
-| 訊號、警報與歷程 | `/intel/signals`、`/intel/alerts`、`/intel/picks/{symbol}/timeline`、`/intel/picks/{symbol}/journey` |
-| 跨軸、狀態與證據 | `/intel/cross-axis`、`/intel/status-labels`、`/intel/signal-dex/{symbol}`、`/intel/proof` |
-| 資金與事件 | `/intel/raw-flow`、`/intel/raw-flow/{symbol}`、`/intel/capital-flow/{symbol}`、`/intel/event-candidates`、`/intel/event-candidates/{symbol}`、`/intel/dealer/{symbol}` |
-| 鏈上與來源涵蓋 | `/intel/onchain`、`/intel/onchain/{symbol}`、`/intel/source-coverage` |
-| 社群與流動性 | `/intel/social`、`/intel/picks/{symbol}/social`、`/intel/liquidity`、`/intel/picks/{symbol}/liquidity`、`/intel/picks/{symbol}/money-flow` |
-| 敘事、板塊與新聞 | `/intel/narrative`、`/intel/narrative-attention`、`/intel/sectors`、`/intel/news` |
-| 選擇權 | `/intel/options`、`/intel/options/{underlying}` |
-
-資料不存在／不合格可能 503，也可能 empty／stale／coverage 不足；不回退假行情。查詢參數與 DTO 需逐路由／reader 核對，例如 candles 的 timeframe／limit 不能直接套到其他路由。本輪不提供未核對的最小結果範例，不宣稱實際 DB、新鮮度、跨交易所費率或來源已可用；此清單不授權重啟採集。
 
 ## 10. 阻擋事項與可延後項目
 

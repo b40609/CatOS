@@ -4,7 +4,7 @@ import base64
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, ".."))
-script_path = os.path.join(current_dir, "start-laptop-dev.ps1")
+script_path = os.path.join(current_dir, "start.ps1")
 
 desktop = os.path.expanduser("~/Desktop")
 
@@ -26,7 +26,7 @@ $shortcut = $wsh.CreateShortcut('{lnk_path}')
 $shortcut.TargetPath = 'powershell.exe'
 $shortcut.Arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Minimized -File "{script_path}"'
 $shortcut.WorkingDirectory = '{project_root}'
-$shortcut.Description = 'CatOS Web Dev Launcher'
+$shortcut.Description = 'CatOS Launcher (http://127.0.0.1:8770/)'
 $shortcut.IconLocation = 'shell32.dll,220'
 $shortcut.Save()
 """
@@ -40,7 +40,7 @@ bat_name = "CatOS \u7db2\u9801\u4e00\u9375\u555f\u52d5.bat"
 bat_path = os.path.join(desktop, bat_name)
 bat_content = f"""@echo off
 chcp 65001 >nul
-echo 正在啟動 catOS 前端服務並開啟瀏覽器畫面...
+echo 正在啟動 CatOS 並開啟瀏覽器...
 powershell -NoProfile -ExecutionPolicy Bypass -File "{script_path}"
 """
 with open(bat_path, "w", encoding="utf-8-sig") as f:

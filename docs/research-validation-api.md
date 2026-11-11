@@ -64,7 +64,7 @@ POST `/api/research/validations`，Content-Type 為 application/json，標頭 `X
 | 結果 | GET `/api/research/runs/{run_id}/result` | 完整封存 JSON，不執行運算 |
 | 報告 | GET `/api/research/runs/{run_id}/report` | 既有下載報告路徑，含任務與來源綁定 |
 
-8771 preview 只將此 POST 轉送既有 8770 writer，GET 沿用原轉送契約，不另建服務或封存目錄。本輪僅以 mock relay 和 in-process TestClient 自測，未連實際 8770／8771。MCP 未新增驗證送出工具；既有清單／結果讀取不變。
+8771 preview 已於 2026-11-11 移除，只剩 8770 一個入口。MCP 未新增驗證送出工具；既有清單／結果讀取不變。
 
 ## 結果欄位
 

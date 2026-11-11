@@ -28,7 +28,6 @@ export interface ResearchVersion {
   restart_required: boolean;
   active_run_id: string | null;
   mode: string;
-  market_status: string;
   cache_policy: string;
 }
 

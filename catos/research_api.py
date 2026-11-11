@@ -1,4 +1,4 @@
-"""Same-origin research adapter, mounted beside the existing shell/Yaozi surfaces."""
+"""Localhost research HTTP adapter: backtests, optimizations and walk-forward validations."""
 
 import argparse
 from contextlib import asynccontextmanager
@@ -6,18 +6,14 @@ from datetime import datetime, timezone
 import json
 import os
 import socket
-import sqlite3
 import uuid
 
-from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
-from catos.market_api import MarketIntelReader, create_app as create_market_app
-from catos.market_intel import MarketIntelError
 from catos.research_catalog import ROOT, catalog, files_hash, json_text
 from catos.research_service import ResearchError, ResearchService
 
-FRONTEND = ROOT / "frontend" / "research"
 RUNTIME_FILES = (
     "catos/research_api.py", "catos/research_catalog.py", "catos/research_service.py",
     "catos/research_worker.py", "catos/research_strategy.py", "catos/research.py",
@@ -31,7 +27,7 @@ RUNTIME_FILES = (
     "catos/research_only_artifacts/donchian-ensemble-donchian-ensemble-preregistered-v1.json",
     "catos/research_only_artifacts/tsmom-multi-tsmom-multi-preregistered-v1.json",
     "catos/research_only_artifacts/dcm-daily-dcm-daily-preregistered-v1.json",
-    "catos/data_io.py", "catos/reporting.py", "catos/market_api.py", "catos/app_shell.py",
+    "catos/data_io.py", "catos/reporting.py",
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
     "catos/research_only_artifacts/donchian-breakout-donchian-parameters-v1.json",
     "examples/closed_bar_demo.py", "examples/research-web-synthetic.csv",
@@ -39,41 +35,17 @@ RUNTIME_FILES = (
 
 
 def build_files():
-    return tuple(RUNTIME_FILES) + tuple(sorted(
-        path.relative_to(ROOT).as_posix() for path in FRONTEND.rglob("*") if path.is_file()
-    ))
+    return tuple(RUNTIME_FILES)
 
 
-class UnavailableMarketReader:
-    """Keep existing intelligence routes explicit without creating a database."""
-
-    def __init__(self, reason):
-        self.reason = reason
-
-    def __getattr__(self, name):
-        def unavailable(*args, **kwargs):
-            raise HTTPException(503, {"status": "unavailable", "reason": self.reason})
-        return unavailable
-
-
-def create_app(*, output_dir=None, market_db=None):
+def create_app(*, output_dir=None):
     service = ResearchService(output_dir or ROOT / "outputs" / "research-web")
-    database = market_db or ROOT / "data" / "market_intel.sqlite"
-    market_status = "ready"
-    try:
-        market_reader = MarketIntelReader(database)
-    except (MarketIntelError, sqlite3.Error) as error:
-        market_status = str(error)
-        market_reader = UnavailableMarketReader(market_status)
-    app = create_market_app(database, market_reader=market_reader)
+    app = FastAPI(title="CatOS", version="1")
     app.state.research = service
-    names = build_files()
-    loaded_build = files_hash(names)
+    loaded_build = files_hash(build_files())
     instance = {"instance_id": uuid.uuid4().hex, "pid": os.getpid(),
                 "started_at": datetime.now(timezone.utc).isoformat(),
-                "workspace": str(ROOT), "build_id": loaded_build, "market_status": market_status}
-    assets = {path.relative_to(FRONTEND).as_posix(): path for path in FRONTEND.rglob("*")
-              if path.is_file() and path.suffix in (".js", ".css")}
+                "workspace": str(ROOT), "build_id": loaded_build}
 
     def version():
         try:
@@ -97,7 +69,7 @@ def create_app(*, output_dir=None, market_db=None):
 
     @app.middleware("http")
     async def research_headers(request, call_next):
-        is_research = request.url.path.startswith(("/research", "/api/research"))
+        is_research = request.url.path.startswith("/api/research")
         if is_research and request.url.hostname != "127.0.0.1":
             return JSONResponse({"detail": "research_requires_127_0_0_1"}, status_code=403)
         response = await call_next(request)
@@ -188,25 +160,13 @@ def create_app(*, output_dir=None, market_db=None):
     def research_report(run_id: str):
         return HTMLResponse(service.report(run_id))
 
-    @app.get("/research/assets/{asset:path}")
-    def research_asset(asset: str):
-        if asset not in assets:
-            raise HTTPException(404, "research_asset_not_found")
-        return FileResponse(assets[asset])
-
-    @app.get("/research", response_class=HTMLResponse)
-    @app.get("/research/", response_class=HTMLResponse)
-    def research_page():
-        page = (FRONTEND / "index.html").read_text(encoding="utf-8")
-        bootstrap = json_text({"build_id": loaded_build, "instance_id": instance["instance_id"]})
-        return HTMLResponse(page.replace("__CATOS_BOOTSTRAP__", bootstrap)
-                            .replace("__CATOS_BUILD__", loaded_build))
-
     return app
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="catOS R1 localhost research; fixed default port, no fallback")
+    parser = argparse.ArgumentParser(
+        description="CatOS research API only (no UI); fixed default port, no fallback. "
+                    "Use `python -m catos.workspace_api` for the full app.")
     parser.add_argument("--port", type=int, default=8770)
     args = parser.parse_args(argv)
     if not 1024 <= args.port <= 65535:
@@ -225,7 +185,7 @@ def main(argv=None):
     try:
         import uvicorn
         app = create_app()
-        print(f"catOS R1 http://127.0.0.1:{args.port}/research/ | workspace={ROOT}")
+        print(f"CatOS research API http://127.0.0.1:{args.port}/api/research/version | workspace={ROOT}")
         print("After source updates, finish active research then Ctrl+C and restart this command.")
         uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=args.port)).run(sockets=[listener])
     finally:

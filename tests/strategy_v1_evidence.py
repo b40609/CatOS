@@ -7,13 +7,12 @@ import platform
 import sqlite3
 from catos.local_sim_control import BUILD_FILES, build_id
 from catos.local_sim_control_runner import DATA_PATH
-from catos.workspace_api import ASSETS, workspace_build
+from catos.workspace_api import workspace_build
 
 ROOT = Path(__file__).resolve().parent.parent
 
 def hashes():
     names = set(BUILD_FILES) | {"catos/workspace_snapshot.py"}
-    names |= {"frontend/workspace/" + n for n in ("index.html", "home.html", "desk.html", *ASSETS)}
     names |= {"tests/" + n for n in ("test_python_strategy_v1.py", "test_python_strategy_api.py", "strategy_v1_mcp_probe.py", "strategy_v1_evidence.py", "simulation_result_fixture.py")}
     names.add(str(DATA_PATH.relative_to(ROOT)).replace("\\", "/"))
     return {name: hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in sorted(names)}

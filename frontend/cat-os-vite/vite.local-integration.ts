@@ -8,7 +8,7 @@ export function localIntegration(backendPort = 8770): Plugin {
     throw new Error('invalid_local_backend_port');
   }
   const target = `http://127.0.0.1:${backendPort}`;
-  const prefixes = ['/api/research', '/api/workspace', '/intel'];
+  const prefixes = ['/api/research', '/api/workspace'];
   const proxy: Record<string, ProxyOptions> = Object.fromEntries(prefixes.map((prefix) => [prefix, {
     target,
     changeOrigin: true,

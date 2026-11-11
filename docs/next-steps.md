@@ -1,6 +1,27 @@
 # v1 之後的下一步
 
-更新：2026-11-09（研究線工作包 B＋A、D、E、F 合併進 `main`，合併 commit `2671a169`，尚未推送）。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`845ab14`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。
+更新：2026-11-11。研究線工作包 B＋A、D、E、F（合併 commit `2671a169`）已於 2026-11-11 推送到 GitHub；下文各項寫的「尚未推送」是 2026-11-09 當時的狀態。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`845ab14`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。
+
+## 2026-11-11：目標確認與接下來的順序
+
+使用者確認的目標（全文見 `AGENTS.md` 的 GOAL）：試用者是用 AI Agent 輔助寫策略的量化開發者；開源試用的最低門檻是在 OKX 模擬盤跑通「想法 → 研究 → 回測 → 部署」；長期要能同時跑多策略。
+
+同日完成（開發者自測，未經獨立驗收；不碰帳務、風控與執行路徑）：
+
+- 主資料夾搬到 `C:/dev/CatOS`，離開被 Google Drive 同步的桌面。
+- Yaozi 市場情報拆成獨立專案，本 repo 移除 `catos/market_*.py`、對應測試與文件；`catos/research_api.py` 不再建立在 market app 上。
+- 後端單埠：8770 直接提供建置後的 React 介面，移除 `frontend/workspace`、`frontend/research`、`/app/*` 舊頁面與 8771 preview；新增一鍵啟動 `start.bat`。
+- 實測：後端 1225 tests OK（11 skipped）、前端 typecheck 0 錯誤、21 tests 通過、build 成功、`tests/simulation_integration_test.mjs` 12 項通過。
+
+依新目標建議的順序（待使用者確認，尚未動工）：
+
+1. 研究驗過的策略能在 local-sim Bot 上跑，行情用已抓取的歷史 K 線重播。不需要金鑰，是「研究 → 部署」第一次接通。要先決定是否放寬「研究策略 Bot 選不到」的規則（`AGENTS.md` INVARIANTS，2026-11-04）。
+2. 回測加保證金與強平模型，讓槓桿下的結果不會高估。
+3. 工作包 B：Kill-Switch／re-arm HTTP。接 Demo 前必備。
+4. 工作包 D：OKX Demo 接線。這是最低試用門檻的最後一段，需要 Demo 授權與金鑰保管方式的決策。
+5. Agent 提交策略的入口（`python_strategy` 上傳製品，測試目前 skip），讓「想法 → 研究」可以由 Agent 走完。
+6. 同一幣種多策略。方案未定（交易所子帳戶、虛擬分倉、訊號合成三種做法各有代價）。
+7. 跨平台（`AccountLock` 目前只支援 Windows）。
 
 ## 候選工作包
 
@@ -10,7 +31,7 @@
 | B | Kill-Switch／re-arm／門檻修改 HTTP | 把 `supervisor.latch`、`set_loss_limits`、`rearm`（`catos/supervisor.py:108,952,970`）接上 HTTP 和風控中心按鈕 | 中。牽涉鎖存與人工恢復政策；Demo 前必備 | 恢復介面細節（確認步驟、誰能 re-arm）。動工前先查業界／開源做法再提方案 |
 | C | 真實歷史 K 線研究 | 研究目前寫死一份 96 根合成資料（`catos/research_catalog.py:21-22,222`）。改成可登錄多份資料集，用 `tools/fetch_okx_candles.py` 抓 OKX 公開歷史 K 線跑回測／優化 | 中。公開行情 GET，不用金鑰 | 採集授權（AGENTS.md：採集不因工作包自動授權） |
 | D | OKX Demo 接線 | Supervisor 持金鑰連 OKX 模擬盤、下單、對帳 | 大，多個工作包；I-b-4 Demo 對帳未通過仍是已知阻斷（`docs/demo-collection-handoff.md`） | Demo 授權、金鑰保管方式；建議 B 先完成 |
-| E | v2：策略上傳／多 Bot／Yaozi 重啟 | python_strategy 上傳製品（測試已 skip）、多 Bot 多策略、市場情報線解凍 | 大 | 受信策略邊界、資料模型、採集邊界 |
+| E | v2：策略上傳／多 Bot | python_strategy 上傳製品（測試已 skip）、多 Bot 多策略。市場情報（Yaozi）已於 2026-11-11 拆成獨立專案，完工後以獨立服務接回 | 大 | 受信策略邊界、資料模型 |
 
 ## 建議順序
 

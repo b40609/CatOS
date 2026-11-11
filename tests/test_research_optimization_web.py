@@ -125,8 +125,7 @@ class OptimizationServiceTests(unittest.TestCase):
 class OptimizationApiTests(unittest.TestCase):
     def test_api_gates_and_saved_result(self):
         with tempfile.TemporaryDirectory() as directory:
-            app = create_app(output_dir=Path(directory) / "research",
-                             market_db=Path(directory) / "missing.sqlite")
+            app = create_app(output_dir=Path(directory) / "research")
             with TestClient(app, base_url="http://127.0.0.1:8770") as client:
                 version = client.get("/api/research/version").json()
                 headers = {"X-CatOS-Build": version["build_id"],

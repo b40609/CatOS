@@ -36,7 +36,6 @@ def run_e2e_verification():
     temp_path = Path(temp_dir.name)
     output_dir = temp_path / "research_outputs"
     output_dir.mkdir(parents=True, exist_ok=True)
-    market_db = temp_path / "market_test.sqlite"
 
     backend_port = find_free_port()
     vite_port = find_free_port()
@@ -46,7 +45,7 @@ def run_e2e_verification():
     print(f"[E2E Init] backend={backend_port}, vite={vite_port}, chrome={chrome_port}")
 
     # 1. Start Isolated Backend Server with Controlled Delay Capability
-    backend_app = create_app(output_dir=output_dir, market_db=market_db)
+    backend_app = create_app(output_dir=output_dir)
     service = backend_app.state.research
 
     # Controlled delay hook for in-flight reload & page leave tests

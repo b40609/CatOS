@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, Route, ScanLine, Globe2, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, Route, ScanLine, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -68,7 +68,6 @@ const GROUPS: NavigationGroup[] = [
     titleEn: "ECOSYSTEM & SYSTEM",
     titleMono: "SYSTEM",
     items: [
-      { to: "/market-intel", name: "市場情報", sub: "MARKET INTEL", icon: Globe2 },
       { to: "/logs", name: "系統日誌", sub: "SYSTEM LOGS", icon: ScrollText },
       { to: "/settings", name: "系統設定", sub: "SETTINGS", icon: Settings2 },
     ],

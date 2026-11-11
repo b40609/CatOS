@@ -240,7 +240,8 @@ try {
     warmup_bars: 6 };
   await check('backtest page shows a Donchian run submitted through the proxy', async () => {
     const catalog = await (await fetch(`${origin}/api/research/catalog`)).json();
-    assert.deepEqual(catalog.strategies.map((s) => s.id), ['sma-trend', 'donchian-breakout']);
+    // Later research strategies are appended; this check needs only the first two.
+    assert.deepEqual(catalog.strategies.map((s) => s.id).slice(0, 2), ['sma-trend', 'donchian-breakout']);
     const { runId, result } = await researchRun('backtests', { ...catalog.defaults, ...DONCHIAN });
     assert.equal(result.provenance.strategy.id, 'donchian-breakout');
     const { formatDecimal } = await vite.ssrLoadModule('/src/lib/format.ts');

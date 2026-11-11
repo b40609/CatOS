@@ -270,8 +270,7 @@ class ResearchApiTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.app = create_app(output_dir=Path(self.directory.name) / "research",
-                              market_db=Path(self.directory.name) / "missing-market.sqlite")
+        self.app = create_app(output_dir=Path(self.directory.name) / "research")
         self.client = TestClient(self.app, base_url="http://127.0.0.1:8770")
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
@@ -279,13 +278,8 @@ class ResearchApiTests(unittest.TestCase):
         self.headers = {"X-CatOS-Build": self.version["build_id"], "Origin": "http://127.0.0.1:8770"}
 
     def test_success_result_and_reload_read_contract(self):
-        page = self.client.get("/research/")
-        self.assertEqual(page.status_code, 200)
-        self.assertEqual(page.headers["cache-control"], "no-store, max-age=0")
-        self.assertIn(self.version["build_id"], page.text)
-        asset = self.client.get("/research/assets/js/research.js")
-        self.assertEqual(asset.status_code, 200)
-        self.assertIn("no-store", asset.headers["cache-control"])
+        self.assertEqual(self.client.get("/api/research/version").headers["cache-control"],
+                         "no-store, max-age=0")
         catalog = self.client.get("/api/research/catalog").json()
         self.assertEqual(catalog["strategies"][0]["id"], "sma-trend")
         response = self.client.post("/api/research/backtests", json=request_copy(), headers=self.headers)
@@ -299,13 +293,10 @@ class ResearchApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/research/runs/{run_id}/result").json(), result.json())
         self.assertEqual(self.client.get("/api/research/runs").json()["items"][0]["run_id"], run_id)
         self.assertEqual(self.client.get(f"/api/research/runs/{run_id}/report").status_code, 200)
-        # The original app root and Yaozi paths remain available.
-        self.assertEqual(self.client.get("/").status_code, 200)
-        self.assertEqual(self.client.get("/app/yaozi").status_code, 200)
-        unavailable = self.client.get("/intel/today")
-        self.assertEqual(unavailable.status_code, 503)
-        self.assertEqual(unavailable.json()["detail"]["reason"], "market_intel_not_found")
-        self.assertFalse((Path(self.directory.name) / "missing-market.sqlite").exists())
+        # The research app carries no page, market-intelligence or legacy shell routes.
+        self.assertNotIn("market_status", self.version)
+        for path in ("/", "/research/", "/app/yaozi", "/intel/today"):
+            self.assertEqual(self.client.get(path).status_code, 404, path)
 
     def test_error_contract_and_origin_version_gates(self):
         invalid = {**request_copy(), "initial_balance": 1000}
@@ -319,7 +310,6 @@ class ResearchApiTests(unittest.TestCase):
             self.assertTrue(self.client.get("/api/research/version").json()["restart_required"])
             self.assertEqual(self.client.post("/api/research/backtests", json=request_copy(), headers=self.headers).status_code, 409)
         self.assertEqual(self.client.get("/api/research/runs/not-an-id").status_code, 400)
-        self.assertEqual(self.client.get("/research/assets/not-registered.js").status_code, 404)
         self.assertEqual(self.client.get("/api/research/version", headers={"Host": "evil.invalid"}).status_code, 403)
 
     def test_duplicate_fields_and_request_limit(self):

@@ -479,7 +479,7 @@ class APITests(unittest.TestCase):
         self.root = Path(self.temp.name)
 
     def app(self):
-        app = create_app(output_dir=self.root / "research", market_db=self.root / "missing.sqlite",
+        app = create_app(output_dir=self.root / "research",
                          evidence_root=self.root / "r4", simulation_root=self.root / "simulation")
         app.state.simulation.runner = held_runner
         return app
@@ -523,7 +523,7 @@ class APITests(unittest.TestCase):
             headers = self.headers(client)
             run_id = self.submit(client, headers).json()["run_id"]
             before = client.get(PREFIX + "/runs/" + run_id).json()
-            for path in ("/", "/workspace/research", "/workspace/execution", PREFIX + "/runs"):
+            for path in ("/api/workspace/version", "/api/research/version", PREFIX + "/runs"):
                 self.assertEqual(client.get(path).status_code, 200)
             self.assertEqual(client.get(PREFIX + "/runs/" + run_id).json(), before)
             # Closing a transport/client (without entering another lifespan) owns no task.
@@ -561,17 +561,9 @@ class APITests(unittest.TestCase):
             headers = self.headers(client)
             self.assertEqual(client.get(PREFIX + "/version").json()["slot"], "unavailable")
             self.assertEqual(self.submit(client, headers).status_code, 503)
-            for path in ("/", "/api/research/version", "/api/research/runs", "/api/workspace/local-sim/runs"):
+            for path in ("/api/workspace/version", "/api/research/version", "/api/research/runs",
+                         "/api/workspace/local-sim/runs"):
                 self.assertEqual(client.get(path).status_code, 200)
-
-    def test_preview_does_not_mount_or_proxy_simulation(self):
-        app = create_app(preview=True, simulation_root=self.root / "simulation")
-        with TestClient(app, base_url="http://127.0.0.1:8771") as client, patch("catos.workspace_api.relay") as relay:
-            self.assertEqual(client.post(PREFIX + "/start", json={}).status_code, 404)
-            self.assertEqual(client.get(PREFIX + "/version").status_code, 404)
-            self.assertNotIn("simulation", app.state._state)
-            relay.assert_not_called()
-        self.assertFalse((self.root / "simulation").exists())
 
 
 if __name__ == "__main__":

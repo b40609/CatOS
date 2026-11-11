@@ -1,13 +1,20 @@
 ## GOAL
 
-建立極簡、本機專用（Localhost-only）的量化交易系統 catOS v1，供 OKX KOL 交易員使用，專注分鐘至小時級的已收盤 K 線策略。
+建立極簡、本機專用（Localhost-only）的量化交易系統 CatOS，專注分鐘至小時級的已收盤 K 線策略。
+
+2026-11-11 使用者確認（取代原本「供 OKX KOL 交易員使用」的說法）：
+- 第一批試用者：用 Codex、Claude Code 這類 AI Agent 輔助寫 Python 的量化／半量化開發者。
+- 成功定義：實盤可同時跑多策略並長期穩定獲利的全週期資產配置系統。
+- 開源試用的最低門檻：在 OKX 模擬盤跑通「想法 → 研究 → 回測 → 部署」的完整迭代流程。
+
+目標不授予權限；Demo／Live、憑證與採集仍依 AUTONOMY 逐次授權。
 
 ## CONTEXT
 
-- 2026-11-03 v1 實況：交付範圍為本機合成模擬（FakeExchange）、單一 manifest 登錄 SMA 策略、單 Bot；前端戰情台／實例監控／側欄狀態列已接 local-sim 控制面投影 HTTP 真資料，不再使用 mock store。v1 不含：python_strategy 上傳製品（v2 候選，測試已 skip）、Demo／Live 下單、Yaozi 市場情報（凍結，程式與測試保留）、多 Bot、Kill-Switch／re-arm HTTP。現況以 README.md 為準，歷史規劃文件已移至 `docs/archive/`。
-- 2026-10-25 使用者確認執行主資料夾更名：`C:/Users/user/Desktop/CatOS_Astra` → `C:/Users/user/Desktop/CatOS`，並同步替換專案內活躍原始碼、文件與設定中的 `CatOS_Astra` 引用。更名理由：`_Astra` 後綴僅反映開發期使用的 ASTRA 模型，不屬於產品命名，產品名稱自始為 CatOS。此決策推翻 2026-10-24 的「取消更名」決定，該日記錄僅保留為歷史沿革。`outputs/`、`reports/` 下歷史驗收證據與執行產物維持原路徑與原內容，作為當時狀態記錄。`CatOS_Yaozi` 維持獨立工作目錄。
+- 2026-11-03 v1 實況：交付範圍為本機合成模擬（FakeExchange）、單一 manifest 登錄 SMA 策略、單 Bot；前端戰情台／實例監控／側欄狀態列已接 local-sim 控制面投影 HTTP 真資料，不再使用 mock store。v1 不含：python_strategy 上傳製品（v2 候選，測試已 skip）、Demo／Live 下單、Yaozi 市場情報（2026-11-11 已拆成獨立專案，見下）、多 Bot、Kill-Switch／re-arm HTTP。現況以 README.md 為準，歷史規劃文件已移至 `docs/archive/`。
+- 2026-10-25 使用者確認執行主資料夾更名：`C:/Users/user/Desktop/CatOS_Astra` → `C:/Users/user/Desktop/CatOS`，並同步替換專案內活躍原始碼、文件與設定中的 `CatOS_Astra` 引用。更名理由：`_Astra` 後綴僅反映開發期使用的 ASTRA 模型，不屬於產品命名，產品名稱自始為 CatOS。此決策推翻 2026-10-24 的「取消更名」決定，該日記錄僅保留為歷史沿革。`outputs/`、`reports/` 下歷史驗收證據與執行產物維持原路徑與原內容，作為當時狀態記錄。2026-11-11 起主資料夾為 `C:/dev/CatOS`（搬出被 Google Drive 同步的桌面，同步曾在 `.git` 內產生衝突副本並弄壞 ref），Yaozi 為獨立 repo `C:/dev/Yaozi`。
 
-- 2026-09-23 使用者已確認：保留 `CatOS`／`CatOS_Yaozi` 分工開發，最終以同一 localhost 網站的「量化交易／Yaozi 情報」分頁交付，切換頁面不控制策略生命週期。目錄分離不是產品分離；整合規則見 `docs/catos-yaozi-integration.md`。不得整包覆蓋另一工作目錄或於執行期跨 worktree import；既有 Git／驗收分工及交易授權限制不變。
+- 2026-11-11 使用者決定把 Yaozi 與 CatOS 暫時拆成兩個專案，Yaozi 完工後再併回成 CatOS 的分頁（取代 2026-09-23 的同 repo 分工與整合規則）。本 repo 不再含 `catos/market_*.py`、其測試與文件；Yaozi 在獨立的私有 repo。之後整合走獨立服務（HTTP），不共用程式碼、不跨 repo import。同日起後端只有一個埠：`catos/workspace_api.py` 在 8770 同時提供研究 API、local-sim 控制面與建置後的 React 介面（`frontend/cat-os-vite/dist`）；舊的 `frontend/workspace`、`frontend/research`、`/app/*` shell 與 8771 preview 已移除。一鍵啟動為 `start.bat`（`scripts/start.ps1`）。
 - 執行與儲存底座僅 Python 3.11+、SQLite（WAL）；禁止 Docker、PostgreSQL、Redis。
 - 核心邏輯以 README 與 `docs/simulation-api-contract-draft.md` 描述的 v1 實作為準；架構原稿已歸檔為 `docs/archive/catOS-architecture-review.md`，只作設計依據與歷史，原稿可能因中斷不完整，缺漏與尚未核准的政策不得當成已定案需求。
 - 目前先完成研究與本機模擬，Demo／Live 分階段再上；架構原稿第 15 節區分已確認決策與待決細節，不要求一次完成全部生產能力。
@@ -20,7 +27,7 @@
 ## AUTONOMY
 
 - 自主完成已授權工作包的本地實作、必要自測、失敗修復與交接；一般可逆修改無須逐次確認，執行邊界見下節。
-- 2026-10-01 使用者授予固定授權：為接續已核准的本機驗證，可使用既有 launcher／資料根恢復缺失的 127.0.0.1:8770 正式服務及 8771 preview，並唯讀建立新的 owner／build／instance 基線，無須逐次詢問。先確認埠未被占用，不停止不明 owner；基線合格後僅執行原核准案例。遇 recovery_required／unavailable 或其他不合格基線，保存原因並停止案例，不解除、不 resume。此授權不擴及破壞性操作、憑證、採集、Demo／Live 交易、金融政策、Git、額外案例或其他工作目錄。
+- 2026-10-01 使用者授予固定授權：為接續已核准的本機驗證，可使用既有 launcher／資料根恢復缺失的 127.0.0.1:8770 正式服務（8771 preview 已於 2026-11-11 移除），並唯讀建立新的 owner／build／instance 基線，無須逐次詢問。先確認埠未被占用，不停止不明 owner；基線合格後僅執行原核准案例。遇 recovery_required／unavailable 或其他不合格基線，保存原因並停止案例，不解除、不 resume。此授權不擴及破壞性操作、憑證、採集、Demo／Live 交易、金融政策、Git、額外案例或其他工作目錄。
 - 完成工作包後提出最有價值的下一個成果與需要決策的事項；同一已授權目標內的必要步驟持續完成，不把每個微小補片變成新授權關卡。不自行啟動未交辦的新功能。
 - 嚴格禁止接觸真實金鑰環境變數、讀取真實憑證或對外發出實盤交易請求；使用假資料與 mock。
 - I-b-4 Demo 唯讀例外已執行並停止，對帳未通過；帳戶身分、指定來源與授權沿革見 `docs/demo-collection-handoff.md`，舊步驟不構成重跑授權。新採集須另有明確授權，不讀其他憑證檔或環境變數，不輸出／保存憑證；未授權實盤、下單、撤單或帳戶修改。一般專用子帳戶交易政策不變。開發者可做下節限定自測；獨立驗收、實際採集及 Git 維持指定分工。
@@ -34,7 +41,7 @@
 - 以可驗收成果作為工作包：使用者交辦「完成／實作／修復」時，包含必要定位、方案、程式與測試修改、限定本地自測、失敗修復、採證及交接。只要求 assessment／審閱／文件、明示不執行或暫停時，嚴守該限制；本次流程修訂不恢復暫停中的 W8。
 - 開始時用簡短說明列出目標、影響範圍、驗證方式與重要限制，即可繼續工作；已有授權不再要求「確認計畫」。常規任務直接實作；跨模組任務先核對契約，方案可放既有文件，不固定拆成 assessment → spec → 範圍確認 → 實作授權多輪。
 - 開發自測包含受影響單元／整合測試、既有合成 fixture、全新隔離測試資料及必要的 localhost fixture UI 互動。使用假資料，不讀產品 DB／憑證、不接外部 provider；啟動前確認測試埠未占用，僅管理本輪可辨識 owner，正常收尾並保留必要證據。新建隔離測試 DB 沿用既有 schema；新 schema／既有 DB 遷移仍另行確認。
-- 正式 8770／8771 控制案例、使用既有資料根的模擬、全市場歷史回測、採集、Demo／Live、金融／資安政策、DB schema、破壞性操作與 Git 不因工作包而自動授權。已核准案例維持既定基線、命令額度與停止條件；範圍內可連續執行，不逐步再問。服務恢復固定授權依上節保留。
+- 正式 8770 控制案例、使用既有資料根的模擬、全市場歷史回測、採集、Demo／Live、金融／資安政策、DB schema、破壞性操作與 Git 不因工作包而自動授權。已核准案例維持既定基線、命令額度與停止條件；範圍內可連續執行，不逐步再問。服務恢復固定授權依上節保留。
 - 同一目標、契約與隔離基線下的相鄰修正可合併交付；不以改動行數、測試數或補片版本數拆工作包。遇失敗先在既有授權及案例額度內定位修復，必要才重驗；額度耗盡、來源漂移、recovery／unavailable 或無法保持隔離時停止相關執行，不自行補跑或解除。
 - 只對會改變產品／金融／來源政策、擴大權限或影響正確性的關鍵缺項提出具體決策。非關鍵缺項採合理假設並記錄；需決策的部分保留，獨立工作繼續。沒有新問題，不重問已確認範圍。
 - 開發者完成自測後一次交付差異、實際命令／結果、證據與未涵蓋部分；2026-11-04 起開發、獨立驗收與 Git 核對全部由 Claude 負責，取代 2026-10-19 指定的 GPT-6 Sol；獨立驗收由未參與該工作包開發的另一個 Claude 會話或子代理執行，commit／push 仍另需授權。自測不得稱為獨驗；獨驗依風險核對原始證據並做必要重驗，不機械重跑所有歷史測試。開發者可修復驗收缺陷，交回受影響範圍重驗，不重新啟動整套規格關卡。

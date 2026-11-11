@@ -15,7 +15,6 @@ import {
   SlidersHorizontal,
   ScanLine,
   ShieldCheck,
-  Globe2,
   ScrollText,
   Settings2,
   Bot,
@@ -98,10 +97,6 @@ export function CommandPalette() {
           >
             <ShieldCheck className="mr-2 size-4 text-primary" />
             <span>風控中心 (Risk & R1 Period)</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleNav("/market-intel")} className="cursor-pointer">
-            <Globe2 className="mr-2 size-4 text-primary" />
-            <span>市場情報 (Market Intel)</span>
           </CommandItem>
           <CommandItem onSelect={() => handleNav("/logs")} className="cursor-pointer">
             <ScrollText className="mr-2 size-4 text-primary" />

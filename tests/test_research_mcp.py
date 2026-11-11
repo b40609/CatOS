@@ -55,7 +55,7 @@ class ResearchMcpTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         root = Path(self.directory.name)
-        self.app = create_app(output_dir=root / "research", market_db=root / "missing.sqlite")
+        self.app = create_app(output_dir=root / "research")
         self.client = TestClient(self.app, base_url="http://127.0.0.1:8770")
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)

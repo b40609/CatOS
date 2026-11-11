@@ -15,7 +15,7 @@ async def held_runner(directory, run_id, stop, emit, update, source_ok):
 
 if __name__ == "__main__":
     root = Path(sys.argv[1]).resolve()
-    app = create_app(output_dir=root / "research", market_db=root / "missing.sqlite",
+    app = create_app(output_dir=root / "research",
                      evidence_root=root / "evidence", simulation_root=root / "simulation")
     # "real" keeps the bounded synthetic runner (8 bars, 1 s each) for end-to-end checks;
     # the default held runner never touches a Supervisor or SQLite.
