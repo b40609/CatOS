@@ -3,9 +3,9 @@
 - 日期：2026-11-06（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話。沒有參與 D、E 的開發，也沒有撰寫任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
 - 範圍：分支 `feat/research-overfitting` 的兩筆 commit，分開下結論。
-  - **D**：`8ab4dbe9`，對照 `eb558c85`（19 個檔案，+1052／−18，其中 357 行是收入 repo 的 B＋A 驗收報告）。
-  - **E**：`bd63e66e`，對照 `8ab4dbe9`（24 個檔案，+1096／−49）。
-  - 驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-overfit-compare-b5cce7`（分支 `claude/acceptance-overfit-compare-b5cce7`，HEAD 即 `bd63e66e`）進行。D 用 `git archive 8ab4dbe9` 匯出到暫存目錄 `d_tree\` 另外驗。
+  - **D**：`fb11e321`，對照 `18370fab`（19 個檔案，+1052／−18，其中 357 行是收入 repo 的 B＋A 驗收報告）。
+  - **E**：`98316e41`，對照 `fb11e321`（24 個檔案，+1096／−49）。
+  - 驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-overfit-compare-b5cce7`（分支 `claude/acceptance-overfit-compare-b5cce7`，HEAD 即 `98316e41`）進行。D 用 `git archive fb11e321` 匯出到暫存目錄 `d_tree\` 另外驗。
 - 結論：
   - **D：PASS（4／4）**
   - **E：PASS（7／7）**
@@ -33,11 +33,11 @@
   - `frontend/cat-os-vite/node_modules/`，含一個被中斷的 `.vite/deps_temp_c5820366`
   - 測試自己寫的 `outputs/workspace-w6-fixture-test-bd99e3d0…`、`outputs/workspace-w8-fixture-test-bae8df91…`
   - 本報告（`.gitignore:47:/reports/*`，要收進 repo 需 `git add -f`）
-  - `git status --short` 乾淨，HEAD 仍是 `bd63e66e`。
+  - `git status --short` 乾淨，HEAD 仍是 `98316e41`。
 
 ## 總表
 
-### D（`8ab4dbe9`）：PASS（4／4）
+### D（`fb11e321`）：PASS（4／4）
 
 | # | 項目 | 結果 |
 | --- | --- | --- |
@@ -46,7 +46,7 @@
 | D3 | O1 窗尾資金費修正（真實資料），O2～O6 文件與前端修正 | PASS（文件狀態見 O6） |
 | D4 | 「工作包 D」實測表重現 | PASS（只在 D commit 可重現，見 O2） |
 
-### E（`bd63e66e`）：PASS（7／7）
+### E（`98316e41`）：PASS（7／7）
 
 | # | 項目 | 結果 |
 | --- | --- | --- |
@@ -67,7 +67,7 @@
 - 前端：
   - HEAD：typecheck exit 0，`npm test` 21／21。
   - D 樹：typecheck exit 0，`node --test` 19／19，`check:tokens OK`。
-- 資料沒有進 git：`git ls-tree -r bd63e66e --name-only | grep -c '^data/'` → 0；兩筆 commit 的 `--stat` 都沒有 `data/okx` 或 `.csv`。
+- 資料沒有進 git：`git ls-tree -r 98316e41 --name-only | grep -c '^data/'` → 0；兩筆 commit 的 `--stat` 都沒有 `data/okx` 或 `.csv`。
 
 ---
 
@@ -142,9 +142,9 @@ continuous data: dev == exact-arithmetic CSCV in 20/20 cases
 
 **讀碼：**
 
-- `optimize()` 在 COMPLETE 分支記錄後才呼叫 `on_result`（`8ab4dbe9:catos/optimization.py:182-183`；HEAD :203）。FAIL 分支在 `except` 內 `continue`，不會呼叫。
-- `execute_optimization` 以 `candidates.setdefault(params, run)` 只保留每組參數第一次的結果（`8ab4dbe9:catos/research_optimization.py:36-38`），再交給 `search_report`（:59）。
-- 滾動驗證以 `trials[selected_trial_number]` 取選定參數（`8ab4dbe9:catos/research_validation_job.py:314-318`）。`research_validation.py` 的 trial 編號就是串列索引（:239），這個取法成立。
+- `optimize()` 在 COMPLETE 分支記錄後才呼叫 `on_result`（`fb11e321:catos/optimization.py:182-183`；HEAD :203）。FAIL 分支在 `except` 內 `continue`，不會呼叫。
+- `execute_optimization` 以 `candidates.setdefault(params, run)` 只保留每組參數第一次的結果（`fb11e321:catos/research_optimization.py:36-38`），再交給 `search_report`（:59）。
+- 滾動驗證以 `trials[selected_trial_number]` 取選定參數（`fb11e321:catos/research_validation_job.py:314-318`）。`research_validation.py` 的 trial 編號就是串列索引（:239），這個取法成立。
 
 `measure_d_onresult.py` 在 D 樹與 HEAD 各跑一次（真實資料前 3,000 根，`entry_bars == 192` 時故意拋錯）：
 
@@ -171,7 +171,7 @@ PASS opt orig/wide report has overfitting table；wf orig/wide report has edges 
 
 ## D3. O1 窗尾資金費修正，以及 O2～O6：PASS（附 O6）
 
-**O1 程式。** `_scenario` 在 `last < uncovered_end_ms`、`last` 落在 8 小時格點、且資料有該時刻開盤價時，把窗尾時刻 T 加進結算時點（`8ab4dbe9:catos/research_costs.py:77-86`；HEAD :80-86）。
+**O1 程式。** `_scenario` 在 `last < uncovered_end_ms`、`last` 落在 8 小時格點、且資料有該時刻開盤價時，把窗尾時刻 T 加進結算時點（`fb11e321:catos/research_costs.py:77-86`；HEAD :80-86）。
 
 **O1 在真實 4H 資料上的核對（`check_o1.py`，D 樹）。** 逐窗以 `research_validation._window_inputs` 的切片規則（`bars[start−warmup : end]`，事件取 `first ≤ t ≤ T`）重跑選定參數。另外自建「評估起點到 T、早於真實資金費起點」的每 8 小時 0.01% 事件，連同真實事件一起交給引擎，比較多出的資金費：
 
@@ -200,7 +200,7 @@ FAILURES: none
 | O2 | `docs/research-real-data-plan.md:301` | 已寫明「Optuna TPE，n_trials 20」「TPE 不是窮舉：SMA 7／7、Donchian 9／12，缺 96/48、288/24、384/72」。D4 也重現了同樣的缺點（`untried: [(96, 48), (288, 24), (384, 72)]`）。 |
 | O3 | `docs/research-real-data-plan.md:307` | 已改為「第一根開盤 61,112.7、收盤 60,777.5」，與 CSV 第一列相同。 |
 | O4 | `docs/research-real-data-plan.md:327` | 已改為 41.29。 |
-| O5 | `docs/next-steps.md:24`、`:29`；`docs/research-real-data-plan.md:254`；`AGENTS.md:28` | B＋A 狀態已改為 commit `eb558c85`、驗收 PASS；「選定的 entry 都在格點上限」已修正；方案標題已改為「使用者選定 B＋A」，`AGENTS.md:28` 的引用同步更新。但 D 新增的第 6 項又寫「未 commit」，見 O6。 |
+| O5 | `docs/next-steps.md:24`、`:29`；`docs/research-real-data-plan.md:254`；`AGENTS.md:28` | B＋A 狀態已改為 commit `18370fab`、驗收 PASS；「選定的 entry 都在格點上限」已修正；方案標題已改為「使用者選定 B＋A」，`AGENTS.md:28` 的引用同步更新。但 D 新增的第 6 項又寫「未 commit」，見 O6。 |
 | O6 | `cost-breakdown-panel.tsx`；`pages/optimization.tsx`、`pages/validation.tsx` | 新增 `emptyText`，預設仍是舊紀錄文字。優化頁在 `best_costs === null` 時、滾動驗證頁在 `costs.total === null` 時改用新文案；欄位不存在（舊紀錄）時仍顯示舊文案。SSR 渲染核對見 E6（`PASS O6: legacy text by default, specific text when given`）。 |
 
 ## D4. 「工作包 D」實測表重現：PASS（附 O2）
@@ -227,7 +227,7 @@ FAILURES: none
 - scipy 參考實作的 DSR、PSR、PBO、年化 Sharpe、偏態 0.203、非超額峰態 35.119，兩次優化都完全相同。
 - 合併 N=16：`merged: N 16 DSR 0.7083 PBO 0.2000 | mine N 16 DSR 0.7083 PBO 0.2000`，與文件相同。16 組是兩次 TPE 實際評估過的參數聯集。
 - 耗時略慢於文件，量級一致；耗時不是驗收門檻。
-- 這張表只能在 `8ab4dbe9` 重現：E 起研究優化改成窮舉，同一請求在 HEAD 的結果不同，見 O2。
+- 這張表只能在 `fb11e321` 重現：E 起研究優化改成窮舉，同一請求在 HEAD 的結果不同，見 O2。
 
 ---
 
@@ -270,7 +270,7 @@ PASS C_score: written-rule re-implementation == research_daily, fill by fill :: 
 
 **無法核實：**
 
-- 「規則在任何真實資料執行前寫好」：規則、程式與量測結果都在同一筆 commit `bd63e66e`，git 歷史無法證明時間先後。
+- 「規則在任何真實資料執行前寫好」：規則、程式與量測結果都在同一筆 commit `98316e41`，git 歷史無法證明時間先後。
 - 原 Pine DCM 指標的評分原文不在 repo，只能核對「文件 ↔ 程式」。
 - 文獻參數（Zarattini 等 2025、Hurst／Ooi／Pedersen 2017 等）是否忠實轉錄，不在本次範圍，沒有查證。
 
@@ -486,7 +486,7 @@ PASS frontend backtest|optimization|validation request for donchian-ensemble|tsm
 
 ## 實際執行的命令與結果
 
-cwd 為 worktree 根目錄，`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/python.exe`，`S` 為上述暫存目錄，`DT=$S/d_tree`（`git archive 8ab4dbe9` 匯出）。
+cwd 為 worktree 根目錄，`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/python.exe`，`S` 為上述暫存目錄，`DT=$S/d_tree`（`git archive fb11e321` 匯出）。
 
 | 命令 | 結果 |
 | --- | --- |
@@ -528,7 +528,7 @@ cwd 為 worktree 根目錄，`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/pytho
   - 在 :434 補註全格點的數字。
   - 或在 N 小時讓判讀文字（`research_overfit.verdict`）提示粒度粗、λ=0 的佔比。
 
-**O2（D 文件）　D 實測表只能在 `8ab4dbe9` 重現。**
+**O2（D 文件）　D 實測表只能在 `fb11e321` 重現。**
 
 - E 讓研究優化在格點 ≤ n_trials 時改窮舉。量測計畫裡同一個 n_trials 20 的請求，在 HEAD 會得到 N=12／15 與 O1 表中的數字。
 - 表頭有寫「TPE，20 trials」，但沒有提醒 E 之後重跑會不同。

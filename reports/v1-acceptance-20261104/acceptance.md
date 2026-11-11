@@ -2,12 +2,12 @@
 
 - 日期：2026-11-04（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話（筆電）。未撰寫範圍內任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
-- 範圍：`feature/catos-v1-sim` 的 `5a101d4..14279af`，共 24 個 commit（216 檔，+5830／−32808）。其中 `ee6f157` 是預審報告（本檔前一版），`14279af` 是 D1 修正。
-- 結論：**PASS（6／6）**。預審發現的缺陷 D1 已由 `14279af` 修正，本輪覆驗通過。
+- 範圍：`feature/catos-v1-sim` 的 `2633a59..93edeb4`，共 24 個 commit（216 檔，+5830／−32808）。其中 `b77d6b7` 是預審報告（本檔前一版），`93edeb4` 是 D1 修正。
+- 結論：**PASS（6／6）**。預審發現的缺陷 D1 已由 `93edeb4` 修正，本輪覆驗通過。
 
 ## 預審報告的性質
 
-- `ee6f157` 是另一台 PC 上的會話撰寫的報告，判定 FAIL（5／6，缺陷 D1）。該會話撰寫過範圍內的 `faefef1`、`ba51c1b`，依 `cc2433d` 起的規定不具獨驗資格，所以那份報告只算**預審**。本檔取代它，成為正式驗收結論。
+- `b77d6b7` 是另一台 PC 上的會話撰寫的報告，判定 FAIL（5／6，缺陷 D1）。該會話撰寫過範圍內的 `5858bd2`、`8d8dd3f`，依 `835095f` 起的規定不具獨驗資格，所以那份報告只算**預審**。本檔取代它，成為正式驗收結論。
 - 預審找到的 D1 經本驗收者確認屬實，並列入下方第 5 項。預審的其他敘述只作為線索；本報告的結論都以本驗收者的原始碼核對與實際執行結果為準。
 - 開發者自測（後端 1373／0 FAIL、前端 typecheck 0 錯、`npm test` 10 通過、build、整合測試 5 PASS；D1 修正另附瀏覽器實點）同樣只當參考。
 
@@ -27,12 +27,12 @@
 | 5 | 戰情台、實例頁、側欄讀 local-sim 真資料；沒有 mock store，也沒有假登入 | PASS（D1 已修） |
 | 6 | `tests/test_python_strategy_*.py` 的 skip 屬 v2 範圍 | PASS |
 
-第 1–4、6 項在 `cc2433d` 上驗過（見「實際執行的命令與結果」）。`14279af` 只改 `README.md`、`personal-os-modal.tsx`、`personalOsStore.ts`，這幾項依據的程式都沒有變，所以不重做；第 5 項與 D1 在 `14279af` 上重驗。
+第 1–4、6 項在 `835095f` 上驗過（見「實際執行的命令與結果」）。`93edeb4` 只改 `README.md`、`personal-os-modal.tsx`、`personalOsStore.ts`，這幾項依據的程式都沒有變，所以不重做；第 5 項與 D1 在 `93edeb4` 上重驗。
 
 ## 1. Snapshot 事實旗標 fail-closed：PASS
 
 依據：
-- `catos/risk.py` `Snapshot`：`valuation_known`、`flows_known`、`margin_ok`、`position_verified` 預設都是 `False`（`479f9a6`），`__post_init__` 要求型別必須是 `bool`。
+- `catos/risk.py` `Snapshot`：`valuation_known`、`flows_known`、`margin_ok`、`position_verified` 預設都是 `False`（`f809f5a`），`__post_init__` 要求型別必須是 `bool`。
 - 產品碼中唯一直接建構 `risk.Snapshot(...)` 的地方是 `catos/local_sim_r4.py` `observe()`。它明示傳入四個 `True`，並附 FakeExchange 為何成立的註解。
 - 其他產生路徑：
   - `Supervisor.observe_risk_period()`（`catos/supervisor.py`）以 `dataclasses.replace` 沿用呼叫端快照的旗標，不會自行補 True。
@@ -95,7 +95,7 @@ LF 實測：在系統 `core.autocrlf=true` 的環境做乾淨 clone，`git ls-fi
 - `src/state/stateAdapter.ts`：只做版本比較與事件游標的整數運算，不碰金額。
 - 前端搜尋 `parseFloat|Number(` 的命中：
   - `account-equity-band`、`allocation-donut-card`、`v0-bot-table` 都經 `toPlotNumber`，只用來算座標。
-  - `backtest.tsx` 與 `backtest-underwater-chart.tsx` 的 `parseFloat` 只用於判斷正負號和畫圖，而且在 `5a101d4` 之前就存在，不是本範圍新增。
+  - `backtest.tsx` 與 `backtest-underwater-chart.tsx` 的 `parseFloat` 只用於判斷正負號和畫圖，而且在 `2633a59` 之前就存在，不是本範圍新增。
 - 整合測試斷言 `bot.equity === '999.91375990'`、`fees === '0.00404010'`，所有 Decimal 欄位都是字串，且符合 `^-?\d+(\.\d+)?$`。
 
 ## 4. 無交易出口，只綁 127.0.0.1：PASS
@@ -108,13 +108,13 @@ LF 實測：在系統 `core.autocrlf=true` 的環境做乾淨 clone，`git ls-fi
   - 沒有 POST `/strategies` 或 POST `/bots`。
 - 綁定位址：`catos/workspace_api.py` 用 `listener.bind(("127.0.0.1", port))`，並設 `uvicorn.Config(host="127.0.0.1")`；`catos/research_api.py` 同樣只綁 `127.0.0.1`。
 - 前端 `simulation-api-adapter.ts` 在 demo／live 模式下不發請求，只回 `mode_not_open`。`npm test` 的 live 案例實測確認：不送請求，變更類操作回 403。
-- `14279af` 移除了前端的 `setApiCredentials`，前端從此沒有任何輸入或保存金鑰的程式。
+- `93edeb4` 移除了前端的 `setApiCredentials`，前端從此沒有任何輸入或保存金鑰的程式。
 
 ## 5. 前端讀真資料、無 mock store、無假登入：PASS（D1 已修）
 
 已刪除的檔案：`src/adapters/mock-adapter.ts`、`src/mock/default-data.ts`、`src/lib/mock/market-tape-10m.ts`、`src/lib/mock/unified-events.ts`、`src/lib/v0-engine.ts`、`src/lib/auth.tsx`、`src/pages/profile.tsx`。
 
-在 `14279af` 對整個 `src/` 搜尋 `mock-adapter`、`default-data`、`INSPECTOR_BOTS`、`usePreviewStore`、`liveMarketStore`、`MARKET_TAPE`、`useAuth`、`login`，結果為 0 筆。
+在 `93edeb4` 對整個 `src/` 搜尋 `mock-adapter`、`default-data`、`INSPECTOR_BOTS`、`usePreviewStore`、`liveMarketStore`、`MARKET_TAPE`、`useAuth`、`login`，結果為 0 筆。
 
 各畫面的資料來源：
 - 戰情台：`src/pages/index.tsx` `renderCard` 的 7 張卡片分別由 `AccountEquityBand`、`ActivityPanel`、`V0BotTable`、`AllocationDonutCard`、`UnifiedIncidentActivityCard` 呈現，這些元件都是 `useCatStore`／`StateAdapter` 的消費者。
@@ -133,7 +133,7 @@ README 的「v1 範圍」已如實揭露：策略中心、風控中心、日誌�
 
 這些內容與 v1「不接 Demo／Live、不碰憑證」不符。
 
-修正 `14279af` 的核對結果：
+修正 `93edeb4` 的核對結果：
 - `src/state/personalOsStore.ts`：
   - `PersonalOsState` 移除 `apiKey`、`passphrase`、`environment`、`ping` 與 `setApiCredentials`、`setEnvironment`。
   - store 預設值不再有這些欄位，`save()` 寫入 localStorage 的 payload 也不再包含它們。
@@ -150,7 +150,7 @@ README 的「v1 範圍」已如實揭露：策略中心、風控中心、日誌�
 ## 6. python_strategy 的 skip 屬 v2：PASS
 
 依據：
-- `cfa7f39` 只在 `PythonApiTests`、`PythonWorkerTests`、`LibraryAndRunTests` 三個類別加上 `@unittest.skip("v2 候選：…Q1")`，測試本體沒有修改。
+- `4133d37` 只在 `PythonApiTests`、`PythonWorkerTests`、`LibraryAndRunTests` 三個類別加上 `@unittest.skip("v2 候選：…Q1")`，測試本體沒有修改。
 - 本驗收者把 skip 拿掉後實跑（`unskip_python_strategy.py`）：11 個測試中 8 個 ERROR、2 個 FAIL，原因全部是功能未實作：
 
 ```text
@@ -162,26 +162,26 @@ README 的「v1 範圍」已如實揭露：策略中心、風控中心、日誌�
 ```
 
 - `git log --all -S'self.library' -- catos` 查無任何提交，可見上傳製品與 allocate 控制面從未存在，不是被 v1 改壞。這與契約文件第 0 節第 2 點及 Q1 的定案一致。
-- 跳過數是 11 或 12：另 1 個是 `test_lot_scenario_demo` 在無權建立 symlink 時呼叫 `skipTest`。本機實測為 12，與 `14279af` 修正後的 README 說法一致。
+- 跳過數是 11 或 12：另 1 個是 `test_lot_scenario_demo` 在無權建立 symlink 時呼叫 `skipTest`。本機實測為 12，與 `93edeb4` 修正後的 README 說法一致。
 
 ## 實際執行的命令與結果
 
-`<clone>` 指 `cc2433d` 的乾淨 clone，`<clone2>` 指 `14279af` 的乾淨 clone；`.venv` 是 `C:\Users\kai\Desktop\CatOS\.venv`。
+`<clone>` 指 `835095f` 的乾淨 clone，`<clone2>` 指 `93edeb4` 的乾淨 clone；`.venv` 是 `C:\Users\kai\Desktop\CatOS\.venv`。
 
 | 命令 | 位置／版本 | 結果 |
 | --- | --- | --- |
-| `git clone` 後 `git ls-files --eol` | `<clone>` `cc2433d` | 556 檔 `w/lf`，0 檔 `w/crlf` |
-| `.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"` | `<clone>` `cc2433d` | `Ran 1373 tests in 268.952s`、`OK (skipped=12)` |
-| `npm run typecheck`／`npm test`／`npm run build` | `<clone>` `cc2433d` | exit 0／10 pass 0 fail／exit 0 |
-| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone>` `cc2433d` | 5 PASS |
+| `git clone` 後 `git ls-files --eol` | `<clone>` `835095f` | 556 檔 `w/lf`，0 檔 `w/crlf` |
+| `.venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"` | `<clone>` `835095f` | `Ran 1373 tests in 268.952s`、`OK (skipped=12)` |
+| `npm run typecheck`／`npm test`／`npm run build` | `<clone>` `835095f` | exit 0／10 pass 0 fail／exit 0 |
+| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone>` `835095f` | 5 PASS |
 | `snapshot_failclosed.py`、`registry_check.py`、`unskip_python_strategy.py` | repo 根目錄，`PYTHONPATH=.;tests` | 輸出見第 1、2、6 項 |
-| `npm run typecheck` | `<clone2>` `14279af` | exit 0 |
-| `npm test` | `<clone2>` `14279af` | tests 10、pass 10、fail 0 |
-| `npm run build` | `<clone2>` `14279af` | exit 0 |
-| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone2>` `14279af` | exit 0，5 PASS（`/state` 經 proxy、合成 run 全 Decimal 字串、`since_version` unchanged、戰情台 DOM、實例頁 DOM 無 NaN／mock 值） |
-| 瀏覽器實點 API 分頁（18870／18890） | `<clone2>` `14279af` | 見第 5 項 D1 |
+| `npm run typecheck` | `<clone2>` `93edeb4` | exit 0 |
+| `npm test` | `<clone2>` `93edeb4` | tests 10、pass 10、fail 0 |
+| `npm run build` | `<clone2>` `93edeb4` | exit 0 |
+| `node tests/simulation_integration_test.mjs <.venv python>` | `<clone2>` `93edeb4` | exit 0，5 PASS（`/state` 經 proxy、合成 run 全 Decimal 字串、`since_version` unchanged、戰情台 DOM、實例頁 DOM 無 NaN／mock 值） |
+| 瀏覽器實點 API 分頁（18870／18890） | `<clone2>` `93edeb4` | 見第 5 項 D1 |
 
-後端在 `14279af` 沒有變更（`git diff cc2433d..14279af -- catos tests` 為空），所以 `cc2433d` 的完整套件結果適用。合併 main 之後的重跑，記錄在合併 commit 之後的回報中。
+後端在 `93edeb4` 沒有變更（`git diff 835095f..93edeb4 -- catos tests` 為空），所以 `835095f` 的完整套件結果適用。合併 main 之後的重跑，記錄在合併 commit 之後的回報中。
 
 ## 非阻斷觀察
 

@@ -1,8 +1,8 @@
-# 工作包 F 第二輪觀察 N1～N6 修正（7b7f743c）獨立驗收
+# 工作包 F 第二輪觀察 N1～N6 修正（c2f0cba9）獨立驗收
 
-- 驗收對象：commit `7b7f743c`（父 `b8eb1280`），分支 worktree `claude/acceptance-nfix-912eb4`，工作樹乾淨。
+- 驗收對象：commit `c2f0cba9`（父 `51500b88`），分支 worktree `claude/acceptance-nfix-912eb4`，工作樹乾淨。
 - 範圍：`reports/research-shortterm-fix-acceptance-20261108/acceptance.md` 的 N1～N6，以及 `docs/research-real-data-plan.md:770-777` 宣稱的處理。
-- 驗收者：沒有參與 `7b7f743c` 的開發；開發者自測（1478 tests OK）只作參考，下面的結果都是本輪實際執行的。
+- 驗收者：沒有參與 `c2f0cba9` 的開發；開發者自測（1478 tests OK）只作參考，下面的結果都是本輪實際執行的。
 - 日期：2026-11-08。
 - 限制遵守：沒有連網、沒有呼叫 OKX；`C:/Users/user/Desktop/CatOS/data/okx/` 只唯讀使用（執行前後所有檔案 sha256 相同）；沒有碰金鑰、沒有啟動 8770／8771、沒有改產品 DB、沒有 commit／push。
 
@@ -32,7 +32,7 @@
 - `verdict` 只有 `search_report` 一個呼叫端（`grep -rn "verdict(" catos tools`）。
 - 只有一組參數時 `trials < 2`，DSR 仍照算，等於對 0 的 PSR。
 
-**真實資料重算**（`n5n6_real.py`：用 repo 的 `validate_request`、`registered_factory`、`research.backtest` 跑 15 個變體；10 張、taker 0.0005、滑價 2 bps、本金 10,000，預熱 5m 864、15m 288、1H 72、4H 18；每組同時用 `7b7f743c` 與 `b8eb1280` 版的 `search_report` 算）
+**真實資料重算**（`n5n6_real.py`：用 repo 的 `validate_request`、`registered_factory`、`research.backtest` 跑 15 個變體；10 張、taker 0.0005、滑價 2 bps、本金 10,000，預熱 5m 864、15m 288、1H 72、4H 18；每組同時用 `c2f0cba9` 與 `51500b88` 版的 `search_report` 算）
 
 ```
  5m F1-0 net -1702.0702204319200547180 ... 15 個變體淨損益與文件表格相同（-1,702.07 … -1,262.60）
@@ -129,7 +129,7 @@ PASS first run contract check fails -> no staging, no paging | code=1 requests=1
 PASS first run 2nd page fails -> staged requests 3 | code=1 requests=3 staged=(3, True, 0)
 PASS resumed to completion; manifest requests == all requests spent == fake server calls | manifest=7 spent=7 server_calls=7
 PASS manifest.json on disk carries the same total | requests field present=True
-PASS old b8eb1280 left no staging after first-run paging failure (defect reproduced) | requests=2
+PASS old 51500b88 left no staging after first-run paging failure (defect reproduced) | requests=2
 PASS old manifest undercounts | old manifest=5 actually spent=7
 PASS rerun 0.05 s after first-run save waits the remaining 0.20 s | sleep=0.2000
 PASS clean resume completes, total == server calls, staging removed | requests=5 calls=5
@@ -149,19 +149,19 @@ ALL PASS
 
 ```
 warm 864 12/3 old-sampler: fills 5801 stdout 1,798,187 B cap 2,000,000 -> ok; sampling {... 'returned_points': 1995 ...}; fills/day(180) 32.23
-warm 864 12/3 7b7f743c: fills 5801 stdout 1,798,443 B cap 2,000,000 -> ok; sampling {... 'returned_points': 1996 ...}; fills/day(180) 32.23
+warm 864 12/3 c2f0cba9: fills 5801 stdout 1,798,443 B cap 2,000,000 -> ok; sampling {... 'returned_points': 1996 ...}; fills/day(180) 32.23
 warm 864 8/2 old-sampler: fills 7757 stdout 2,193,399 B cap 2,000,000 -> over; sampling {... 'returned_points': 1995 ...}; fills/day(180) 43.09
-warm 864 8/2 7b7f743c: fills 7757 stdout 2,193,655 B cap 2,000,000 -> over; sampling {... 'returned_points': 1996 ...}; fills/day(180) 43.09
+warm 864 8/2 c2f0cba9: fills 7757 stdout 2,193,655 B cap 2,000,000 -> over; sampling {... 'returned_points': 1996 ...}; fills/day(180) 43.09
 ```
 
-- 用 `b8eb1280` 的抽樣函式，逐位元組重現文件 `:728` 的 1,798,187／2,193,399 bytes。
+- 用 `51500b88` 的抽樣函式，逐位元組重現文件 `:728` 的 1,798,187／2,193,399 bytes。
 - 評估期間：權益點 51,841 = 51,840 根 × 5 分鐘 = 180 天。5,801 ÷ 180 = 32.23、7,757 ÷ 180 = 43.09，「每天約 32～43 筆」正確。
 - 第一次量時把資料根直接指到主 checkout，provenance 變成絕對路徑，多出 112 bytes（4 個檔 × 28 字元）；改成 repo 相對路徑後才相同。這是量法差異，不是程式差異。
-- 觀察 P1：`7b7f743c` 的 N6 多保留一點，HEAD 上的輸出是 1,798,443／2,193,655 bytes，比文件多 256 bytes。文件已寫明「`b8eb1280` 獨驗重現的數字」，所以措辭正確；結論不變。
+- 觀察 P1：`c2f0cba9` 的 N6 多保留一點，HEAD 上的輸出是 1,798,443／2,193,655 bytes，比文件多 256 bytes。文件已寫明「`51500b88` 獨驗重現的數字」，所以措辭正確；結論不變。
 
 ## N2 `docs/next-steps.md:93`：PASS（附觀察 P5）
 
-- 原本「尚未 commit、尚未獨立驗收」已改成已 commit 的 hash（`2f839a36`、`b8eb1280`）與已完成的獨驗（PASS 9／9、PASS 11／11）及報告路徑；N1～N6 寫「只有開發者自測」。
+- 原本「尚未 commit、尚未獨立驗收」已改成已 commit 的 hash（`fc2ff409`、`51500b88`）與已完成的獨驗（PASS 9／9、PASS 11／11）及報告路徑；N1～N6 寫「只有開發者自測」。
 - 報告路徑 `reports/research-shortterm-acceptance-20261107/acceptance.md`、`reports/research-shortterm-fix-acceptance-20261108/acceptance.md` 都存在。
 
 ## N3 選法措辭：PASS
@@ -175,7 +175,7 @@ warm 864 8/2 7b7f743c: fills 7757 stdout 2,193,655 B cap 2,000,000 -> over; samp
 ```
 b60d804f16604688b441cdab8e8050ae626ed93290b4d7e569fa9e9530a4d33f *reports/research-shortterm-fix-acceptance-20261108/acceptance.md
 b60d804f16604688b441cdab8e8050ae626ed93290b4d7e569fa9e9530a4d33f *../acceptance-ffix-5810b1/reports/research-shortterm-fix-acceptance-20261108/acceptance.md
-b60d804f16604688b441cdab8e8050ae626ed93290b4d7e569fa9e9530a4d33f *-     ← git show 7b7f743c:<同路徑>
+b60d804f16604688b441cdab8e8050ae626ed93290b4d7e569fa9e9530a4d33f *-     ← git show c2f0cba9:<同路徑>
 identical                                                              ← cmp
 i/lf    w/lf    attr/text=auto eol=lf    reports/research-shortterm-fix-acceptance-20261108/acceptance.md
 0                                                                      ← CR 數
@@ -183,7 +183,7 @@ i/lf    w/lf    attr/text=auto eol=lf    reports/research-shortterm-fix-acceptan
 
 ## 測試
 
-在本 worktree（`7b7f743c`，執行前 `git status --short` 為空）跑全套後端：
+在本 worktree（`c2f0cba9`，執行前 `git status --short` 為空）跑全套後端：
 
 ```
 $PY -B -m unittest discover -s tests
@@ -198,9 +198,9 @@ exit 0
 
 ## 本輪觀察（非阻斷）
 
-**P1（文件數字，位元組級）　`docs/research-real-data-plan.md:728` 的位元組數是 `b8eb1280` 的，HEAD 上多 256 bytes。**
+**P1（文件數字，位元組級）　`docs/research-real-data-plan.md:728` 的位元組數是 `51500b88` 的，HEAD 上多 256 bytes。**
 - N6 讓 5m 的抽樣從 1,995 點變 1,996 點，worker 輸出 12／3 是 1,798,443 bytes、8／2 是 2,193,655 bytes。
-- 文件已註明是 `b8eb1280` 的數字，措辭沒錯；之後若要寫「目前的大小」，要用 HEAD 重量。
+- 文件已註明是 `51500b88` 的數字，措辭沒錯；之後若要寫「目前的大小」，要用 HEAD 重量。
 
 **P2（統計顯示）　沒爆倉的組不到 2 組時，「純運氣可期待的最大 Sharpe」與變異數仍顯示 0。**
 - `search_report` 在變異數無法估計時把 DSR 設為 None，但 `trial_sharpe_variance` 仍是 "0.00000000"、`expected_max_sharpe_annualized` 仍是 "0.000"（`catos/research_overfit.py:226-228`、`:249-251`）。
@@ -230,8 +230,8 @@ exit 0
 
 | 命令 | 結果 |
 | --- | --- |
-| `git diff --stat b8eb1280 7b7f743c`；`git diff b8eb1280 7b7f743c -- catos tools tests docs` | 9 個檔，+415／-14 |
-| `git show b8eb1280:catos/research_overfit.py`（及 `research_catalog.py`、`tools/fetch_okx_candles.py`）存到 scratchpad `old/` | 舊版對照 |
+| `git diff --stat 51500b88 c2f0cba9`；`git diff 51500b88 c2f0cba9 -- catos tools tests docs` | 9 個檔，+415／-14 |
+| `git show 51500b88:catos/research_overfit.py`（及 `research_catalog.py`、`tools/fetch_okx_candles.py`）存到 scratchpad `old/` | 舊版對照 |
 | `$PY -B $S/n5n6_real.py <worktree>` | 四組 DSR／PBO 與文件相同；沒爆倉的三組新舊輸出相同；`FAILURES: none`；資料檔未變 |
 | `$PY -B $S/n4_check.py <worktree>` | 11／11 PASS |
 | `$PY -B $S/n6_prop.py <worktree> $S/old/old_catalog.py` | 4,000 組 0 違反；P3、P4 |

@@ -1,6 +1,6 @@
-# 工作包 F 驗收後修正（b8eb1280）獨立驗收
+# 工作包 F 驗收後修正（51500b88）獨立驗收
 
-- 對象：commit `b8eb1280`（父 `2f839a36`），分支 `claude/acceptance-ffix-5810b1` 的 HEAD 就是 `b8eb1280`，工作樹乾淨。
+- 對象：commit `51500b88`（父 `fc2ff409`），分支 `claude/acceptance-ffix-5810b1` 的 HEAD 就是 `51500b88`，工作樹乾淨。
 - 驗收者：獨立的 Claude 會話，沒有參與這批修正的開發。開發者自測（`Ran 1475 tests`、`OK (skipped=11)`）只當參考，下面的結果都是本會話實際執行的。
 - 日期：2026-11-08。
 
@@ -55,7 +55,7 @@
 - `catos/research_robustness.py:64` `wiped_out()`。`daily_returns` 遇到爆倉就丟錯（`:115`），所以 bootstrap 也算不出來。
 - `catos/research_catalog.py:641` `_wiped_out` 回傳 `time_ms`、`min_equity`（Decimal）與說明。`:673` 寫進 payload 的 `equity_wiped_out`。
 - `catos/research_optimization.py:20`、`:24`：HTML 報告的最佳 Sharpe 顯示「爆倉，不計算」，並列出爆倉的組數；DSR 是 None 時，`costs_html` 顯示「—」（`research_catalog.py:593`）。
-- 金額全程是 Decimal：`git diff 2f839a36 b8eb1280 -- catos/` 新增的行沒有任何 `float(`。`min_equity` 的型別實測是 `Decimal`。float 只出現在既有的報酬率統計（P7 允許）。
+- 金額全程是 Decimal：`git diff fc2ff409 51500b88 -- catos/` 新增的行沒有任何 `float(`。`min_equity` 的型別實測是 `Decimal`。float 只出現在既有的報酬率統計（P7 允許）。
 
 **真實資料重算**（`o5_check.py`）
 
@@ -230,7 +230,7 @@ FAILURES: none
 - **O2**：`docs/research-real-data-plan.md:649` 補上兩條規則，並註明是補記。程式 `catos/research_intraday.py:162-167`（`decision is None and position == ZERO` 才登記發動；新的發動直接覆蓋 `self.launch`）和文字一致。策略原始碼在這個 commit 沒有變（`--stat` 不含 `research_intraday.py` 與 manifest）。照字面另寫的四個數字引自上一輪報告，本輪沒有重算。
 - **O4**：`:721-723` 的各組最佳 DSR、PBO、逐變體範圍 0.0002～0.1346，全部和 Y1 的重算相同。選法沒有寫明，見 N3。
 - **O6**：`:736` 寫「1.87～4.12（5m～1H 是 2.92～4.12，4H 是 1.87）」。表內 F1 對側四個週期的值是 4.12、4.06、2.92、1.87，相符。
-- **O7**：`docs/next-steps.md:93` 已把 F 改成「已 commit `2f839a36`、獨立驗收 PASS 9／9」，O7 本身照做了。但同一行又寫了這批修正「尚未 commit、尚未獨立驗收」，見 N2。
+- **O7**：`docs/next-steps.md:93` 已把 F 改成「已 commit `fc2ff409`、獨立驗收 PASS 9／9」，O7 本身照做了。但同一行又寫了這批修正「尚未 commit、尚未獨立驗收」，見 N2。
 - **O11**：
   - `catos/research_catalog.py:158-164` 的註解：(20 + 1) × 60,000 = 1,260,000，實測 14.1～14.5 秒，最壞約 17 秒，不加預檢。
   - 重測：20 次 TPE、5m 6 個月、Donchian 96～480／12～72，透過真 worker 兩次，分別 14.6 秒、14.3 秒（逾時 30 秒；本次 N 為 13，評估 51,840 根）。和註解相符，比上一輪報告的 14.5 秒多 0.1 秒以內。
@@ -240,7 +240,7 @@ FAILURES: none
 ## Y6. 收錄的報告和原檔相同：PASS
 
 ```
-$ git show b8eb1280:reports/research-shortterm-acceptance-20261107/acceptance.md | tr -d '\r' | sha256sum
+$ git show 51500b88:reports/research-shortterm-acceptance-20261107/acceptance.md | tr -d '\r' | sha256sum
 39e8ec450f3fe02e322f8c6a7db3d8b7cc4bad9b74bb9814edb38d772164a688
 $ tr -d '\r' < .claude/worktrees/acceptance-shortterm-a51238/reports/research-shortterm-acceptance-20261107/acceptance.md | sha256sum
 39e8ec450f3fe02e322f8c6a7db3d8b7cc4bad9b74bb9814edb38d772164a688
@@ -253,9 +253,9 @@ $ tr -d '\r' < .claude/worktrees/acceptance-shortterm-a51238/reports/research-sh
 | 命令（cwd 是 worktree；`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/python.exe`） | 結果 |
 | --- | --- |
 | `$PY -B -m unittest discover -s tests` | `Ran 1475 tests in 184.569s`、`OK (skipped=11)`，3 分 8 秒；log 中有 `Port 53029 already in use. No process stopped and no alternate port selected.`，是既有 fixture 遇到埠被佔用時的處理，不是失敗。本 worktree 有 `data/okx` 副本，總數和 skip 數仍和開發者自測相同 |
-| `git diff --check 2f839a36 b8eb1280` | exit 0 |
-| 差異檔案逐一 `git show b8eb1280:<path> \| grep -c $'\r'` | 全部是 0（LF） |
-| `git ls-tree -r b8eb1280 --name-only \| grep -c '^data/'` | 0 |
+| `git diff --check fc2ff409 51500b88` | exit 0 |
+| 差異檔案逐一 `git show 51500b88:<path> \| grep -c $'\r'` | 全部是 0（LF） |
+| `git ls-tree -r 51500b88 --name-only \| grep -c '^data/'` | 0 |
 | `frontend/cat-os-vite`：`npm ci` | EXIT 0（`allow-scripts` 警告沒有執行 esbuild postinstall，不影響後面的檢查） |
 | `npm run typecheck` | exit 0 |
 | `npm run check:tokens` | `check:tokens OK - no arbitrary font sizes in src/ or index.html` |
@@ -266,7 +266,7 @@ $ tr -d '\r' < .claude/worktrees/acceptance-shortterm-a51238/reports/research-sh
 
 | 命令 | 結果 |
 | --- | --- |
-| `git show b8eb1280 --stat`、`git diff 2f839a36 b8eb1280 -- catos/ tools/ tests/ frontend/ README.md docs/` | 21 個檔案，+1079／−73 |
+| `git show 51500b88 --stat`、`git diff fc2ff409 51500b88 -- catos/ tools/ tests/ frontend/ README.md docs/` | 21 個檔案，+1079／−73 |
 | `cp -r C:/Users/user/Desktop/CatOS/data/okx data/okx && diff -r …` | `SAME` |
 | `PYTHONIOENCODING=utf-8 PYTHONPATH=. $PY -B $S/o5_check.py` | `FAILURES: none` |
 | `… $PY -B $S/o3_check.py $S/svc_scratch` | 只有 N6 那一項自加檢查 FAIL，其餘 PASS |
@@ -284,10 +284,10 @@ $ tr -d '\r' < .claude/worktrees/acceptance-shortterm-a51238/reports/research-sh
 - 「每天約 32～42 筆」是用資料集約 183 個日曆天算的。用評估期間 180 天（51,840 根）算，是 32.2～43.1 筆。
 - 結論（5,801 筆可跑、7,757 筆超過）不變。可改成本輪的數字，或註明是約略值。
 
-**N2（文件狀態，第三次）　`docs/next-steps.md:93` 在 commit `b8eb1280` 內寫「修正只有開發者自測，尚未 commit、尚未獨立驗收」。**
+**N2（文件狀態，第三次）　`docs/next-steps.md:93` 在 commit `51500b88` 內寫「修正只有開發者自測，尚未 commit、尚未獨立驗收」。**
 
 - 和上一輪的 O7、再上一輪的 O6 同型：狀態文字在 commit 前寫好，一 commit 就過時。
-- 本次驗收後要更新成「已 commit `b8eb1280`、獨驗 PASS」。可考慮把狀態改寫在 commit 之後的下一筆變更，或不寫「尚未 commit」這種一定會過時的字眼。
+- 本次驗收後要更新成「已 commit `51500b88`、獨驗 PASS」。可考慮把狀態改寫在 commit 之後的下一筆變更，或不寫「尚未 commit」這種一定會過時的字眼。
 
 **N3（文件措辭）　`:721`「各週期組內選出的最佳變體（四個週期都是 F2）」沒有寫依什麼選。**
 

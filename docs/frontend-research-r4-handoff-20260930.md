@@ -1,6 +1,6 @@
 # R4 local-sim 啟動交接
 
-更新：2026-09-30 20:23 台灣時間。使用者已授權啟動 R4，並選擇短程驗證後立即連續跑 8 小時；原由 6.1 Sol 完成實作與短程驗證。**狀態：8 小時正式 verifier PASS，進入限定範圍 Git 收尾。** 唯一 run `347282b9d0d9433db6a0276209936f60` 實際 28800.073 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、worker_closed=true。5.6 Sol (Web) 已依正式 CLI 驗收；基線 `7c346f2`，契約見 R4 spec（已移至 `archive/dev-history` 分支：`docs/frontend-research-r4-spec-20260930.md`）。以下啟動與早期驗證紀錄保留為歷史。
+更新：2026-09-30 20:23 台灣時間。使用者已授權啟動 R4，並選擇短程驗證後立即連續跑 8 小時；原由 6.1 Sol 完成實作與短程驗證。**狀態：8 小時正式 verifier PASS，進入限定範圍 Git 收尾。** 唯一 run `347282b9d0d9433db6a0276209936f60` 實際 28800.073 秒、32 根正式＋2 根預熱、13 fills、0 anomalies、worker_closed=true。5.6 Sol (Web) 已依正式 CLI 驗收；基線 `e373d0c`，契約見 R4 spec（已移至 `archive/dev-history` 分支：`docs/frontend-research-r4-spec-20260930.md`）。以下啟動與早期驗證紀錄保留為歷史。
 
 ## 完成內容與證據
 

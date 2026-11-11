@@ -3,9 +3,9 @@
 - 日期：2026-11-07（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話。沒有參與 D／E 驗收後修正，也沒有參與工作包 F 的開發，沒有撰寫任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
 - 範圍：分支 `feat/research-overfitting` 的兩筆 commit，分開下結論。
-  - **修正**：`3c78d6fd`，對照 `bd63e66e`（8 個檔案，+674／−16，其中 584 行是收錄的 D／E 驗收報告）。
-  - **F**：`2f839a36`，對照 `3c78d6fd`（19 個檔案，+1058／−16）。
-  - 驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-shortterm-a51238` 進行（分支 `claude/acceptance-shortterm-a51238`，HEAD 即 `2f839a36`，與 `feat/research-overfitting` 相同）。修正 commit 用 `git archive 3c78d6fd` 匯出到暫存目錄 `fix_tree\` 另外驗。
+  - **修正**：`03649414`，對照 `98316e41`（8 個檔案，+674／−16，其中 584 行是收錄的 D／E 驗收報告）。
+  - **F**：`fc2ff409`，對照 `03649414`（19 個檔案，+1058／−16）。
+  - 驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-shortterm-a51238` 進行（分支 `claude/acceptance-shortterm-a51238`，HEAD 即 `fc2ff409`，與 `feat/research-overfitting` 相同）。修正 commit 用 `git archive 03649414` 匯出到暫存目錄 `fix_tree\` 另外驗。
 - 結論：
   - **修正：PASS（2／2）**
   - **F：PASS（9／9）**
@@ -45,18 +45,18 @@
   - `frontend/cat-os-vite/node_modules/`，含被中斷的 `.vite/deps_temp_f2e0a28e`
   - 測試自己產生的 `outputs/workspace-w6-fixture-test-856555f3…`、`outputs/workspace-w8-fixture-test-01aad23e…`
   - 本報告（`.gitignore:47:/reports/*`，要收進 repo 需 `git add -f`）
-  - `git status --short` 乾淨，HEAD 仍是 `2f839a36`。
+  - `git status --short` 乾淨，HEAD 仍是 `fc2ff409`。
 
 ## 總表
 
-### 修正（`3c78d6fd`）：PASS（2／2）
+### 修正（`03649414`）：PASS（2／2）
 
 | # | 項目 | 結果 |
 | --- | --- | --- |
 | X1 | O1～O6 照上一份報告的建議修正，文件數字正確（完整格點 N=12／15／21、N=29、N=34 重算） | PASS |
 | X2 | `logit_zero_share` 與判讀提醒、`edge_selections` 排除開關參數 | PASS（提醒措辭見 O1） |
 
-### F（`2f839a36`）：PASS（9／9）
+### F（`fc2ff409`）：PASS（9／9）
 
 | # | 項目 | 結果 |
 | --- | --- | --- |
@@ -79,7 +79,7 @@
 - 前端：
   - HEAD：typecheck exit 0；`npm test` 第 2、3 次都是 21／21（`check:tokens OK`）。
   - 修正樹：`tsc --noEmit` exit 0、`check:tokens OK`；`node --test` 第 2、3 次都是 21／21。
-- 資料沒有進 git：`git ls-tree -r 2f839a36 --name-only | grep -c '^data/'` → 0，`3c78d6fd` 也是 0；兩筆 commit 的 `--stat` 都沒有 `data/okx` 或 `.csv`。
+- 資料沒有進 git：`git ls-tree -r fc2ff409 --name-only | grep -c '^data/'` → 0，`03649414` 也是 0；兩筆 commit 的 `--stat` 都沒有 `data/okx` 或 `.csv`。
 
 ---
 
@@ -90,7 +90,7 @@
 | 觀察 | 上一份報告的建議 | 修正內容 | 判定 |
 | --- | --- | --- | --- |
 | O1 | 補註全格點數字，或在 N 小時讓判讀提示粒度粗、λ=0 佔比 | `docs/research-real-data-plan.md:431-437` 加完整格點表；`:443` 改寫判讀並引用 11／70；`catos/research_overfit.py:136-140` 回報 `logit_zero_share`；`:151`、`:171-173` 在 N < 10 或佔比 ≥ 10% 時加提醒 | 照做 |
-| O2 | 表下註明對應 commit | `research-real-data-plan.md:431` 註明 `8ab4dbe9`、TPE 9／12 與 10／15 組 | 照做 |
+| O2 | 表下註明對應 commit | `research-real-data-plan.md:431` 註明 `fb11e321`、TPE 9／12 與 10／15 組 | 照做 |
 | O3 | 寫明 N=29 算法、買進持有成交時點、相關係數的 C 是哪一版、張數換算價格 | `:562-565`（N=29 近似、0.3720、N=34 0.3960／0.1429）、`:546`（第二根評估 K 線開盤成交）、`:567`（箭頭版與評分版都列）、`:568`（決策日收盤） | 照做 |
 | O4 | 兩個值的參數不計邊界，或改文案 | `research_overfit.py:229-231` 排除最多兩個值的參數，`:246` 列在 `excluded_switch_params` | 照做 |
 | O5 | 更新 `research_costs.py:15-16` 模組說明 | `catos/research_costs.py:15-19` 改寫，並指向 `EQUITY_SIZED_NOTICE`（`:37`、`:144`） | 照做 |
@@ -439,7 +439,7 @@ FAILURES: none
 
 ## 實際執行的命令與結果
 
-cwd 為 worktree 根目錄。`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/python.exe`；`S` 為上述暫存目錄；`P` 為上一輪獨驗會話的暫存目錄 `C:/Users/user/AppData/Local/Temp/claude/27f11abdf19a5896/7cff6b8e-d55e-4336-b6fe-4d18904a1066/scratchpad`（只取 scipy 的 `pkgs` 與 `ref_stats.py`）；`FT=$S/fix_tree`（`git archive 3c78d6fd` 匯出）。
+cwd 為 worktree 根目錄。`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/python.exe`；`S` 為上述暫存目錄；`P` 為上一輪獨驗會話的暫存目錄 `C:/Users/user/AppData/Local/Temp/claude/27f11abdf19a5896/7cff6b8e-d55e-4336-b6fe-4d18904a1066/scratchpad`（只取 scipy 的 `pkgs` 與 `ref_stats.py`）；`FT=$S/fix_tree`（`git archive 03649414` 匯出）。
 
 | 命令 | 結果 |
 | --- | --- |
@@ -459,7 +459,7 @@ cwd 為 worktree 根目錄。`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/pytho
 | `timeout 180 npm test` ×3 | 第一次逾時 exit 124（11 個 ✖，O12）；第 2、3 次 exit 0、21／21 |
 | `$FT` 前端（junction 共用 node_modules）：`npx tsc --noEmit`、`node scripts/check-tokens.mjs`、`node --test …` ×3 | tsc exit 0、`check:tokens OK`；第一次逾時（O12），第 2、3 次 21／21 |
 | `node $S/fe_check_f.mjs <frontend> $S` | 全部 PASS |
-| `git ls-tree -r 2f839a36 --name-only \| grep -c '^data/'`、`3c78d6fd` 同 | 0、0 |
+| `git ls-tree -r fc2ff409 --name-only \| grep -c '^data/'`、`03649414` 同 | 0、0 |
 
 ## 非阻斷觀察
 
@@ -547,7 +547,7 @@ cwd 為 worktree 根目錄。`PY=C:/Users/user/Desktop/CatOS/.venv/Scripts/pytho
 ## 未涵蓋
 
 - **每次實際採集的請求數**：manifest 只記總數（269／356／533）。我用離線重放證明，現行程式在這三個範圍必然是 144＋125、144＋144＋68、144×3＋101，總數與 manifest 相同、沒有重試。但沒有實際採集時的執行紀錄可以逐次核對。
-- **授權與採集的先後**：AGENTS.md:29 的條文與資料都在 2026-11-07（資料 20:34～20:38 +08 抓取），條文是隨 `2f839a36` 一起 commit 的。使用者同意的對話我看不到，無法從 git 證明「先授權、後抓取」。
+- **授權與採集的先後**：AGENTS.md:29 的條文與資料都在 2026-11-07（資料 20:34～20:38 +08 抓取），條文是隨 `fc2ff409` 一起 commit 的。使用者同意的對話我看不到，無法從 git 證明「先授權、後抓取」。
 - **事前登錄的時間先後**：量測計畫、規則與量測結果在同一筆 commit，無法從 git 歷史證明「先寫規則、後跑結果」。只能確認文件文字與程式逐筆一致（F3），以及 O2 的兩點未寫明。
 - **規則與使用者校準原意的忠實度**：我只核對「計畫文件 ↔ 程式」。F1 的失效停損，文件自己註明不是使用者原話（`:638`）。觸價進場、週成本／月成本沒有實作（`:736-737`）。
 - **瀏覽器實測**（選做）：沒有起研究服務與 Vite 代理，沒有在瀏覽器開回測頁。改用 typecheck、既有前端測試、真實 payload 的 SSR 渲染，以及頁面條件的程式碼核對。舊紀錄在整頁上的實際顯示、版面與互動沒有重驗，視覺由使用者自行在網頁驗收。

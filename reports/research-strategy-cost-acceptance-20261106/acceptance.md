@@ -2,7 +2,7 @@
 
 - 日期：2026-11-06（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話。沒有參與本工作包的開發，也沒有撰寫任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
-- 範圍：分支 `feat/research-strategy-cost` 的 `eb558c85`，對照父 commit `240637fb`（`git diff 240637fb eb558c85`：20 個檔案，+899／−40）。驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-strategy-cost-8221eb`（分支 `claude/acceptance-strategy-cost-8221eb`，HEAD 即 `eb558c85`）進行。
+- 範圍：分支 `feat/research-strategy-cost` 的 `18370fab`，對照父 commit `d3e6cefc`（`git diff d3e6cefc 18370fab`：20 個檔案，+899／−40）。驗收在 worktree `C:\Users\user\Desktop\CatOS\.claude\worktrees\acceptance-strategy-cost-8221eb`（分支 `claude/acceptance-strategy-cost-8221eb`，HEAD 即 `18370fab`）進行。
 - 結論：**PASS（7／7）**，沒有阻斷缺陷，附 7 項非阻斷觀察（O1～O7）。依指示不 commit、不 push、不 merge。
 - 自寫腳本與完整輸出在本會話暫存目錄 `C:\Users\user\AppData\Local\Temp\claude\837e5163a61f2809\891bd209-adcb-43ef-96fc-6ace69cbd047\scratchpad\`（不在 repo，會話結束後可能被清掉；關鍵輸出已抄進本報告）：`check_costs.py`、`check_datasets.py`、`old_behavior.py`、`check_fetch.py`、`boundary.py`、`render_panel.mjs`，以及同名 `.log` 與 `measure_acceptance.json`。
 
@@ -13,7 +13,7 @@
 - 沒有修改程式、測試或文件，只新增本報告。沒有 commit、push、merge、切換分支或 stash。竄改測試只改暫存目錄內的資料集副本，用完即刪。
 - 沒有啟動任何 HTTP 服務，沒有使用 18870／18890，沒有碰 8770／8771。前端驗證用 `tsc`、`node --test` 與 Vite SSR 渲染（middleware mode、`ws: false`，不開埠）。
 - `catos` 匯入路徑指向 worktree（`...\acceptance-strategy-cost-8221eb\catos\__init__.py`），venv 的 Python 3.14.6；Node v26.4.0。
-- 執行後 worktree 只多了 git 忽略的產物，依指示沒有刪除：`data/`（複製的資料集）、`frontend/cat-os-vite/node_modules/`（`npm ci`，含一個被中斷的 `.vite/deps_temp_e523e733`，見 O7），以及後端套件自己寫的 `outputs/workspace-w6-fixture-test-52f569c2…`、`outputs/workspace-w8-fixture-test-58971aae…`。`git status --short` 乾淨，HEAD 仍是 `eb558c85`。本報告本身也在忽略範圍內（`.gitignore:47:/reports/*`；既有驗收報告是強制加入追蹤的），要收進 repo 需 `git add -f`。
+- 執行後 worktree 只多了 git 忽略的產物，依指示沒有刪除：`data/`（複製的資料集）、`frontend/cat-os-vite/node_modules/`（`npm ci`，含一個被中斷的 `.vite/deps_temp_e523e733`，見 O7），以及後端套件自己寫的 `outputs/workspace-w6-fixture-test-52f569c2…`、`outputs/workspace-w8-fixture-test-58971aae…`。`git status --short` 乾淨，HEAD 仍是 `18370fab`。本報告本身也在忽略範圍內（`.gitignore:47:/reports/*`；既有驗收報告是強制加入追蹤的），要收進 repo 需 `git add -f`。
 
 ## 總表
 
@@ -60,7 +60,7 @@ FAILURES: none
 ```
 
 - 竄改測試用的是真實 4H 資料集的暫存副本：把 `complete` 改成 true 會被拒；連同雜湊與筆數一起改掉尾端 3 筆，`load_manifest` 重算後以 `funding_stops_before_end` 拒絕，不會因 manifest 宣稱而放行。
-- **舊的「資金費完整」資料集行為不變**：`old_behavior.py` 分別在 `git archive 240637fb` 與 `git archive eb558c85` 的匯出目錄內，以同一份輸入（15m、480 根、資金費從第一根到最後一根）呼叫 `write_dataset`，再 `load_manifest`、`execute_request`：
+- **舊的「資金費完整」資料集行為不變**：`old_behavior.py` 分別在 `git archive d3e6cefc` 與 `git archive 18370fab` 的匯出目錄內，以同一份輸入（15m、480 根、資金費從第一根到最後一根）呼叫 `write_dataset`，再 `load_manifest`、`execute_request`：
 
 ```text
 PASS same dataset files byte for byte (manifest, candles, funding, instrument)
@@ -279,7 +279,7 @@ FAILURES: none
   - 資金費缺口：採「不計真實資金費並明示＋固定費率假設情境」，假設情境在 payload、報表、前端都標「假設情境，不是實際帳務」。
 - **README.md**：研究資料列（:15）描述「manifest 雜湊相符、無缺口；資金費必須連續到最後一根、可晚於第一根開始；明示之前未計資金費並另列固定費率假設情境；三種研究都有成本拆解與買進持有基準」，與程式一致。抓取工具段（:66）「資金費在結束前中斷就停止，不寫入任何檔案；`--days` 上限 1,830」與第 1、2 項實測一致：中斷時沒有留下資料夾或 staging 目錄。
 - **docs/next-steps.md** 第 5 項、**docs/research-real-data-plan.md**「工作包 B＋A」：實作與數字描述與程式及第 5 項重跑相符。不精確處列在 O2～O5。
-- **資料沒有進 git**：`git ls-tree -r eb558c85 --name-only | grep -c '^data/'` → 0；`git show --stat eb558c85` 沒有 `data/okx` 或 `.csv`；`git check-ignore -v` → `.gitignore:29:/data/`；複製資料後 `git status --short` 乾淨（`data/` 只出現在 `--ignored` 清單）。
+- **資料沒有進 git**：`git ls-tree -r 18370fab --name-only | grep -c '^data/'` → 0；`git show --stat 18370fab` 沒有 `data/okx` 或 `.csv`；`git check-ignore -v` → `.gitignore:29:/data/`；複製資料後 `git status --short` 乾淨（`data/` 只出現在 `--ignored` 清單）。
 
 ## 實際執行的命令與結果
 
@@ -331,7 +331,7 @@ FAILURES: none
 
 **O5　入口文件有過時或不精確的敘述。**
 
-- `docs/next-steps.md:24` 仍寫「只有開發者自測，**尚未獨立驗收、未 commit**」，實際已 commit 為 `eb558c85`；本次驗收後也要更新驗收狀態。
+- `docs/next-steps.md:24` 仍寫「只有開發者自測，**尚未獨立驗收、未 commit**」，實際已 commit 為 `18370fab`；本次驗收後也要更新驗收狀態。
 - 同檔 :29「選定參數都在格點上限」：只有 entry 384 在上限，exit 是 24／48／72。方案文件 `docs/research-real-data-plan.md:352` 的說法是對的。
 - `docs/research-real-data-plan.md:254` 標題仍是「下一個工作包候選：策略與成本（2026-11-06 提案，待你選）」，但已經選定。`AGENTS.md:28` 以這個標題引用，若改名要一起改。
 

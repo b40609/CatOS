@@ -2,7 +2,7 @@
 
 - 日期：2026-11-04（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收子代理。沒有參與本工作包的開發，也沒有撰寫任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。
-- 範圍：worktree `C:\Users\kai\Desktop\CatOS\.claude\worktrees\second-strategy`，分支 `feat/research-second-strategy`，`2d9d6cb..a1e54ba`（1 個 commit，25 個檔案，+1331／−359）。
+- 範圍：worktree `C:\Users\kai\Desktop\CatOS\.claude\worktrees\second-strategy`，分支 `feat/research-second-strategy`，`3a599e3..59f840f`（1 個 commit，25 個檔案，+1331／−359）。
 - 結論：**PASS（7／7）**，沒有阻斷缺陷，附 7 項非阻斷觀察（O1～O7）。依指示不 commit、不 push、不 merge。
 - 自寫腳本與證據在本會話暫存目錄 `C:\Users\kai\AppData\Local\Temp\claude\C--Users-kai-Desktop-CatOS\7773c9f0-e321-4239-a3e6-bd95de1760f4\scratchpad\`（不在 repo，會話結束後可能被清掉；關鍵輸出已抄進本報告）。
 
@@ -10,10 +10,10 @@
 
 - 沒有對 OKX 或任何外部服務發請求，沒有抓資料；`data/okx` 只讀。四個資料檔的 sha256 與開發者證據相同（candles `a127a291…`、funding `3969db2d…`、instrument `248697dd…`、manifest `e8fa6cc7…`）。
 - 沒有修改程式、測試或文件，只新增本報告。沒有 commit、push、merge、切換分支或 stash。
-- 基底比對用 `git archive 2d9d6cb` 匯出到暫存目錄，不動 git 狀態。竄改測試只改 `git archive a1e54ba` 的暫存副本。
+- 基底比對用 `git archive 3a599e3` 匯出到暫存目錄，不動 git 狀態。竄改測試只改 `git archive 59f840f` 的暫存副本。
 - 只用 18870／18890。每次啟動前都確認兩埠沒有監聽。整合測試、研究服務量測、UI 驗收環境各啟停一次，結束後兩埠都沒有監聽，也沒有殘留的 fixture 或 harness 程序。沒有碰 8770／8771／8890。
 - `catos` 匯入路徑指向 worktree（`...\second-strategy\catos\__init__.py`），Python 3.12.10。`git ls-files --eol`：571 個追蹤檔，0 個 CRLF。
-- 執行過程在 worktree 留下的都是 git 忽略的產物：`frontend/cat-os-vite/dist`（build）、`catos/__pycache__`，以及後端套件自己寫的 `outputs/workspace-w6-fixture-test-d4e74ab9…`、`outputs/workspace-w8-fixture-test-cf4b188f…`。依指示沒有刪除。`git status` 乾淨，HEAD 仍是 `a1e54ba`。
+- 執行過程在 worktree 留下的都是 git 忽略的產物：`frontend/cat-os-vite/dist`（build）、`catos/__pycache__`，以及後端套件自己寫的 `outputs/workspace-w6-fixture-test-d4e74ab9…`、`outputs/workspace-w8-fixture-test-cf4b188f…`。依指示沒有刪除。`git status` 乾淨，HEAD 仍是 `59f840f`。
 
 ## 總表
 
@@ -80,7 +80,7 @@ PASS Donchian source hash == pinned == manifest :: 1596e3ace639379086f6fd5ff2ba7
 - Worker 登錄表只 glob `catos/research_artifacts/*.json`（`catos/strategy_registry.py:25`、`:197`）。Donchian 的 manifest 在 `catos/research_only_artifacts/`，所以 `resolve` 回 `unknown_strategy`，`WorkerConfig.from_wire`（`catos/ipc.py:238-242`）回 `unregistered strategy`。即使帶上 `strategy_artifact` 也一樣。
 - `strategy_registry.resolve('sma-trend').instantiate()` 仍是 `RegisteredSMA`，`closes.maxlen` 2、`quantity` 2。策略模組沒有進 `sys.modules`。
 - SMA 製品沒變：
-  - `git diff --stat 2d9d6cb..a1e54ba` 對下列檔案是空的：`catos/research_artifacts`、`catos/research_strategy.py`、`examples/closed_bar_demo.py`、`catos/strategy_registry.py`、`catos/ipc.py`、`catos/worker.py`、`catos/supervisor.py`、`catos/simulation_catalog.py`、`catos/local_sim*`、`catos/workspace_api.py`、`catos/research_api.py`。
+  - `git diff --stat 3a599e3..59f840f` 對下列檔案是空的：`catos/research_artifacts`、`catos/research_strategy.py`、`examples/closed_bar_demo.py`、`catos/strategy_registry.py`、`catos/ipc.py`、`catos/worker.py`、`catos/supervisor.py`、`catos/simulation_catalog.py`、`catos/local_sim*`、`catos/workspace_api.py`、`catos/research_api.py`。
   - 三個 SMA 檔的 blob 在兩個 commit 相同：manifest `add6fcf5…`、research_strategy `219b479d…`、closed_bar_demo `8a348049…`。
   - catalog 的 SMA 項目在基底與新版逐字相同（比較時去掉新增的 `warmup` 欄），含 `sha256` 與 manifest 檔雜湊 `401a8fcc…`。
 - local-sim 呼叫 `validate_request(DEFAULT_REQUEST)` 的四處（`catos/local_sim_control.py:415`、`catos/local_sim_control_runner.py:52`、`catos/local_sim_r4.py:204`、`catos/local_sim_r4_verify.py:89`）都只取回傳的第 0、1 項。第 2 項從 `period` 改成參數 dict 不影響它們。
@@ -244,13 +244,13 @@ SMA 各窗選定 6 × 32；SMA 各窗 OOS：-0.794%、-0.729%、+0.042%、-0.569
 
 | 命令 | 位置 | 結果 |
 | --- | --- | --- |
-| `git diff --stat 2d9d6cb..a1e54ba`；`git log --oneline -5`；`git status` | `<wt>` | 25 個檔案 +1331／−359；工作樹乾淨 |
+| `git diff --stat 3a599e3..59f840f`；`git log --oneline -5`；`git status` | `<wt>` | 25 個檔案 +1331／−359；工作樹乾淨 |
 | `<py> -c "import catos; print(catos.__file__)"` | `<wt>` | `...\second-strategy\catos\__init__.py`，3.12.10 |
 | `<py> -m unittest discover -s tests -p "test_*.py"` | `<wt>` | `Ran 1408 tests in 217.167s`、`OK (skipped=12)`，exit 0；含預期的 `Port 61405 already in use...` |
 | `<py> -m unittest discover -s tests -p "test_research_donchian.py" -v` | `<wt>` | `Ran 15 tests`、`OK`（1393 + 15 = 1408） |
 | `<py> -B <s>\check_rules.py` | `<wt>` | 12 項 PASS（見第 1 項） |
 | `<py> -B <s>\check_isolation.py`；`strategy_registry.resolve('sma-trend').instantiate()` | `<wt>` | 見第 2 項；`RegisteredSMA 2 2`，不進 `sys.modules`。腳本中一項 instantiate 檢查原本誤用 `period` 屬性名而顯示 FAIL，改核對 `closes.maxlen` 後通過，屬腳本本身的錯 |
-| `git archive 2d9d6cb catos examples tests`，加上 `data/okx` 副本 | `<s>\base` | 基底匯出 |
+| `git archive 3a599e3 catos examples tests`，加上 `data/okx` 副本 | `<s>\base` | 基底匯出 |
 | `<py> -B <s>\check_requests.py`（基底、新版各一次）＋ `compare_requests.py` | `<s>\base`、`<wt>` | `shared cases: 92; differing: 0`；Donchian 44 案例 |
 | `<py> -B <s>\check_consistency.py <開發者 measure-20261104> <s>\consistency_out` | `<wt>` | 全部 PASS（見第 4、5 項） |
 | `node <s>\gen_frontend_request.mjs` | `<wt>` | 前端預設 Donchian 請求，`validationProblems` 為空，計算量 184,752 |

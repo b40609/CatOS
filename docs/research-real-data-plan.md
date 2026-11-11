@@ -96,7 +96,7 @@ manifest 記錄：來源端點、`instId`、`bar`、起訖時間、列數、CSV 
 
 ## 滾動驗證接上真實資料（2026-11-04，分支 `feat/research-validation-real-data`）
 
-獨立驗收 7／7 PASS，附 4 項非阻斷觀察（`reports/research-validation-real-data-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，這部分只有開發者自測。已合併進 `main`（`aa4def4`）並推送。
+獨立驗收 7／7 PASS，附 4 項非阻斷觀察（`reports/research-validation-real-data-acceptance-20261104/acceptance.md`）。驗收後依觀察 O1–O4 補了回看根數上限、前端預檢與文件數字，這部分只有開發者自測。已合併進 `main`（`0e36985`）並推送。
 
 ### 業界與開源 walk-forward 報告怎麼呈現
 
@@ -428,7 +428,7 @@ Donchian 各窗 OOS：
 
 兩邊 OOS 視窗相同：2023-03-14 到 2025-12-08，每窗 1,200 根，約 200 天。兩次搜尋合併後共 16 個不同參數組，最佳仍是 384/48，DSR 0.7083、PBO 0.2000。
 
-上表是在 commit `8ab4dbe9` 以 Optuna TPE 量測，只評估到 9／12 與 10／15 組。工作包 E 之後，研究優化在格點點數 ≤ n_trials 時改為窮舉，同一請求在之後的版本會評估完整格點，數字不同（驗收觀察 O2）。完整格點的數字由獨立驗收與開發者各自重算，結果一致：
+上表是在 commit `fb11e321` 以 Optuna TPE 量測，只評估到 9／12 與 10／15 組。工作包 E 之後，研究優化在格點點數 ≤ n_trials 時改為窮舉，同一請求在之後的版本會評估完整格點，數字不同（驗收觀察 O2）。完整格點的數字由獨立驗收與開發者各自重算，結果一致：
 
 | 搜尋（完整格點） | N | DSR | PBO |
 | --- | --- | --- | --- |
@@ -725,7 +725,7 @@ Donchian 各窗 OOS：
 - 每次回測 0.4～1.6 秒。result.json 最大 929,807 bytes（F3 1H，2026-11-08 多了爆倉欄位）。
   - 真正受 2 MB 上限約束的是 worker 的輸出（payload 加 HTML 報告）。原本報告把每個權益點都畫進圖表，15 個變體的輸出最大 1,514,277 bytes。
   - 2026-11-08 起，報告的權益圖和 payload 一樣抽樣到 2,000 點，成交明細最多列 400 筆（完整的在 result.json），報告固定約 115 KB。
-  - 6 個月 5m 上實測：Donchian 12／3 有 5,801 筆成交，輸出 1,798,187 bytes，可以跑；8／2 有 7,757 筆，輸出 2,193,399 bytes，超過上限（`b8eb1280` 獨驗重現的數字；原本寫的 1,797,828／2,193,038 是定稿前版本量的，少約 360 bytes）。以評估期間 180 天計，上限落在每天約 32～43 筆成交之間。
+  - 6 個月 5m 上實測：Donchian 12／3 有 5,801 筆成交，輸出 1,798,187 bytes，可以跑；8／2 有 7,757 筆，輸出 2,193,399 bytes，超過上限（`51500b88` 獨驗重現的數字；原本寫的 1,797,828／2,193,038 是定稿前版本量的，少約 360 bytes）。以評估期間 180 天計，上限落在每天約 32～43 筆成交之間。
 
 ### 判讀
 
@@ -748,7 +748,7 @@ Donchian 各窗 OOS：
 
 ### 獨立驗收與驗收後修正（2026-11-08）
 
-獨立驗收報告：`reports/research-shortterm-acceptance-20261107/acceptance.md`。修正 commit `3c78d6fd` PASS 2／2、工作包 F `2f839a36` PASS 9／9，沒有阻斷缺陷；12 項非阻斷觀察處理如下：
+獨立驗收報告：`reports/research-shortterm-acceptance-20261107/acceptance.md`。修正 commit `03649414` PASS 2／2、工作包 F `fc2ff409` PASS 9／9，沒有阻斷缺陷；12 項非阻斷觀察處理如下：
 
 | 觀察 | 處理 |
 | --- | --- |
@@ -765,28 +765,28 @@ Donchian 各窗 OOS：
 | O11 優化逾時餘裕 | 優化的計算量本來就有上限：(20 + 1) × 60,000 = 126 萬根次；本機 5m 6 個月 20 次實測 14.1～14.5 秒，最壞約 17 秒，在 30 秒逾時內。不加預檢，在 `research_catalog.py` 註明；比本機慢 1.7 倍以上的機器跑最長的資料集時要減少試驗次數 |
 | O12 `npm ci` 後第一次 `node --test` 卡住 | 環境問題，不在本次範圍 |
 
-這批修正 commit `b8eb1280`，2026-11-08 第二輪獨立驗收 PASS 11／11（報告：`reports/research-shortterm-fix-acceptance-20261108/acceptance.md`），沒有阻斷缺陷；6 項非阻斷觀察處理如下：
+這批修正 commit `51500b88`，2026-11-08 第二輪獨立驗收 PASS 11／11（報告：`reports/research-shortterm-fix-acceptance-20261108/acceptance.md`），沒有阻斷缺陷；6 項非阻斷觀察處理如下：
 
 | 觀察 | 處理 |
 | --- | --- |
-| N1 worker 輸出位元組數無法逐位元組重現 | 改成獨驗在 `b8eb1280` 重現的 1,798,187／2,193,399 bytes；每天筆數改用評估期間 180 天算（32～43 筆）。結論不變 |
+| N1 worker 輸出位元組數無法逐位元組重現 | 改成獨驗在 `51500b88` 重現的 1,798,187／2,193,399 bytes；每天筆數改用評估期間 180 天算（32～43 筆）。結論不變 |
 | N2 next-steps 狀態在 commit 內就過時（第三次） | 狀態只寫已發生的事（已 commit 的 hash、已完成的獨驗），不再寫「尚未 commit」這類一 commit 就過時的字眼 |
 | N3 組內最佳變體沒寫選法 | 補上「依淨損益選」，並註明依 Sharpe 選時 5m 是 F3 |
-| N4 `--resume` 第一次執行在 K 線分頁失敗時請求不計入 | 第一次執行在合約檢查通過後、開始分頁前先存一次進度，之後的失敗都計入總數；只有合約資料就失敗的第一次執行（最多 1 次請求加重試）不留紀錄，寫在 docstring。另更正：`b8eb1280` 的 commit 訊息寫「每頁 K 線抓完即存」，實際是每次執行抓完該次的 K 線頁才存一次 |
+| N4 `--resume` 第一次執行在 K 線分頁失敗時請求不計入 | 第一次執行在合約檢查通過後、開始分頁前先存一次進度，之後的失敗都計入總數；只有合約資料就失敗的第一次執行（最多 1 次請求加重試）不留紀錄，寫在 docstring。另更正：`51500b88` 的 commit 訊息寫「每頁 K 線抓完即存」，實際是每次執行抓完該次的 K 線頁才存一次 |
 | N5 只剩 1 組沒爆倉時 N 不起作用 | 兩組以上的搜尋裡，沒爆倉的不到 2 組時無法估計 Sharpe 變異數，DSR 改為不計算並在判讀寫明；PBO 粒度提醒的「只有 N 組參數」改用實際進入 PBO 的組數。只跑一組（沒有搜尋）時維持 DSR 等於對 0 的 PSR。真實資料的數字不受影響 |
 | N6 抽樣後的權益圖不一定從第一個點開始 | `sample_curve_indices` 一律保留第一點與最後一點，總數仍不超過 2,000；payload 與報告的圖從初始權益開始 |
 
-這批修正 commit `7b7f743c`，2026-11-08 第三輪獨立驗收 PASS 6／6（報告：`reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`），沒有阻斷缺陷；5 項非阻斷觀察處理如下：
+這批修正 commit `c2f0cba9`，2026-11-08 第三輪獨立驗收 PASS 6／6（報告：`reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`），沒有阻斷缺陷；5 項非阻斷觀察處理如下：
 
 | 觀察 | 處理 |
 | --- | --- |
-| P1 N1 的位元組數是 `b8eb1280` 的，`7b7f743c` 多 256 bytes | 不改：文件已註明是 `b8eb1280` 的數字；之後的抽樣與欄位名稱變動都會讓輸出差幾百 bytes，不逐版重量。上限落點（每天約 32～43 筆）不變 |
+| P1 N1 的位元組數是 `51500b88` 的，`c2f0cba9` 多 256 bytes | 不改：文件已註明是 `51500b88` 的數字；之後的抽樣與欄位名稱變動都會讓輸出差幾百 bytes，不逐版重量。上限落點（每天約 32～43 筆）不變 |
 | P2 DSR 不計算時，純運氣最大 Sharpe 與變異數仍顯示 0 | 變異數無法估計時，`trial_sharpe_variance`、`expected_max_sharpe_per_bar`、`expected_max_sharpe_annualized` 一併回 None，HTML 報告與前端面板顯示「不適用」；只跑一組參數時維持 0 |
 | P3 滾動驗證的抽樣多補一次第一點 | `research_validation_job._sampled_curve` 直接用 `sample_curve_indices(…, limit)`，不再傳 `limit - 1` 再補 0 |
 | P4 `sample_curve_indices` 在 limit = 2 時除以 0；方法名稱沒提頭尾點 | limit < 3 時丟 ValueError；payload 與滾動驗證的 `method` 改為 `bucket_deepest_drawdown_keep_first_last`，報告說明改寫成「保留第一點、最後一點，以及每個區間回撤最深的一點」 |
-| P5 next-steps 的「只有開發者自測」在驗收後過時 | 更新為 `7b7f743c` 已獨驗 PASS 與報告路徑 |
+| P5 next-steps 的「只有開發者自測」在驗收後過時 | 更新為 `c2f0cba9` 已獨驗 PASS 與報告路徑 |
 
-這批處理 commit `45c12512`，2026-11-09 第四輪獨立驗收 PASS 5／5（報告：`reports/research-shortterm-pfix-acceptance-20261109/acceptance.md`），沒有阻斷缺陷；2 項非阻斷觀察：
+這批處理 commit `b1e637fd`，2026-11-09 第四輪獨立驗收 PASS 5／5（報告：`reports/research-shortterm-pfix-acceptance-20261109/acceptance.md`），沒有阻斷缺陷；2 項非阻斷觀察：
 
 | 觀察 | 處理 |
 | --- | --- |

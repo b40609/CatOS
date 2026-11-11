@@ -2,7 +2,7 @@
 
 - 日期：2026-11-04（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話（筆電）。沒有撰寫本工作包任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。開發者是另一個 Claude 會話。
-- 範圍：`feat/research-real-data` 的 `0dc1fae..fe0912c`，1 個 commit，19 個檔案（+1259／−278）。
+- 範圍：`feat/research-real-data` 的 `fc63f2f..7c90133`，1 個 commit，19 個檔案（+1259／−278）。
 - 結論：**PASS（6／6）**，附 8 項非阻斷觀察。依指示只 commit 本報告，不合併 main、不 push。
 
 ## 驗收限制與隔離
@@ -14,7 +14,7 @@
   - 竄改測試都在暫存副本上進行。
   - 瀏覽器實測時，把資料集複製到乾淨 clone 的 `data/okx` 下使用。
   - 驗收結束時，四個原始檔的 sha256 與修改時間（12:11:38）都沒有變。
-- **重跑都在乾淨 clone 上做**：`git clone -b feat/research-real-data`，HEAD `fe0912c`。
+- **重跑都在乾淨 clone 上做**：`git clone -b feat/research-real-data`，HEAD `7c90133`。
   - 前端以 `npm ci` 全新安裝。
   - Python 使用 repo 的 `.venv`（3.12.10），Node 使用 24.19.0。
 - **瀏覽器實測**：在隔離的 18870／18890 上，以全新的 fixture 資料根進行；用完關閉，並確認兩個埠都已釋放。
@@ -225,7 +225,7 @@ validation on real dataset: validation_supports_synthetic_dataset_only
 
 ## 實際執行的命令與結果
 
-`<clone13>` 指 `fe0912c` 的乾淨 clone，`<fe>` 指 `<clone13>/frontend/cat-os-vite`。
+`<clone13>` 指 `7c90133` 的乾淨 clone，`<fe>` 指 `<clone13>/frontend/cat-os-vite`。
 
 | 命令 | 位置 | 結果 |
 | --- | --- | --- |

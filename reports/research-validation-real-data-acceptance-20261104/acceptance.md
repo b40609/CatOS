@@ -2,9 +2,9 @@
 
 - 日期：2026-11-04（Asia/Taipei）
 - 驗收者：Claude Opus 5.5，獨立驗收會話（筆電）。沒有撰寫本工作包任何 commit，具 AGENTS.md「DEVELOPMENT WORKFLOW」所定的獨驗資格。開發者是另一個 Claude 會話。
-- 範圍：`feat/research-validation-real-data` 的 `3f5ee9b..280dff4`，2 個 commit：
-  - `2b47779`：本工作包，20 個檔案（+1704／−226）。
-  - `280dff4`：只改 `docs/next-steps.md` 的「收尾雜項」表格（+9／−9）。
+- 範圍：`feat/research-validation-real-data` 的 `ff7382d..c17a371`，2 個 commit：
+  - `201723d`：本工作包，20 個檔案（+1704／−226）。
+  - `c17a371`：只改 `docs/next-steps.md` 的「收尾雜項」表格（+9／−9）。
 - 結論：**PASS（7／7）**，附 4 項非阻斷觀察。依指示只 commit 本報告，不合併、不 push。
 - 自寫腳本與證據放在群組筆記資料夾 `side-session-notes\local_d1eea98d-4f4a-472b-94b3-c4e5ceebedff\validation-real-data-acceptance\`（不在 repo）。
 
@@ -14,7 +14,7 @@
 - **沒有修改 `data/okx`。**
   - 資料集複製到暫存 clone 使用；竄改測試只改暫存 clone 裡的副本，測完還原。
   - 驗收結束時，四個原始檔的 sha256 與修改時間（12:11:38.93）都沒有變。
-- **重驗都在乾淨 clone 上做**：`git clone -c core.autocrlf=false`，分支 HEAD `280dff4`、main `3f5ee9b`，`git ls-files --eol` 為 563 個 LF。
+- **重驗都在乾淨 clone 上做**：`git clone -c core.autocrlf=false`，分支 HEAD `c17a371`、main `ff7382d`，`git ls-files --eol` 為 563 個 LF。
   - Python 用 repo 的 `.venv`（3.12.10）；Node 24.19.0、npm 11.17.0。
   - 前端以 `npm ci` 全新安裝。
 - **只用 18870／18890。** 開始前確認兩埠沒有監聽；用完關閉，確認兩埠都能重新綁定、fixture 程序已結束。
@@ -190,7 +190,7 @@ restored: True
 | 送出 OKX 預設 | 約 3.9 秒出結果：6/6 COMPLETE、32×6、0/6 窗為正、最佳 -4.76%、最差 -16.53%、30/30 次回測、未使用 0 根。各窗表的 OOS 報酬、淨損益、回撤、手續費、資金費、成交數，都等於 API 值四捨五入到兩位；`title` 與 API 字串完全相同 |
 | 點選 #3 | 該列反白；明細標題為 10/01 13:00 → 10/12 18:00 UTC，標示「圖表取樣 156 / 1,077 點」。訓練格點 4 列（32 選定，鄰域最差 -22.97%）；分環境 7 類＋合計（1,076 根、98 筆、-107.12），與 API total 相同，顯示「與樣本外帳務核對一致」 |
 | 注入 OOS_FAILED／NO_SELECTION（攔截 result JSON） | HUD 顯示「4 / 6 COMPLETE」「部分視窗無樣本外結果」「0 / 4 窗為正」，最佳／最差只取有結果的 4 窗。這兩列的數字欄全是「不適用」；明細顯示「此視窗沒有樣本外結果（OOS_FAILED）：RuntimeError: injected。不以 0 計入。」與「（NO_SELECTION）：訓練格點沒有可選的穩定區。不以 0 計入。」 |
-| 優化頁 | 任務清單不含驗證任務。OKX、8~32、7 試驗、seed 42 → Trial #1、週期 31、-81.97%，與上一份驗收（`fe0912c`）相同 |
+| 優化頁 | 任務清單不含驗證任務。OKX、8~32、7 試驗、seed 42 → Trial #1、週期 31、-81.97%，與上一份驗收（`7c90133`）相同 |
 | 共用忙碌槽 | 經 API 送出一筆約 14 秒的驗證，在優化頁按刷新後顯示「後端忙碌中」，按鈕停用並顯示「後端計算中...」；任務完成後自動解除，按鈕恢復 |
 | 回到驗證頁 | 兩筆驗證任務依時間排序，預設選最新一筆：8/8 COMPLETE、1/8 窗為正、未使用 4,228 根、取樣 101 / 201 點 |
 | 全頁 | 沒有 NaN 或 undefined |
@@ -207,7 +207,7 @@ restored: True
 
 ## 6. 後端完整套件：PASS
 
-- 在沒有 `data/okx` 的乾淨 clone（`280dff4`）執行：`Ran 1393 tests in 241.863s`、`OK (skipped=11)`，exit 0。
+- 在沒有 `data/okx` 的乾淨 clone（`c17a371`）執行：`Ran 1393 tests in 241.863s`、`OK (skipped=11)`，exit 0。
 - 這台機器可以建立 symlink，所以只 skip 11 個，符合 README 的「11 或 12」。
 
 ## 7. 文件與實測一致：PASS（附觀察 O3）
@@ -227,7 +227,7 @@ restored: True
   - 只引用、不內嵌的檔案範圍。
   - 報表改為摘要表。
 - **`docs/backend-frontend-integration-map.md`**：`lookback_bars` 改寫為 1～19,999，等於程式的 `MAX_BARS - 1`；React 串接狀態也與實際相符。
-- **`docs/next-steps.md`（`280dff4` 收尾表格）**：
+- **`docs/next-steps.md`（`c17a371` 收尾表格）**：
 
 | 項目 | 文件狀態 | 核對結果 |
 | --- | --- | --- |
@@ -251,7 +251,7 @@ restored: True
 
 | 命令 | 位置 | 結果 |
 | --- | --- | --- |
-| `git clone -q -c core.autocrlf=false --no-hardlinks C:/Users/kai/Desktop/CatOS <dir>`，再 `git checkout --detach 280dff4`／`3f5ee9b` | scratchpad | 5 份 clone；563 個 LF |
+| `git clone -q -c core.autocrlf=false --no-hardlinks C:/Users/kai/Desktop/CatOS <dir>`，再 `git checkout --detach c17a371`／`ff7382d` | scratchpad | 5 份 clone；563 個 LF |
 | `<py> -B -m unittest discover -s tests -p "test_*.py"` | `<suite>` | `Ran 1393 tests in 241.863s`、`OK (skipped=11)`，exit 0 |
 | `npm ci --no-audit --no-fund` | `<fe>` | exit 0（npm 11 提示 esbuild 的 postinstall 不在 allowScripts 內，不影響 build） |
 | `npm run typecheck` | `<fe>` | exit 0 |
@@ -295,5 +295,5 @@ restored: True
 - **其他機器**：沒有在另一台機器量計算量與耗時，與文件「未涵蓋」相同。
 - **超限失敗路徑**：沒有實際觸發 30 秒逾時與 2 MB 輸出超限，因為找不到會超限的合法請求；這兩段處理程式不在本範圍的改動內。
 - **外部連結**：沒有核對方案文件引用的外部工具文件內容。
-- **遠端分支**：`280dff4` 的遠端分支狀態以本機追蹤分支為準，沒有連 GitHub。
+- **遠端分支**：`c17a371` 的遠端分支狀態以本機追蹤分支為準，沒有連 GitHub。
 - **後端套件的資料條件**：只在沒有 `data/okx` 的乾淨 clone 跑過（開發者是在有 `data/okx` 的工作目錄跑的）。真實資料路徑另由第 2～4 項的程序內與服務實測涵蓋。

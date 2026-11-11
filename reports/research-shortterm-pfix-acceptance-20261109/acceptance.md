@@ -1,6 +1,6 @@
-# 工作包 F 第三輪觀察 P1～P5 處理（45c12512）獨立驗收
+# 工作包 F 第三輪觀察 P1～P5 處理（b1e637fd）獨立驗收
 
-- 驗收對象：commit `45c12512`（父 commit `7b7f743c`），分支 `claude/acceptance-pfix-411cf8`，worktree `acceptance-shortterm-a51238`。
+- 驗收對象：commit `b1e637fd`（父 commit `c2f0cba9`），分支 `claude/acceptance-pfix-411cf8`，worktree `acceptance-shortterm-a51238`。
 - 驗收者：未參與 P1～P5 開發的 Claude 會話（2026-11-09）。
 - 範圍：上一輪報告 `reports/research-shortterm-nfix-acceptance-20261108/acceptance.md` 的 P1～P5；宣稱的處理見 `docs/research-real-data-plan.md:780-787`。
 - 限制：沒有連網、沒有呼叫 OKX；`C:/Users/user/Desktop/CatOS/data/okx/` 只讀（前後 sha256 相同）；沒有碰金鑰；沒有啟動或停止 8770／8771；沒有改產品 DB；沒有 commit、push、merge。
@@ -30,7 +30,7 @@
 
 ### 後端新舊比對
 
-方法：`$S/p2_check.py` 用測試裡的 `Flip`、`candles`、`config` 合成 4 組試驗，必要時把權益扣到 0 以下模擬爆倉。同一組輸入分別交給 HEAD 的 `search_report`，以及 `git show 7b7f743c:catos/research_overfit.py` 存下的舊版，比對整個 dict。
+方法：`$S/p2_check.py` 用測試裡的 `Flip`、`candles`、`config` 合成 4 組試驗，必要時把權益扣到 0 以下模擬爆倉。同一組輸入分別交給 HEAD 的 `search_report`，以及 `git show c2f0cba9:catos/research_overfit.py` 存下的舊版，比對整個 dict。
 
 | 情境 | N／爆倉 | 新舊差異鍵 | 新版三欄 | 舊版三欄 | `overfit_rows` 顯示 |
 | --- | --- | --- | --- | --- | --- |
@@ -51,7 +51,7 @@
 
 方法：`$S/ssr/run.mjs` 用 worktree 內 `node_modules` 的 esbuild，把 `overfitting-panel.tsx` 和 `react-dom/server` 打包成 CJS。路徑別名 `@` 指向 `src`，tsconfig 用 worktree 的設定。接著把上表 8 種情境的後端 JSON（`$S/reports.json`，由新版 `search_report` 產生）餵給 `renderToStaticMarkup`，從 HTML 抓「純運氣可期待的最大 Sharpe（年化）」那一列的值。
 
-為了對照，渲染時把 `7b7f743c` 版的元件暫存為 `src/components/catos/__old_overfitting_panel_acc.tsx`，跑完立即刪除；之後 `git status --short` 是乾淨的。
+為了對照，渲染時把 `c2f0cba9` 版的元件暫存為 `src/components/catos/__old_overfitting_panel_acc.tsx`，跑完立即刪除；之後 `git status --short` 是乾淨的。
 
 這是靜態伺服器端渲染，不是瀏覽器互動；面板本身沒有互動元件。
 
@@ -75,7 +75,7 @@ FAILURES: 0
 
 程式證據：`catos/research_validation_job.py:142-147` 直接呼叫 `sample_curve_indices(drawdown_pcts(...), limit)`，不再先傳 `limit - 1` 再補 0；`method` 改為 `bucket_deepest_drawdown_keep_first_last`（`:164`）。
 
-方法：`$S/p34_check.py` 用 `test_research_datasets.write_fixture` 在暫存目錄建立合成的抓取資料集。同一個請求分別交給 HEAD 的 `execute_validation`，以及 `7b7f743c` 版的 `research_validation_job.py`（整個舊模組，含舊 `_sampled_curve` 和舊方法名稱，搭配同一個 catalog），比對兩邊的 payload 和 HTML 報告。兩版的 `sample_curve_indices` 只差在 limit 檢查，抽樣邏輯相同。
+方法：`$S/p34_check.py` 用 `test_research_datasets.write_fixture` 在暫存目錄建立合成的抓取資料集。同一個請求分別交給 HEAD 的 `execute_validation`，以及 `c2f0cba9` 版的 `research_validation_job.py`（整個舊模組，含舊 `_sampled_curve` 和舊方法名稱，搭配同一個 catalog），比對兩邊的 payload 和 HTML 報告。兩版的 `sample_curve_indices` 只差在 limit 檢查，抽樣邏輯相同。
 
 | 設定 | 每窗 limit | 拿掉 OOS 權益曲線與 `curve_sampling` 後 payload 相同 | 報告相同 | 每窗點數（新／舊） |
 | --- | --- | --- | --- | --- |
@@ -120,7 +120,7 @@ limit 檢查：
 
 ## P1 不改的理由：PASS（理由成立）
 
-- `docs/research-real-data-plan.md:728` 寫明位元組數是「`b8eb1280` 獨驗重現的數字」，措辭本身正確。
+- `docs/research-real-data-plan.md:728` 寫明位元組數是「`51500b88` 獨驗重現的數字」，措辭本身正確。
 - 本 commit 又改了 payload 的 `method` 名稱和報告說明文字，輸出再次變動，正好印證「之後的抽樣與欄位名稱變動都會讓輸出差幾百 bytes」。
 - HEAD 實測（`$S/p1_bytes.py`，真實 5m 資料唯讀，provenance 路徑比照一般 checkout）：
 
@@ -130,19 +130,19 @@ limit 檢查：
 data unchanged: True
 ```
 
-- 和 `7b7f743c` 的 1,798,443／2,193,655 相比，各多 49 bytes。12／3 仍在 2,000,000 上限內，8／2 仍超過。
+- 和 `c2f0cba9` 的 1,798,443／2,193,655 相比，各多 49 bytes。12／3 仍在 2,000,000 上限內，8／2 仍超過。
 - 成交筆數 5,801／7,757 不變，每天約 32.23～43.09 筆，符合「上限落點每天約 32～43 筆不變」。
 
 ## P5 `docs/next-steps.md:93`：PASS
 
-- 新增的文字是：「N1～N6 在 `7b7f743c` 修正，第三輪獨立驗收 PASS 6／6，報告在 `reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`；第三輪的 5 項觀察 P1～P5 的處理見 … 只有開發者自測」。
+- 新增的文字是：「N1～N6 在 `c2f0cba9` 修正，第三輪獨立驗收 PASS 6／6，報告在 `reports/research-shortterm-nfix-acceptance-20261108/acceptance.md`；第三輪的 5 項觀察 P1～P5 的處理見 … 只有開發者自測」。
 - 這些內容在 commit 當下都是事實：報告已收錄在同一個 commit，P1～P5 當時確實只有自測。沒有預寫本輪的驗收結果。
 - 本輪 PASS 之後，「只有開發者自測」會再次過時。這是逐輪更新的固有落差，不算缺陷。
 
 ## 收錄的第三輪報告：PASS
 
 ```
-6a82b80be6e348a0eff86ed20465a1c3e018c8f7b42d73a1dc98a1807f44b619  git show 45c12512:reports/.../acceptance.md
+6a82b80be6e348a0eff86ed20465a1c3e018c8f7b42d73a1dc98a1807f44b619  git show b1e637fd:reports/.../acceptance.md
 6a82b80be6e348a0eff86ed20465a1c3e018c8f7b42d73a1dc98a1807f44b619  .claude/worktrees/acceptance-nfix-912eb4/reports/.../acceptance.md
 cmp → IDENTICAL；兩邊都是 18,862 bytes；原檔 CR 數 0
 git ls-files -s → 100644 3b72f0fd…，attr text=auto eol=lf
@@ -152,7 +152,7 @@ sha256 開頭與開發端宣稱的 `6a82b80be6e348a0` 相同。
 
 ## 其他核對
 
-- `git diff --check 7b7f743c 45c12512 -- . ':!reports'`：exit 0，沒有空白錯誤。
+- `git diff --check c2f0cba9 b1e637fd -- . ':!reports'`：exit 0，沒有空白錯誤。
 - 本 commit 改動的 12 個檔，`git ls-files --eol` 全部是 `i/lf w/lf`。
 
 ## 測試
@@ -193,8 +193,8 @@ sha256 開頭與開發端宣稱的 `6a82b80be6e348a0` 相同。
 
 | 命令 | 結果 |
 | --- | --- |
-| `git diff --stat 7b7f743c 45c12512`；`git diff 7b7f743c 45c12512 -- . ':!reports'` | 12 個檔，+283／-17 |
-| `git show 7b7f743c:catos/<模組>.py > $S/old/old_<模組>.py`（overfit、optimization、validation_job、catalog、reporting） | 舊版對照 |
+| `git diff --stat c2f0cba9 b1e637fd`；`git diff c2f0cba9 b1e637fd -- . ':!reports'` | 12 個檔，+283／-17 |
+| `git show c2f0cba9:catos/<模組>.py > $S/old/old_<模組>.py`（overfit、optimization、validation_job、catalog、reporting） | 舊版對照 |
 | `PYTHONIOENCODING=utf-8 $PY -B $S/p2_check.py <worktree> $S/reports.json` | 8 種情境 PASS，`FAILURES: none` |
 | `node $S/ssr/run.mjs <worktree> $S` | 8 種情境 PASS，`FAILURES: 0`；暫存的舊元件已刪除，`git status` 乾淨 |
 | `PYTHONIOENCODING=utf-8 $PY -B $S/p34_check.py <worktree>` | limit 檢查、3,000 組性質測試 0 違反、19 窗新舊比對 PASS，`FAILURES: none` |
