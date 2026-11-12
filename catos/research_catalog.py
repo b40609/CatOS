@@ -9,7 +9,8 @@ from pathlib import Path
 import re
 from types import ModuleType
 
-from catos import research, research_costs, research_datasets, research_overfit, research_trades
+from catos import (research, research_costs, research_datasets, research_loss_limits, research_overfit,
+                   research_trades)
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -135,6 +136,7 @@ ENGINE_FILES = (
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py",
     "catos/research_costs.py", "catos/research_overfit.py", "catos/research_trades.py",
+    "catos/research_loss_limits.py",
 )
 DEFAULT_REQUEST = {
     "strategy_id": STRATEGY_ID, "dataset_id": DATASET_ID,
@@ -713,6 +715,7 @@ def execute_request(request, expected_source):
         "margin_model": dataset.margin_summary(),
         "trade_stats": research_trades.trade_stats(result),
         "equity_wiped_out": _wiped_out(result),
+        "daily_loss_limits": research_loss_limits.summary(result, bars),
         "data_notice": dataset.notice,
         "trade_count_unit": "simulated fills, not closed round trips",
     }
@@ -723,7 +726,9 @@ def execute_request(request, expected_source):
                                      "method": "bucket_deepest_drawdown_keep_first_last"}
     report = render_report(result, curve_indices=keep, max_trade_rows=REPORT_MAX_FILL_ROWS)
     report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n"
-                            + costs_html(margin_rows(payload["margin_model"], result), "保證金與強平") + "\n</body>", 1)
+                            + costs_html(margin_rows(payload["margin_model"], result), "保證金與強平") + "\n"
+                            + costs_html(research_loss_limits.report_rows(payload["daily_loss_limits"]),
+                                         "套用 Soft／Hard 日損門檻的觸發次數") + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report

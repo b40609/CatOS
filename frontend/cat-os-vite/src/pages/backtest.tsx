@@ -19,6 +19,7 @@ import { DatasetPicker, pickDataset } from "@/components/catos/dataset-picker";
 import { StrategyPicker } from "@/components/catos/strategy-picker";
 import { CostBreakdownPanel, costViewFromBreakdown } from "@/components/catos/cost-breakdown-panel";
 import { TradeStatsPanel } from "@/components/catos/trade-stats-panel";
+import { DailyLossLimitsPanel } from "@/components/catos/daily-loss-limits-panel";
 import { formatDateTimeWithYear, formatDecimal, formatDrawdownPct, formatRatioPct, signOf } from "@/lib/format";
 import {
   DONCHIAN_ID, donchianParams, formatParams, minWarmupBars, minWarmupProblems, paramLabel, paramProblems, paramSpecs,
@@ -637,6 +638,8 @@ function BacktestPage() {
         {result && !resultLoading && result.trade_stats && (
           <TradeStatsPanel stats={result.trade_stats} />
         )}
+
+        {result && !resultLoading && <DailyLossLimitsPanel value={result.daily_loss_limits} />}
 
         {result && !resultLoading && (
           <CostBreakdownPanel
