@@ -68,7 +68,14 @@
 ### 已同意、排程中
 
 - 回測報表加「如果套用 Soft／Hard，這段歷史會觸發幾次」（2026-11-12 同意，保證金模型完成後做）。
-- 刪除 Virtual Lots 原型（2026-11-12 同意）。`catos/journal.py` 每次開帳本都會建 6 張 lot 表並把 `PRAGMA user_version` 設為 7；正式資料根的 8 個帳本都有這 6 張表，全部 0 筆。做法：刪掉 lot 程式與測試，保留這 6 張表的建表語句，不改 schema、不遷移。
+
+### 刪除 Virtual Lots 原型（2026-11-12 完成）
+
+- 刪掉 34 個檔（9,345 行）：`catos/lot_*.py`、`lots.py`、`ipc_lots.py`、對應測試與輔助、`examples/lot_scenario_demo.py`、`docs/lot-fill-handoff.md`。commit `223e02e4`，驗收後的修正在下一個 commit。
+- 帳本不改 schema、不遷移：`catos/journal.py` 逐字保留 6 張 lot 表的建表語句（`RETAINED_*`），新帳本的 `sqlite_master` 與 `user_version=7` 和刪除前相同；1 到 6 版升 7 版照舊；`user_version` 8／9（只有原型建過）明確報錯。原本附帶在 Lot 啟動復原裡的 `quick_check` 整庫檢查保留。
+- 驗證：後端 `Ran 1247` → `Ran 890 tests`（刪 364、增 7），`OK (skipped=11)` 不變；8 個正式帳本的複本改動前後都能開、結果逐列相同。前端未改動。
+- 獨立驗收 PASS（7／7，無阻斷），報告 `reports/remove-virtual-lots-acceptance-20261112/acceptance.md`。
+- 待決（非阻斷，驗收觀察 O1）：v7 帳本開檔不再檢查 6 張 lot 表的結構與資料；要不要補一個便宜的檢查由使用者決定。
 
 ### 等使用者決定
 

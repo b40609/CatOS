@@ -355,7 +355,8 @@ class Journal:
                 if version < 7:
                     _install_retained_tables(self.connection, RETAINED_LOT_FILL_TABLES, _RETAINED_LOT_FILL_SCHEMA)
                 self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
-                # 這兩項整庫檢查原本附帶在 Lot 啟動復原裡；原型刪除後保留，開檔行為不變。
+                # 這兩項整庫檢查原本附帶在 Lot 啟動復原裡，原型刪除後保留。
+                # Lot 表本身的結構與資料不再驗證（程式已不讀寫它們）。
                 if (self.connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1
                         or [row[0] for row in self.connection.execute("PRAGMA quick_check")] != ["ok"]):
                     raise JournalError("journal integrity check failed")

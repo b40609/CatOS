@@ -112,10 +112,11 @@ class JournalSchemaTests(unittest.TestCase):
                 Journal(path, "fake-account", D("100")).close()
                 with closing(sqlite3.connect(path)) as db, db:
                     db.execute(f"PRAGMA user_version={version}")
-                before = schema(path)
+                before = path.read_bytes()
                 with self.assertRaisesRegex(JournalError, "Virtual Lots prototype"):
                     Journal(path, "fake-account", D("100"))
-                self.assertEqual(schema(path), before)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual(schema(path)[0], version)
 
     def test_unknown_versions_still_refused(self):
         for version in (10, 99):
@@ -137,7 +138,8 @@ class JournalSchemaTests(unittest.TestCase):
             # Point the bots table's unique index at the wrong root page.
             db.execute("UPDATE sqlite_master SET rootpage=(SELECT rootpage FROM sqlite_master "
                        "WHERE name='control') WHERE name='sqlite_autoindex_bots_1'")
-        with self.assertRaises((JournalError, sqlite3.DatabaseError)):
+        # Removing the retained quick_check lets this ledger open (checked by mutation).
+        with self.assertRaisesRegex(JournalError, "integrity check failed"):
             Journal(path, "fake-account", D("100"))
 
 
