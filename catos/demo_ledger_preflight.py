@@ -36,6 +36,7 @@ _REQUIRED_TABLES = frozenset((
     "metadata", "control", "bots", "ownership", "inputs", "intents",
     "reservations", "outbox", "risk_control", "risk_orders", "execution_mode",
     "execution_orders", "execution_fills", "risk_actions", "protection",
+    # Virtual Lots 原型已刪除，但 schema 7 仍建這 6 張空表（見 journal.RETAINED_*）。
     "lot_bindings", "lot_heads", "lot_revisions", "lot_fill_orders",
     "lot_fill_events", "lot_fill_terminals",
 ))

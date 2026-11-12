@@ -22,7 +22,7 @@
 | 固定模板本機模擬 | 已有 HTTP；單槽 SMA 合成 smoke 模板 start／stop | `/api/workspace/simulation/*` | 尚未透過主 React 狀態 adapter 串接；只限固定 8 根／2 根預熱模板，非任意 Bot 或常駐交易 |
 | 舊 local-sim 證據瀏覽 | 已有唯讀 HTTP | `/api/workspace/local-sim/runs*` | 可讀 manifest／status／events；不是即時帳戶、Worker 存活或風控就緒證明 |
 | 帳戶風控、R1 風控期間基準 | 已有 Python／local-sim；**R1 未接 HTTP／UI** | 目前不能從 React 讀取／操作完整帳戶風控 | R1 local-sim 有歷史獨驗 PASS；風控／Kill Switch 展示不能宣稱已控制後端 |
-| Virtual Lots／逐筆成交帳務 | 已有分階段 Python／local-sim 工作與證據 | 無對應前端 HTTP 契約 | 不等於目前單合約單 Bot 執行已改制，也不含完整多 Lot 分配、funding 與交易整合 |
+| Virtual Lots／逐筆成交帳務 | 原型已於 2026-11-12 刪除 | 無 | 帳本只保留 6 張空的 lot 表以維持 schema 7；同幣種多策略的方向見 `docs/next-steps.md` 第 6 步 |
 | 真實行情研究、任意策略上傳、AI 自主研究、Demo／Live | 本次研究 HTTP 沒有完整可用流程 | 尚未實作此整合，或需另核對／另行授權 | 不能以展示按鈕、模組存在或研究完成推導為交易能力 |
 | Yaozi 情報 | 有唯讀路由，依指定本機資料可用性 | 第 9 節保留路由索引 | 情報頁仍有固定告警／費率；本輪未核實各卡 DTO、實際資料與新鮮度 |
 
@@ -354,7 +354,7 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
   - POST `/api/workspace/simulation/bots`
   舊 [v1 交接](v1-local-core-handoff-20261002.md) 與 mock 路徑不能當現行 API 文件。
 - **風控／R1**：2026-11-03 起有唯讀 GET `/risk`、`/positions`、`/state`（投影自 local-sim 控制面事件的 `risk_state`，`basis.period_start_ms` 為台北日起點、UI 應標示「合成基準」）。[risk.py](../catos/risk.py)、[risk_period.py](../catos/risk_period.py)、[supervisor.py](../catos/supervisor.py) 的 R1 首次合格觀測、基準建立、latch／re-arm、Kill Switch 與門檻修改仍沒有 HTTP；顯示語義應為「風控期間損益」與實際起算時間，不涵蓋起算前整日日損；重啟／反彈／跨日不自動解除 latch。
-- **Lot 帳務**：見 [lot-fill-handoff.md](lot-fill-handoff.md)。Python／local-sim 階段與歷史驗證按各切片認定，不提升為現行多 Bot 共用合約、交易、額度預留、內部對沖或完整分攤能力。
+- **Lot 帳務**：Virtual Lots 原型（程式、測試與交接文件）已於 2026-11-12 刪除；帳本只保留 6 張空的 lot 表以維持 schema 7。
 - 模組存在、單元測試通過、MCP 有方法或 mock 有命令，都不等於網站已取得控制能力。要補 HTTP 屬另一個後端工作包，本次只記錄。
 
 ### 前端完成前可固定的契約與待決範圍

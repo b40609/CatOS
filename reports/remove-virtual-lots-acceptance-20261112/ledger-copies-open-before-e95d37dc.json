@@ -1,0 +1,653 @@
+{
+ "catos_file": "C:\\Users\\user\\.t3\\worktrees\\CatOS\\chore-remove-virtual-lo-776e0bd075c74035\\catos\\__init__.py",
+ "ledgers": {
+  "local-sim-control-4874ffc8cb444bbc898032005a1a848e": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "sim-control-sma": 8
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-control-5975e67dffa34594ab78c1fe4bf475b0": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "sim-control-sma": 28
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-control-89470c8bb7084de89ed701d54b9274fd": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "sim-control-sma": 12
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-control-c02f745093ae4aaba423cb5a51855219": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "sim-control-sma": 28
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-r4-049a422bab384a068839d22e8ec55ac8": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "r4-sma": 28
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-r4-347282b9d0d9433db6a0276209936f60": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "r4-sma": 94
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-r4-51e0f2cbe309473e8c0e2b32563a4087": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "r4-sma": 14
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  },
+  "local-sim-r4-d8fdd571ef554c8681e2316edd22bbe9": {
+   "before": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   },
+   "open": {
+    "opened": true,
+    "risk": true,
+    "execution": true,
+    "bots": {
+     "r4-sma": 28
+    },
+    "risk_mode": "RUN"
+   },
+   "after": {
+    "user_version": 7,
+    "integrity_check": "ok",
+    "lot_rows": {
+     "lot_bindings": 0,
+     "lot_heads": 0,
+     "lot_revisions": 0,
+     "lot_fill_orders": 0,
+     "lot_fill_events": 0,
+     "lot_fill_terminals": 0
+    },
+    "tables": [
+     "bots",
+     "control",
+     "execution_fills",
+     "execution_mode",
+     "execution_orders",
+     "inputs",
+     "intents",
+     "lot_bindings",
+     "lot_fill_events",
+     "lot_fill_orders",
+     "lot_fill_terminals",
+     "lot_heads",
+     "lot_revisions",
+     "metadata",
+     "outbox",
+     "ownership",
+     "protection",
+     "reservations",
+     "risk_actions",
+     "risk_control",
+     "risk_orders"
+    ]
+   }
+  }
+ }
+}

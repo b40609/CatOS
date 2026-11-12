@@ -66,7 +66,7 @@
 
 ### 獨立驗收
 
-- 需要獨立驗收的改動：帳務、風控、執行、IPC、持久化，以及研究核心的損益與成本計算。對應 `catos/` 下的 `journal`、`risk`、`risk_period`、`execution`、`supervisor`、`worker`、`ipc`、`protection`、`fake_exchange`、`lot_*`、`research`、`research_costs`、`research_trades` 等模組。
+- 需要獨立驗收的改動：帳務、風控、執行、IPC、持久化，以及研究核心的損益與成本計算。對應 `catos/` 下的 `journal`、`risk`、`risk_period`、`execution`、`supervisor`、`worker`、`ipc`、`protection`、`fake_exchange`、`research`、`research_costs`、`research_trades` 等模組。
 - 做法：由沒有參與該改動的另一個會話或模型執行，核對原始證據並依風險重驗，不機械重跑所有歷史測試。自測不能稱為獨立驗收。
 - 其他改動（介面、文件、工具、啟動腳本、報表呈現）自測通過即可交付，交付時寫明「未經獨立驗收」。
 - 驗收發現的缺陷由開發者修復，只重驗受影響的範圍，不重啟整套流程。
@@ -115,7 +115,7 @@
 - Soft／Hard 日損與手動 Kill Switch 一律鎖存，當日不重設預算，僅限人工恢復；反彈、跨日、重啟或入金不自動解除。人工恢復仍不得覆蓋有效風險原因；原風險原因消失且恢復條件合格後，可隨時人工 re-arm；修改門檻不直接解除 latch。
 - 風控與額度保留原子化；UNKNOWN 不盲目重送或釋放額度；重啟先對帳且保留硬熔斷。
 - P6 已確認：每個 Bot 可獨立設定災難停損比例，不同幣種可不同，預設 0% 表示不啟用。使用 OKX 交易所端整倉停損作斷線／主機故障時最後保險；正常仍由策略自身停損處理，不取代帳戶級 Soft／Hard。觸發來源採 mark；tick 向提早觸發方向取整（多倉向上、空倉向下）；非零比例改為 0% 時必須等完整取消終態才完成停用，UNKNOWN 期間禁增倉並告警。部位平均成本改變時更新；保護建立／更新失敗時禁止繼續增加曝險並告警，不做自動減持。儲存失效繞過持久化的 emergency 下單通道仍延後，不宣稱離線精確帳戶日損清倉。
-- P8 研發方向已更新：允許隔離的 Virtual Lots／IPC v2、S2 同 writer 快照持久化，以及使用者已指示執行的 S3 合成逐筆成交帳務；僅 local-sim、一訂單明確歸屬一 Lot、完整 USDT 費用、同交易去重與重放。缺費用、成交更正、資金費分攤及多 Lot 分配留後續。現行 v1 執行仍為單合約單 Bot、`cross`＋`net_mode`；不接交易、額度預留、內部對沖或 P6 改造，不升級使用者既有 DB。S3 開發交接與驗證狀態見 `docs/lot-fill-handoff.md`。
+- P8：現行 v1 執行仍為單合約單 Bot、`cross`＋`net_mode`。Virtual Lots 原型（IPC v2、S2 快照持久化、S3 合成逐筆成交帳務）已於 2026-11-12 依使用者決定刪除；帳本保留 6 張空的 lot 表以維持 schema 7，不升級使用者既有 DB。
 
 ## 設計邊界
 

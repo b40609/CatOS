@@ -17,7 +17,7 @@ from catos.supervisor import LocalSupervisor, SupervisorUnavailable
 from test_ipc import config
 from test_journal import proof
 from test_risk import snapshot
-from lot_journal_helpers import drop_empty_lot_schema
+from journal_legacy_helpers import drop_empty_lot_schema
 
 
 class PolicyTests(unittest.TestCase):

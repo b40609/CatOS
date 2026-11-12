@@ -14,7 +14,7 @@ from catos.journal import FixtureDecision, Journal, JournalError
 from test_ipc import STEP, config
 from test_journal import input_for, prepare_and_commit, proof, result_for
 from test_risk import snapshot
-from lot_journal_helpers import drop_empty_lot_schema
+from journal_legacy_helpers import drop_empty_lot_schema
 
 D = Decimal
 

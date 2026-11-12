@@ -137,12 +137,125 @@ _RISK_SCHEMA = (
 )
 
 
+# Virtual Lots 原型已於 2026-11-12 刪除。schema 7 的帳本都有下列 6 張表（正式帳本全部 0 筆），
+# 新帳本照原文建立，讓 sqlite_master 與 user_version 和刪除前完全相同、既有帳本不必遷移。
+# 程式不再讀寫這些表；DDL 文字必須逐字保留（tests/test_journal_schema.py 會比對）。
+RETAINED_LOT_TABLES = ("lot_bindings", "lot_heads", "lot_revisions")  # schema 6 加入
+RETAINED_LOT_FILL_TABLES = ("lot_fill_orders", "lot_fill_events", "lot_fill_terminals")  # schema 7 加入
+# schema 8／9 只有原型和它的測試建過，現在一律拒絕開啟。
+RETIRED_LOT_SCHEMA_VERSIONS = (8, 9)
+_RETAINED_LOT_SCHEMA = (
+    """CREATE TABLE lot_bindings (
+        bot_id TEXT PRIMARY KEY NOT NULL,
+        account_ref TEXT NOT NULL,
+        environment TEXT NOT NULL CHECK(environment='local-sim'),
+        inst_id TEXT NOT NULL,
+        contract_json TEXT NOT NULL
+            CHECK(length(CAST(contract_json AS BLOB)) BETWEEN 1 AND 65536),
+        last_commit_seq INTEGER NOT NULL DEFAULT 0
+            CHECK(last_commit_seq BETWEEN 0 AND 9223372036854775807)
+    ) STRICT""",
+    """CREATE TABLE lot_heads (
+        lot_id TEXT PRIMARY KEY NOT NULL
+            CHECK(length(lot_id)=64 AND lot_id NOT GLOB '*[^0-9a-f]*'),
+        bot_id TEXT NOT NULL REFERENCES lot_bindings(bot_id),
+        open_event_seq INTEGER NOT NULL
+            CHECK(open_event_seq BETWEEN 1 AND 9223372036854775807),
+        open_intent_key TEXT NOT NULL UNIQUE
+            CHECK(length(open_intent_key)=64 AND open_intent_key NOT GLOB '*[^0-9a-f]*'),
+        side TEXT NOT NULL CHECK(side IN ('long','short')),
+        current_revision INTEGER NOT NULL
+            CHECK(current_revision BETWEEN 1 AND 9223372036854775807),
+        UNIQUE(bot_id, open_event_seq),
+        UNIQUE(lot_id, bot_id),
+        FOREIGN KEY(lot_id, current_revision)
+            REFERENCES lot_revisions(lot_id, revision) DEFERRABLE INITIALLY DEFERRED
+    ) STRICT""",
+    """CREATE TABLE lot_revisions (
+        lot_id TEXT NOT NULL,
+        bot_id TEXT NOT NULL,
+        revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 9223372036854775807),
+        expected_revision INTEGER NOT NULL
+            CHECK(expected_revision BETWEEN 0 AND 9223372036854775806),
+        write_id TEXT NOT NULL CHECK(length(write_id) BETWEEN 1 AND 64),
+        commit_seq INTEGER NOT NULL CHECK(commit_seq BETWEEN 1 AND 9223372036854775807),
+        operation TEXT NOT NULL CHECK(operation IN ('CREATE','REPLACE')),
+        opened_qty TEXT NOT NULL CHECK(typeof(opened_qty)='text'),
+        remaining_qty TEXT NOT NULL CHECK(typeof(remaining_qty)='text'),
+        average_entry TEXT NOT NULL CHECK(typeof(average_entry)='text'),
+        realized_pnl TEXT NOT NULL CHECK(typeof(realized_pnl)='text'),
+        fees_paid TEXT NOT NULL CHECK(typeof(fees_paid)='text'),
+        funding_paid TEXT CHECK(funding_paid IS NULL OR typeof(funding_paid)='text'),
+        trigger_price_type TEXT NOT NULL CHECK(trigger_price_type='mark'),
+        take_profit TEXT CHECK(take_profit IS NULL OR typeof(take_profit)='text'),
+        stop_loss TEXT CHECK(stop_loss IS NULL OR typeof(stop_loss)='text'),
+        opening_unresolved INTEGER NOT NULL CHECK(opening_unresolved IN (0,1)),
+        closing_unresolved INTEGER NOT NULL CHECK(closing_unresolved IN (0,1)),
+        request_json TEXT NOT NULL
+            CHECK(length(CAST(request_json AS BLOB)) BETWEEN 1 AND 65536),
+        request_hash TEXT NOT NULL
+            CHECK(length(request_hash)=64 AND request_hash NOT GLOB '*[^0-9a-f]*'),
+        PRIMARY KEY(lot_id, revision),
+        UNIQUE(bot_id, write_id),
+        UNIQUE(bot_id, commit_seq),
+        FOREIGN KEY(lot_id, bot_id) REFERENCES lot_heads(lot_id, bot_id),
+        CHECK(revision=expected_revision+1),
+        CHECK((operation='CREATE' AND expected_revision=0)
+           OR (operation='REPLACE' AND expected_revision>=1))
+    ) STRICT""",
+)
+_RETAINED_LOT_FILL_COMMON = """seq INTEGER NOT NULL UNIQUE CHECK(seq>0),
+    request_json TEXT NOT NULL CHECK(length(CAST(request_json AS BLOB)) BETWEEN 1 AND 65536),
+    request_hash TEXT NOT NULL CHECK(length(request_hash)=64),
+    lot_id TEXT, revision INTEGER, commit_seq INTEGER,
+    CHECK((lot_id IS NULL AND revision IS NULL AND commit_seq IS NULL)
+       OR (lot_id IS NOT NULL AND revision IS NOT NULL AND commit_seq IS NOT NULL
+           AND revision>0 AND commit_seq>0)),
+    FOREIGN KEY(lot_id,revision) REFERENCES lot_revisions(lot_id,revision),
+    UNIQUE(lot_id,revision)"""
+_RETAINED_LOT_FILL_SCHEMA = (
+    f"""CREATE TABLE lot_fill_orders (
+        order_key TEXT PRIMARY KEY NOT NULL,
+        bot_id TEXT NOT NULL REFERENCES lot_bindings(bot_id),
+        event_seq INTEGER NOT NULL CHECK(event_seq>0),
+        managed_lot_id TEXT NOT NULL,
+        intent_key TEXT NOT NULL UNIQUE,
+        resolved_quantity TEXT NOT NULL,
+        {_RETAINED_LOT_FILL_COMMON}, UNIQUE(bot_id,event_seq)
+    ) STRICT""",
+    f"""CREATE TABLE lot_fill_events (
+        order_key TEXT NOT NULL REFERENCES lot_fill_orders(order_key),
+        trade_id TEXT NOT NULL, fill_seq INTEGER NOT NULL CHECK(fill_seq>0),
+        quantity TEXT NOT NULL, price TEXT NOT NULL, fee_paid TEXT NOT NULL,
+        fee_currency TEXT NOT NULL CHECK(fee_currency='USDT'),
+        {_RETAINED_LOT_FILL_COMMON}, PRIMARY KEY(order_key,trade_id), UNIQUE(order_key,fill_seq)
+    ) STRICT""",
+    f"""CREATE TABLE lot_fill_terminals (
+        order_key TEXT PRIMARY KEY NOT NULL REFERENCES lot_fill_orders(order_key),
+        terminal_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('FILLED','CANCELED','REJECTED')),
+        final_fill_seq INTEGER NOT NULL CHECK(final_fill_seq>=0),
+        final_filled_qty TEXT NOT NULL,
+        {_RETAINED_LOT_FILL_COMMON}
+    ) STRICT""",
+)
+
+
+def _install_retained_tables(connection, tables, schema):
+    """Called only inside Journal's initialization transaction."""
+    for name in tables:
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone():
+            raise JournalError("unexpected retained table before schema install")
+    for statement in schema:
+        connection.execute(statement)
+
+
 def _columns(connection, table):
     return {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
 
 
 def _migrate_core_schema(connection):
-    """Migrate only catOS core columns; PRAGMA user_version remains the Lot version."""
+    """Migrate only catOS core columns; PRAGMA user_version stays SCHEMA_VERSION."""
     metadata = _columns(connection, "metadata")
     ownership = _columns(connection, "ownership")
     if not {"account_id", "environment", "fixture_budget"} <= metadata:
@@ -175,26 +288,11 @@ def _migrate_core_schema(connection):
 
 class Journal:
     """Internal writer owned by Supervisor's one dedicated thread and account lock."""
-    def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False, *, lot_schema_version=7):
+    def __init__(self, path, account_id, fixture_budget, risk_limits=None, execution_enabled=False):
         from catos.execution import ExecutionJournal, SCHEMA as EXECUTION_SCHEMA
         from catos.protection import ProtectionJournal
-        from catos.lot_journal import LotJournal, install_schema as install_lot_schema
-        from catos.lot_fills import LotFillJournal, install_schema as install_fill_schema
-        from catos.lot_journal import LotStorageError
-        if type(lot_schema_version) is not int or lot_schema_version not in (7, 8, 9):
-            raise LotStorageError("schema_version_mismatch")
-        if lot_schema_version == 8:
-            if risk_limits is not None or execution_enabled is not False:
-                raise LotStorageError("unsupported_fee_version")
-            from catos.lot_schema8 import (LotJournalV2 as LotJournal,
-                LotFillJournalV2 as LotFillJournal, install_lot_schema, install_fill_schema)
-        elif lot_schema_version == 9:
-            if risk_limits is not None or execution_enabled is not False:
-                raise LotStorageError("unsupported_fee_version")
-            from catos.lot_schema9 import (LotJournalV3 as LotJournal,
-                LotFillJournalV3 as LotFillJournal, install_lot_schema, install_fill_schema)
         if sqlite3.sqlite_version_info < (3, 37, 0):
-            raise JournalError("SQLite 3.37+ required for Lot STRICT tables")
+            raise JournalError("SQLite 3.37+ required for STRICT tables")
         if type(execution_enabled) is not bool or (execution_enabled and risk_limits is None):
             raise JournalError("local execution requires installed risk")
         self.execution = None
@@ -212,15 +310,13 @@ class Journal:
         self.connection.row_factory = sqlite3.Row
         try:
             version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-            if ((lot_schema_version in (8, 9) and version not in (0, lot_schema_version))
-                    or (lot_schema_version == 7 and version in (8, 9))):
-                raise LotStorageError("schema_version_mismatch")
+            if version in RETIRED_LOT_SCHEMA_VERSIONS:
+                raise JournalError(f"schema {version} came from the removed Virtual Lots prototype; "
+                                   "not supported, no automatic rebuild")
             if version == 0:
                 if self.connection.execute("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").fetchone():
-                    if lot_schema_version == 9:
-                        raise LotStorageError("schema_version_mismatch")
                     raise JournalError("refusing an unrecognized nonempty database")
-            elif version not in (1, 2, 3, 4, 5, 6, lot_schema_version):
+            elif version not in (1, 2, 3, 4, 5, 6, SCHEMA_VERSION):
                 raise JournalError("unsupported journal schema; no automatic rebuild")
             else:
                 meta = self.connection.execute("SELECT * FROM metadata").fetchone()
@@ -255,18 +351,14 @@ class Journal:
                 if version < 5:
                     self.connection.execute("CREATE TABLE IF NOT EXISTS protection (bot_id TEXT PRIMARY KEY REFERENCES bots(bot_id), state_json TEXT NOT NULL)")
                 if version < 6:
-                    install_lot_schema(self.connection)
+                    _install_retained_tables(self.connection, RETAINED_LOT_TABLES, _RETAINED_LOT_SCHEMA)
                 if version < 7:
-                    install_fill_schema(self.connection)
-                self.connection.execute(f"PRAGMA user_version={lot_schema_version}")
-                self.lots = LotJournal(self)
-                if lot_schema_version == 9:
-                    self.lot_fills = LotFillJournal(self)
-                    self.lots._recover_in_transaction()
-                else:
-                    self.lots._recover_in_transaction()
-                    self.lot_fills = LotFillJournal(self)
-                    self.lot_fills._recover_in_transaction()
+                    _install_retained_tables(self.connection, RETAINED_LOT_FILL_TABLES, _RETAINED_LOT_FILL_SCHEMA)
+                self.connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+                # 這兩項整庫檢查原本附帶在 Lot 啟動復原裡；原型刪除後保留，開檔行為不變。
+                if (self.connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1
+                        or [row[0] for row in self.connection.execute("PRAGMA quick_check")] != ["ok"]):
+                    raise JournalError("journal integrity check failed")
                 self.protection = ProtectionJournal(self)
                 for row in self.connection.execute('SELECT bot_id FROM protection'):
                     state = self.protection.state(row[0])
@@ -326,85 +418,6 @@ class Journal:
 
     def close(self):
         self.connection.close()
-
-    @contextmanager
-    def _lot_read_snapshot(self):
-        """Pin one WAL snapshot without acquiring the writer reservation."""
-        from catos.lot_journal import LotStorageError
-        if self.lots._failed:
-            raise LotStorageError("storage_unavailable")
-        started = False
-        try:
-            if self.connection.in_transaction:
-                raise LotStorageError("storage_unavailable")
-            self.connection.execute("BEGIN DEFERRED")
-            started = True
-            metadata = self.connection.execute("SELECT * FROM metadata").fetchall()
-            if (len(metadata) != 1 or metadata[0]["account_id"] != self.account_id
-                    or metadata[0]["environment"] != ENVIRONMENT
-                    or ipc.decimal_text(metadata[0]["fixture_budget"], "stored budget", derived=True) != self.budget):
-                raise LotStorageError("integrity_error")
-            yield
-        except LotStorageError as exc:
-            if exc.code == "integrity_error":
-                self.lots._failed = True
-                cause = exc.__cause__
-                while cause is not None:
-                    if isinstance(cause, sqlite3.Error):
-                        code = getattr(cause, "sqlite_errorcode", None)
-                        # Existing replay wrappers also wrap I/O errors as integrity errors.
-                        if code is None or (code & 255) not in (1, 11, 17, 19, 26):
-                            raise LotStorageError("storage_unavailable") from exc
-                        break
-                    cause = cause.__cause__
-            raise
-        except sqlite3.Error as exc:
-            self.lots._failed = True
-            code = getattr(exc, "sqlite_errorcode", None)
-            reason = ("integrity_error" if started and code is not None
-                      and (code & 255) in (1, 11, 17, 19, 26) else "storage_unavailable")
-            raise LotStorageError(reason) from exc
-        except (ValueError, TypeError, KeyError, IndexError) as exc:
-            self.lots._failed = True
-            raise LotStorageError("integrity_error") from exc
-        except BaseException:
-            self.lots._failed = True
-            raise
-        finally:
-            if started:
-                try:
-                    self.connection.rollback()
-                except sqlite3.Error as exc:
-                    self.lots._failed = True
-                    raise LotStorageError("storage_unavailable") from exc
-
-    def capture_lot_snapshot(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
-        if self.lots.v2:
-            from catos.lot_journal import LotStorageError
-            raise LotStorageError("unsupported_fee_version")
-        from catos.lot_snapshot import validate_request, _materialize
-        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
-        with self._lot_read_snapshot():
-            capture = _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms)
-        return capture
-
-    def capture_lot_snapshot_v2(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
-        from catos.lot_journal import LotStorageError
-        from catos.lot_snapshot import validate_request, _materialize
-        if self.lots.schema_version != 8:
-            raise LotStorageError("unsupported_fee_version")
-        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
-        with self._lot_read_snapshot():
-            return _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms, v2=True)
-
-    def capture_lot_snapshot_v3(self, *, scope, inst_id, observed_at_ms, valid_until_ms):
-        from catos.lot_journal import LotStorageError
-        from catos.lot_snapshot import validate_request, _materialize
-        if self.lots.schema_version != 9:
-            raise LotStorageError("unsupported_fee_version")
-        validate_request(self, scope, inst_id, observed_at_ms, valid_until_ms)
-        with self._lot_read_snapshot():
-            return _materialize(self, scope, inst_id, observed_at_ms, valid_until_ms, v2=True, v3=True)
 
     def _bot(self, bot_id):
         row = self.connection.execute("SELECT * FROM bots WHERE bot_id=?", (bot_id,)).fetchone()
