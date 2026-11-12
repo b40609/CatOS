@@ -361,7 +361,40 @@ export interface EquityWipedOut {
   notice: string;
 }
 
+// Days of the run that would hit the account Soft/Hard daily-loss limits (catos/research_loss_limits.py).
+export interface DailyLossLimitCount {
+  limit_pct: string;
+  days: number;
+  per_year: string | null;
+  first_day: string | null;
+  listed: { day: string; loss_pct: string }[];
+  truncated: boolean;
+}
+
+export interface DailyLossLimits {
+  method: string;
+  days_evaluated: number;
+  span_days: number;
+  years: string | null;
+  first_day: string | null;
+  last_day: string | null;
+  max_daily_loss: { day: string; loss_pct: string; basis: string; low_equity: string; low_bar_open_ms: number } | null;
+  stopped: { day: string; reason: "liquidation" | "equity_non_positive" } | null;
+  straddling_bars: number;
+  thresholds: {
+    key: "current" | "proposed";
+    label: string;
+    applied_to_risk: boolean;
+    soft: DailyLossLimitCount;
+    hard: DailyLossLimitCount;
+  }[];
+  max_listed_days: number;
+  notice: string[];
+}
+
 export interface BacktestResultPayload {
+  // Absent on runs archived before the daily-loss diagnostic (2026-11-12).
+  daily_loss_limits?: DailyLossLimits;
   // Absent on runs archived before round-trip statistics existed (2026-11-07).
   trade_stats?: TradeStats;
   // null when equity stayed above 0; absent on runs archived before 2026-11-08.
