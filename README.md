@@ -121,7 +121,7 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 
 以下每條指令都實際執行過（2026-11-11，除非另外註明）。
 
-後端完整套件（約 2 分鐘；2026-11-12 刪除 Virtual Lots 原型後的結果 890 tests、0 FAIL、0 ERROR、11 skipped：v2 候選的 python_strategy 兩個模組）：
+後端完整套件（約 2 分鐘；2026-11-12 刪除 Virtual Lots 原型並合併日損觸發次數後的結果 902 tests、0 FAIL、0 ERROR、11 skipped：v2 候選的 python_strategy 兩個模組）：
 
 ```bash
 .venv/Scripts/python.exe -m unittest discover -s tests -p "test_*.py"
