@@ -46,9 +46,9 @@ class Script(research.Strategy):
         return None if value is None else D(value)
 
 
-def run(bars, targets, balance, *, margin=MODEL, fee="0.0005", funding=()):
+def run(bars, targets, balance, *, margin=MODEL, fee="0.0005", funding=(), slippage="0"):
     strategy = Script(targets)
-    config = research.BacktestConfig(CONTRACT, TF, D(balance), D(fee), D("0"), tuple(funding), margin)
+    config = research.BacktestConfig(CONTRACT, TF, D(balance), D(fee), D(slippage), tuple(funding), margin)
     result = research.backtest(strategy=lambda: strategy, candles=bars, config=config)
     return result, strategy
 
@@ -153,6 +153,26 @@ class LiquidationTest(unittest.TestCase):
                          (D("0"), D("-752.5"), D("-6000"), D("30")))
         reconcile(self, result, bars)
 
+    def test_open_gap_liquidates_before_a_pending_exit_fills(self):
+        # Acceptance D1 (2026-11-12). Long 50 (0.5 BTC) at 40000, fee 10: B = 2081 and
+        # P_liq = (20000 - 2081) / (0.5 x 0.9955) = 36000. The exit decided at bar 1's close
+        # would fill at bar 2's open 30000, past P_liq: the liquidation comes first.
+        flat = lambda i, p: bar(i, p, p, p, p)
+        bars = (flat(0, "40000"), flat(1, "40000"), bar(2, "30000", "30500", "29500", "30000"),
+                flat(3, "30000"), flat(4, "30000"))
+        result, strategy = run(bars, {0: "50", 1: "0", 3: "10"}, "2091")
+        liq = result.liquidation
+        self.assertEqual((liq.trigger, liq.time_ms, liq.fill_price, liq.gapped, liq.liquidation_price),
+                         ("open", bars[2].open_time_ms, D("30000"), True, D("36000")))
+        # e = 2081 - 5000 = -2919: nothing to charge, the fund covers 2919.
+        self.assertEqual((liq.realized_pnl, liq.deficit_covered, liq.balance_after), (D("-5000"), D("2919"), D("0")))
+        self.assertEqual((len(result.trades), strategy.calls, result.performance.final_equity), (2, 2, D("0")))
+        self.assertTrue(all(point.equity >= 0 for point in result.equity_curve))
+        reconcile(self, result, bars)
+        # Holding through the same gap gives the same liquidation.
+        held, _ = run(bars, {0: "50"}, "2091")
+        self.assertEqual((held.liquidation.fill_price, held.liquidation.deficit_covered), (D("30000"), D("2919")))
+
     def test_close_time_funding_can_trigger_a_liquidation_at_the_close(self):
         # Bar 2 low 55100: equity 347.5 > 247.95. Funding at its close (rate 0.002, mark 55100)
         # costs 110.2, leaving equity 237.3 <= 247.95 at the close.
@@ -237,6 +257,17 @@ class InitialMarginTest(unittest.TestCase):
         result, _ = run(self.BARS, {0: "100", 1: "-150"}, "630")
         self.assertEqual(result.margin_rejection_count, 1)
         self.assertEqual(result.trades[-1].position_after, D("100"))
+
+    def test_slippage_counts_as_order_loss_against_the_open(self):
+        # Acceptance D2 (2026-11-12). Long 50 at open 40000 with 20 bps: fill 40080, fee 10.02.
+        # Valued at the open, equity = balance - 10.02 - 0.5 x 80; tier 1 needs 0.5 x 40000 x 1% = 200.
+        flat = lambda i, p: bar(i, p, p, p, p)
+        bars = (flat(0, "40000"), flat(1, "40000"), flat(2, "40000"))
+        result, _ = run(bars, {0: "50"}, "250.02", slippage="20")
+        self.assertEqual((result.margin_rejection_count, result.trades[0].price), (0, D("40080")))
+        result, _ = run(bars, {0: "50"}, "250.01", slippage="20")
+        rejection = result.margin_rejections[0]
+        self.assertEqual((rejection.equity_after, rejection.required_initial_margin), (D("199.99"), D("200")))
 
     def test_above_the_last_tier_and_leverage_setting(self):
         result, _ = run(self.BARS, {0: "20001"}, "100000000")

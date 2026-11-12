@@ -208,7 +208,7 @@ export interface MarginModelSummary {
 export interface LiquidationRecord {
   time_ms: number;
   bar_open_time_ms: number;
-  trigger: 'adverse_extreme' | 'after_funding';
+  trigger: 'open' | 'adverse_extreme' | 'after_funding';
   trigger_price: string;
   liquidation_price: string;
   fill_price: string;

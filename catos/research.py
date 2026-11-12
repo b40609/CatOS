@@ -217,7 +217,9 @@ class Liquidation:
 
     time_ms: int  # the fill's time: the bar open, or the bar close for "after_funding"
     bar_open_time_ms: int
-    trigger: str  # "adverse_extreme" (bar low/high) or "after_funding" (close, after close-time funding)
+    # "open" (the open gapped through it, checked before any fill), "adverse_extreme"
+    # (bar low/high) or "after_funding" (the close, after close-time funding)
+    trigger: str
     trigger_price: Decimal
     liquidation_price: Decimal  # tick-rounded against the trader
     fill_price: Decimal
@@ -437,7 +439,12 @@ class _Ledger:
         return Trade(bar.open_time_ms, intent.decision_time_ms, delta, price, fee, realized, target)
 
     def margin_rejection(self, intent: Intent, bar: Candle, execution) -> MarginRejection | None:
-        """Initial-margin check for a fill that grows |position|; reductions always pass."""
+        """Initial-margin check for a fill that grows |position|; reductions always pass.
+
+        The bar open stands in for the mark price: post-fill equity is valued
+        there, so the slippage between the open and the fill price counts as the
+        order loss OKX charges against an opening order.
+        """
         margin = self.config.margin
         target = intent.target_position
         if margin is None or abs(target) <= abs(self.position):
@@ -448,8 +455,9 @@ class _Ledger:
         if tier is None:
             return MarginRejection(intent.decision_time_ms, bar.open_time_ms, self.position, target, price,
                                    "above_max_tier", None, None)
-        equity = self.balance + realized - fee + target * per_contract * (price - average)
-        required = abs(target) * per_contract * price * margin.initial_rate(tier)
+        mark = bar.open
+        equity = self.balance + realized - fee + target * per_contract * (mark - average)
+        required = abs(target) * per_contract * mark * margin.initial_rate(tier)
         if equity >= required:
             return None
         return MarginRejection(intent.decision_time_ms, bar.open_time_ms, self.position, target, price,
@@ -582,6 +590,16 @@ def backtest(
 
         for bar in bars[warmup_bars:]:
             settle_through(bar.open_time_ms)
+            if liquidation is None and ledger.position != ZERO:
+                # A gap through the liquidation price between the last close and this
+                # open liquidates the held position at the open, before the pending
+                # intent could fill; the intent is then void.
+                found = ledger.liquidation_price(bar.open, bar.open)
+                if found is not None:
+                    trade, liquidation = ledger.liquidate(time_ms=bar.open_time_ms, bar=bar, trigger="open",
+                                                          trigger_price=bar.open, found=found)
+                    trades.append(trade)
+                    pending = None
             if pending is not None:
                 execution = ledger.execution(pending.target_position, bar)
                 rejection = ledger.margin_rejection(pending, bar, execution)
