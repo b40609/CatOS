@@ -286,10 +286,12 @@ _MARGIN_ASSUMPTIONS = (
     "Single-contract cross margin, net mode, OKX position tiers; no Guardian or live order state machine.",
     "Liquidation when equity <= maintenance margin + fee_rate liquidation fee at the bar's adverse extreme "
     "(low for longs, high for shorts); trade prices stand in for the mark price.",
+    "A position the open gapped through is liquidated at the open before any fill; the pending intent is void.",
     "Liquidation fills at the tick-rounded liquidation price (the open if it gapped through), charges the "
     "liquidation fee and a tier-MMR clearance fee, floors equity at 0 and stops trading; "
     "tier 3+ is not reduced in steps.",
-    "Fills that grow the position are rejected when post-fill equity is below the tier initial margin.",
+    "Fills that grow the position are rejected when post-fill equity, valued at the open (mark stand-in, so "
+    "slippage counts as order loss), is below the tier initial margin there.",
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
