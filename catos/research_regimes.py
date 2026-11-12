@@ -200,8 +200,12 @@ def _attribute(result, labels):
     context.Emax = max(context.Emax, high + headroom)
     by_close = {label.close_time_ms: label for label in labels}
     fills = {}
+    liquidation_fill = result.trades[-1] if result.liquidation is not None else None
     for trade in result.trades:
-        fills[trade.time_ms] = fills.get(trade.time_ms, 0) + 1
+        # A liquidation is counted in the bar it happened in; one triggered by
+        # close-time funding carries the close as its time.
+        key = result.liquidation.bar_open_time_ms if trade is liquidation_fill else trade.time_ms
+        fills[key] = fills.get(key, 0) + 1
     payments = iter(result.funding)
     payment = next(payments, None)
     rows = []

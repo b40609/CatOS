@@ -10,6 +10,13 @@ manifest names; a hash mismatch, a gap, a funding mismatch, an unknown field or
 an unsupported instrument rejects it (fail-closed), the same rule the strategy
 registry applies to strategy sources. Nothing here touches the network:
 ``tools/fetch_okx_candles.py`` fetches, then calls ``write_dataset``.
+
+Position tiers (2026-11-12, docs/research-margin-model.md) are a separate
+snapshot per instrument in ``data/okx/<instId>/position-tiers/``, written only by
+``write_position_tiers``. Every dataset of that instrument uses the newest one
+for the backtest margin model and lists it, with its sha256, among its files; an
+invalid snapshot rejects the dataset, and no snapshot leaves the model off with
+that reason stated in every run.
 """
 
 import csv
@@ -44,6 +51,10 @@ ENDPOINTS = (
     "/api/v5/public/funding-rate-history",
     "/api/v5/public/instruments",
 )
+# Position tiers for the backtest margin model (2026-11-11 authorization: BTC-USDT-SWAP only).
+# Kept out of ENDPOINTS: candle dataset manifests list exactly those three endpoints.
+TIERS_ENDPOINT = "/api/v5/public/position-tiers"
+TIERS_INST_IDS = ("BTC-USDT-SWAP",)
 BAR_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1H": 3_600_000, "4H": 14_400_000}
 MANIFEST_FIELDS = {
     "schema", "schema_version", "dataset_id", "source", "inst_id", "bar", "timeframe_ms",
@@ -56,7 +67,19 @@ DATASET_ID = re.compile(r"okx-[a-z0-9]+(?:-[a-z0-9]+)*-\d{8}-\d{8}")
 SHA256 = re.compile(r"[0-9a-f]{64}")
 INST_ID = re.compile(r"[A-Z0-9]+-USDT-SWAP")
 NOTICE = ("OKX 公開歷史 K 線（已收盤）與實際資金費率；資金費以結算當下 K 線開盤價近似 mark price。"
-          "本根收盤決策、下一根開盤加滑價成交，沒有訂單簿、保證金與強平模型，不代表實盤可得績效。")
+          "本根收盤決策、下一根開盤加滑價成交，沒有訂單簿，不代表實盤可得績效。")
+MARGIN_ON_NOTICE = ("保證金與強平：單合約全倉、OKX 部位檔位（{fetched} UTC 快照），以 K 線最不利價（多單最低價、"
+                    "空單最高價）檢查，成交價代替標記價格，會高估強平。")
+MARGIN_OFF_NOTICE = "本機沒有這個合約的部位檔位快照，未啟用保證金與強平模型，有槓桿時結果偏樂觀。"
+TIERS_SCHEMA = "catos.research.position_tiers"
+TIERS_SOURCE = "okx_public_position_tiers"
+TIERS_DIR = "position-tiers"
+TIERS_FIELDS = {"schema", "schema_version", "source", "endpoint", "params", "inst_id", "td_mode",
+                "fetched_at_ms", "requests", "records"}
+MARGIN_REASONS = {
+    "no_position_tiers": "本機沒有這個合約的部位檔位快照",
+    "synthetic_fixture": "內建合成資料集的合約規格是測試用的，不套用真實檔位",
+}
 PARTIAL_FUNDING_NOTICE = "資金費只涵蓋 {first} UTC 之後；之前的期間未計資金費（OKX 只保留約 3 個月的資金費歷史）。"
 
 
@@ -113,6 +136,121 @@ def contract_from_instrument(record, inst_id):
     }
 
 
+def tiers_params(inst_id):
+    """Request parameters of the tier snapshot: cross margin, the instrument family <BASE>-USDT."""
+    return {"instType": "SWAP", "tdMode": "cross", "instFamily": inst_id.rsplit("-", 1)[0]}
+
+
+def _record_decimal(record, key):
+    value = record.get(key)
+    if type(value) is not str:
+        raise ValueError(f"position_tiers_{key}_invalid")
+    try:
+        number = Decimal(value)
+    except InvalidOperation:
+        raise ValueError(f"position_tiers_{key}_invalid") from None
+    if not number.is_finite() or number < 0:
+        raise ValueError(f"position_tiers_{key}_invalid")
+    return number
+
+
+def parse_tiers(records, inst_id):
+    """research.MarginTier rows from raw OKX records; fail on anything unexpected.
+
+    Tiers must be numbered 1..n in order, start at 0 contracts and be contiguous
+    (each minSz above the previous maxSz), with 0 < mmr < imr <= 1.
+    """
+    family = tiers_params(inst_id)["instFamily"]
+    if type(records) is not list or not records:
+        raise ValueError("position_tiers_empty")
+    tiers, previous = [], None
+    for number, record in enumerate(records, start=1):
+        if type(record) is not dict or record.get("instFamily") != family or record.get("tier") != str(number):
+            raise ValueError("position_tiers_record_mismatch")
+        low, high = _record_decimal(record, "minSz"), _record_decimal(record, "maxSz")
+        mmr, imr = _record_decimal(record, "mmr"), _record_decimal(record, "imr")
+        if (low != 0 if previous is None else low <= previous) or high <= low:
+            raise ValueError("position_tiers_not_contiguous")
+        if not 0 < mmr < imr <= 1:
+            raise ValueError("position_tiers_rates_invalid")
+        tiers.append(research.MarginTier(number, high, mmr, imr))
+        previous = high
+    return tuple(tiers)
+
+
+def _tiers_name(inst_id, fetched_at_ms):
+    stamp = datetime.fromtimestamp(fetched_at_ms / 1000, tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"okx-{inst_id.lower()}-position-tiers-cross-{stamp}.json"
+
+
+def write_position_tiers(root=None, *, inst_id, records, fetched_at_ms, requests):
+    """Write one tier snapshot (the raw OKX records) atomically and return its path."""
+    if inst_id not in TIERS_INST_IDS:
+        raise ValueError(f"position_tiers_not_authorized: {inst_id}")
+    parse_tiers(records, inst_id)
+    root = Path(root) if root is not None else DATA_ROOT
+    parent = root / inst_id / TIERS_DIR
+    target = parent / _tiers_name(inst_id, fetched_at_ms)
+    if target.exists():
+        raise FileExistsError(f"position_tiers_exist: {target}")
+    content = _json_bytes({
+        "schema": TIERS_SCHEMA, "schema_version": SCHEMA_VERSION, "source": TIERS_SOURCE,
+        "endpoint": TIERS_ENDPOINT, "params": tiers_params(inst_id), "inst_id": inst_id, "td_mode": "cross",
+        "fetched_at_ms": fetched_at_ms, "requests": requests, "records": records,
+    })
+    parent.mkdir(parents=True, exist_ok=True)
+    staging = parent / f".{target.name}.staging-{os.getpid()}"
+    staging.write_bytes(content)
+    os.replace(staging, target)
+    return target
+
+
+@dataclass(frozen=True)
+class PositionTiers:
+    inst_id: str
+    path: Path
+    sha256: str
+    fetched_at_ms: int
+    tiers: tuple
+
+    def model(self):
+        return research.MarginModel(self.tiers, self.sha256)
+
+
+def load_position_tiers(path, root=None):
+    """Verify one tier snapshot; raise ValueError on any doubt."""
+    root = Path(root) if root is not None else DATA_ROOT
+    path = Path(path)
+    if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("position_tiers_path_invalid")
+    data = path.read_bytes()
+    value = _strict_json(path, data)
+    if type(value) is not dict or set(value) != TIERS_FIELDS:
+        raise ValueError("position_tiers_fields_mismatch")
+    inst_id, fetched = value["inst_id"], value["fetched_at_ms"]
+    if ((value["schema"], value["schema_version"], value["source"], value["endpoint"], value["td_mode"])
+            != (TIERS_SCHEMA, SCHEMA_VERSION, TIERS_SOURCE, TIERS_ENDPOINT, "cross")):
+        raise ValueError("position_tiers_schema_mismatch")
+    if inst_id not in TIERS_INST_IDS or value["params"] != tiers_params(inst_id):
+        raise ValueError("position_tiers_instrument_invalid")
+    if type(fetched) is not int or type(value["requests"]) is not int:
+        raise ValueError("position_tiers_integer_required")
+    if (path.parent.name, path.parent.parent.name) != (TIERS_DIR, inst_id) or path.name != _tiers_name(inst_id, fetched):
+        raise ValueError("position_tiers_name_mismatch")
+    tiers = parse_tiers(value["records"], inst_id)
+    return PositionTiers(inst_id, path, hashlib.sha256(data).hexdigest(), fetched, tiers)
+
+
+def latest_position_tiers(inst_id, root=None):
+    """The newest valid snapshot for inst_id, or None; any invalid snapshot is an error (fail-closed)."""
+    root = Path(root) if root is not None else DATA_ROOT
+    directory = root / inst_id / TIERS_DIR
+    if not directory.is_dir():
+        return None
+    snapshots = [load_position_tiers(path, root) for path in sorted(directory.glob("*.json"))]
+    return max(snapshots, key=lambda item: item.fetched_at_ms, default=None)
+
+
 def find_gaps(times, start_ms, end_ms, timeframe_ms):
     """Expected bar open times in [start, end) that are missing from times."""
     present = set(times)
@@ -140,7 +278,8 @@ def funding_coverage(times, start_ms, end_ms, timeframe_ms):
     return interval, times[0] - start_ms < interval
 
 
-def _strict_json(path):
+def _strict_json(path, data=None):
+    """Strict JSON from path, or from data (bytes already read) so a hash covers the parsed bytes."""
     def pairs(items):
         keys = [key for key, _ in items]
         if len(keys) != len(set(keys)):
@@ -150,8 +289,8 @@ def _strict_json(path):
     def reject(_value):
         raise ValueError("manifest_non_string_number")
 
-    return json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=pairs,
-                      parse_float=reject, parse_constant=reject)
+    text = Path(path).read_text(encoding="utf-8") if data is None else data.decode("utf-8")
+    return json.loads(text, object_pairs_hook=pairs, parse_float=reject, parse_constant=reject)
 
 
 def _json_bytes(value):
@@ -236,6 +375,21 @@ class Dataset:
     # First funding event and spacing; None for a dataset without funding.
     funding_from_ms: int | None = None
     funding_interval_ms: int | None = None
+    # Position tiers for the margin model; None leaves it off for margin_reason.
+    position_tiers: PositionTiers | None = None
+    margin_reason: str = "no_position_tiers"
+
+    def margin_summary(self):
+        """Whether runs on this dataset use the margin model, and which tier snapshot."""
+        tiers = self.position_tiers
+        if tiers is None:
+            return {"enabled": False, "reason": self.margin_reason,
+                    "reason_text": MARGIN_REASONS.get(self.margin_reason, self.margin_reason),
+                    "tiers_path": None, "tiers_sha256": None, "tiers": None, "tiers_fetched_at_ms": None,
+                    "leverage": None}
+        return {"enabled": True, "reason": None, "reason_text": None, "tiers_path": rel_path(tiers.path),
+                "tiers_sha256": tiers.sha256, "tiers": len(tiers.tiers), "tiers_fetched_at_ms": tiers.fetched_at_ms,
+                "leverage": "tier_max"}
 
     @property
     def funding_complete(self):
@@ -261,13 +415,18 @@ class Dataset:
                 "timeframe": next(bar for bar, ms in BAR_MS.items() if ms == self.timeframe_ms),
                 "bars": self.bars, "start_ms": self.start_ms, "end_ms": self.end_ms,
                 "funding": self.funding_path is not None,
-                "funding_coverage": self.funding_summary(), "notice": self.notice}
+                "funding_coverage": self.funding_summary(), "margin_model": self.margin_summary(),
+                "notice": self.notice}
 
     def load(self, config):
-        """Closed bars plus funding events; funding mark = the bar open at the funding time."""
+        """Closed bars plus funding events (mark = the bar open at the funding time) and the margin model."""
         bars = load_candles_csv(self.candles_path, config=config)
         if len(bars) != self.bars:
             raise ValueError("dataset_bar_count_mismatch")
+        if self.position_tiers is not None:
+            if sha256_file(self.position_tiers.path) != self.position_tiers.sha256:
+                raise ValueError("position_tiers_changed")
+            config = replace(config, margin=self.position_tiers.model())
         if self.funding_path is None:
             return bars, config
         opens = {bar.open_time_ms: bar.open for bar in bars}
@@ -368,6 +527,10 @@ def load_manifest(path, root=None):
     funding_label = "含資金費" if funding["complete"] else f"資金費自 {funding_first} 起"
     notice = NOTICE if funding["complete"] else NOTICE + PARTIAL_FUNDING_NOTICE.format(
         first=datetime.fromtimestamp(funding_times[0] / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"))
+    tiers = latest_position_tiers(inst_id, root)
+    notice += MARGIN_OFF_NOTICE if tiers is None else MARGIN_ON_NOTICE.format(
+        fetched=datetime.fromtimestamp(tiers.fetched_at_ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M"))
+    tier_files = () if tiers is None else ((rel_path(tiers.path), tiers.sha256),)
     return Dataset(
         dataset_id=dataset_id,
         name=f"OKX {inst_id} {bar} · {first} ~ {last} · {bars:,} 根已收盤 K 線（{funding_label}）",
@@ -379,11 +542,12 @@ def load_manifest(path, root=None):
         start_ms=start,
         end_ms=end,
         files=((rel_path(path), sha256_file(path)),
-               *((rel_path(directory / name), files[name]) for name in FILES)),
+               *((rel_path(directory / name), files[name]) for name in FILES), *tier_files),
         funding_path=directory / FUNDING,
         notice=notice,
         funding_from_ms=funding_times[0],
         funding_interval_ms=funding["interval_ms"],
+        position_tiers=tiers,
     )
 
 

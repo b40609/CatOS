@@ -14,6 +14,8 @@ USDT and reports it.
   trip, the opening part to the new one.
 - Funding settles before a fill at the same timestamp (the engine's order), so a
   payment at time t belongs to the trip that was open just before t.
+- A liquidation (margin model) closes the last trip; its clearance cost (net of
+  any security-fund cover, Performance.liquidation_cost) is charged to that trip.
 - Win rate counts closed trips with positive net PnL (after fees and funding);
   zero-PnL trips are neither wins nor losses. The open trip is reported apart.
 """
@@ -39,10 +41,11 @@ class RoundTrip:
     fees: Decimal
     funding_paid: Decimal
     fills: int
+    liquidation_cost: Decimal = ZERO
 
     @property
     def net_pnl(self):
-        return self.realized_pnl - self.fees - self.funding_paid
+        return self.realized_pnl - self.fees - self.funding_paid - self.liquidation_cost
 
 
 def round_trips(result):
@@ -53,6 +56,7 @@ def round_trips(result):
     events = sorted([(payment.time_ms, 0, payment) for payment in result.funding]
                     + [(trade.time_ms, 1, trade) for trade in result.trades], key=lambda item: (item[0], item[1]))
     position = ZERO
+    liquidation_fill = result.trades[-1] if result.liquidation is not None else None
     with localcontext(_WIDE):
         for time_ms, kind, item in events:
             if kind == 0:
@@ -70,6 +74,8 @@ def round_trips(result):
                 current.fees += item.fee * closing_share
                 current.fills += 1
                 current.close_time_ms = time_ms
+                if item is liquidation_fill:
+                    current.liquidation_cost = result.performance.liquidation_cost
                 closed.append(current)
                 current = None
                 if new != ZERO:

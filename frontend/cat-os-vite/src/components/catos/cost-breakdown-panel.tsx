@@ -14,6 +14,7 @@ export interface CostView {
   fill_count: number;
   cost_bps_per_side: string | null;
   break_even_bps_per_side: string | null;
+  liquidation_cost?: string;
   buy_hold_pnl: string;
   underlying_return_pct: string | null;
   assumed_funding_paid: string | null;
@@ -87,6 +88,10 @@ export function CostBreakdownPanel({
               <Row label="滑價（含價格取整）" value={formatDecimal(view.slippage, { digits: 2, suffix: " USDT" })} />
               <Row label="資金費（資料集實際）" value={formatDecimal(view.funding_paid, { digits: 2, sign: true, suffix: " USDT" })}
                 hint="正數為支出、負數為收入" />
+              {view.liquidation_cost !== undefined && signOf(view.liquidation_cost) !== "zero" && (
+                <Row label="強平清算費" value={formatDecimal(view.liquidation_cost, { digits: 2, sign: true, suffix: " USDT" })}
+                  hint="保證金模型強平時收的清算費，扣除保險基金補足的穿倉；負數表示保險基金補足的比清算費多" />
+              )}
               <Row label="淨損益" value={formatDecimal(view.net_pnl, USDT)} tone={toneOf(view.net_pnl)} />
             </div>
             <div>

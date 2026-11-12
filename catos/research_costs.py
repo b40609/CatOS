@@ -3,9 +3,11 @@
 Everything here is derived from a finished ``BacktestResult`` and the same bars;
 nothing changes how a run trades. All money is Decimal in the research context.
 
-price_pnl = net_pnl + fees + slippage + funding_paid: the result valued at each
-fill bar's open instead of the fill price, before fees, slippage (including
-adverse tick rounding) and funding. Tests check it against an independent re-run
+price_pnl = net_pnl + fees + slippage + funding_paid + liquidation_cost: the
+result valued at each fill bar's open instead of the fill price, before fees,
+slippage (including adverse tick rounding), funding and the liquidation clearance
+cost. A liquidation fill (margin model) is valued at its own price: its distance
+from the bar open is the price move that triggered it, not execution slippage. Tests check it against an independent re-run
 with zero fee and zero slippage, which fills exactly at the open.
 
 The funding scenario is an assumption, never ledger data: when a dataset's real
@@ -71,6 +73,8 @@ class CostBreakdown:
     break_even_bps_per_side: Decimal | None
     buy_hold: BuyHold
     funding_scenario: FundingScenario | None
+    # Liquidation clearance fee minus any security-fund deficit cover (margin model); 0 otherwise.
+    liquidation_cost: Decimal = ZERO
 
 
 def _scenario(result, bars, uncovered_end_ms, rate, interval_ms):
@@ -118,14 +122,18 @@ def cost_breakdown(result, bars, quantity, funding_from_ms=None, *,
         opens = {bar.open_time_ms: bar.open for bar in bars}
         per_contract = result.config.contract.base_per_contract
         slippage = notional = ZERO
-        for trade in result.trades:
+        liquidation_fill = len(result.trades) - 1 if result.liquidation is not None else None
+        for index, trade in enumerate(result.trades):
+            size = abs(trade.quantity) * per_contract
+            notional += size * trade.price
+            if index == liquidation_fill:
+                continue
             if trade.time_ms not in opens:
                 raise ValueError("trade_time_without_candle")
-            size = abs(trade.quantity) * per_contract
             slippage += abs(trade.price - opens[trade.time_ms]) * size
-            notional += size * trade.price
         performance = result.performance
-        price_pnl = performance.net_pnl + performance.fees + slippage + performance.funding_paid
+        price_pnl = (performance.net_pnl + performance.fees + slippage + performance.funding_paid
+                     + performance.liquidation_cost)
         cost_bps = break_even = None
         if notional:
             cost_bps = (performance.fees + slippage) / notional * BPS
@@ -144,7 +152,7 @@ def cost_breakdown(result, bars, quantity, funding_from_ms=None, *,
                 scenario = replace(scenario, notice=scenario.notice + EQUITY_SIZED_NOTICE)
         return CostBreakdown(price_pnl, performance.fees, slippage, performance.funding_paid,
                              performance.net_pnl, notional, len(result.trades), cost_bps, break_even,
-                             buy_hold, scenario)
+                             buy_hold, scenario, performance.liquidation_cost)
 
 
 def total(breakdowns):
@@ -165,6 +173,7 @@ def total(breakdowns):
         return {
             "windows": len(rows), "price_pnl": price_pnl, "fees": fees, "slippage": slippage,
             "funding_paid": funding, "net_pnl": add("net_pnl"), "traded_notional": notional,
+            "liquidation_cost": add("liquidation_cost"),
             "fill_count": sum(row.fill_count for row in rows),
             "cost_bps_per_side": (fees + slippage) / notional * BPS if notional else None,
             "break_even_bps_per_side": (price_pnl - funding) / notional * BPS if notional else None,
@@ -177,6 +186,7 @@ def total(breakdowns):
 REPORT_ROWS = (
     ("price_pnl", "價格損益（成本前，以成交 K 線開盤價計）"), ("fees", "手續費"),
     ("slippage", "滑價（含價格取整）"), ("funding_paid", "資金費（資料集實際，正為支出）"),
+    ("liquidation_cost", "強平清算費（扣除保險基金補足，未強平為 0）"),
     ("net_pnl", "淨損益"), ("traded_notional", "成交名目"), ("fill_count", "成交筆數"),
     ("cost_bps_per_side", "每邊成本 bps（手續費＋滑價）"),
     ("break_even_bps_per_side", "每邊兩平成本 bps（淨損益為 0 時可承受的手續費＋滑價）"),

@@ -19,7 +19,7 @@ from catos.research_catalog import (
     MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, costs_for, costs_html,
     decimal_string,
     drawdown_pcts, json_text, load_dataset_bars, provenance, registered_factory,
-    require_search_names, resolve_dataset, sample_curve_indices, strategy_spec, validate_request,
+    require_search_names, resolve_dataset, sample_curve_indices, slim_margin, strategy_spec, validate_request,
 )
 from catos.research_datasets import SOURCE as FETCHED_SOURCE, rel_path
 from catos.research_regimes import REGIMES, RegimeRule, regime_walk_forward, regimes_json
@@ -167,7 +167,7 @@ def compact_result(result):
     slim = replace(result, labels=(), validation=replace(result.validation, windows=tuple(windows)),
                    windows=tuple(replace(row, evaluation=replace(row.evaluation, intervals=()))
                                  if row.evaluation is not None else row for row in result.windows))
-    value = json.loads(regimes_json(slim))
+    value = slim_margin(json.loads(regimes_json(slim)))
     del value["labels"]
     for row in value["windows"]:
         if row["evaluation"] is not None:
@@ -308,6 +308,7 @@ def execute_validation(request, expected_source):
         "result": compact_result(result),
         "costs": costs,
         "evaluation_complete": result.validation.complete,
+        "margin_model": dataset.margin_summary(),
         "data_notice": f"各 OOS 視窗獨立，不是連續投資組合或部署通過門檻。分類參數僅供示範。{dataset.notice}",
     }
     payload["selection_edges"] = research_overfit.edge_selections(

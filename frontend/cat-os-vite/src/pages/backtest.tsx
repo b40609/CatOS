@@ -406,6 +406,7 @@ function BacktestPage() {
   // Derive parameters from actual selected run / result
   const activeRequest = result?.request || selectedRun?.request;
   const perf = result?.result?.performance;
+  const liquidation = result?.result?.liquidation ?? null;
   const activeStrategy = pickStrategy(catalog?.strategies, activeRequest?.strategy_id ?? strategy?.id ?? null);
   const formProblems = strategy
     ? [...paramProblems(strategy, params, warmupBars), ...minWarmupProblems(strategy, warmupBars, dataset),
@@ -604,8 +605,18 @@ function BacktestPage() {
           <p data-testid="backtest-wiped-out"
              className="rounded border border-rose-400/40 bg-rose-400/5 px-3 py-1.5 text-xs text-rose-400">
             <strong className="font-semibold">
-              權益在 {formatDateTimeWithYear(result.equity_wiped_out.time_ms)}（台北）跌破 0（最低{" "}
-              {formatDecimal(result.equity_wiped_out.min_equity, { digits: 2, suffix: " USDT" })}）。
+              {liquidation ? (
+                <>
+                  {formatDateTimeWithYear(liquidation.time_ms)}（台北）被強平：以{" "}
+                  {formatDecimal(liquidation.fill_price, { digits: 1 })} 平掉 {formatDecimal(liquidation.position, { digits: 2 })} 張
+                  {liquidation.gapped ? "（跳空越過強平價，以開盤價成交）" : ""}，之後停止交易。
+                </>
+              ) : (
+                <>
+                  權益在 {formatDateTimeWithYear(result.equity_wiped_out.time_ms)}（台北）跌破 0（最低{" "}
+                  {formatDecimal(result.equity_wiped_out.min_equity, { digits: 2, suffix: " USDT" })}）。
+                </>
+              )}
             </strong>{" "}
             {result.equity_wiped_out.notice}
           </p>
@@ -735,6 +746,21 @@ function BacktestPage() {
                             ? ` · 僅涵蓋 ${formatUtcTime(result.funding_coverage.from_ms)} 之後`
                             : ""} · 期末估值平倉`
                       : "明示零資金費 · 期末估值平倉"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/50 pt-2" data-testid="backtest-margin-model">
+                  <span className="text-muted-foreground">保證金與強平</span>
+                  <span className="font-mono text-foreground font-medium text-right"
+                        title={result?.margin_model?.tiers_sha256 ?? undefined}>
+                    {!result
+                      ? "--"
+                      : !result.margin_model
+                        ? "舊結果：未啟用保證金模型"
+                        : result.margin_model.enabled
+                          ? `全倉檔位模型 · 檔位 ${result.margin_model.tiers_sha256?.slice(0, 12)}…${
+                              liquidation ? " · 已強平" : ""}${
+                              result.result.margin_rejection_count ? ` · 保證金不足拒單 ${result.result.margin_rejection_count} 次` : ""}`
+                          : `未啟用：${result.margin_model.reason_text ?? result.margin_model.reason}`}
                   </span>
                 </div>
               </div>

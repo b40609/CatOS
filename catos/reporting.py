@@ -245,6 +245,17 @@ def render_report(result: BacktestResult, *, curve_indices=None, max_trade_rows=
     assumptions_items = "\n".join(
         f"<li>{html.escape(a)}</li>" for a in result.assumptions
     )
+    if cfg.margin is None:
+        margin_banner = "未建立保證金、強平或交易所端狀態機模型。"
+    else:
+        margin_banner = ("已套用單合約全倉的保證金與強平模型（OKX 部位檔位，sha256 "
+                         f"{html.escape(cfg.margin.tiers_sha256[:12])}…）；未建立交易所端狀態機模型。")
+        if result.liquidation is not None:
+            liq = result.liquidation
+            margin_banner += (f"本次在 {html.escape(str(liq.time_ms))} 以 {html.escape(_format_decimal(liq.fill_price))} "
+                              "強平，之後停止交易。")
+        if result.margin_rejection_count:
+            margin_banner += f"初始保證金不足拒單 {result.margin_rejection_count} 次。"
 
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
@@ -406,7 +417,7 @@ footer {{
 <header>
   <h1>catOS 研究回測報告 - {html.escape(spec.inst_id)}</h1>
   <div class="boundary-banner">
-    <strong>聲明：</strong>本報告為純記憶體 Closed Bar 模型之研究結果，非 Demo／Live 執行器。交易筆數指模擬成交筆數，不宣稱往返交易數。未建立保證金、強平或交易所端狀態機模型。
+    <strong>聲明：</strong>本報告為純記憶體 Closed Bar 模型之研究結果，非 Demo／Live 執行器。交易筆數指模擬成交筆數，不宣稱往返交易數。{margin_banner}
   </div>
 </header>
 

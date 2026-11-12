@@ -13,6 +13,12 @@ as incomplete and disclosed per run.
 
 Usage (repo root):
     .venv/Scripts/python.exe -B tools/fetch_okx_candles.py --inst-id BTC-USDT-SWAP --bar 15m --days 90
+
+--position-tiers instead fetches one snapshot of the public position tiers
+(``GET /api/v5/public/position-tiers``, cross margin, one request) for the
+backtest margin model, under the 2026-11-11 authorization: BTC-USDT-SWAP only,
+same pacing, budget and storage rules. The snapshot is written by
+``catos.research_datasets.write_position_tiers``.
 """
 
 import argparse
@@ -31,6 +37,9 @@ from catos import research_datasets as datasets  # noqa: E402
 
 BASE_URL = "https://www.okx.com"
 CANDLES_PATH, FUNDING_PATH, INSTRUMENTS_PATH = datasets.ENDPOINTS
+TIERS_PATH = datasets.TIERS_ENDPOINT
+# Every endpoint this tool may call: the dataset's three plus the position tiers (2026-11-11).
+ALLOWED_PATHS = (*datasets.ENDPOINTS, TIERS_PATH)
 MIN_INTERVAL_S = 0.25
 PAGE_LIMIT = 100
 MAX_RETRIES = 3
@@ -73,7 +82,7 @@ class Client:
         self._last = None
 
     def get(self, path, params):
-        if path not in datasets.ENDPOINTS:
+        if path not in ALLOWED_PATHS:
             raise FetchError(f"endpoint_not_allowed: {path}")
         url = f"{self.base_url}{path}?{urllib.parse.urlencode(params)}"
         for attempt in range(MAX_RETRIES + 1):
@@ -141,6 +150,17 @@ def fetch_instrument(client, inst_id):
     return data[0]
 
 
+def fetch_position_tiers(client, inst_id):
+    """Raw cross-margin tier records for one linear USDT swap (instFamily = <BASE>-USDT)."""
+    if inst_id not in datasets.TIERS_INST_IDS:
+        raise FetchError(f"position_tiers_not_authorized: {inst_id}")
+    family = inst_id.rsplit("-", 1)[0]
+    data = client.get(TIERS_PATH, {"instType": "SWAP", "tdMode": "cross", "instFamily": family})
+    if type(data) is not list or not data or any(type(item) is not dict for item in data):
+        raise FetchError("position_tiers_shape_unexpected")
+    return data
+
+
 def fetch_candles(client, inst_id, bar, start_ms, end_ms):
     """Closed bars with open time in [start, end), ascending, as (ms, open, high, low, close)."""
     rows = {}
@@ -205,12 +225,20 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     parser = argparse.ArgumentParser(description="Fetch one OKX public research dataset (no API key).")
     parser.add_argument("--inst-id", default="BTC-USDT-SWAP")
     parser.add_argument("--bar", default="15m", choices=sorted(datasets.BAR_MS))
-    parser.add_argument("--days", type=int, required=True, help="whole days ending at the last closed bar")
+    parser.add_argument("--days", type=int, help="whole days ending at the last closed bar (required for candles)")
     parser.add_argument("--end-ms", type=int, help="exclusive end (bar-aligned) to re-fetch a known range")
     parser.add_argument("--max-requests", type=int, default=MAX_REQUESTS_CAP)
     parser.add_argument("--resume", action="store_true",
                         help="fetch a long range over several runs, each within --max-requests")
+    parser.add_argument("--position-tiers", action="store_true",
+                        help="fetch one cross-margin position tier snapshot instead of candles")
     args = parser.parse_args(argv)
+    if args.position_tiers:
+        if args.days is not None or args.end_ms is not None or args.resume:
+            parser.error("--position-tiers takes no --days, --end-ms or --resume")
+        return _position_tiers(args, client, now_ms, root)
+    if args.days is None:
+        parser.error("--days is required")
     if not datasets.INST_ID.fullmatch(args.inst_id) or not 1 <= args.days <= MAX_DAYS:
         parser.error(f"inst-id must be <BASE>-USDT-SWAP and days in [1, {MAX_DAYS}]")
     if not 1 <= args.max_requests <= MAX_REQUESTS_CAP:
@@ -244,6 +272,23 @@ def main(argv=None, *, client=None, now_ms=None, root=None):
     print(json.dumps({"dataset_id": dataset.dataset_id, "path": datasets.rel_path(target),
                       "bars": dataset.bars, "funding_events": len(funding),
                       "requests": client.requests, "files": dict(dataset.files)}, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _position_tiers(args, client, now_ms, root):
+    now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+    client = client or Client(max_requests=args.max_requests)
+    try:
+        records = fetch_position_tiers(client, args.inst_id)
+        target = datasets.write_position_tiers(root, inst_id=args.inst_id, records=records,
+                                               fetched_at_ms=now_ms, requests=client.requests)
+        snapshot = datasets.load_position_tiers(target, root)
+    except (FetchError, ValueError, FileExistsError) as error:
+        print(f"stopped after {client.requests} requests: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps({"path": datasets.rel_path(target), "sha256": snapshot.sha256,
+                      "tiers": len(snapshot.tiers), "requests": client.requests},
+                     ensure_ascii=False, indent=2))
     return 0
 
 
