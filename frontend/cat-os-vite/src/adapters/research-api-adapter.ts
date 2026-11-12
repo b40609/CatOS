@@ -64,6 +64,7 @@ export interface ResearchDatasetMeta {
   funding?: boolean;
   // How funding is counted: OKX keeps ~3 months, so a long dataset starts funding late.
   funding_coverage?: FundingCoverage;
+  margin_model?: MarginModelSummary;
   notice?: string;
   files?: Record<string, string>;
   contract: {
@@ -187,6 +188,43 @@ export interface BacktestPerformance {
   funding_paid: string;
   max_drawdown_pct: string;
   trade_count: number; // Exact integer simulated fills, not round trips
+  // Margin model: clearance fee minus any security-fund cover; absent on older runs.
+  liquidation_cost?: string;
+}
+
+// docs/research-margin-model.md: single-contract cross margin from OKX position tiers.
+export interface MarginModelSummary {
+  enabled: boolean;
+  reason: string | null; // why it is off: "no_position_tiers" | "synthetic_fixture"
+  reason_text: string | null;
+  tiers_path: string | null;
+  tiers_sha256: string | null;
+  tiers: number | null;
+  tiers_fetched_at_ms: number | null;
+  leverage: string | null;
+}
+
+// The forced close (result.trades ends with its fill); null when the run was not liquidated.
+export interface LiquidationRecord {
+  time_ms: number;
+  bar_open_time_ms: number;
+  trigger: 'adverse_extreme' | 'after_funding';
+  trigger_price: string;
+  liquidation_price: string;
+  fill_price: string;
+  gapped: boolean;
+  position: string;
+  average_entry: string;
+  tier: number;
+  maintenance_rate: string;
+  balance_before: string;
+  realized_pnl: string;
+  clearance_fee: string;
+  liquidation_fee: string;
+  fee_charged: string;
+  clearance_charged: string;
+  deficit_covered: string;
+  balance_after: string;
 }
 
 export interface FundingCoverage {
@@ -207,6 +245,7 @@ export interface CostBreakdown {
   fill_count: number;
   cost_bps_per_side: string | null;
   break_even_bps_per_side: string | null;
+  liquidation_cost?: string; // margin model only; absent on older runs
   buy_hold: {
     quantity: string;
     entry_open: string;
@@ -239,6 +278,7 @@ export interface CostTotal {
   fill_count: number;
   cost_bps_per_side: string | null;
   break_even_bps_per_side: string | null;
+  liquidation_cost?: string; // margin model only; absent on older runs
   buy_hold_pnl: string;
   assumed_funding_paid: string | null;
   assumed_funding_events: number | null;
@@ -313,10 +353,11 @@ export interface TradeStats {
   notice: string;
 }
 
-// First close where equity reached <= 0; the engine has no liquidation model.
+// First close where equity reached <= 0, or the liquidation when the margin model is on.
 export interface EquityWipedOut {
   time_ms: number;
   min_equity: string;
+  liquidated?: boolean; // absent on runs archived before the margin model (2026-11-12)
   notice: string;
 }
 
@@ -328,6 +369,8 @@ export interface BacktestResultPayload {
   // Absent on runs archived before cost attribution existed.
   costs?: CostBreakdown;
   funding_coverage?: FundingCoverage;
+  // Absent on runs archived before the margin model (2026-11-12): those ran without it.
+  margin_model?: MarginModelSummary;
   run_id?: string;
   created_at?: string;
   build_id?: string;
@@ -344,6 +387,8 @@ export interface BacktestResultPayload {
     performance: BacktestPerformance;
     pending_intent: any | null;
     assumptions: string[];
+    liquidation?: LiquidationRecord | null;
+    margin_rejection_count?: number;
   };
   drawdown_curve: DrawdownCurvePoint[];
   data_notice: string;

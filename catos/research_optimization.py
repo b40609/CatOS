@@ -77,6 +77,7 @@ def execute_optimization(request, expected_source):
                "best_costs": asdict(best_costs) if best_costs else None,
                "overfitting": overfitting,
                "funding_coverage": dataset.funding_summary(),
+               "margin_model": dataset.margin_summary(),
                "data_notice": f"樣本內搜尋，未執行樣本外檢驗，不代表市場績效。{dataset.notice}"}
     payload = json.loads(json_text(payload))
     rows = "".join(

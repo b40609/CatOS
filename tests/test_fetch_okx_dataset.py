@@ -318,3 +318,50 @@ class ResumableFetchTest(unittest.TestCase):
             self.assertGreater(len(okx.calls), calls)
             self.assertFalse(path.exists())
             self.assertFalse(path.with_name(path.name + ".tmp").exists())
+
+
+class PositionTiersFetchTest(unittest.TestCase):
+    """2026-11-11 authorization: one public position-tiers request, BTC-USDT-SWAP only."""
+
+    RECORDS = [{"tier": "1", "instFamily": "BTC-USDT", "instId": "", "uly": "BTC-USDT", "minSz": "0",
+                "maxSz": "1000", "mmr": "0.004", "imr": "0.01", "maxLever": "100"}]
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "okx"
+        self.time = FakeTime()
+        self.calls = []
+
+    def opener(self, url):
+        parts = urlsplit(url)
+        self.calls.append((parts.path, {key: values[0] for key, values in parse_qs(parts.query).items()}))
+        return 200, json.dumps({"code": "0", "msg": "", "data": self.RECORDS}).encode()
+
+    def run_tool(self, *args):
+        client = fetch.Client(max_requests=5, opener=self.opener, clock=self.time.clock, sleep=self.time.sleep,
+                              base_url="https://fake.invalid")
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = fetch.main(["--position-tiers", *args], client=client, now_ms=END, root=self.root)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_one_request_writes_a_verified_snapshot(self):
+        code, out, err = self.run_tool()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.calls, [(fetch.TIERS_PATH, {"instType": "SWAP", "tdMode": "cross",
+                                                          "instFamily": "BTC-USDT"})])
+        summary = json.loads(out)
+        self.assertEqual((summary["tiers"], summary["requests"]), (1, 1))
+        snapshot = datasets.latest_position_tiers("BTC-USDT-SWAP", self.root)
+        self.assertEqual(snapshot.sha256, summary["sha256"])
+
+    def test_other_instruments_and_candle_options_are_refused(self):
+        code, _, err = self.run_tool("--inst-id", "ETH-USDT-SWAP")
+        self.assertEqual(code, 1)
+        self.assertIn("position_tiers_not_authorized", err)
+        self.assertEqual(self.calls, [])
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            fetch.main(["--position-tiers", "--days", "3"])
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            fetch.main([])

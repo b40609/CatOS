@@ -310,7 +310,8 @@ def _synthetic_dataset():
         candles_path=DATA_PATH, contract=SYNTHETIC_CONTRACT, timeframe_ms=900_000, bars=96,
         start_ms=None, end_ms=None,
         files=((DATA_PATH.relative_to(ROOT).as_posix(), file_hash(DATA_PATH)),),
-        funding_path=None, notice="合成資料；不代表歷史市場績效。資金費事件明示為空。",
+        funding_path=None, notice="合成資料；不代表歷史市場績效。資金費事件明示為空。未套用保證金與強平模型。",
+        margin_reason="synthetic_fixture",
     )
 
 
@@ -645,13 +646,47 @@ def sample_curve_indices(drawdowns, limit=MAX_CURVE_POINTS):
 
 
 def _wiped_out(result):
-    """First time equity reached <= 0 (no liquidation model), or None."""
+    """First time equity reached <= 0 (or the liquidation, with the margin model), or None."""
     index = research_overfit.first_non_positive(result.equity_curve)
     if index is None:
         return None
+    notice = research_overfit.WIPED_OUT_NOTICE if result.liquidation is None else research_overfit.LIQUIDATION_NOTICE
     return {"time_ms": result.equity_curve[index].time_ms,
             "min_equity": min(point.equity for point in result.equity_curve),
-            "notice": research_overfit.WIPED_OUT_NOTICE}
+            "liquidated": result.liquidation is not None, "notice": notice}
+
+
+def slim_margin(value):
+    """Replace each serialized MarginModel's tier table with its size; the sha256 still names it.
+
+    The tiers come from a hash-checked snapshot listed in the provenance, so the
+    payload keeps the label instead of ~8 KB of tiers in every result.
+    """
+    if isinstance(value, dict):
+        margin = value.get("margin")
+        if isinstance(margin, dict) and isinstance(margin.get("tiers"), (list, tuple)):
+            value["margin"] = {**margin, "tiers": len(margin["tiers"])}
+        for item in value.values():
+            slim_margin(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            slim_margin(item)
+    return value
+
+
+def margin_rows(summary, result=None):
+    """Report rows for the margin model of one run (summary = Dataset.margin_summary())."""
+    if not summary["enabled"]:
+        return [("保證金模型", f"未啟用：{summary['reason_text']}")]
+    rows = [("保證金模型", "啟用：單合約全倉、OKX 部位檔位、K 線最不利價檢查"),
+            ("檔位快照", summary["tiers_path"]), ("檔位 sha256", summary["tiers_sha256"])]
+    if result is not None:
+        liq = result.liquidation
+        rows.append(("強平", "無" if liq is None else
+                     f"{liq.time_ms}（UTC 毫秒）以 {liq.fill_price} 平 {liq.position} 張，"
+                     f"強平手續費 {liq.fee_charged}、清算費 {liq.clearance_charged}、保險基金補足 {liq.deficit_covered}"))
+        rows.append(("初始保證金不足拒單", result.margin_rejection_count))
+    return rows
 
 
 def execute_request(request, expected_source):
@@ -668,13 +703,14 @@ def execute_request(request, expected_source):
     )
     drawdown = [{"time_ms": point.time_ms, "drawdown_pct": value} for point, value
                 in zip(result.equity_curve, drawdown_pcts(result.equity_curve, config.initial_balance))]
-    result_payload = asdict(result)
+    result_payload = slim_margin(asdict(result))
     keep = sample_curve_indices([point["drawdown_pct"] for point in drawdown])
     costs = costs_for(result, bars, quantity, dataset, snapshot["strategy_id"])
     payload = {
         "request": snapshot, "provenance": expected_source,
         "result": result_payload, "drawdown_curve": drawdown,
         "costs": asdict(costs), "funding_coverage": dataset.funding_summary(),
+        "margin_model": dataset.margin_summary(),
         "trade_stats": research_trades.trade_stats(result),
         "equity_wiped_out": _wiped_out(result),
         "data_notice": dataset.notice,
@@ -686,7 +722,8 @@ def execute_request(request, expected_source):
         payload["curve_sampling"] = {"total_points": len(drawdown), "returned_points": len(keep),
                                      "method": "bucket_deepest_drawdown_keep_first_last"}
     report = render_report(result, curve_indices=keep, max_trade_rows=REPORT_MAX_FILL_ROWS)
-    report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n</body>", 1)
+    report = report.replace("</body>", costs_html(cost_rows(costs)) + "\n"
+                            + costs_html(margin_rows(payload["margin_model"], result), "保證金與強平") + "\n</body>", 1)
     if provenance(dataset.dataset_id, snapshot["strategy_id"]) != expected_source:
         raise ValueError("source_changed_during_run")
     return json.loads(json_text(payload)), report
