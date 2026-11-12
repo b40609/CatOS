@@ -1,6 +1,6 @@
 # 回測保證金與強平模型（第一步：單合約全倉）
 
-2026-11-12 開工前寫成，實作與驗收結果附在文末。範圍是使用者 2026-11-11 同意的第一步：單合約全倉；每根 K 線用最不利價（多單用最低價、空單用最高價）檢查權益是否跌到維持保證金；跌到就強平、扣強平成本、標記並停止交易；下單時檢查初始保證金，不夠就拒單。
+2026-11-12 開工前寫成；實作、驗收與實測附在第 6 節。範圍是使用者 2026-11-11 同意的第一步：單合約全倉；每根 K 線用最不利價（多單用最低價、空單用最高價）檢查權益是否跌到維持保證金；跌到就強平、扣強平成本、標記並停止交易；下單時檢查初始保證金，不夠就拒單。
 
 第 2 步（改用標記價格）與第 3 步（多合約共用保證金）不在範圍內。
 
@@ -135,3 +135,20 @@
 - 雜湊：整個檔案的 sha256。研究端每次載入都重新計算並核對欄位，有疑問就不用（fail-closed）。本機有多份快照時用抓取時間最新的一份。
 - 沒有放進既有資料集的 manifest：既有 manifest 的欄位與端點清單是固定的，改了會讓四份已抓的資料集全部驗證失敗；而且檔位是「現在」的快照，和 K 線區間無關，同一份快照適用該合約的所有資料集。
 - 授權：只限 BTC-USDT-SWAP（工具與資料層都寫死），沿用同一套節流、請求上限與存放規則（`AGENTS.md` 授權紀錄 2026-11-11）。
+
+## 6. 實作、驗收與實測（2026-11-12）
+
+程式：`catos/research.py`（`MarginTier`、`MarginModel`、`Liquidation`、`MarginRejection`；`BacktestConfig.margin`、`Performance.liquidation_cost`），`catos/research_datasets.py`（檔位快照讀寫、掛到資料集），`catos/research_catalog.py`／`research_optimization.py`／`research_validation_job.py`（輸出 `margin_model`），`catos/research_costs.py`、`research_trades.py`、`research_regimes.py`（強平清算費的對帳），`tools/fetch_okx_candles.py --position-tiers`，回測頁的「保證金與強平」列與強平提示。測試在 `tests/test_research_margin.py`（20 個）與 `tests/test_fetch_okx_dataset.py` 的 `PositionTiersFetchTest`。
+
+檔位快照：`data/okx/BTC-USDT-SWAP/position-tiers/okx-btc-usdt-swap-position-tiers-cross-20261112T023422Z.json`，99 檔，sha256 `638d1e4a5bb2b500b2c1a5aaed853cbd4c4ab6c24422eb47a8322c053c3479bf`。當天對這個端點共 3 次請求（1 次存檔路徑寫錯而丟棄、1 次檢視欄位、1 次正式存檔），都是 BTC-USDT-SWAP、公開端點、沒有金鑰。
+
+獨立驗收（全新 Claude 子代理，只拿規格、差異與證據路徑）：
+
+- 第一次（`c160dbfe`）：FAIL，阻斷缺陷 D1、非阻斷缺陷 D2，其餘 8 個核對項目通過。全文 `reports/margin-model-acceptance-20261112/acceptance.md`。
+  - D1：開盤跳空越過強平價時，前一根收盤決定的平倉或減倉先成交，權益變負且沒有強平紀錄。修法：成交前先用開盤價檢查原部位（見第 2 節順序第 2 步）。
+  - D2：初始保證金檢查沒算 order loss。修法：以開盤價代替標記價格估值。
+- 重驗（`6cdb9115`，另一個全新子代理，只驗 D1、D2 影響範圍）：PASS，沒有新缺陷。1500 組隨機案例比對修正前後，差異只出現在「開盤越過強平價」與「滑價大於 0 的初始保證金」兩類，都符合規格；`margin=None` 與 `main` 600 組 0 差異。全文 `reports/margin-model-acceptance-20261112/reverify-d1-d2.md`。
+
+真實資料實測（`execute_request` 純計算，不提交任務）：重跑 `docs/research-real-data-plan.md` 記錄爆倉的 F3 Donchian 1H（24／6、10 張、本金 10,000、taker 0.0005、滑價 2 bps）。2026-07-08 以 63416.9 被強平（第 1 檔、未跳空），強平手續費 3.17、清算費 25.36，權益歸 0 並停止交易；舊引擎是同日稍晚權益跌破 0 後繼續算到 -525.75。往返統計對帳殘差 0。
+
+沒做的事：介面只在整合測試的合成資料集上實際渲染過「未啟用」狀態；「啟用」與「已強平」狀態只有型別檢查與後端輸出測試，沒有在瀏覽器實際操作。優化與滾動驗證頁沒有顯示舊結果的「未啟用」標示（資料仍有 `margin_model` 欄位可判斷）。
