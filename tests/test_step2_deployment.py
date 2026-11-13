@@ -139,8 +139,15 @@ class ApprovalRecordTests(Isolated):
                     approvals.read_records()
                 with self.assertRaises(approvals.ApprovalError):
                     approvals.active_approval(first["record_id"])
+        self.path.write_bytes(original.replace(b'"quantity":"1"', b'"quantity":"' + bytes([255]) + b'"', 1))
+        with self.assertRaisesRegex(approvals.ApprovalError, "approval_invalid_utf8"):
+            approvals.read_records()
         self.path.write_bytes(original)
         self.assertEqual(len(approvals.read_records()), 2)
+        # Known limit (documented): dropping whole trailing lines leaves a valid shorter chain.
+        self.path.write_bytes(lines[0] + bytes([10]))
+        self.assertEqual([r["record_id"] for r in approvals.read_records()], [first["record_id"]])
+        self.path.write_bytes(original)
 
     def test_revoke_is_a_new_record_and_cannot_repeat(self):
         record = self.approve()
@@ -382,6 +389,23 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(repeat["passed"], repeat)
         self.assertTrue(replay_consistency.compare_run(self.temp / "a", bars(), CONTRACT)["passed"])
 
+    async def test_resume_refuses_a_reserved_unsent_intent(self):
+        original = local_sim_replay._fill_intent
+
+        async def interrupted(*args):
+            raise local_sim_replay.ReplayStopped("test_interrupted_before_dispatch")
+
+        with patch.object(local_sim_replay, "_fill_intent", interrupted):
+            first = await self.replay("a")
+        self.assertEqual(first["status"]["stop_reason"], "test_interrupted_before_dispatch")
+        self.assertEqual(len(self.ledger("a", "SELECT 1 FROM risk_orders")), 1)
+        self.assertIs(local_sim_replay._fill_intent, original)
+        resumed = await local_sim_replay.replay_bars(record=self.record, contract=CONTRACT, bars=bars(),
+                                                     output_dir=self.temp / "a", resume=True)
+        self.assertEqual((resumed["status"]["state"], resumed["status"]["stop_reason"]),
+                         ("stopped", "resume_with_reserved_unsent_intent"))
+        self.assertEqual(self.ledger("a", "SELECT count(*) FROM execution_orders"), [(0,)])
+
     async def test_revocation_stops_before_the_next_bar_without_flatten_or_release(self):
         def at(status):
             if status["bars"] == 7 and status["state"] == "running":
@@ -454,6 +478,7 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([(a["approval_id"], a["state"], a["source"]) for a in body["approvals"]],
                          [(self.record["record_id"], "active", "current")])
         (run,) = body["runs"]
+        self.assertEqual((run["approvals_path"], run["formal_approval"]), (os.environ[approvals.ENV_PATH], False))
         self.assertEqual((run["state"], run["bars_done"], run["consistency"]["passed"]), ("completed", len(CLOSES), True))
         self.assertEqual(client.post(replay_api.PATH).status_code, 405)
         self.assertEqual(before, {p: p.stat().st_mtime_ns for p in self.temp.rglob("*") if p.is_file()})

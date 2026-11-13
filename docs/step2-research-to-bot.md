@@ -33,7 +33,7 @@
 
 | 部分 | 檔案 | 內容 |
 | --- | --- | --- |
-| 核准紀錄 | `catos/strategy_approvals.py` | 只增 JSON Lines，每行存前一行 sha256；改、刪、換順序、截斷、非正規 JSON 一律讀取失敗（fail-closed）。核准單位是部署設定（`catos/deployment_profiles/*.json`）。CLI 要完整 64 碼 sha256 且必須是互動式終端機。只有 `BOT_STRATEGIES` 列的策略可核准（目前只有 Donchian；工作包 E／F 的策略狀態取決於全部歷史，不可上 Bot）。lookback 上限 512 根。 |
+| 核准紀錄 | `catos/strategy_approvals.py` | 只增 JSON Lines，每行存前一行 sha256；改一行、刪中間的行、換順序、截斷半行、非正規 JSON 或非 UTF-8 一律讀取失敗（fail-closed）。**偵測不到**：整行刪掉結尾的幾行，或把檔案還原成較早的版本（例如刪掉最後一筆撤銷，核准會恢復有效）；這需要檔案以外的錨點，和「程序上的防呆、不是安全邊界」一致（驗收觀察 1）。核准單位是部署設定（`catos/deployment_profiles/*.json`）。CLI 要完整 64 碼 sha256 且必須是互動式終端機。只有 `BOT_STRATEGIES` 列的策略可核准（目前只有 Donchian；工作包 E／F 的策略狀態取決於全部歷史，不可上 Bot）。lookback 上限 512 根。 |
 | 兩層登錄 | `catos/strategy_registry.py` `resolve_deployment` | 內建層不變。研究製品只透過有效核准解析：策略、版本、來源 sha256（也核對研究白名單與磁碟上的檔案）、manifest 檔 sha256、entry、參數、張數、合約、週期、預熱、lookback 全部相符才通過。 |
 | IPC | `catos/ipc.py` | `WorkerConfig.deployment`；檢查點 v2 只存 `event_seq` 與最後一根時間，不存策略狀態；`ready` 必須恰好在餵滿 lookback 根時為真；重啟歷史（最近 lookback 根已提交 K 線）在 init 訊框傳給 Worker。SMA 的 v1 檢查點與 wire 格式不變。 |
 | Worker | `catos/worker.py`、`catos/worker_host.py` | 部署設定以核准解析；重啟時以歷史 K 線預熱重餵；每根前後都重新核對核准與來源，撤銷或改檔就停。子程序只多繼承 `CATOS_STRATEGY_APPROVALS`（路徑，不是憑證）。 |
@@ -48,9 +48,10 @@
 - 核准紀錄只在本機，換機器要重新核准；擋得住意外接線，擋不住刻意繞過的本機程式（P1 本來就不提供這種保證）。
 - `CATOS_STRATEGY_APPROVALS` 可指定別的核准檔，只供隔離測試；每次重播的 manifest 與一致性報告都記錄實際用的核准檔路徑。
 - 撤銷或改檔後，該帳本的 Supervisor 無法再解析設定，連釋放合約也做不到；要先重新核准。每次重播是獨立帳本與帳戶，不影響其他重播。
-- 續跑只處理在 K 線之間停下的情況；中斷在成交途中（有未終結委託或已保留未送出的意圖）時續跑會 fail-closed，不自動修復。
+- 續跑只處理在 K 線之間停下的情況；中斷在成交途中（有未終結委託，或已保留額度、還沒送出的意圖）時，續跑一開始就停止（`resume_with_unresolved_orders`／`resume_with_reserved_unsent_intent`），不自動修復。
 - 沒做（列為待辦）：local-sim 控制面（`control.json`）的重播模板與介面啟動按鈕；目前只能用 CLI 啟動重播，介面只看。提案曾列「依模板驗證 control.json」，因為只做唯讀介面就不需要動它，正式資料根的 `control.json` 不受影響。
 - 資金費仍明示為 0；接進 Supervisor 屬於帳務改動，接 Demo 前另議。
+- Worker 單根回應超過 5 秒（`WorkerHost` 既有逾時）就 fail-closed。2026-11-13 同機跑前端建置時實際發生一次；用 `resume` 續跑即可，結果和不中斷的重播位元組相同。
 
 ## 驗證
 

@@ -257,6 +257,7 @@ def compare_run(run_dir, bars, contract, *, published=None):
                       realized_pnl=str(result.performance.realized_pnl), fees=str(result.performance.fees),
                       trade_count=result.performance.trade_count),
         decision_digest=decision_digest(inputs, intents),
+        tool_sha256=research_catalog.files_hash(("catos/replay_consistency.py", "catos/research.py")),
         fill_digest=hashlib.sha256(json_text(bot_rows).encode()).hexdigest(),
     )
     if published is not None:
@@ -334,7 +335,8 @@ def markdown(report):
              f"- 結果：{'PASS' if report['passed'] else 'FAIL'}（門檻：{report['threshold']}）",
              f"- 比對基準：{report['baseline']}",
              f"- 核准 id：`{report['approval_id']}`（核准檔 `{report['approvals_path']}`）",
-             f"- 策略來源 sha256：`{report['source_sha256']}`；build_id `{report['build_id']}`",
+             f"- 策略來源 sha256：`{report['source_sha256']}`；build_id `{report['build_id']}`；"
+             f"比對工具與研究引擎 sha256 `{report['tool_sha256']}`",
              f"- 資料集：`{(report['dataset'] or {}).get('id')}`，{report['bars']} 根（預熱 {report['warmup_bars']}、"
              f"評估 {report['evaluation_bars']}）",
              f"- 風控上限：`{json.dumps(report['risk_limits'])}`", "", "| 檢查 | 結果 |", "| --- | --- |"]

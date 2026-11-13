@@ -109,6 +109,13 @@ def _sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def _text(raw):
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ApprovalError("approval_invalid_utf8") from None
+
+
 def _strict_json(raw):
     def pairs(items):
         result = {}
@@ -179,7 +186,7 @@ def load_profile(path):
     raw = Path(path).read_bytes()
     if len(raw) > 8192:
         raise ApprovalError("profile_too_large")
-    return validate_profile(_strict_json(raw.decode("utf-8")))
+    return validate_profile(_strict_json(_text(raw)))
 
 
 def _record_id(body):
@@ -248,7 +255,7 @@ def read_records(path=None):
     approved = set()
     revoked = set()
     for line in raw.split(b"\n")[:-1]:
-        record = _strict_json(line.decode("utf-8"))
+        record = _strict_json(_text(line))
         _check_record(record, prev)
         if canonical(record).encode("utf-8") != line:
             raise ApprovalError("approval_line_not_canonical")

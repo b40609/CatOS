@@ -28,7 +28,7 @@ def _json(path):
 def _approvals():
     try:
         records = strategy_approvals.read_records()
-    except strategy_approvals.ApprovalError as error:
+    except (strategy_approvals.ApprovalError, OSError, ValueError) as error:
         return "unavailable", [], [f"approvals_{error}"]
     revoked = {r["approval_id"]: r["created_at"] for r in records if r["action"] == "revoke"}
     items = []
@@ -64,6 +64,8 @@ def _run(directory):
     final = None if summary is None else summary.get("final_account")
     return {
         "run_id": manifest["run_id"], "created_at": manifest["created_at"], "approval_id": manifest["approval_id"],
+        "approvals_path": manifest["approvals_path"],
+        "formal_approval": Path(manifest["approvals_path"]).resolve() == strategy_approvals.DEFAULT_PATH.resolve(),
         "strategy_id": profile["strategy_id"], "version": profile["version"], "parameters": profile["parameters"],
         "inst_id": profile["inst_id"], "timeframe_ms": profile["timeframe_ms"],
         "dataset_id": None if manifest.get("dataset") is None else manifest["dataset"].get("id"),

@@ -31,6 +31,9 @@ export interface ReplayRunDTO {
   run_id: string;
   created_at: string;
   approval_id: string;
+  /** Approvals file the run resolved through; false = not the formal file (a test record). */
+  approvals_path: string;
+  formal_approval: boolean;
   strategy_id: string;
   version: string;
   parameters: Record<string, number>;

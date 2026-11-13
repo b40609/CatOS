@@ -121,6 +121,9 @@ export function ReplayPanel() {
                       <tr key={r.run_id} className="num border-t border-border/60">
                         <td className="py-1 pr-3" title={`${r.strategy_id} ${params(r.parameters)} · ${r.dataset_id ?? ""}`}>
                           {shortId(r.run_id)}
+                          {!r.formal_approval && (
+                            <span className="ml-1 text-down" title={`核准檔：${r.approvals_path}`}>測試核准</span>
+                          )}
                         </td>
                         <td className="py-1 pr-3" title={r.stop_reason ?? undefined}>
                           {RUN_STATE[r.state] ?? r.state}

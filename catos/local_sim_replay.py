@@ -263,6 +263,11 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
             held = await supervisor._io(supervisor._journal.execution.unresolved)
             if held:
                 raise ReplayStopped("resume_with_unresolved_orders")
+            reserved = await supervisor._io(lambda: supervisor._journal.connection.execute(
+                "SELECT 1 FROM risk_orders UNION ALL SELECT 1 FROM outbox LIMIT 1").fetchone())
+            if reserved is not None:
+                # Interrupted between the risk reservation and the fill; not repaired here.
+                raise ReplayStopped("resume_with_reserved_unsent_intent")
             view = await durable_view(supervisor, config, last.open_time_ms + tf, last.close)
             await _reconcile(supervisor, view.position, f"replay-resume-{start}")
             status.update(bars=start, warmup_bars=min(start, warmup), evaluation_bars=max(0, start - warmup))
