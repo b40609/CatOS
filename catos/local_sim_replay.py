@@ -257,9 +257,9 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
             return
         events.event("kill_switch", evidence=fired, seq=status["bars"])
         try:
-            await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
-        except Exception as exc:
-            raise ReplayStopped(f"manual_kill:{fired}:latch_failed:{type(exc).__name__}") from None
+            await supervisor.manual_kill(actor=watch.actor, evidence_id=fired)
+        except Exception as exc:  # recorded as a failure, not a clean stop
+            raise RuntimeError(f"manual_kill_latch_failed:{fired}:{type(exc).__name__}") from None
         raise ReplayStopped("manual_kill:" + fired)
 
     async def observe_again(view):

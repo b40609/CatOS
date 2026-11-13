@@ -234,7 +234,7 @@ async def run(profile="smoke", *, output_root=None):
                 fired = watch.check()
                 if fired is not None:
                     evidence.event("kill_switch", evidence=fired)
-                    await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
+                    await supervisor.manual_kill(actor=watch.actor, evidence_id=fired)
                     raise StopRequested("manual_kill:" + fired)
 
             await reconcile(supervisor, D("0"), 0)

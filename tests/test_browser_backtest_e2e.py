@@ -17,6 +17,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))

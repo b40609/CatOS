@@ -17,6 +17,7 @@ from catos.data_io import load_candles_csv
 from catos.research_catalog import DATA_PATH, DEFAULT_REQUEST, load_registered_strategy, provenance, validate_request
 from catos.worker_host import WorkerHost
 from test_ipc import account, bar, config
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 D = Decimal
 

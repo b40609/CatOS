@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from catos.workspace_api import create_app
 from catos.workspace_snapshot import LocalSimReader, SnapshotError, MAX_METADATA
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 RUN = "a" * 32
 NOW = datetime(2026, 9, 30, 4, 0, tzinfo=timezone.utc)

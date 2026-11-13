@@ -23,6 +23,7 @@ from catos.research_catalog import (
 )
 from catos.research_service import ResearchError, ResearchService
 from catos.research_strategy import RegisteredSMA
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 
 def request_copy():

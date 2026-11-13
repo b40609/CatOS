@@ -106,7 +106,12 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      {kill?.error ? (
+      {!available ? (
+        <p className="text-amber-400">
+          介面讀不到總開關狀態。要緊急停止，在專案資料夾的終端機執行：
+          <code className="ml-1 text-foreground">.venv\Scripts\python.exe -m catos.cli kill engage --reason "原因"</code>
+        </p>
+      ) : kill?.error ? (
         <p className="text-amber-400">紀錄檔有問題，視同已觸發：{kill.error}。要用終端機檢查 outputs/controls/kill-switch.jsonl。</p>
       ) : engaged && last ? (
         <p className="text-muted-foreground">

@@ -178,11 +178,26 @@ CatOS 的規則比上面都嚴（自動清倉＋鎖存），本包不放寬。�
   - `.venv\Scripts\python.exe -m catos.cli kill clear --reason "原因"`（只限互動式終端機，代理不得執行）
 - 紀錄檔：`outputs/controls/kill-switch.jsonl`（git 忽略）；`CATOS_KILL_SWITCH` 可指到別的路徑，測試一律用隔離路徑。
 
+### 紀錄檔的保守規則
+
+- 紀錄檔內容被改、截斷、順序被換、不是 JSON、讀不到，都當成已觸發。
+- 第一次使用後會多一個 `kill-switch.jsonl.lock` 旁檔。之後紀錄檔被刪或被清成 0 位元組，也當成已觸發（獨立驗收 D1 修正）。
+- 只有「紀錄檔和 `.lock` 旁檔都不存在」才算全新安裝。要重置總開關，必須由使用者刻意刪除這兩個檔；代理不得刪除或編輯（紅線）。
+
+### 解除時「有 run 在跑」的檢查範圍
+
+- 介面解除只檢查 8770 自己的控制面 run；終端機的歷史重播與 R4 看不到。CLI `kill clear` 不做這項檢查。
+- 安全結果不受影響：每個執行中的 run 會記住「開始之後出現過的任何一次觸發」，即使隨後被解除，它仍會在下一根 K 線前停止（`Watch`）。
+
 ### 和提案的差異
 
 - 除了控制面與歷史重播，R4 浸泡測試（`catos/local_sim_r4.py`）也會在啟動前拒絕、在等待下一根 K 線時每秒檢查。它也持有 Supervisor，提案時漏列。
 - 紀錄檔另有一個 `.lock` 旁檔，讓介面與終端機不會同時寫入。
 - `request_id` 寫進紀錄，同一個 `request_id` 重送不會多寫一筆。
+- 鎖存寫入失敗時，run 記為失敗（控制面 `failed`、重播 `failed`），不是一般的停止（驗收 O3）。
+- 帳本稽核列的操作者記 `kill-switch-http` 或 `kill-switch-cli`，對應觸發的來源（驗收 O4）。
+- 會啟動 run 的測試模組都用 `tests/kill_isolation.py` 把總開關檔指到暫存路徑，使用者觸發 Kill 不會讓測試失敗（驗收 O2）。
+- 沒有另外建立 `docs/kill-switch.md`，用法與規則都寫在本文件。
 - 既有測試裡依舊預設數字校準的情境（3.0 倍、10%／20%），改成明確使用 `risk.LEGACY_LIMITS`，測的是機制；新預設的數值與邊界由 `tests/test_kill_switch.py` 測。
 
 ### 改動的檔案

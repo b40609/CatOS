@@ -47,7 +47,7 @@ R1 的 `external_net` 僅包含實際起算後、已分類且已證明歸屬的�
 
 費用、資金費及損益已含在當前權益，不重複扣除。台北 UTC+08:00 午夜切日；快照跨午夜仍須重新確認當日基準。報告顯示「風控期間損益」與起算時間，不涵蓋起算前的當日損失。舊 exact-midnight／Q1 能力與 Demo 路徑保留，不代表 Demo 已接入 R1；舊明示 E1 封鎖不自動解除。
 
-2026-11-14 工作包 B：新帳本預設有效槓桿上限 1.0x、單幣占比 50%（單幣 0.5 倍權益）、Soft 5%／Hard 10%；`risk.LEGACY_LIMITS` 保留之前的 3.0x／50%、10%／20%。既有帳本沿用建立時保存的值。手動 Kill 由共用總開關（`catos/kill_switch.py`）觸發，`Supervisor.manual_kill` 鎖存並寫一筆 `risk_actions`（kind `manual_kill`）；細節見 `docs/wp-b-kill-switch-proposal.md`。
+2026-11-14 工作包 B：新帳本預設有效槓桿上限 1.0x、單幣占比 50%（單幣 0.5 倍權益）、Soft 5%／Hard 10%；`risk.LEGACY_LIMITS` 保留之前的 3.0x／50%、10%／20%。既有帳本保存建立時的值：重開時呼叫端必須傳入相同的上限，不同就直接報錯（`risk mode/limits cannot be replaced in place`），不會默默改用新值；舊值的重播用 `--limits legacy-v1` 續跑。手動 Kill 由共用總開關（`catos/kill_switch.py`）觸發，`Supervisor.manual_kill` 鎖存並寫一筆 `risk_actions`（kind `manual_kill`）；細節見 `docs/wp-b-kill-switch-proposal.md`。
 
 最新 P5：Soft／Hard 可配置，v1 預設損失 10%／20%（2026-11-14 起為 5%／10%）；入金、反彈、跨日、重啟均不自動解除。原原因消失且條件合格後可隨時人工 re-arm，修改門檻不直接解除 latch。P5 本機遷移已完成：可配置 10%／20%、原子保存門檻、合格人工 re-arm、schema 4 控制稽核；舊意圖不復活。實際帳戶資料與交易所適配仍未接入。
 

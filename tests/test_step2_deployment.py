@@ -19,6 +19,7 @@ from unittest.mock import patch
 from catos import (ipc, local_sim_replay, replay_consistency, research, research_catalog, risk,
                    strategy_approvals as approvals, strategy_registry)
 from catos.worker_host import WorkerError, WorkerHost
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 D = Decimal
 START = 1_767_225_600_000  # 2026-01-01 00:00 UTC (08:00 Taipei)

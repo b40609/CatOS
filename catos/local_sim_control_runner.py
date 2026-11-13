@@ -25,6 +25,10 @@ class Killed(Exception):
     pass
 
 
+class KillLatchFailed(RuntimeError):
+    """The switch fired but the ledger latch did not persist: a failure, not a clean stop."""
+
+
 def boundary(stop):
     if stop.is_set():
         raise Stopped()
@@ -62,9 +66,9 @@ async def run_case(directory, run_id, stop, emit, update, source_ok):
             return
         emit("kill_switch", evidence=fired)
         try:
-            await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
+            await supervisor.manual_kill(actor=watch.actor, evidence_id=fired)
         except Exception as exc:
-            raise Killed("manual_kill_latch_failed_" + type(exc).__name__) from None
+            raise KillLatchFailed("manual_kill_latch_failed") from exc
         raise Killed("manual_kill")
 
     try:

@@ -104,6 +104,33 @@ class RecordFileTests(IsolatedSwitch):
                 with self.assertRaises(ks.KillSwitchError):
                     ks.Watch()
 
+    def test_deleted_or_emptied_file_after_first_use_reads_as_engaged(self):
+        # Acceptance D1 (2026-11-14): only "neither file nor .lock sidecar" is a fresh install.
+        ks.engage(reason="r", actor="cli")
+        self.assertTrue(ks.lock_path(self.path).exists())
+        self.path.unlink()
+        value = ks.status()
+        self.assertEqual((value["engaged"], value["error"]), (True, "kill_switch_file_missing"))
+        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
+            ks.require_clear()
+        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
+            ks.Watch()
+        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
+            ks.engage(reason="r", actor="cli")
+        self.path.write_bytes(b"")
+        value = ks.status()
+        self.assertEqual((value["engaged"], value["error"]), (True, "kill_switch_file_empty"))
+        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_empty"):
+            ks.require_clear()
+        # Resetting means deleting both files on purpose.
+        self.path.unlink()
+        ks.lock_path(self.path).unlink()
+        self.assertFalse(ks.status()["engaged"])
+        self.assertEqual(ks.require_clear(), 0)
+        record, appended = ks.engage(reason="r", actor="http")
+        self.assertTrue(appended)
+        self.assertEqual(record["prev_sha256"], ks.GENESIS)
+
     def test_concurrent_engages_append_exactly_one_record(self):
         ids = [f"{i:032x}" for i in range(12)]
         with ThreadPoolExecutor(max_workers=12) as pool:
@@ -129,6 +156,13 @@ class WatchTests(IsolatedSwitch):
         self.assertIsNone(watch.check())
         self.path.unlink()
         self.assertEqual(watch.check(), "kill-switch-unreadable")
+
+    def test_watch_reports_who_engaged(self):
+        watch = ks.Watch()
+        self.assertEqual(watch.actor, "kill-switch")
+        ks.engage(reason="r", actor="http")
+        watch.check()
+        self.assertEqual(watch.actor, "kill-switch-http")
 
     def test_engaged_switch_refuses_a_new_watch(self):
         ks.engage(reason="r", actor="cli")
@@ -262,6 +296,11 @@ class ControlPlaneKillTests(unittest.IsolatedAsyncioTestCase):
         finally:
             connection.close()
         self.assertEqual(rows, [("manual_kill", "kill-switch-" + reply["record"]["record_id"])])
+        actors = sqlite3.connect(self.temp / "simulation" / run_id / "state.sqlite3")
+        try:
+            self.assertEqual(actors.execute("SELECT actor FROM risk_actions").fetchall(), [("kill-switch-http",)])
+        finally:
+            actors.close()
         self.assertIn("manual_kill", reasons)
         with self.assertRaises(control.ControlError) as caught:
             await self.service.start("d" * 32, control.TEMPLATE)
@@ -381,6 +420,20 @@ class ReplayKillTests(unittest.IsolatedAsyncioTestCase):
                                                      output_dir=self.temp / "a", resume=True)
         self.assertEqual((resumed["status"]["state"], resumed["status"]["stop_reason"]),
                          ("stopped", "supervisor_not_healthy"))
+
+    async def test_a_latch_that_does_not_persist_is_a_failure_not_a_clean_stop(self):
+        def at(status):
+            if status["bars"] == 7 and status["state"] == "running" and not ks.status()["engaged"]:
+                ks.engage(reason="r", actor="cli")
+
+        async def broken(self, **kwargs):
+            raise OSError("disk full")
+
+        with patch.object(local_sim_replay, "PROGRESS_EVERY_BARS", 1), \
+                patch.object(LocalSupervisor, "manual_kill", broken):
+            summary = await self.replay("a", progress=at)
+        self.assertEqual(summary["status"]["state"], "failed")
+        self.assertIn("manual_kill_latch_failed", summary["status"]["stop_reason"])
 
     async def test_legacy_limit_set_is_recorded_in_the_manifest(self):
         summary = await self.replay("a", risk_limits=local_sim_replay.LIMIT_SETS["legacy-v1"])

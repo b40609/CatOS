@@ -12,7 +12,10 @@ each of them reads; it is not a ledger. Each Bot's ledger keeps its own latch
   procedural guard, not a security boundary.
 - While engaged no new run starts. A running run checks before every bar and
   stops on any engage written after it started, even if it was cleared since.
-- Any doubt about the file (unreadable, edited, truncated) reads as engaged.
+- Any doubt about the file (unreadable, edited, truncated, emptied, or deleted
+  after it was first used) reads as engaged. A fresh install is the only state
+  without records: neither the record file nor its ``.lock`` sidecar exists, so
+  resetting the switch means the user deliberately deletes both files.
 
 ``CATOS_KILL_SWITCH`` overrides the path for isolated tests and self-tests.
 """
@@ -118,8 +121,18 @@ def _check(record, prev, engaged):
         raise KillSwitchError("kill_switch_sequence_invalid")
 
 
-def read_records(path=None):
-    """Every record in order; any doubt about the file raises (fail closed)."""
+def lock_path(path):
+    return Path(str(path) + ".lock")
+
+
+def read_records(path=None, *, fresh=None):
+    """Every record in order; any doubt about the file raises (fail closed).
+
+    A missing record file is a fresh install only when its ``.lock`` sidecar is
+    missing too (``fresh`` overrides that check for the writer that just created
+    the sidecar). Every write appends a whole line, so an existing empty file is
+    never legitimate.
+    """
     path = kill_switch_path() if path is None else Path(path)
     if path.is_symlink():
         raise KillSwitchError("kill_switch_file_symlink_rejected")
@@ -127,13 +140,20 @@ def read_records(path=None):
         with path.open("rb") as stream:
             raw = stream.read(MAX_FILE_BYTES + 1)
     except FileNotFoundError:
+        if fresh is None:
+            try:
+                fresh = not lock_path(path).exists()
+            except OSError:
+                fresh = False
+        if not fresh:
+            raise KillSwitchError("kill_switch_file_missing") from None
         return []
     except OSError:
         raise KillSwitchError("kill_switch_file_unavailable") from None
     if len(raw) > MAX_FILE_BYTES:
         raise KillSwitchError("kill_switch_file_too_large")
     if not raw:
-        return []
+        raise KillSwitchError("kill_switch_file_empty")
     if not raw.endswith(b"\n"):
         raise KillSwitchError("kill_switch_file_truncated")
     records, prev, engaged = [], GENESIS, False
@@ -172,11 +192,14 @@ class _FileLock:
     """Exclusive sidecar lock so the 8770 app and a CLI never append at once."""
 
     def __init__(self, path):
-        self.path = Path(str(path) + ".lock")
+        self.path = lock_path(path)
         self.stream = None
+        self.fresh = False
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Only the writer that creates the sidecar may treat a missing record file as new.
+        self.fresh = not self.path.exists()
         stream = self.path.open("a+b")
         deadline = time.monotonic() + 5
         while True:
@@ -213,8 +236,7 @@ class _FileLock:
             self.stream.close()
 
 
-def _append(path, action, actor, reason, request_id):
-    records = read_records(path)  # verifies the chain before extending it
+def _append(path, action, actor, reason, request_id, records):
     prev = _sha256(path.read_bytes().split(b"\n")[-2] + b"\n") if records else GENESIS
     record = {"schema": SCHEMA, "schema_version": SCHEMA_VERSION, "prev_sha256": prev, "action": action,
               "actor": actor, "reason": reason, "request_id": request_id,
@@ -255,14 +277,14 @@ def engage(*, reason, actor, request_id=None, path=None):
     """Returns (record, appended). Already engaged: the active record, nothing appended."""
     _validate_command(actor, reason, request_id)
     path = kill_switch_path() if path is None else Path(path)
-    with _FileLock(path):
-        records = read_records(path)
+    with _FileLock(path) as lock:
+        records = read_records(path, fresh=True if lock.fresh else None)
         replay = _replayed(records, request_id, "engage")
         if replay is not None:
             return replay, False
         if records and records[-1]["action"] == "engage":
             return records[-1], False
-        return _append(path, "engage", actor, reason, request_id), True
+        return _append(path, "engage", actor, reason, request_id, records), True
 
 
 def clear(*, reason, actor, confirm, request_id=None, path=None, runs_active=lambda: False):
@@ -271,8 +293,8 @@ def clear(*, reason, actor, confirm, request_id=None, path=None, runs_active=lam
     if confirm != CONFIRM_WORD:
         raise KillSwitchError("kill_switch_confirmation_required")
     path = kill_switch_path() if path is None else Path(path)
-    with _FileLock(path):
-        records = read_records(path)
+    with _FileLock(path) as lock:
+        records = read_records(path, fresh=True if lock.fresh else None)
         replay = _replayed(records, request_id, "clear")
         if replay is not None:
             return replay
@@ -280,7 +302,7 @@ def clear(*, reason, actor, confirm, request_id=None, path=None, runs_active=lam
             raise KillSwitchError("kill_switch_not_engaged")
         if runs_active():
             raise KillSwitchError("simulation_run_active")
-        return _append(path, "clear", actor, reason, request_id)
+        return _append(path, "clear", actor, reason, request_id, records)
 
 
 def require_clear(path=None):
@@ -305,6 +327,7 @@ class Watch:
         self.start_count = require_clear(self.path)
         self._stamp = self._stat()
         self.fired = None
+        self.actor = "kill-switch"  # ledger audit actor; "kill-switch-http"/"-cli" once fired
 
     def _stat(self):
         try:
@@ -332,6 +355,7 @@ class Watch:
         engaged = [r for r in records[self.start_count:] if r["action"] == "engage"]
         if engaged:
             self.fired = "kill-switch-" + engaged[0]["record_id"]
+            self.actor = "kill-switch-" + engaged[0]["actor"]
             return self.fired
         self._stamp = stamp
         return None

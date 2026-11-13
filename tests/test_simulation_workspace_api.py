@@ -16,6 +16,7 @@ from catos import local_sim_control_runner as runner
 from catos import simulation_catalog as catalog
 from catos.local_sim_control_api import PREFIX
 from catos.workspace_api import create_app
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 BUILD = "a" * 64
 REQUEST, STOP, OTHER = "a" * 32, "b" * 32, "c" * 32
