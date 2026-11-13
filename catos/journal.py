@@ -598,6 +598,19 @@ class Journal:
             (kind, actor, evidence_id, canonical(before.to_wire()), canonical(after.to_wire()),
              canonical(limits.to_wire())))
 
+    def audit_manual_kill(self, before, actor, evidence_id):
+        """Work package B: who killed this Bot and why (the latch itself is save_risk's job)."""
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "kill evidence")
+        if self.risk_limits is None:
+            raise JournalError("risk mode is not enabled")
+        with self._transaction():
+            after = self.risk_state()
+            if "manual_kill" not in after.reasons:
+                raise JournalError("manual kill is not latched")
+            self._audit_risk("manual_kill", actor, evidence_id, before, after, self.risk_limits)
+        return after
+
     def set_loss_limits(self, limits, expected, actor, evidence_id):
         ipc.token(actor, "operator")
         ipc.token(evidence_id, "configuration evidence")

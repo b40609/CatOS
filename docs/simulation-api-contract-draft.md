@@ -289,7 +289,7 @@ v1 單合約：`position == "0"` 時空陣列，否則一筆。
 
 - 只回 local-sim：所有 DTO 的 `mode` 固定 `"local"`／`"local-sim-synthetic"`；服務內沒有任何讀取憑證、環境變數或對外連線的路徑（`local_sim_control_runner.py` 使用 `FakeExchange`）。任何含 `demo`／`live` 的請求回 403 `mode_not_available`，不回 404（讓前端能區分「不存在」與「被禁止」）。
 - 同源與版本：POST 維持 `local_sim_control_api.py` 全套檢查；GET 加 host 檢查。回應維持 `X-CatOS-Build`／`X-CatOS-Instance`／`Cache-Control: no-store`。前端 POST 必帶 `X-CatOS-Build`、`X-CatOS-Instance`（取自 `/version`）、`Content-Type: application/json`、body 僅精確欄位集合、`request_id` 由前端 `crypto.randomUUID()` 去連字號產生並在送出前存入 `sessionStorage`（`PendingCommand` 契約 `command.ts` 已定義）。
-- 不新增寫入面：`/state`、`/risk`、`/positions`、`/events` 不碰 SQLite 寫、不建立基準、不解除 latch、不釋放 ownership。v1 不提供 kill-switch／re-arm／set_loss_limits HTTP（`supervisor.latch`／`rearm`／`set_loss_limits` 存在但未授權接入，見 Q8）。
+- 不新增寫入面：`/state`、`/risk`、`/positions`、`/events` 不碰 SQLite 寫、不建立基準、不解除 latch、不釋放 ownership。v1 不提供 kill-switch／re-arm／set_loss_limits HTTP（`supervisor.latch`／`rearm`／`set_loss_limits` 存在但未授權接入，見 Q8）。2026-11-14 工作包 B 起，Kill-Switch 的 GET `/kill-switch`、POST `/kill-switch/engage`、POST `/kill-switch/clear` 已接上（同一套 POST 檢查；`/state` 多一個 `kill_switch` 欄位，跟 `risk` 網域同版本）；門檻修改與單一 Bot re-arm 仍不提供，延到接 OKX Demo 的工作包。
 - 不讀產品 DB：v1 投影只用控制面記憶體與 `control.json`；若 Q3 選讀 `state.sqlite3`，必須 `mode=ro` 且只在 run 終態後讀。
 - 上限：`/events` `limit ≤ 200`；`/state` 的 `events` 固定最近 40；回應不含 `source` 原始碼。
 

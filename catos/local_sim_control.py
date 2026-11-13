@@ -11,7 +11,7 @@ import re
 import time
 import uuid
 
-from catos import risk
+from catos import kill_switch, risk
 from catos import simulation_catalog as catalog
 from catos.local_sim_control_runner import run_case
 from catos.local_sim_r4 import RUNTIME_FILES
@@ -58,6 +58,16 @@ class ControlError(Exception):
         self.status = status
 
 
+KILL_STATUS = {"kill_switch_engaged": 409, "kill_switch_not_engaged": 409, "simulation_run_active": 409,
+               "request_id_conflict": 409, "kill_switch_confirmation_required": 422,
+               "kill_switch_reason_invalid": 422, "kill_switch_request_id_invalid": 422}
+
+
+def kill_error(error):
+    code = str(error)
+    return ControlError(code, KILL_STATUS.get(code, 503))
+
+
 def strict_json(data):
     def pairs(items):
         value = {}
@@ -100,6 +110,7 @@ class LocalSimControlService:
         self.seen_build = self.loaded_build
         self.limits = risk.Limits()
         self._contract = None
+        self._kill_stamp = self._kill_signature()
 
     def _bump(self, *domains):
         self.state_version += 1
@@ -284,6 +295,11 @@ class LocalSimControlService:
             return self.snapshot(binding[1])
         if template_id != TEMPLATE:
             raise ControlError("unsupported_template", 422)
+        try:
+            kill_switch.require_clear()
+        except kill_switch.KillSwitchError as error:
+            raise ControlError("kill_switch_engaged" if str(error) == "kill_switch_engaged"
+                               else "kill_switch_unreadable", 409) from None
         if self.current_build() != self.loaded_build:
             raise ControlError("source_changed_restart_required", 409)
         if any(r["control_state"] not in TERMINAL or not r["cleanup_confirmed"] for r in self.runs.values()):
@@ -406,6 +422,55 @@ class LocalSimControlService:
         finally:
             self.active = None
 
+    # Kill-Switch (work package B, docs/wp-b-kill-switch-proposal.md). The record
+    # file is shared with CLI replays; runs check it before every bar themselves.
+
+    @staticmethod
+    def _kill_signature():
+        try:
+            info = kill_switch.kill_switch_path().stat()
+        except FileNotFoundError:
+            return None
+        except OSError:
+            return "unavailable"
+        return (info.st_size, info.st_mtime_ns)
+
+    def kill_switch(self):
+        value = kill_switch.status()
+        value.pop("path", None)
+        return {**value, "confirm_word": kill_switch.CONFIRM_WORD,
+                "default_limits": self.limits.to_wire(), "version": self.state_version}
+
+    def _kill_changed(self):
+        stamp = self._kill_signature()
+        if stamp != self._kill_stamp:
+            self._kill_stamp = stamp
+            self._bump("risk")
+
+    async def engage_kill(self, request_id, reason):
+        # No _ready(): the switch is a file shared with CLI replays, so engaging must
+        # work even when this control plane is unavailable or closing.
+        try:
+            record, appended = await asyncio.to_thread(
+                kill_switch.engage, reason=reason, actor="http", request_id=request_id)
+        except kill_switch.KillSwitchError as error:
+            raise kill_error(error) from None
+        if not self.unavailable:
+            self._kill_changed()
+        return {"record": kill_switch.public(record), "appended": appended,
+                "kill_switch": self.kill_switch()}
+
+    async def clear_kill(self, request_id, reason, confirm):
+        self._ready()
+        try:
+            record = await asyncio.to_thread(
+                kill_switch.clear, reason=reason, actor="http", confirm=confirm, request_id=request_id,
+                runs_active=lambda: self.active is not None)
+        except kill_switch.KillSwitchError as error:
+            raise kill_error(error) from None
+        self._kill_changed()
+        return {"record": kill_switch.public(record), "kill_switch": self.kill_switch()}
+
     # Read-only projections (contract: docs/simulation-api-contract-draft.md section 2).
     # They read control-plane memory only: no SQLite, no basis creation, no latch changes.
 
@@ -508,6 +573,7 @@ class LocalSimControlService:
             self.seen_build = current
             self._bump("service")
         self._ready()
+        self._kill_changed()
         if since_version is not None and (type(since_version) is not int or since_version < 0):
             raise ControlError("invalid_since_version", 422)
         base = {"contract": "catos.simulation.v1", "version": self.state_version,
@@ -519,7 +585,7 @@ class LocalSimControlService:
         return {**base, "unchanged": False, "service": self.version(),
                 "strategies": self.strategies()["items"], "bots": self.bots()["items"],
                 "risk": self.risk(), "positions": self.positions()["items"],
-                "summary": self.summary(),
+                "summary": self.summary(), "kill_switch": self.kill_switch(),
                 "events": {"items": recent, "next_since": recent[-1]["seq"] if recent else 0,
                            "omitted": self._omitted()},
                 "domains": dict(self.domains)}

@@ -58,8 +58,8 @@ CatOS 啟動後，把這個 stdio MCP 伺服器加進你的 Agent，工作目錄
 | Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
 | OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter）與研究資料抓取工具 `tools/fetch_okx_candles.py`（三個公開端點，加上部位檔位端點、只限 BTC-USDT-SWAP；不用金鑰）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
 | 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口的資料集，不符即拒絕；資金費必須連續到最後一根，可以晚於第一根開始（OKX 只保留約 3 個月），這時結果會明示之前未計資金費，並另列固定費率的假設情境。回測、優化與滾動驗證都有成本拆解（價格損益、手續費、滑價、資金費、每邊兩平成本）與買進持有基準（`catos/research_costs.py`）。回測、優化與滾動驗證都可選上述七個研究策略與資料集；回測另有往返交易統計（勝率、賺賠比、獲利因子、期望值，`catos/research_trades.py`）；單次回測上限 60,000 根，報告的權益圖抽樣、成交明細最多列 400 筆（完整的在 result.json）；OKX 資料集在本機有部位檔位快照時預設套用單合約全倉的保證金與強平模型（每根 K 線以最不利價檢查，強平後權益歸 0、停止交易；擴大部位時檢查初始保證金，不足拒單），結果標示是否啟用與檔位 sha256，見 `docs/research-margin-model.md`；合成資料集與沒有檔位快照時不套用並寫明原因；被強平或權益跌破 0 的執行標成爆倉，不算 Sharpe 等比率統計；優化結果附過擬合檢查（DSR、PSR、PBO，`catos/research_overfit.py`），滾動驗證附邊界選參統計，研究優化在格點點數 ≤ n_trials 時窮舉；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
-| 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 10%／20%）、有效槓桿與單幣曝險預算（3.0x／50%）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
-| HTTP | 研究 API 與 local-sim 控制面投影（見下方）；**沒有** Kill-Switch／re-arm HTTP，前端對應按鈕標示「未接線」 |
+| 風控 | R1 台北日固定基準、Soft／Hard 日損鎖存（預設 5%／10%）、有效槓桿與單幣曝險預算（預設 1.0x／50%，即單幣 0.5 倍權益；2026-11-14 前是 3.0x／50%、10%／20%）、Kill-Switch 總開關（見下）、P6 災難停損設定；`risk.Snapshot` 的事實旗標預設 fail-closed（未宣告即視為未知） |
+| HTTP | 研究 API、local-sim 控制面投影與 Kill-Switch（觸發／解除，見 `docs/wp-b-kill-switch-proposal.md`）；**沒有**門檻修改與單一 Bot re-arm 的 HTTP（延到接 OKX Demo 的工作包） |
 | 前端 | 戰情台、實例監控、風控中心、策略中心、系統日誌與側欄狀態列讀取控制面真資料；回測／優化／滾動驗證頁接研究 HTTP；設定頁讀取服務版本；策略覆盤頁標示「v1 未啟用」。建置後由後端在 8770 直接提供 |
 
 ## 平台與環境需求
@@ -183,7 +183,8 @@ FastAPI (127.0.0.1:8770)  catos/workspace_api.py
 - OKX Demo／Live 下單、撤單、帳戶修改與憑證載入；前端 demo／live 模式只回「未開放」。
 - 市場情報（Yaozi）：2026-11-11 拆成獨立專案，程式、測試與文件都不在本 repo；之後以獨立服務的方式接回來，不共用程式碼。
 - 策略覆盤：需要 Demo／實盤的成交與權益歷史；前端「策略覆盤」頁標示「v1 未啟用」，不顯示任何示範數字。
-- 多 Bot、多合約、Kill-Switch／re-arm HTTP、P6 交易所端實際掛單。
+- 多 Bot、多合約、門檻修改與單一 Bot re-arm 的 HTTP、P6 交易所端實際掛單。
+- Kill-Switch 在本機模擬不平倉：觸發後所有 run 在下一根 K 線前停止、帳本鎖存，部位留在帳本；真的市價清倉在接上交易所後才做。
 
 ## 文件索引
 

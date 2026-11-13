@@ -5,6 +5,8 @@
  *   GET  /api/workspace/simulation/events?since=N&limit=M
  *   POST /api/workspace/simulation/bots/start
  *   POST /api/workspace/simulation/runs/{run_id}/stop
+ *   POST /api/workspace/simulation/kill-switch/engage
+ *   POST /api/workspace/simulation/kill-switch/clear   (user only: reason + typed 解除)
  *
  * Invariants (shared with research-api-adapter):
  * 1. Decimal strings pass through untouched.
@@ -21,6 +23,7 @@ import type {
   BotMode,
   CommandType,
   EventsPageDTO,
+  KillSwitchCommandResponseDTO,
   PendingCommand,
   RunDTO,
   StartBotResponseDTO,
@@ -157,6 +160,16 @@ export class SimulationApiAdapter implements WorkspaceAdapter {
   async stopBot(runId: string, requestId?: string): Promise<RunDTO> {
     if (!/^[0-9a-f]{32}$/.test(runId)) throw new ResearchApiError(422, 'invalid_run_id');
     return this.command<RunDTO>(`${SIMULATION_PREFIX}/runs/${runId}/stop`, 'stop_bot', {}, requestId);
+  }
+
+  async engageKill(reason: string, requestId?: string): Promise<KillSwitchCommandResponseDTO> {
+    return this.command<KillSwitchCommandResponseDTO>(`${SIMULATION_PREFIX}/kill-switch/engage`, 'kill_engage',
+      { reason }, requestId);
+  }
+
+  async clearKill(reason: string, confirm: string, requestId?: string): Promise<KillSwitchCommandResponseDTO> {
+    return this.command<KillSwitchCommandResponseDTO>(`${SIMULATION_PREFIX}/kill-switch/clear`, 'kill_clear',
+      { reason, confirm }, requestId);
   }
 
   getPendingCommand(): PendingCommand | null {

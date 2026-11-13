@@ -29,16 +29,16 @@ ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 DAYS_PER_YEAR = Decimal("365")
 MAX_LISTED_DAYS = 50
-# User-approved 2026-11-12 (AGENTS.md authorization record); not yet in catos/risk.py.
-PROPOSED_SOFT = Decimal("0.05")
-PROPOSED_HARD = Decimal("0.10")
+# The defaults before 2026-11-14 (risk.LEGACY_LIMITS), shown for comparison only.
+LEGACY_SOFT = Decimal("0.10")
+LEGACY_HARD = Decimal("0.20")
 _TAIPEI = timezone(timedelta(hours=8))
 _PCT = Decimal("0.0001")
 _YEAR = Decimal("0.01")
 
 NOTICE = (
     "純診斷：不改變成交、部位與損益，也不模擬鎖存；實盤觸發後當天會停止增倉或清倉，之後的數字會不同。",
-    "回測沒有套用單幣曝險上限（新預設 0.5 倍權益），部位大小照策略本身。",
+    "回測沒有套用單幣曝險上限（現行預設 0.5 倍權益），部位大小照策略本身。",
     "切日依 Asia/Taipei 00:00（UTC+8）；分母是當日第一根 K 線開盤時、成交前的權益；"
     "最低權益用每根 K 線的最不利價估（多單最低價、空單最高價），會高估觸發次數。",
     "首日與末日可能只涵蓋部分時段；權益歸零（強平）的那天算觸發，之後不再計數。",
@@ -124,7 +124,10 @@ def _limit_summary(days, losses, limit, span_days):
 
 
 def summary(result, bars):
-    """JSON-ready trigger counts for the current risk.Limits defaults and the approved new defaults."""
+    """JSON-ready trigger counts for the current risk.Limits defaults and the pre-2026-11-14 ones.
+
+    Results archived before 2026-11-14 carry key "proposed" (5%/10%, then not applied)
+    where this has "legacy" (10%/20%); the UI shows each result's own labels."""
     from catos import risk
 
     days, straddling = daily_lows(result, bars)
@@ -136,7 +139,7 @@ def summary(result, bars):
     stopped = next((day for day in days if day[4]), None)
     sets = (
         ("current", "現行預設（catos/risk.py）", True, defaults.soft_loss, defaults.hard_loss),
-        ("proposed", "新預設，尚未套用到風控（2026-11-12 同意）", False, PROPOSED_SOFT, PROPOSED_HARD),
+        ("legacy", "舊預設（2026-11-14 前），只供對照", False, LEGACY_SOFT, LEGACY_HARD),
     )
     return {
         "method": "taipei_day_open_basis_adverse_extreme_v1",

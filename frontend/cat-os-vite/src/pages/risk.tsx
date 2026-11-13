@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import { Lock, RefreshCw, ShieldCheck, Unlock } from "lucide-react";
+import { Lock, OctagonX, ShieldCheck, Unlock } from "lucide-react";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
+import { KillSwitchPanel } from "@/components/catos/kill-switch-panel";
 import { RISK_STATUS_META } from "@/components/catos/v0-bot-table";
 import { eventTitle } from "@/components/catos/unified-incident-activity-card";
 import { useCatStore } from "@/state/catStore";
@@ -177,6 +178,19 @@ function RiskManagement() {
         }
       />
 
+      {/* ==================== Kill-Switch（工作包 B） ==================== */}
+      <Panel
+        title={
+          <div className="flex items-center gap-2">
+            <OctagonX className="size-4 text-red-400" />
+            <span>Kill-Switch 總開關</span>
+          </div>
+        }
+        meta={<span className="font-mono text-t2 text-muted-foreground">觸發任何人可按 · 解除只限你本人</span>}
+      >
+        <KillSwitchPanel />
+      </Panel>
+
       {/* ==================== R1 風控期間基準 ==================== */}
       <Panel
         title={
@@ -186,14 +200,12 @@ function RiskManagement() {
           </div>
         }
         meta={
-          <button
-            type="button"
-            disabled
-            title="v1 不暴露 kill-switch / re-arm / 門檻修改 HTTP"
-            className="flex h-6 items-center rounded border border-border/60 bg-secondary/30 px-2 font-mono text-t2 text-muted-foreground cursor-not-allowed"
+          <span
+            className="font-mono text-t2 text-muted-foreground"
+            title="單一 Bot 的人工 re-arm 在接 OKX Demo 的工作包接上；本機模擬 run 被停止後是終態"
           >
-            <RefreshCw className="mr-1 size-3" /> 人工 re-arm · 未接線
-          </button>
+            單一 Bot re-arm · Demo 工作包再接
+          </span>
         }
       >
         {risk && derived && limits ? (
@@ -295,7 +307,7 @@ function RiskManagement() {
           title="風控參數與最後一次觀測"
           meta={
             <span className="font-mono text-t2 text-muted-foreground">
-              {risk ? `觀測 seq ${risk.seq} · 合成 ${formatClock(risk.time_ms)} · ` : ""}門檻修改 HTTP 未接線
+              {risk ? `觀測 seq ${risk.seq} · 合成 ${formatClock(risk.time_ms)} · ` : ""}門檻修改 · Demo 工作包再接
             </span>
           }
         >

@@ -19,6 +19,10 @@ from test_journal import proof, prepare_and_commit, input_for, result_for
 from test_risk import snapshot
 from journal_legacy_helpers import drop_empty_lot_schema
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 
 def policy(ratio='.10', **changes):
     return p.Config(D(ratio), **changes)
@@ -76,7 +80,7 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
 
     def make(self):
         return LocalSupervisor(self.path, account_id='fake-account', bot_id='bot', config=config(),
-                               fixture_budget=D(100), risk_limits=risk.Limits(), exchange=self.exchange)
+                               fixture_budget=D(100), risk_limits=LIMITS, exchange=self.exchange)
 
     async def cleanup(self):
         await self.s.close()

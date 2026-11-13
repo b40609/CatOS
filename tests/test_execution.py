@@ -18,6 +18,10 @@ from catos.journal import FixtureDecision
 from test_risk import snapshot
 from journal_legacy_helpers import drop_empty_lot_schema
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 D = Decimal
 
 
@@ -42,7 +46,7 @@ class ExecutionTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.path = Path(directory.name) / "state.sqlite3"
-        self.j = Journal(self.path, "fake-account", D("100"), risk.Limits(), True)
+        self.j = Journal(self.path, "fake-account", D("100"), LIMITS, True)
         self.addCleanup(lambda: self.j.close() if self.j else None)
         self.j.register("bot", config())
         self.reconcile()
@@ -55,7 +59,7 @@ class ExecutionTests(unittest.TestCase):
     def observe(self, **changes):
         previous = self.j.risk_state()
         s = snapshot(previous.seq + 1, 3 * STEP, valid_until_ms=10 * STEP, **changes)
-        self.j.save_risk(risk.observe(previous, s))
+        self.j.save_risk(risk.observe(previous, s, LIMITS))
 
     def reconcile(self, **changes):
         state = self.j.snapshot("bot")
@@ -173,7 +177,7 @@ class ExecutionTests(unittest.TestCase):
             db.execute("DROP TABLE execution_mode")
             db.execute("PRAGMA user_version=2")
             db.commit()
-        self.j = Journal(self.path, "fake-account", D("100"), risk.Limits(), True)
+        self.j = Journal(self.path, "fake-account", D("100"), LIMITS, True)
         self.assertEqual(self.j.snapshot("bot")["checkpoint"].event_seq, 3)
         self.assertEqual(self.j.total_reserved(), D("2"))
         self.assertIsNone(self.submit())  # Restart invalidates the old unsent epoch.
@@ -210,10 +214,10 @@ class ExecutionTests(unittest.TestCase):
             for cancel_pending in (False, True):
                 with self.subTest(position=position, cancel_pending=cancel_pending):
                     path = self.path.with_name(f"partial-{position}-{cancel_pending}.sqlite3")
-                    with closing(Journal(path, "fake-account", D("100"), risk.Limits(), True)) as j:
+                    with closing(Journal(path, "fake-account", D("100"), LIMITS, True)) as j:
                         j.register("bot", config())
                         j.reconcile("bot", proof(0))
-                        j.save_risk(risk.observe(j.risk_state(), snapshot(1, 3 * STEP, valid_until_ms=10 * STEP)))
+                        j.save_risk(risk.observe(j.risk_state(), snapshot(1, 3 * STEP, valid_until_ms=10 * STEP), LIMITS))
                         prepare_and_commit(j, 0)
                         prepare_and_commit(j, 1)
                         entry = position_intent(j, 2, D("0"), 2 * position)
@@ -228,7 +232,7 @@ class ExecutionTests(unittest.TestCase):
                         j.reconcile("bot", proof(j.snapshot("bot")["revision"], position=position,
                                                 attributed_bot_id="bot", ordinary_open=1))
                         j.save_risk(risk.observe(j.risk_state(), snapshot(2, 3 * STEP,
-                            valid_until_ms=10 * STEP, position=position)))
+                            valid_until_ms=10 * STEP, position=position), LIMITS))
                         duplicate = position_intent(j, 3, position, 2 * position)
                         self.assertEqual(duplicate.reason, "order_pending")
                         reduction = position_intent(j, 4, position, D("0"))
@@ -351,7 +355,7 @@ class ExecutionTests(unittest.TestCase):
         self.j.record_halts({"hard_loss"})
         op = self.j.risk_state().flatten_id
         self.j.close()
-        self.j = Journal(self.path, "fake-account", D("100"), risk.Limits(), True)
+        self.j = Journal(self.path, "fake-account", D("100"), LIMITS, True)
         self.assertEqual(self.j.execution.order(self.key)["state"], "UNKNOWN")
         self.assertEqual(self.j.risk_state().flatten_id, op)
         self.assertIsNone(self.submit())

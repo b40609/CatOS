@@ -5,7 +5,7 @@
  * creating a second one.
  */
 
-export type CommandType = 'start_bot' | 'stop_bot';
+export type CommandType = 'start_bot' | 'stop_bot' | 'kill_engage' | 'kill_clear';
 
 export type CommandStatus = 'pending' | 'success' | 'failed' | 'uncertain';
 

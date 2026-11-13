@@ -183,6 +183,10 @@ def main(argv: list[str] | None = None) -> int:
     if args_in and args_in[0] == "replay-compare":
         from catos.replay_consistency import cli_main
         return cli_main(args_in[1:])
+    # Work package B (2026-11-14): Kill-Switch; `kill clear` is user-only (interactive terminal).
+    if args_in and args_in[0] == "kill":
+        from catos.kill_switch import cli_main
+        return cli_main(args_in[1:])
     parser = argparse.ArgumentParser(
         description="catOS Dual SMA Strategy Backtest CLI"
     )

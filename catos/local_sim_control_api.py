@@ -51,16 +51,18 @@ def mount_simulation(app, output_root, *, service=None):
             stamp(response, service)
         return response
 
-    async def command(request, keys, optional=()):
+    async def command(request, keys, optional=(), *, bound=True):
         if request.url.hostname != "127.0.0.1":
             raise HTTPException(403, "simulation_requires_127_0_0_1")
         if request.headers.get("origin") not in (None, str(request.base_url).rstrip("/")):
             raise HTTPException(403, "simulation_origin_mismatch")
         if request.headers.get("content-type", "").split(";", 1)[0] != "application/json":
             raise HTTPException(415, "application_json_required")
-        if request.headers.get("x-catos-instance") != service.instance_id:
+        # Kill engage (bound=False) is the safe direction: it must work from a stale
+        # page or while the source changed on disk, so it skips instance/build binding.
+        if bound and request.headers.get("x-catos-instance") != service.instance_id:
             raise HTTPException(409, "service_instance_mismatch")
-        if request.headers.get("x-catos-build") != service.loaded_build:
+        if bound and request.headers.get("x-catos-build") != service.loaded_build:
             raise HTTPException(409, "page_version_mismatch_reload_required")
         body = bytearray()
         async for block in request.stream():
@@ -142,6 +144,23 @@ def mount_simulation(app, output_root, *, service=None):
         if limit > MAX_EVENT_LIMIT:
             raise ControlError("invalid_limit", 422)
         return service.events(since, limit)
+
+    # Kill-Switch (work package B). Engage: anyone. Clear: the user, with a reason
+    # and the typed confirmation word; agents must not call it (AGENTS.md 紅線).
+
+    @app.get(PREFIX + "/kill-switch")
+    async def kill_status():
+        return service.kill_switch()
+
+    @app.post(PREFIX + "/kill-switch/engage")
+    async def kill_engage(request: Request):
+        value = await command(request, ("request_id", "reason"), bound=False)
+        return await service.engage_kill(value["request_id"], value["reason"])
+
+    @app.post(PREFIX + "/kill-switch/clear")
+    async def kill_clear(request: Request):
+        value = await command(request, ("request_id", "reason", "confirm"))
+        return await service.clear_kill(value["request_id"], value["reason"], value["confirm"])
 
     @app.post(PREFIX + "/bots/start", status_code=202)
     async def start_bot(request: Request):

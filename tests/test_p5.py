@@ -19,6 +19,10 @@ from test_journal import proof
 from test_risk import snapshot
 from journal_legacy_helpers import drop_empty_lot_schema
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 
 class PolicyTests(unittest.TestCase):
     def test_custom_boundaries_and_decimal_validation(self):
@@ -33,26 +37,26 @@ class PolicyTests(unittest.TestCase):
                 risk.Limits(soft_loss=soft, hard_loss=hard)
 
     def test_soft_same_day_recovery_preserves_basis_and_rejects_active_loss(self):
-        state = risk.observe(risk.State(), snapshot(equity=D(900)))
+        state = risk.observe(risk.State(), snapshot(equity=D(900)), LIMITS)
         with self.assertRaises(ipc.ProtocolError):
-            risk.rearm(state, risk.Limits(), 0, reconciled=True)
-        bounced = risk.observe(state, snapshot(2, 1, equity=D(950)))
+            risk.rearm(state, LIMITS, 0, reconciled=True)
+        bounced = risk.observe(state, snapshot(2, 1, equity=D(950)), LIMITS)
         self.assertEqual(bounced.mode, 'NO_INCREASE')
-        recovered = risk.rearm(bounced, risk.Limits(), 1, reconciled=True)
+        recovered = risk.rearm(bounced, LIMITS, 1, reconciled=True)
         self.assertEqual((recovered.mode, recovered.basis, recovered.snapshot.external_net),
                          ('RUN', state.basis, D(0)))
         self.assertGreater(recovered.epoch, bounced.epoch)
 
     def test_expiry_missing_day_and_bad_position_veto_recovery(self):
-        state = risk.halt(risk.observe(risk.State(), snapshot()), {'soft_loss'})
+        state = risk.halt(risk.observe(risk.State(), snapshot(), LIMITS), {'soft_loss'})
         for state_, now in ((state, 60000), (replace(state, health='DEGRADED'), 0),
                            (replace(state, snapshot=replace(state.snapshot, position_verified=False)), 0)):
             with self.assertRaises(ipc.ProtocolError):
-                risk.rearm(state_, risk.Limits(), now, reconciled=True)
+                risk.rearm(state_, LIMITS, now, reconciled=True)
         midnight = risk.DAY_MS - risk.TAIPEI_OFFSET_MS
-        state = risk.observe(state, snapshot(2, midnight, basis=None))
+        state = risk.observe(state, snapshot(2, midnight, basis=None), LIMITS)
         with self.assertRaises(ipc.ProtocolError):
-            risk.rearm(state, risk.Limits(), midnight, reconciled=True)
+            risk.rearm(state, LIMITS, midnight, reconciled=True)
 
 
 class RecoveryTests(unittest.IsolatedAsyncioTestCase):
@@ -72,7 +76,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
 
     def make(self, limits=None):
         return LocalSupervisor(self.path, account_id='fake-account', bot_id='bot', config=config(),
-                               fixture_budget=D(100), risk_limits=limits or risk.Limits())
+                               fixture_budget=D(100), risk_limits=limits or LIMITS)
 
     async def cleanup(self):
         await self.s.close()

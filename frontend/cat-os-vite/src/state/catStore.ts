@@ -4,6 +4,7 @@ import type {
   BotViewDTO,
   CommandRecord,
   EventDTO,
+  KillSwitchDTO,
   PendingCommand,
   PositionDTO,
   RegisteredStrategyDTO,
@@ -41,6 +42,7 @@ export interface CatState {
   strategies: RegisteredStrategyDTO[];
   bots: BotViewDTO[];
   risk: RiskSnapshotDTO | null;
+  killSwitch: KillSwitchDTO | null;   // versioned with the risk domain
   positions: PositionDTO[];
   summary: SummaryDTO | null;
   events: EventDTO[];          // ascending by seq, capped at MAX_STORED_EVENTS
@@ -69,10 +71,10 @@ export interface CatState {
   addCommandRecord: (record: CommandRecord) => void;
 }
 
-function cleared(): Pick<CatState, 'instanceId' | 'service' | 'strategies' | 'bots' | 'risk' | 'positions' | 'summary'
+function cleared(): Pick<CatState, 'instanceId' | 'service' | 'strategies' | 'bots' | 'risk' | 'killSwitch' | 'positions' | 'summary'
   | 'events' | 'eventsNextSince' | 'eventsOmitted' | 'pendingCommand' | 'commandHistory' | 'versionMap'> {
   return {
-    instanceId: null, service: null, strategies: [], bots: [], risk: null, positions: [], summary: null,
+    instanceId: null, service: null, strategies: [], bots: [], risk: null, killSwitch: null, positions: [], summary: null,
     events: [], eventsNextSince: 0, eventsOmitted: 0, pendingCommand: null, commandHistory: [], versionMap: {},
   };
 }

@@ -24,10 +24,14 @@ def taipei_day(time_ms):
 
 @dataclass(frozen=True)
 class Limits:
-    leverage: Decimal = D("3.0")
+    """Defaults since 2026-11-14 (work package B, approved 2026-11-12 and 2026-11-14):
+    account effective leverage 1.0x, single coin 50% of that (0.5x equity),
+    Soft 5% / Hard 10%. Ledgers keep the limits they were created with
+    (risk_control.limits_json); LEGACY_LIMITS are the values before that day."""
+    leverage: Decimal = D("1.0")
     symbol_share: Decimal = D("0.50")
-    soft_loss: Decimal = D("0.10")
-    hard_loss: Decimal = D("0.20")
+    soft_loss: Decimal = D("0.05")
+    hard_loss: Decimal = D("0.10")
 
     def __post_init__(self):
         if decimal(self.leverage, "leverage") <= 0:
@@ -39,6 +43,11 @@ class Limits:
 
     def to_wire(self):
         return {name: str(value) for name, value in vars(self).items()}
+
+
+# Defaults before 2026-11-14 (3.0x account, 1.5x single coin, Soft 10% / Hard 20%):
+# kept for resuming or comparing runs recorded with them, never as a default.
+LEGACY_LIMITS = Limits(D("3.0"), D("0.50"), D("0.10"), D("0.20"))
 
 
 SYNTHETIC_BASELINE_SOURCE = "synthetic_midnight_snapshot_v1"

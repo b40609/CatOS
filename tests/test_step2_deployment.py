@@ -266,9 +266,10 @@ class ReversalRiskTests(unittest.TestCase):
                          "reduction_conflict")
         self.assertEqual(self.evaluate("-5", self.state(margin_ok=False), allow_reversal=True).reason,
                          "increase_gate_closed")
-        # 1500 USDT single-coin budget at mark 100 and 0.01 per contract = 1500 contracts.
-        self.assertTrue(self.evaluate("-1500", allow_reversal=True).accepted)
-        self.assertEqual(self.evaluate("-1501", allow_reversal=True).reason, "symbol_exposure_limit")
+        # Defaults since 2026-11-14: 500 USDT single-coin budget (0.5x of 1000) at mark 100 and
+        # 0.01 per contract = 500 contracts.
+        self.assertTrue(self.evaluate("-500", allow_reversal=True).accepted)
+        self.assertEqual(self.evaluate("-501", allow_reversal=True).reason, "symbol_exposure_limit")
 
 
 class WorkerV2Tests(unittest.IsolatedAsyncioTestCase):

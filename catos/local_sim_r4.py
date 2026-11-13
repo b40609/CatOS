@@ -11,7 +11,7 @@ from pathlib import Path
 import time
 import uuid
 
-from catos import ipc, research, risk
+from catos import ipc, kill_switch, research, risk
 from catos.data_io import load_candles_csv
 from catos.fake_exchange import FakeExchange, Fill, Report, TAG
 from catos.journal import Reconciliation, digest
@@ -32,7 +32,7 @@ RUNTIME_FILES = (
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
     "catos/supervisor.py", "catos/journal.py", "catos/risk.py",
     "catos/execution.py", "catos/fake_exchange.py", "catos/account_lock.py",
-    "catos/protection.py", "catos/data_io.py",
+    "catos/protection.py", "catos/data_io.py", "catos/kill_switch.py",
 )
 
 
@@ -171,10 +171,12 @@ def check_health(supervisor, directory, runtime_sha):
         raise RuntimeError("worker_or_supervisor_not_healthy")
 
 
-async def wait_slot(deadline, supervisor, evidence, runtime_sha):
+async def wait_slot(deadline, supervisor, evidence, runtime_sha, kill=None):
     last_wall, last_mono = time.time(), time.monotonic()
     last_heartbeat = last_mono
     while True:
+        if kill is not None:
+            await kill()
         current_wall, current_mono = time.time(), time.monotonic()
         if max(current_wall - last_wall, current_mono - last_mono) > 120:
             raise RuntimeError("continuity_gap_exceeded_120_seconds")
@@ -196,6 +198,7 @@ async def run(profile="smoke", *, output_root=None):
     if profile not in PROFILES:
         raise ValueError("unsupported R4 profile")
     bars_count, interval = PROFILES[profile]
+    watch = kill_switch.Watch()  # work package B: engaged or unreadable refuses before the run directory
     run_id = uuid.uuid4().hex
     directory = Path(output_root or ROOT / "outputs" / "local-sim-r4") / run_id
     directory.mkdir(parents=True, exist_ok=False)
@@ -227,8 +230,16 @@ async def run(profile="smoke", *, output_root=None):
                 bot_id="r4-sma", config=worker_config, fixture_budget=D("1000"),
                 risk_limits=risk.Limits(), exchange=exchange, day_clock=clock,
                 require_new_database=True) as supervisor:
+            async def kill_check():
+                fired = watch.check()
+                if fired is not None:
+                    evidence.event("kill_switch", evidence=fired)
+                    await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
+                    raise StopRequested("manual_kill:" + fired)
+
             await reconcile(supervisor, D("0"), 0)
             for i, bar in enumerate(bars[:2]):
+                await kill_check()
                 receipt = await supervisor.process_bar(i + 1, bar, None,
                     now_ms=bar.open_time_ms + config.timeframe_ms,
                     expires_at_ms=bar.open_time_ms + 2 * config.timeframe_ms)
@@ -241,7 +252,7 @@ async def run(profile="smoke", *, output_root=None):
                 expected_finish_at=(datetime.now(TAIPEI) + timedelta(seconds=bars_count * interval)).isoformat(),
                 worker_pid=supervisor._worker.process.pid)
             for offset, bar in enumerate(bars[2:bars_count + 2], 1):
-                await wait_slot(started_mono + offset * interval, supervisor, evidence, runtime_sha)
+                await wait_slot(started_mono + offset * interval, supervisor, evidence, runtime_sha, kill_check)
                 event_started = time.monotonic()
                 seq = offset + 2
                 now_ms = bar.open_time_ms + config.timeframe_ms
@@ -301,7 +312,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="smoke")
     args = parser.parse_args()
-    directory, status = asyncio.run(run(args.profile))
+    try:
+        directory, status = asyncio.run(run(args.profile))
+    except kill_switch.KillSwitchError as error:
+        print(json_text({"error": str(error)}), flush=True)
+        return 1
     print(json_text({"directory": str(directory), **status}), flush=True)
     return 0 if status["state"] == "complete" else 1
 

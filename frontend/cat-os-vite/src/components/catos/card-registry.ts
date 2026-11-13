@@ -51,7 +51,7 @@ export const ALL_CARDS: CardMeta[] = [
     category: "資產風控",
     desc: "帳戶有效槓桿倍數、單幣曝險預算 50% 限制與多空甜甜圈資產分佈",
     icon: PieChart,
-    badge: "3.0x 上限",
+    badge: "1.0x／單幣 0.5x",
     spec: {
       dataFeed: "OKX SWAP WebSocket",
       latency: "100ms 實時",

@@ -16,6 +16,10 @@ from test_journal import input_for, prepare_and_commit, proof, result_for
 from test_risk import snapshot
 from journal_legacy_helpers import drop_empty_lot_schema
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 D = Decimal
 
 
@@ -24,7 +28,7 @@ class RiskJournalTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.path = Path(directory.name) / "risk.sqlite3"
-        self.journal = Journal(self.path, "fake-account", D("100"), risk.Limits())
+        self.journal = Journal(self.path, "fake-account", D("100"), LIMITS)
         self.addCleanup(lambda: self.journal.close() if self.journal else None)
         self.journal.register("bot", config())
         self.journal.reconcile("bot", proof(0))
@@ -35,7 +39,7 @@ class RiskJournalTests(unittest.TestCase):
     def observe(self, **changes):
         old = self.journal.risk_state()
         s = snapshot(old.seq + 1, 3 * STEP, valid_until_ms=20 * STEP, **changes)
-        self.journal.save_risk(risk.observe(old, s))
+        self.journal.save_risk(risk.observe(old, s, LIMITS))
 
     def test_atomic_risk_reservation_counts_prior_quantity_and_replay(self):
         first = prepare_and_commit(self.journal, 2, target=D("1000"))
@@ -74,7 +78,7 @@ class RiskJournalTests(unittest.TestCase):
         self.assertEqual(self.journal.connection.execute("SELECT eligible FROM risk_orders").fetchone()[0], 0)
         self.assertEqual(self.journal.total_reserved(), D("2"))
         self.journal.close()
-        self.journal = Journal(self.path, "fake-account", D("100"), risk.Limits())
+        self.journal = Journal(self.path, "fake-account", D("100"), LIMITS)
         restored = self.journal.risk_state()
         self.assertEqual((restored.mode, restored.phase, restored.flatten_id, restored.basis),
                          ("FLAT", "WORKING", state.flatten_id, state.basis))
@@ -127,7 +131,7 @@ class RiskJournalTests(unittest.TestCase):
             db.execute("DROP TABLE execution_orders")
             db.execute("DROP TABLE execution_mode")
             db.execute("PRAGMA user_version=1")
-        journal = Journal(legacy, "legacy", D("100"), risk.Limits())
+        journal = Journal(legacy, "legacy", D("100"), LIMITS)
         self.addCleanup(journal.close)
         self.assertEqual(journal.snapshot("bot")["checkpoint"].event_seq, 1)
         self.assertEqual(journal.risk_state().mode, "FLAT")
@@ -143,7 +147,7 @@ class RiskJournalTests(unittest.TestCase):
         prepare_and_commit(journal, 2, target=D("2"), fixture=FixtureDecision(True, D("1")))
         journal.close()
         with self.assertRaisesRegex(JournalError, "fixture obligations"):
-            Journal(legacy, "legacy", D("100"), risk.Limits())
+            Journal(legacy, "legacy", D("100"), LIMITS)
 
 
 if __name__ == "__main__":

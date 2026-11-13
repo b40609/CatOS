@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Pause, Play, Cpu, Layers, ShieldCheck, Clock, Server } from "lucide-react";
 import { AppShell } from "@/components/catos/shell";
@@ -57,6 +57,7 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: stri
 function BotManagement() {
   const bots = useCatStore((s) => s.bots);
   const risk = useCatStore((s) => s.risk);
+  const killSwitch = useCatStore((s) => s.killSwitch);
   const summary = useCatStore((s) => s.summary);
   const strategies = useCatStore((s) => s.strategies);
   const connection = useCatStore((s) => s.connection);
@@ -291,8 +292,11 @@ function BotManagement() {
                 <span className="text-zinc-300 font-semibold" title="protection = null：v1 local-sim 未配置 P6 保護">未啟用</span>
               </div>
               <div className="flex items-center justify-between text-t1 text-muted-foreground">
-                <span>Kill Switch / 人工 re-arm</span>
-                <span className="text-zinc-300 font-semibold" title="v1 不暴露 kill-switch / re-arm / 門檻修改 HTTP">未接線</span>
+                <span>Kill-Switch 總開關</span>
+                <Link to="/risk" className={killSwitch?.engaged ? "text-red-400 font-semibold" : "text-emerald-400 font-semibold"}
+                      title="在風控中心觸發或解除">
+                  {killSwitch === null ? "未連線" : killSwitch.engaged ? "已觸發 · 前往風控中心" : "未觸發 · 前往風控中心"}
+                </Link>
               </div>
             </div>
 

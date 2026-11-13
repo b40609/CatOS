@@ -382,7 +382,7 @@ export interface DailyLossLimits {
   stopped: { day: string; reason: "liquidation" | "equity_non_positive" } | null;
   straddling_bars: number;
   thresholds: {
-    key: "current" | "proposed";
+    key: "current" | "legacy" | "proposed"; // "proposed": results archived before 2026-11-14
     label: string;
     applied_to_risk: boolean;
     soft: DailyLossLimitCount;

@@ -16,6 +16,37 @@ export interface RiskLimitsDTO {
   hard_loss: DecimalString;
 }
 
+/**
+ * Kill-Switch (work package B, GET /kill-switch and the `kill_switch` field of
+ * GET /state). One shared, hash-chained record file: engaged blocks every new
+ * local-sim run, and a running run stops before its next bar. An unreadable or
+ * edited file reports engaged with `error` set (fail closed).
+ */
+export interface KillSwitchRecordDTO {
+  record_id: string;
+  action: 'engage' | 'clear';
+  actor: 'http' | 'cli';
+  reason: string;
+  created_at: string;
+}
+
+export interface KillSwitchDTO {
+  engaged: boolean;
+  error: string | null;
+  engaged_record: (KillSwitchRecordDTO & Record<string, unknown>) | null;
+  count: number | null;
+  recent: KillSwitchRecordDTO[];   // newest first
+  confirm_word: string;            // "解除"
+  default_limits: RiskLimitsDTO;   // risk.Limits() for new runs
+  version: number;
+}
+
+export interface KillSwitchCommandResponseDTO {
+  record: KillSwitchRecordDTO;
+  appended?: boolean;
+  kill_switch: KillSwitchDTO;
+}
+
 export interface RiskBasisDTO {
   day: number;
   equity: DecimalString;

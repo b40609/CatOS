@@ -5,7 +5,7 @@
  */
 import type { BotViewDTO } from './bot';
 import type { DecimalString } from './decimal';
-import type { PositionDTO, RiskSnapshotDTO, RiskStatus } from './risk';
+import type { KillSwitchDTO, PositionDTO, RiskSnapshotDTO, RiskStatus } from './risk';
 import type { RunDTO } from './run';
 import type { RegisteredStrategyDTO } from './strategy';
 
@@ -50,6 +50,7 @@ export type EventKind =
   | 'final_account'
   | 'stop'
   | 'anomaly'
+  | 'kill_switch'
   | (string & {});
 
 export type EventLevel = 'INFO' | 'WARN' | 'ERROR';
@@ -92,6 +93,8 @@ export interface WorkspaceStateDTO {
   summary: SummaryDTO | null;
   events: { items: EventDTO[]; next_since: number; omitted: number };
   domains: Record<StateDomain, number>;
+  // Work package B; versioned with the `risk` domain. Absent from older backends.
+  kill_switch?: KillSwitchDTO;
 }
 
 export interface WorkspaceUnchangedDTO {

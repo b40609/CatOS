@@ -18,6 +18,10 @@ from test_journal import proof
 from test_risk import snapshot
 from test_execution import report
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 D = Decimal
 
 
@@ -42,7 +46,7 @@ class ExecutionSupervisorTests(unittest.IsolatedAsyncioTestCase):
 
     def make(self, **kwargs):
         return LocalSupervisor(self.path, account_id="fake-account", bot_id="bot", config=config(),
-            fixture_budget=D("100"), risk_limits=risk.Limits(), exchange=self.exchange, **kwargs)
+            fixture_budget=D("100"), risk_limits=LIMITS, exchange=self.exchange, **kwargs)
 
     async def cleanup(self):
         if self.s is not None:
@@ -187,11 +191,11 @@ class ExecutionSupervisorTests(unittest.IsolatedAsyncioTestCase):
     async def test_cannot_inject_live_client_or_disable_execution_on_restart(self):
         with self.assertRaises(SupervisorUnavailable):
             LocalSupervisor(self.path, account_id="fake-account", bot_id="bot", config=config(),
-                fixture_budget=D("100"), risk_limits=risk.Limits(), exchange=object())
+                fixture_budget=D("100"), risk_limits=LIMITS, exchange=object())
         await self.s.close()
         self.s = None
         disabled = LocalSupervisor(self.path, account_id="fake-account", bot_id="bot", config=config(),
-                fixture_budget=D("100"), risk_limits=risk.Limits())
+                fixture_budget=D("100"), risk_limits=LIMITS)
         with self.assertRaisesRegex(JournalError, "cannot be disabled"):
             await disabled.start()
 

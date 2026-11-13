@@ -7,6 +7,10 @@ import unittest
 from catos import ipc, risk
 from test_ipc import config
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 D = Decimal
 
 
@@ -22,8 +26,8 @@ def snapshot(seq=1, time_ms=0, **changes):
 
 
 def verdict(s=None, target="2", **kwargs):
-    state = risk.observe(risk.State(), snapshot() if s is None else s)
-    return risk.evaluate(state, risk.Limits(), config().contract, D(target), state.snapshot.position,
+    state = risk.observe(risk.State(), snapshot() if s is None else s, LIMITS)
+    return risk.evaluate(state, LIMITS, config().contract, D(target), state.snapshot.position,
                          state.snapshot.time_ms, reconciled=True, **kwargs)
 
 
@@ -57,25 +61,25 @@ class RiskTests(unittest.TestCase):
 
     def test_legal_reduction_survives_all_increase_gates(self):
         state = risk.observe(risk.State(), snapshot(position=D("10"), equity=D("800"),
-                                                   risk_equity=D("0"), margin_ok=False))
+                                                   risk_equity=D("0"), margin_ok=False), LIMITS)
         self.assertEqual(state.mode, "FLAT")
         for target in (D("0"), D("5")):
-            result = risk.evaluate(state, risk.Limits(), config().contract, target, D("10"), 0, reconciled=True)
+            result = risk.evaluate(state, LIMITS, config().contract, target, D("10"), 0, reconciled=True)
             self.assertTrue(result.accepted)
             self.assertTrue(result.reduce_only)
             self.assertEqual(result.reservation, 0)
-        self.assertFalse(risk.evaluate(state, risk.Limits(), config().contract, D("-1"), D("10"), 0, reconciled=True).accepted)
+        self.assertFalse(risk.evaluate(state, LIMITS, config().contract, D("-1"), D("10"), 0, reconciled=True).accepted)
 
     def test_reduction_requires_fresh_position_and_no_conflicting_reduction(self):
         for changes in (dict(position_verified=False), dict(reduction_conflict=True), dict(pending_sell=D("1"))):
             with self.subTest(changes=changes):
                 self.assertFalse(verdict(snapshot(position=D("10"), **changes), target="0").accepted)
         self.assertFalse(verdict(snapshot(position=D("10")), target="0", held_reduction=True).accepted)
-        state = risk.observe(risk.State(), snapshot(position=D("10")))
+        state = risk.observe(risk.State(), snapshot(position=D("10")), LIMITS)
         for position, now, known in ((D("9"), 0, True), (D("10"), 60_000, True), (D("10"), 0, False)):
-            self.assertFalse(risk.evaluate(state, risk.Limits(), config().contract, D("0"), position, now, reconciled=known).accepted)
+            self.assertFalse(risk.evaluate(state, LIMITS, config().contract, D("0"), position, now, reconciled=known).accepted)
         expired = risk.expire(state, 60_000)
-        self.assertFalse(risk.evaluate(expired, risk.Limits(), config().contract, D("0"), D("10"), 0, reconciled=True).accepted)
+        self.assertFalse(risk.evaluate(expired, LIMITS, config().contract, D("0"), D("10"), 0, reconciled=True).accepted)
         self.assertEqual(verdict(snapshot(position=D("10")), target="9.5").reason, "invalid_contract_quantity")
 
     def test_short_reduction_and_cross_zero_rejected(self):
@@ -84,42 +88,42 @@ class RiskTests(unittest.TestCase):
 
     def test_soft_hard_boundaries_and_fixed_external_flow_denominator(self):
         for equity, expected in (("900.0001", "RUN"), ("900", "NO_INCREASE"), ("800", "FLAT")):
-            self.assertEqual(risk.observe(risk.State(), snapshot(equity=D(equity))).mode, expected)
+            self.assertEqual(risk.observe(risk.State(), snapshot(equity=D(equity)), LIMITS).mode, expected)
         # A 100 deposit is excluded, and does not dilute the original 1000 denominator.
-        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("1000"), external_net=D("100"))).mode, "NO_INCREASE")
-        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("700"), external_net=D("-100"))).mode, "FLAT")
+        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("1000"), external_net=D("100")), LIMITS).mode, "NO_INCREASE")
+        self.assertEqual(risk.observe(risk.State(), snapshot(equity=D("700"), external_net=D("-100")), LIMITS).mode, "FLAT")
 
     def test_taipei_midnight_requires_explicit_basis_and_keeps_latches(self):
         midnight = risk.DAY_MS - risk.TAIPEI_OFFSET_MS
         self.assertEqual(risk.taipei_day(midnight - 1), 0)
         self.assertEqual(risk.taipei_day(midnight), 1)
-        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1, equity=D("800")))
+        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1, equity=D("800")), LIMITS)
         op = state.flatten_id
-        state = risk.observe(state, snapshot(2, midnight, basis=None, equity=D("2000")))
+        state = risk.observe(state, snapshot(2, midnight, basis=None, equity=D("2000")), LIMITS)
         self.assertEqual((state.mode, state.health, state.flatten_id), ("FLAT", "DEGRADED", op))
         restored = risk.State.from_wire(state.to_wire())
         self.assertIsNone(restored.basis_blocked_day)
-        retried = risk.observe(restored, snapshot(3, midnight + 1, equity=D("2000")))
+        retried = risk.observe(restored, snapshot(3, midnight + 1, equity=D("2000")), LIMITS)
         self.assertEqual((retried.mode, retried.health), ("FLAT", "HEALTHY"))
         next_midnight = midnight + risk.DAY_MS
-        state = risk.observe(restored, snapshot(3, next_midnight, equity=D("2000")))
+        state = risk.observe(restored, snapshot(3, next_midnight, equity=D("2000")), LIMITS)
         self.assertEqual((state.mode, state.health, state.flatten_id), ("FLAT", "HEALTHY", op))
         self.assertIsNone(state.basis_blocked_day)
 
     def test_fixed_basis_cannot_be_rebuilt_on_restart_or_same_day(self):
-        state = risk.observe(risk.State(), snapshot())
+        state = risk.observe(risk.State(), snapshot(), LIMITS)
         restored = risk.State.from_wire(state.to_wire())
         self.assertEqual(restored, state)
         with self.assertRaisesRegex(ipc.ProtocolError, "fixed day basis"):
-            risk.observe(restored, snapshot(2, 1, basis=risk.DayBasis(0, D("2000"), "new")))
+            risk.observe(restored, snapshot(2, 1, basis=risk.DayBasis(0, D("2000"), "new")), LIMITS)
         with self.assertRaises(ipc.ProtocolError):
-            risk.observe(restored, snapshot())
+            risk.observe(restored, snapshot(), LIMITS)
 
     def test_bounce_deposit_kill_and_progress_never_rearm(self):
-        state = risk.observe(risk.State(), snapshot(equity=D("800")))
+        state = risk.observe(risk.State(), snapshot(equity=D("800")), LIMITS)
         epoch = state.epoch
         op = state.flatten_id
-        state = risk.observe(state, snapshot(2, 1, equity=D("3000"), external_net=D("2000")))
+        state = risk.observe(state, snapshot(2, 1, equity=D("3000"), external_net=D("2000")), LIMITS)
         self.assertEqual(state.mode, "FLAT")
         state = risk.halt(state, {"manual_kill"})
         self.assertGreater(state.epoch, epoch)
@@ -128,16 +132,16 @@ class RiskTests(unittest.TestCase):
         with self.assertRaises(ipc.ProtocolError):
             risk.progress(state, "DONE", complete=True)
         state = risk.progress(risk.progress(state, "VERIFY"), "DONE", complete=True)
-        state = risk.observe(state, snapshot(3, 2, position=D("1")))
+        state = risk.observe(state, snapshot(3, 2, position=D("1")), LIMITS)
         self.assertEqual((state.mode, state.phase, state.flatten_id), ("FLAT", "WORKING", op))
 
     def test_timer_and_next_day_close_increases_independent_of_bar(self):
-        state = risk.observe(risk.State(), snapshot())
+        state = risk.observe(risk.State(), snapshot(), LIMITS)
         self.assertEqual(risk.expire(state, 60_000).health, "DEGRADED")
         midnight = risk.DAY_MS - risk.TAIPEI_OFFSET_MS
-        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1))
+        state = risk.observe(risk.State(), snapshot(time_ms=midnight - 1), LIMITS)
         self.assertEqual(risk.expire(state, midnight).health, "DEGRADED")
-        self.assertEqual(risk.evaluate(state, risk.Limits(), config().contract, D("1"), D("0"), midnight, reconciled=True).reason, "day_basis_missing")
+        self.assertEqual(risk.evaluate(state, LIMITS, config().contract, D("1"), D("0"), midnight, reconciled=True).reason, "day_basis_missing")
 
     def test_decimal_context_isolation_and_float_rejection(self):
         with localcontext() as ctx:

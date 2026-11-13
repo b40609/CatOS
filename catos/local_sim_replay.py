@@ -17,7 +17,13 @@ Nothing here touches the network or a real exchange.
   then the opening leg re-evaluated from flat (decision 8).
 - A Soft/Hard crossing, a rejected verdict or any fault stops the replay with
   the reason recorded; nothing is liquidated (decision 7).
-- The risk limits are a parameter; the defaults stay risk.Limits() (decision 6).
+- The risk limits are a parameter; the default is risk.Limits() (since 2026-11-14 the
+  work-package-B defaults; ``legacy-v1`` is the set used before, for comparison and
+  for resuming runs recorded with it).
+- Kill-Switch (work package B): a replay does not start while the switch is
+  engaged, and checks it before every bar. On an engage it latches
+  ``manual_kill`` in the ledger with an audit row and stops; nothing is
+  flattened or released (decision 7, approved 2026-11-14).
 """
 
 import argparse
@@ -32,7 +38,7 @@ from pathlib import Path
 import time
 import uuid
 
-from catos import ipc, research, research_catalog, risk, strategy_approvals, strategy_registry
+from catos import ipc, kill_switch, research, research_catalog, risk, strategy_approvals, strategy_registry
 from catos.fake_exchange import FakeExchange, Fill, Report, TAG
 from catos.journal import Reconciliation, digest
 from catos.local_sim_r4 import (RUNTIME_FILES as R4_RUNTIME_FILES, FixtureClock, atomic_json, durable_view,
@@ -46,10 +52,9 @@ DEFAULT_OUTPUT = ROOT / "outputs" / "local-sim-replay"
 PACES = {"full": 0, "per-bar-1s": 1}
 PROGRESS_EVERY_BARS = 100
 PROGRESS_EVERY_SECONDS = 1.0
-# Comparison run with the new defaults the user approved for step 3 (not applied
-# to risk.Limits() here): single-coin 0.5x equity = leverage 1.0 x share 0.5.
-NEW_DEFAULT_LIMITS = risk.Limits(D("1.0"), D("0.50"), D("0.05"), D("0.10"))
-LIMIT_SETS = {"current": risk.Limits(), "new-defaults": NEW_DEFAULT_LIMITS}
+# "current" is risk.Limits() (since 2026-11-14: single-coin 0.5x equity = leverage
+# 1.0 x share 0.5, Soft 5% / Hard 10%); "legacy-v1" is the set used before.
+LIMIT_SETS = {"current": risk.Limits(), "legacy-v1": risk.LEGACY_LIMITS}
 RUNTIME_FILES = tuple(R4_RUNTIME_FILES) + (
     "catos/local_sim_replay.py", "catos/research_donchian.py", "catos/research_datasets.py",
     "catos/research_only_artifacts/donchian-breakout-donchian-parameters-v1.json",
@@ -191,6 +196,7 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
     if type(pace_seconds) not in (int, float) or pace_seconds not in PACES.values():
         raise ValueError("pace must be full (0) or per-bar-1s (1)")
     output_dir = Path(output_dir)
+    watch = kill_switch.Watch()  # engaged or unreadable: refuse before touching the run directory
     if resume:
         previous = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
         if (previous["approval_id"] != record["record_id"] or previous["profile"] != record["profile"]
@@ -245,6 +251,17 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
             if progress is not None:
                 progress(dict(status))
 
+    async def kill_check():
+        fired = watch.check()
+        if fired is None:
+            return
+        events.event("kill_switch", evidence=fired, seq=status["bars"])
+        try:
+            await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
+        except Exception as exc:
+            raise ReplayStopped(f"manual_kill:{fired}:latch_failed:{type(exc).__name__}") from None
+        raise ReplayStopped("manual_kill:" + fired)
+
     async def observe_again(view):
         await observe(supervisor, view, view_mark[0], clock, events, balance)
 
@@ -277,6 +294,7 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
         for index, bar in enumerate(bars[start:], start):
             if stop is not None and stop.is_set():
                 raise ReplayStopped("operator_stop")
+            await kill_check()
             try:
                 strategy_registry.resolve_deployment(worker)
             except strategy_registry.RegistryError as exc:
@@ -300,6 +318,8 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
                         raise ReplayStopped("operator_stop")
                 elif pace_seconds:
                     await asyncio.sleep(pace_seconds)
+                if pace_seconds:
+                    await kill_check()
                 view = await durable_view(supervisor, config, now_ms, bar.close)
                 view_mark[0] = bar.close
                 try:
@@ -395,7 +415,7 @@ def cli_main(argv=None):
         summary = asyncio.run(replay(profile=strategy_approvals.load_profile(args.profile),
                                      dataset_id=args.dataset, output_root=args.output_root,
                                      limits=args.limits, pace=args.pace, max_bars=args.max_bars))
-    except (ValueError, OSError) as error:
+    except (ValueError, OSError, kill_switch.KillSwitchError) as error:
         print(f"錯誤：{error}")
         return 1
     print(json.dumps({"run_dir": str(Path(args.output_root or DEFAULT_OUTPUT) / summary["run_id"]),

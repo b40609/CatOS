@@ -21,6 +21,10 @@ from test_journal import proof
 from test_reconciliation_gate import BASE_TAIPEI_MS as MIDNIGHT, signed_report
 from test_supervisor import wait_flag
 
+# Scenarios here are calibrated to the pre-2026-11-14 limits (3.0x, Soft 10% / Hard 20%):
+# they test mechanics, not defaults. New-default values and boundaries: tests/test_kill_switch.py.
+LIMITS = risk.LEGACY_LIMITS
+
 
 CLASSIFICATIONS = okx_readonly.FlowClassification("r1-synthetic", (
     okx_readonly.FlowClassificationEntry("1", "1", "external", "fixture-deposit"),
@@ -72,7 +76,7 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
 
     async def open_supervisor(self):
         supervisor = LocalSupervisor(self.path, account_id="r1-fixture", bot_id="bot",
-            config=config(), fixture_budget=D("100"), risk_limits=risk.Limits(), day_clock=self.clock,
+            config=config(), fixture_budget=D("100"), risk_limits=LIMITS, day_clock=self.clock,
             exchange=FakeExchange("r1-fixture"))
         self.addAsyncCleanup(supervisor.close)
         await supervisor.start()
@@ -378,7 +382,7 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
                       posId="synthetic-position", pos="10"),)
         await self.observe(report_at(facts=facts), position=position)
         old_basis = self.supervisor.risk_state.basis
-        self.assertTrue(risk.evaluate(self.supervisor.risk_state, risk.Limits(), config().contract,
+        self.assertTrue(risk.evaluate(self.supervisor.risk_state, LIMITS, config().contract,
             D("11"), position, self.clock.now, reconciled=True).accepted)
         next_report = report_at(36_000_000 + risk.DAY_MS, facts=facts)
         self.clock.now = next_report["completed_ms"] + 50
@@ -388,12 +392,12 @@ class R1Tests(unittest.IsolatedAsyncioTestCase):
             valid_until_ms=self.clock.now + 1000, basis=None, flow_basis_id=None, flow_start_ms=None)
         self.supervisor.observe_risk(current_position)
         for target, accepted in (("11", False), ("5", True), ("0", True)):
-            verdict = risk.evaluate(self.supervisor.risk_state, risk.Limits(), config().contract,
+            verdict = risk.evaluate(self.supervisor.risk_state, LIMITS, config().contract,
                 D(target), position, self.clock.now, reconciled=True)
             self.assertEqual(verdict.accepted, accepted)
         await self.observe(next_report, position=position)
         self.assertNotEqual(self.supervisor.risk_state.basis.day, old_basis.day)
-        self.assertTrue(risk.evaluate(self.supervisor.risk_state, risk.Limits(), config().contract,
+        self.assertTrue(risk.evaluate(self.supervisor.risk_state, LIMITS, config().contract,
             D("11"), position, self.clock.now, reconciled=True).accepted)
 
     async def test_caller_mutation_during_commit_cannot_change_qualified_equity(self):

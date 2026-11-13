@@ -158,7 +158,8 @@ try {
     for (const bad of FORBIDDEN) assert.ok(!text.includes(bad), `bots page contains "${bad}"`);
     assert.ok(text.includes('999.91'), 'bots equity missing');
     assert.ok(text.includes('sim-control-sma') && text.includes('BTC-USDT-SWAP'), 'bots identity missing');
-    assert.ok(text.includes('未接線'), 'kill-switch / restart not marked as unwired');
+    assert.ok(text.includes('Kill-Switch 總開關') && text.includes('未觸發'), 'kill-switch state missing on bots page');
+    assert.ok(text.includes('重啟 Worker · 未接線'), 'restart not marked as unwired');
     console.log(`screenshot ${shot}`);
   });
   // v1.1: the remaining pages read the same projections; the old mock values must be gone.
@@ -168,8 +169,9 @@ try {
     for (const bad of [...FORBIDDEN, '12,500', '427.5', '展示資料', '197/197']) assert.ok(!text.includes(bad), `risk page contains "${bad}"`);
     assert.match(text, /正常 · (可|禁)增倉/, 'risk status chip missing');
     assert.ok(text.includes(`seq ${final.risk.seq}`), 'risk observation seq missing');
-    assert.ok(text.includes('Soft 10.00%') && text.includes('Hard 20.00%'), 'loss limits missing');
-    assert.ok(text.includes('未接線'), 're-arm not marked as unwired');
+    // Work package B defaults (2026-11-14): Soft 5% / Hard 10%.
+    assert.ok(text.includes('Soft 5.00%') && text.includes('Hard 10.00%'), 'loss limits missing');
+    assert.ok(text.includes('Kill-Switch 未觸發'), 'kill-switch state missing on risk page');
     console.log(`screenshot ${shot}`);
   });
   await check('logs page DOM shows the real event stream and no mock values', async () => {
@@ -186,6 +188,25 @@ try {
     assert.ok(text.includes('sma-trend') && text.includes('sma-parameters-v1') && text.includes('approved'), 'registry entry missing');
     assert.ok(text.includes('999.91'), 'bound bot equity missing');
     console.log(`screenshot ${shot}`);
+  });
+  await check('kill-switch engage blocks new runs, the pages show it, and clear needs the typed word', async () => {
+    await adapter.engageKill('integration test');
+    assert.equal(store.getState().killSwitch.engaged, true);
+    assert.equal(store.getState().commandHistory[0].command_type, 'kill_engage');
+    await assert.rejects(adapter.startBot('sim-control-sma'),
+      (e) => e.status === 409 && e.detail === 'kill_switch_engaged');
+    const killed = await page('/risk', 'risk-killed');
+    assert.ok(killed.text.includes('Kill-Switch 已觸發') && killed.text.includes('integration test'), 'engaged state missing');
+    const bots = await page('/bots', 'bots-killed');
+    assert.ok(bots.text.includes('已觸發'), 'engaged state missing on bots page');
+    await assert.rejects(adapter.clearKill('wrong word', 'clear'),
+      (e) => e.status === 422 && e.detail === 'kill_switch_confirmation_required');
+    assert.equal(store.getState().killSwitch.engaged, true);
+    await adapter.clearKill('checked', '解除');
+    assert.equal(store.getState().killSwitch.engaged, false);
+    const cleared = await page('/risk', 'risk-cleared');
+    assert.ok(cleared.text.includes('Kill-Switch 未觸發'), 'cleared state missing');
+    console.log(`screenshot ${killed.shot}`);
   });
   await check('review page is marked not enabled and shows no demo numbers', async () => {
     const { text, shot } = await page('/review', 'review');

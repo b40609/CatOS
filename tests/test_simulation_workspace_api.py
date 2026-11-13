@@ -105,7 +105,7 @@ class ProjectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(full["version"], opened)
         self.assertEqual(set(full), {"contract", "version", "instance_id", "observed_at_ms", "unchanged",
                                      "service", "strategies", "bots", "risk", "positions", "summary",
-                                     "events", "domains"})
+                                     "events", "domains", "kill_switch"})
         self.assertEqual(full["domains"]["bots"], full["version"])
         self.assertEqual(full["domains"]["events"], full["version"])
         self.assertEqual(full["domains"]["risk"], opened)
@@ -156,15 +156,16 @@ class ProjectionTests(unittest.IsolatedAsyncioTestCase):
         snapshot = service.risk()
         self.assertEqual((snapshot["run_id"], snapshot["mode"], snapshot["health"], snapshot["reasons"]),
                          (first["run_id"], "RUN", "HEALTHY", []))
-        self.assertEqual(snapshot["limits"], {"leverage": "3.0", "symbol_share": "0.50",
-                                              "soft_loss": "0.10", "hard_loss": "0.20"})
+        # Work package B defaults (2026-11-14): 1.0x account, 0.5x single coin, Soft 5% / Hard 10%.
+        self.assertEqual(snapshot["limits"], {"leverage": "1.0", "symbol_share": "0.50",
+                                              "soft_loss": "0.05", "hard_loss": "0.10"})
         self.assertEqual(snapshot["basis"]["period_start_ms"], DAY * risk.DAY_MS - risk.TAIPEI_OFFSET_MS)
         self.assertEqual(snapshot["basis"]["equity"], "1000")
         self.assertNotIn("basis", snapshot["snapshot"])
         derived = snapshot["derived"]
         self.assertEqual((derived["period_pnl"], derived["period_pnl_ratio"], derived["exposure_budget"],
                           derived["symbol_budget"], derived["can_increase"], derived["status"]),
-                         ("0", "0", "3000.0", "1500.000", True, "normal"))
+                         ("0", "0", "1000.0", "500.000", True, "normal"))
         # Decimal strings keep their scale; the flat pre-decision snapshot has zero exposure.
         self.assertEqual((Decimal(derived["notional"]), Decimal(derived["effective_leverage"])), (0, 0))
         for value in (derived["period_pnl"], snapshot["snapshot"]["equity"], bot["equity"]):
@@ -177,7 +178,7 @@ class ProjectionTests(unittest.IsolatedAsyncioTestCase):
         summary = service.summary()
         self.assertEqual((summary["equity"], summary["running_bots"], summary["total_bots"],
                           summary["leverage_limit"], summary["risk_status"], summary["basis_equity"]),
-                         ("1003.21", 1, 1, "3.0", "normal", "1000"))
+                         ("1003.21", 1, 1, "1.0", "normal", "1000"))
         self.assertEqual(summary["invariants"]["fixed_tag"], "41cb53c54d6dABDE")
         await service.stop(first["run_id"], STOP)
         await service.task
@@ -391,7 +392,7 @@ class APITests(unittest.TestCase):
             state = client.get(PREFIX + "/state").json()
             self.assertEqual(state["service"], client.get(PREFIX + "/version").json())
             self.assertEqual(state["bots"][0]["current_run_id"], run_id)
-            self.assertEqual(state["risk"]["derived"]["exposure_budget"], "3000.0")
+            self.assertEqual(state["risk"]["derived"]["exposure_budget"], "1000.0")
             self.assertEqual(state["positions"][0]["notional"], "2.030")
             self.assertEqual(state["summary"]["equity"], "1003.21")
             self.assertIsInstance(state["summary"]["equity"], str)

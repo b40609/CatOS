@@ -5,7 +5,7 @@ from dataclasses import replace
 from decimal import Decimal, localcontext
 import time
 
-from catos import ipc, research, risk
+from catos import ipc, kill_switch, research, risk
 from catos.data_io import load_candles_csv
 from catos.fake_exchange import FakeExchange, Fill, Report, TAG
 from catos.journal import digest
@@ -18,6 +18,10 @@ INTERVAL_SECONDS = 1
 
 
 class Stopped(Exception):
+    pass
+
+
+class Killed(Exception):
     pass
 
 
@@ -43,11 +47,31 @@ class Events:
 
 
 async def run_case(directory, run_id, stop, emit, update, source_ok):
-    """Returns cleanup evidence; never releases ownership, flattens or re-arms."""
+    """Returns cleanup evidence; never releases ownership, flattens or re-arms.
+
+    Kill-Switch (work package B): checked before every bar; an engage latches
+    ``manual_kill`` with an audit row and stops the run (no simulated flatten).
+    """
     supervisor = None
     worker_process = None
     outcome, error, cleanup = "completed", None, False
+
+    async def kill_check():
+        fired = watch.check()
+        if fired is None:
+            return
+        emit("kill_switch", evidence=fired)
+        try:
+            await supervisor.manual_kill(actor="kill-switch", evidence_id=fired)
+        except Exception as exc:
+            raise Killed("manual_kill_latch_failed_" + type(exc).__name__) from None
+        raise Killed("manual_kill")
+
     try:
+        try:
+            watch = kill_switch.Watch()
+        except kill_switch.KillSwitchError:
+            raise Killed("kill_switch_engaged") from None
         boundary(stop)
         _, config, _, _ = validate_request(DEFAULT_REQUEST)
         raw = load_candles_csv(DATA_PATH, config=config)
@@ -68,6 +92,7 @@ async def run_case(directory, run_id, stop, emit, update, source_ok):
         await reconcile(supervisor, Decimal("0"), 0)
         for i, bar in enumerate(bars[:2]):
             boundary(stop)
+            await kill_check()
             if not source_ok():
                 raise RuntimeError("source_changed_during_simulation")
             receipt = await supervisor.process_bar(i + 1, bar, None,
@@ -83,6 +108,7 @@ async def run_case(directory, run_id, stop, emit, update, source_ok):
         fills = 0
         for offset, bar in enumerate(bars[2:BAR_COUNT + 2], 1):
             await wait_boundary(stop)
+            await kill_check()
             if not source_ok():
                 raise RuntimeError("source_changed_during_simulation")
             worker = supervisor._worker
@@ -132,6 +158,8 @@ async def run_case(directory, run_id, stop, emit, update, source_ok):
              risk_state=supervisor.risk_state.to_wire())
     except Stopped:
         outcome = "stopped"
+    except Killed as exc:
+        outcome, error = "stopped", str(exc)
     except BaseException as exc:
         outcome, error = "failed", type(exc).__name__
         if isinstance(exc, asyncio.CancelledError):

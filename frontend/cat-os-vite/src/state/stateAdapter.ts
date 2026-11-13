@@ -64,7 +64,9 @@ export class StateAdapter {
       service: state.service, strategies: state.strategies,
     })) || applied;
     applied = current.applyAuthoritativeUpdate('bots', versions.bots, () => ({ bots: state.bots })) || applied;
-    applied = current.applyAuthoritativeUpdate('risk', versions.risk, () => ({ risk: state.risk })) || applied;
+    applied = current.applyAuthoritativeUpdate('risk', versions.risk, () => ({
+      risk: state.risk, killSwitch: state.kill_switch ?? null,
+    })) || applied;
     applied = current.applyAuthoritativeUpdate('positions', versions.positions, () => ({ positions: state.positions })) || applied;
     // summary derives from bots + risk: version with the newer of the two
     current.applyAuthoritativeUpdate('summary', Math.max(versions.bots, versions.risk), () => ({ summary: state.summary }));
@@ -243,12 +245,49 @@ export class StateAdapter {
     }
   }
 
+  /** Kill-Switch engage (work package B). Anyone may engage; the backend stops runs before their next bar. */
+  public async engageKill(reason: string, requestId?: string): Promise<void> {
+    await this.killCommand('kill_engage', { reason }, requestId,
+      (id) => this.adapter.engageKill(reason, id));
+  }
+
+  /** Kill-Switch clear: the user only, with a reason and the typed confirmation word. */
+  public async clearKill(reason: string, confirm: string, requestId?: string): Promise<void> {
+    await this.killCommand('kill_clear', { reason }, requestId,
+      (id) => this.adapter.clearKill(reason, confirm, id));
+  }
+
+  private async killCommand(type: 'kill_engage' | 'kill_clear', body: Record<string, string>,
+                            requestId: string | undefined, send: (id: string) => Promise<unknown>): Promise<void> {
+    const generation = useCatStore.getState().modeGeneration;
+    const id = requestId ?? newRequestId();
+    try {
+      await send(id);
+      useCatStore.getState().setPendingCommand(null);
+      this.record(type, id, body, 'success', { http_status: 200 });
+    } catch (err) {
+      const error = err instanceof ResearchApiError ? err : new ResearchApiError(0, 'network_error');
+      useCatStore.getState().setPendingCommand(this.adapter.getPendingCommand());
+      this.record(type, id, body, error.status === 0 ? 'uncertain' : 'failed',
+        { http_status: error.status, error_code: error.detail });
+      throw error;
+    } finally {
+      if (useCatStore.getState().modeGeneration === generation && useCatStore.getState().mode === 'local') {
+        await this.refresh(generation, { full: true });
+      }
+    }
+  }
+
   /** Replay the persisted command with its original request_id (idempotent on the backend). */
   public async retryPendingCommand(): Promise<void> {
     const pending = this.adapter.getPendingCommand();
     if (!pending) { useCatStore.getState().setPendingCommand(null); return; }
     if (pending.command_type === 'start_bot') {
       await this.startBot(pending.body.bot_id, pending.body.request_id);
+    } else if (pending.command_type === 'kill_engage') {
+      await this.engageKill(pending.body.reason, pending.body.request_id);
+    } else if (pending.command_type === 'kill_clear') {
+      await this.clearKill(pending.body.reason, pending.body.confirm, pending.body.request_id);
     } else {
       const runId = pending.path.split('/').at(-2) ?? '';
       await this.stopBot(runId, pending.body.request_id);

@@ -9,6 +9,7 @@
 import type {
   BotMode,
   EventsPageDTO,
+  KillSwitchCommandResponseDTO,
   PendingCommand,
   RunDTO,
   StartBotResponseDTO,
@@ -43,6 +44,11 @@ export interface WorkspaceAdapter {
   startBot(botId: string, requestId?: string): Promise<StartBotResponseDTO>;
   /** POST /runs/{run_id}/stop; stop completes the current accounting event first. */
   stopBot(runId: string, requestId?: string): Promise<RunDTO>;
+
+  /** POST /kill-switch/engage; anyone may engage (the safe direction). */
+  engageKill(reason: string, requestId?: string): Promise<KillSwitchCommandResponseDTO>;
+  /** POST /kill-switch/clear; the user only, with a reason and the typed confirmation word. */
+  clearKill(reason: string, confirm: string, requestId?: string): Promise<KillSwitchCommandResponseDTO>;
 
   getPendingCommand(): PendingCommand | null;
   clearPendingCommand(): void;

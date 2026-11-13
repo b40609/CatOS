@@ -119,6 +119,22 @@ class LocalSupervisor:
             self._accept_risk(risk.halt(self.risk_state, {reason}))
         # Persistence is serialized after current work; not claimed durable yet.
 
+    async def manual_kill(self, *, actor, evidence_id):
+        """Kill-Switch (work package B): latch now, then persist the latch and its audit row.
+
+        The in-memory gate closes before any await, exactly like latch(). Recovery
+        stays the explicit manual re-arm; nothing here flattens or releases.
+        """
+        ipc.token(actor, "operator")
+        ipc.token(evidence_id, "kill evidence")
+        before = self.risk_state
+        self.latch("manual_kill")
+        async with self._operation():
+            await self._flush_halts()
+            if self.risk_state is not None and self._risk_loaded:
+                await self._io(self._journal.audit_manual_kill, before, actor, evidence_id)
+        return self.risk_state
+
     def _accept_risk(self, state):
         if self.halt_reasons - state.reasons:
             state = risk.halt(state, self.halt_reasons)

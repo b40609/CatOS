@@ -25,7 +25,8 @@
 .venv\Scripts\python.exe -m catos.cli replay-compare outputs\local-sim-replay\<run_id>
 ```
 
-- `--limits new-defaults` 用新風控值（1.0 倍有效槓桿 × 50% = 單幣 0.5 倍、Soft 5%、Hard 10%）跑對照，不改預設。
+- 2026-11-14 起預設 `--limits current` 就是新風控值（1.0 倍有效槓桿 × 50% = 單幣 0.5 倍、Soft 5%、Hard 10%）；`--limits legacy-v1` 是之前的 3.0 倍／50%、10%／20%，用來對照或續跑用舊值錄的 run。原本的 `new-defaults` 選項已移除（工作包 B）。
+- Kill-Switch 觸發中時重播啟動不了；重播中觸發，會在下一根 K 線前鎖存 `manual_kill` 並停止，不平倉（`docs/wp-b-kill-switch-proposal.md`）。
 - `--pace per-bar-1s` 是每根 1 秒的展示步調（4H 五年約 3 小時，Ctrl+C 結束）；預設 `full` 全速。
 - 進度與結果在策略中心頁下方的「研究策略上 Bot」面板（唯讀，每 2 秒更新）。
 

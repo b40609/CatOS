@@ -1,4 +1,5 @@
 """Isolated loopback fixture for the real Vite proxy regression checks."""
+import os
 from pathlib import Path
 import sys
 
@@ -15,6 +16,8 @@ async def held_runner(directory, run_id, stop, emit, update, source_ok):
 
 if __name__ == "__main__":
     root = Path(sys.argv[1]).resolve()
+    # Work package B: the Kill-Switch record file lives in the isolated root, never outputs/.
+    os.environ["CATOS_KILL_SWITCH"] = str(root / "kill-switch.jsonl")
     app = create_app(output_dir=root / "research",
                      evidence_root=root / "evidence", simulation_root=root / "simulation")
     # "real" keeps the bounded synthetic runner (8 bars, 1 s each) for end-to-end checks;

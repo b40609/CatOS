@@ -194,6 +194,8 @@ def event_level_category(event):
         state = event.get("risk_state") or {}
         return ("WARN" if state.get("reasons") or state.get("mode") not in (None, "RUN")
                 else "INFO"), "RISK"
+    if kind == "kill_switch":
+        return "ERROR", "RISK"
     if kind in ("stop", "anomaly"):
         return "ERROR" if kind == "anomaly" else "WARN", "SYSTEM"
     return "INFO", "SYSTEM"

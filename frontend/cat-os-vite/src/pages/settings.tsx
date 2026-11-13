@@ -5,6 +5,8 @@ import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { Button } from "@/components/ui/button";
 import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { researchApi, type ResearchVersion } from "@/adapters/research-api-adapter";
+import { useCatStore } from "@/state/catStore";
+import { formatDecimal, formatRatioPct } from "@/lib/format";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -26,6 +28,7 @@ interface WorkspaceVersion {
 }
 
 function SettingsPage() {
+  const defaultLimits = useCatStore((s) => s.killSwitch?.default_limits ?? null);
   const [researchVer, setResearchVer] = useState<ResearchVersion | null>(null);
   const [workspaceVer, setWorkspaceVer] = useState<WorkspaceVersion | null>(null);
   const [checking, setChecking] = useState(false);
@@ -198,7 +201,11 @@ function SettingsPage() {
                 <ShieldCheck className="size-4 text-amber-400" />
                 <span className="font-medium text-foreground">風控權益基準</span>
               </div>
-              <span className="font-mono text-muted-foreground">有效槓桿上限 3.0x · 單幣預算上限 50%</span>
+              <span className="font-mono text-muted-foreground">
+                {defaultLimits
+                  ? `新 run 預設：有效槓桿上限 ${formatDecimal(defaultLimits.leverage, { digits: 1, suffix: "x" })} · 單幣占比 ${formatRatioPct(defaultLimits.symbol_share, { sign: false })} · Soft ${formatRatioPct(defaultLimits.soft_loss, { sign: false })} / Hard ${formatRatioPct(defaultLimits.hard_loss, { sign: false })}`
+                  : "未連線（讀取後端 risk.Limits() 預設）"}
+              </span>
             </div>
           </div>
         </Panel>
