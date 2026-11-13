@@ -134,6 +134,74 @@ class ExecutionJournal:
             self._dirty(bot_id)
             return request
 
+    def reversal_close_key(self, intent_key):
+        return canonical(dict(kind="reversal_close", intent_key=intent_key))
+
+    def reversal_pending(self, bot_id, intent_key):
+        """True when a reversal intent still needs its closing leg before the opening leg.
+
+        Only a ``reversal_reserved`` intent qualifies, only while the verified
+        position is still on the other side of zero, and only once: a closing
+        order that exists in any state (including ABORTED) is never re-created.
+        """
+        with localcontext(research._CONTEXT):
+            row = self.db.execute("SELECT target,reason FROM intents WHERE intent_key=? AND bot_id=?",
+                                  (intent_key, bot_id)).fetchone()
+            if row is None or row["reason"] != "reversal_reserved":
+                return False
+            if self.db.execute("SELECT 1 FROM execution_orders WHERE order_key IN (?,?)",
+                               (intent_key, self.reversal_close_key(intent_key))).fetchone():
+                return False
+            _, owner = self.j._require_owner(bot_id)
+            position = D("0") if owner["position"] is None else D(owner["position"])
+            return position * D(row["target"]) < 0
+
+    def prepare_reversal_close(self, bot_id, intent_key, now_ms):
+        """Closing leg of an approved reversal: one reduce-only order for the whole position.
+
+        Risk is re-evaluated as a legal reduction from the verified position. If
+        the leg cannot be sent, the reversal intent is ended in the same
+        transaction (ABORTED, reservation released), so its opening leg can never
+        go out without the close.
+        """
+        ipc.integer(now_ms, "submit time")
+        key = self.reversal_close_key(intent_key)
+        with self.j._transaction(), localcontext(research._CONTEXT):
+            if self.db.execute("SELECT 1 FROM execution_orders WHERE order_key IN (?,?)",
+                               (key, intent_key)).fetchone():
+                return None  # NEVER resend either leg.
+            bot, owner = self.j._require_owner(bot_id)
+            row = self.db.execute("""SELECT i.*,r.quantity,r.reduce_only,r.eligible,v.amount,p.input_json
+                FROM intents i JOIN risk_orders r USING(intent_key) JOIN reservations v USING(intent_key)
+                JOIN inputs p ON p.bot_id=i.bot_id AND p.seq=i.seq WHERE i.intent_key=? AND i.bot_id=?""",
+                (intent_key, bot_id)).fetchone()
+            if row is None or bot["isolated"] or row["reason"] != "reversal_reserved" or row["reduce_only"]:
+                raise JournalError("only a committed risk-approved reversal can be closed")
+            state = self.j.risk_state()
+            deadline = json.loads(row["input_json"])["expires_at_ms"]
+            position = D(owner["position"]) if owner["position"] is not None else D("0")
+            reduction = self.reduction_conflict(position) or any(
+                bool(held["reduce_only"]) for held in self.db.execute(
+                    "SELECT reduce_only FROM risk_orders WHERE intent_key<>?", (intent_key,)))
+            verdict = risk.evaluate(state, self.j.risk_limits, self.j._checkpoint(bot).config.contract,
+                                    D("0"), position, now_ms, held_reduction=reduction,
+                                    reconciled=self._known(owner, position))
+            allowed = (state.snapshot is not None and row["eligible"] and row["epoch"] == state.epoch
+                       and position * D(row["target"]) < 0 and now_ms < deadline
+                       and verdict.accepted and verdict.reduce_only and verdict.quantity == -position
+                       and not self.unresolved())
+            quantity = -position if position != 0 else D(row["target"])
+            request = self._insert(key, bot, quantity, True, deadline, state.epoch, D("0"), None,
+                                   "SUBMITTING" if allowed else "ABORTED")
+            if not allowed:
+                self._release(key)
+                self._insert(intent_key, bot, D(row["quantity"]), False, deadline, state.epoch,
+                             D(row["amount"]), intent_key, "ABORTED")
+                self._release(intent_key)
+                return None
+            self._dirty(bot_id)
+            return request
+
     def abort_unsent(self, key):
         """Only called before entering FakeExchange.submit, while holding the operation slot."""
         with self.j._transaction():

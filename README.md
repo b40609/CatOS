@@ -54,7 +54,7 @@ CatOS 啟動後，把這個 stdio MCP 伺服器加進你的 Agent，工作目錄
 | 項目 | v1 實況 |
 | --- | --- |
 | 執行環境 | 僅 local-sim：`catos/fake_exchange.py` 合成撮合，固定模板 8 根＋2 根預熱的合成 15m K 線 |
-| 策略 | Bot 只有一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略。研究另有 `donchian-breakout`／`donchian-parameters-v1`（Donchian 通道突破，多／空），以及 2026-11-06 預先登錄的三個日線策略（`catos/research_daily.py`：`donchian-ensemble` Donchian 多週期集成、`tsmom-multi` 時間序列動能、`dcm-daily` DCM 日線版）、2026-11-07 預先登錄的兩個短週期策略（`catos/research_intraday.py`：`dcm-fade` DCM 假突破反轉、`dcm-pullback` DCM 突破後回踩），manifest 都在 Worker 不讀的 `catos/research_only_artifacts/`，Bot 選不到 |
+| 策略 | Bot 只有一個登錄策略 `sma-trend`／`sma-parameters-v1`（SMA 長／平），由 `catos/research_artifacts/*.json` manifest 驅動：`catos/strategy_registry.py` 只接受 `approval_state == "approved"`，載入前核對 `source_files` 的 sha256，不符即拒絕，不退回預設策略。研究另有 `donchian-breakout`／`donchian-parameters-v1`（Donchian 通道突破，多／空），以及 2026-11-06 預先登錄的三個日線策略（`catos/research_daily.py`：`donchian-ensemble` Donchian 多週期集成、`tsmom-multi` 時間序列動能、`dcm-daily` DCM 日線版）、2026-11-07 預先登錄的兩個短週期策略（`catos/research_intraday.py`：`dcm-fade` DCM 假突破反轉、`dcm-pullback` DCM 突破後回踩），manifest 都在 Worker 不讀的 `catos/research_only_artifacts/`。2026-11-12 起（第 2 步）研究策略只有在使用者以 CLI 逐一核准部署設定後，才能在 local-sim Bot 上跑歷史重播；目前只有 Donchian 可核准，其餘研究策略 Bot 仍選不到。見 `docs/step2-research-to-bot.md` |
 | Bot | 單一 Bot `sim-control-sma`，單合約獨佔（`BTC-USDT-SWAP`，`cross`＋`net_mode`），單槽控制面 |
 | OKX | 只有 GET 唯讀證據模組（`catos/okx_readonly.py` 離線核對、`catos/okx_http.py` 單次 GET adapter）與研究資料抓取工具 `tools/fetch_okx_candles.py`（三個公開端點，加上部位檔位端點、只限 BTC-USDT-SWAP；不用金鑰）。**沒有** Demo／Live 下單、撤單或帳戶修改路徑 |
 | 研究資料 | 內建 96 根合成資料集，加上經授權抓取的 OKX 公開歷史資料（已收盤 K 線、實際資金費率、合約規格），存在本機 `data/okx/`（git 忽略）。研究端只接受 manifest 雜湊相符、無缺口的資料集，不符即拒絕；資金費必須連續到最後一根，可以晚於第一根開始（OKX 只保留約 3 個月），這時結果會明示之前未計資金費，並另列固定費率的假設情境。回測、優化與滾動驗證都有成本拆解（價格損益、手續費、滑價、資金費、每邊兩平成本）與買進持有基準（`catos/research_costs.py`）。回測、優化與滾動驗證都可選上述七個研究策略與資料集；回測另有往返交易統計（勝率、賺賠比、獲利因子、期望值，`catos/research_trades.py`）；單次回測上限 60,000 根，報告的權益圖抽樣、成交明細最多列 400 筆（完整的在 result.json）；OKX 資料集在本機有部位檔位快照時預設套用單合約全倉的保證金與強平模型（每根 K 線以最不利價檢查，強平後權益歸 0、停止交易；擴大部位時檢查初始保證金，不足拒單），結果標示是否啟用與檔位 sha256，見 `docs/research-margin-model.md`；合成資料集與沒有檔位快照時不套用並寫明原因；被強平或權益跌破 0 的執行標成爆倉，不算 Sharpe 等比率統計；優化結果附過擬合檢查（DSR、PSR、PBO，`catos/research_overfit.py`），滾動驗證附邊界選參統計，研究優化在格點點數 ≤ n_trials 時窮舉；滾動驗證結果 v2 不保存逐根明細，在 8,640 根上約 0.6 MB。見 `docs/research-real-data-plan.md` |
@@ -195,6 +195,7 @@ FastAPI (127.0.0.1:8770)  catos/workspace_api.py
 - API 參考：服務啟動後開 `http://127.0.0.1:8770/docs`（FastAPI 依現行路由自動產生）。
 - `docs/backend-frontend-integration-map.md`：研究與模擬 API 的請求範例與欄位對照（2026-10-25 的交接文件，狀態敘述已過時，範例仍可用）。
 - `docs/worker.md`：Worker／IPC 契約與策略登錄。
+- `docs/step2-research-to-bot.md`：研究策略核准、Bot 歷史重播與一致性比對（第 2 步）；設計與決策見 `docs/step2-research-to-bot-proposal.md`。
 - `docs/archive/`：落後 v1 實作的歷史文件（架構評估、交接）。
 - 開發過程的交接、評估與逐輪驗收紀錄不在 `main`，保留在 `archive/dev-history` 分支。
 

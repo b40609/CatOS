@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 import { AppShell, PageHead, Panel } from "@/components/catos/shell";
+import { ReplayPanel } from "@/components/catos/replay-panel";
 import { BOT_STATE_LABEL } from "@/components/catos/v0-bot-table";
 import { useCatStore } from "@/state/catStore";
 import { StateAdapter } from "@/state/stateAdapter";
@@ -260,6 +261,10 @@ function StrategyCenter() {
           </div>
         </div>
       )}
+
+      <div className="mt-3">
+        <ReplayPanel />
+      </div>
     </AppShell>
   );
 }

@@ -1,10 +1,14 @@
 """Manifest-driven registry of approved strategy artifacts.
 
 The worker never hard-codes a strategy module. Every approved artifact is a
-manifest under ``catos/research_artifacts`` naming its ``entry`` and the
-``source_files`` whose joint sha256 must still match before the entry is
-executed. Any mismatch, missing manifest or non-approved state fails closed:
-nothing falls back to a default strategy.
+manifest naming its ``entry`` and the ``source_files`` whose joint sha256 must
+still match before the entry is executed. Any mismatch, missing manifest or
+non-approved state fails closed: nothing falls back to a default strategy.
+
+Two layers (2026-11-12, docs/step2-research-to-bot-proposal.md): the built-in
+artifacts in ``catos/research_artifacts`` (``resolve``), and research artifacts
+in ``catos/research_only_artifacts`` that a Bot reaches only through an active
+local approval whose every bound field matches (``resolve_deployment``).
 
 Executed modules are built from the verified bytes in memory and are never
 inserted into ``sys.modules``, so the parent process can import this module
@@ -20,6 +24,7 @@ from pathlib import Path
 import re
 from types import ModuleType
 
+from catos import research_catalog, strategy_approvals
 from catos.research_catalog import DEFAULT_REQUEST, ROOT, json_text
 
 MANIFEST_DIR = ROOT / "catos" / "research_artifacts"
@@ -142,6 +147,10 @@ class RegisteredStrategy:
         parameters = DEFAULT_REQUEST["parameters"]
         return self.load()(parameters["period"], Decimal(parameters["quantity"]))
 
+    def instantiate_deployment(self, deployment):
+        """Bind an approved deployment's parameters and contracts (constructor order)."""
+        return self.load()(*(value for _, value in deployment.parameters), deployment.quantity)
+
     def restore(self, checkpoint):
         strategy = self.instantiate()
         strategy.closes.extend(checkpoint.closes)
@@ -221,3 +230,46 @@ def resolve(strategy_id, version=None, *, directory=None, root=None):
         raise RegistryError("ambiguous_strategy_version")
     return approved[0]
 
+
+
+def resolve_deployment(config, *, approvals_path=None):
+    """The research artifact behind ``config.deployment``, only through an active approval.
+
+    Every field the approval binds must match: strategy and version (bot
+    eligible), source sha256 (also the research white list and the files on
+    disk), manifest file sha256, entry, parameters in constructor order,
+    contracts, instrument, timeframe, warm-up and lookback. A revoked or missing
+    approval, an edited source or manifest, or any other difference raises.
+    """
+    deployment = config.deployment
+    if deployment is None:
+        raise RegistryError("deployment_required")
+    try:
+        bot = strategy_approvals.bot_strategy(config.strategy_id, config.strategy_artifact)
+        record = strategy_approvals.active_approval(deployment.approval_id, approvals_path)
+    except strategy_approvals.ApprovalError as exc:
+        raise RegistryError(str(exc)) from None
+    spec = bot.research
+    profile = record["profile"]
+    names = [name for name, _, _ in spec.parameters]
+    expected_parameters = tuple((name, profile["parameters"][name]) for name in names)
+    if (record["strategy_id"] != config.strategy_id or record["version"] != config.strategy_artifact
+            or record["source_sha256"] != deployment.source_sha256
+            or record["manifest_sha256"] != deployment.manifest_sha256
+            or deployment.parameters != expected_parameters
+            or str(deployment.quantity) != profile["quantity"]
+            or deployment.lookback != bot.lookback(profile["parameters"])
+            or profile["inst_id"] != config.contract.inst_id
+            or profile["timeframe_ms"] != config.timeframe_ms
+            or profile["warmup_bars"] != config.warmup_bars):
+        raise RegistryError("deployment_does_not_match_approval")
+    entry = read_manifest(spec.manifest, ROOT)
+    if (not entry.approved or (entry.strategy_id, entry.version) != (config.strategy_id, config.strategy_artifact)
+            or entry.sha256 != spec.sha256 or entry.sha256 != record["source_sha256"]
+            or entry.entry != record["entry"] or entry.entry != spec.entry
+            or tuple(entry.source_files) != tuple(spec.files)):
+        raise RegistryError("deployment_manifest_mismatch")
+    if research_catalog.file_hash(spec.manifest) != record["manifest_sha256"]:
+        raise RegistryError("deployment_manifest_changed")
+    entry.verified_sources()  # artifact_hash_mismatch if a source byte changed
+    return entry

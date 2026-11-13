@@ -694,9 +694,41 @@ class Journal:
         known = (owner["position"] is not None and owner["reconciled_revision"] is not None
                  and owner["fills_reconciled"] and owner["unknown_count"] == 0
                  and Decimal(owner["position"]) == account.position)
-        return risk.evaluate(state, self.risk_limits, self._checkpoint(bot).config.contract,
+        config = self._checkpoint(bot).config
+        # A deployment's reversal is reserved as its opening leg; Supervisor.dispatch
+        # first closes the old position with a separate reduce-only order.
+        return risk.evaluate(state, self.risk_limits, config.contract,
                              result.target_position, account.position, now_ms,
-                             held_buy=buys, held_sell=sells, held_reduction=reducing, reconciled=bool(known))
+                             held_buy=buys, held_sell=sells, held_reduction=reducing, reconciled=bool(known),
+                             allow_reversal=config.deployment is not None)
+
+    def _intent_key(self, config, bot_id, seq):
+        """v1 keeps its original key; a deployment names its strategy, version and approval."""
+        if config.deployment is None:
+            parts = [ENVIRONMENT, self.account_id, bot_id, ipc.STRATEGY_ID, ipc.STRATEGY_VERSION, seq, 0]
+        else:
+            parts = [ENVIRONMENT, self.account_id, bot_id, config.strategy_id, config.strategy_artifact,
+                     config.deployment.approval_id, seq, 0]
+        return json.dumps(parts, separators=(",", ":"))
+
+    def history(self, bot_id, count):
+        """The last ``count`` committed input bars up to the checkpoint, oldest first (checkpoint v2)."""
+        ipc.integer(count, "history length")
+        checkpoint = self._checkpoint(self._bot(bot_id))
+        rows = self.connection.execute(
+            """SELECT seq,input_json FROM inputs WHERE bot_id=? AND state='COMMITTED' AND seq<=?
+               ORDER BY seq DESC LIMIT ?""", (bot_id, checkpoint.event_seq, count)).fetchall()
+        expected = list(range(checkpoint.event_seq, checkpoint.event_seq - len(rows), -1))
+        if [row["seq"] for row in rows] != expected or len(rows) != min(count, checkpoint.event_seq):
+            raise JournalError("committed input history is incomplete")
+        bars = []
+        for row in reversed(rows):
+            payload = ipc.decode_payload(row["input_json"].encode("utf-8"))["payload"]
+            value = ipc.exact(payload["bar"], tuple(f for f in ("open_time_ms", "open", "high", "low", "close", "closed")))
+            bars.append(research.Candle(ipc.integer(value["open_time_ms"], "history open_time_ms"),
+                                        *(ipc.decimal_text(value[name], "history price", positive=True)
+                                          for name in ("open", "high", "low", "close"))))
+        return tuple(bars)
 
     def snapshot(self, bot_id):
         bot = self._bot(bot_id)
@@ -964,8 +996,7 @@ class Journal:
             status, reason = "NO_INTENT", "no_target"
             verdict = None
             if result.target_position is not None:
-                key = json.dumps([ENVIRONMENT, self.account_id, bot_id, ipc.STRATEGY_ID,
-                                  ipc.STRATEGY_VERSION, result.event_seq, 0], separators=(",", ":"))
+                key = self._intent_key(current.config, bot_id, result.event_seq)
                 if now_ms >= stored["expires_at_ms"]:
                     status, reason = "EXPIRED", "deadline_elapsed"
                 elif self.risk_limits is not None:

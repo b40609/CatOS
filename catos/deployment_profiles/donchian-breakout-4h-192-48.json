@@ -1,0 +1,14 @@
+{
+  "schema": "catos.strategy-deployment",
+  "schema_version": 1,
+  "strategy_id": "donchian-breakout",
+  "version": "donchian-parameters-v1",
+  "parameters": {"entry_bars": 192, "exit_bars": 48},
+  "quantity": "1",
+  "inst_id": "BTC-USDT-SWAP",
+  "timeframe_ms": 14400000,
+  "warmup_bars": 192,
+  "initial_balance": "10000",
+  "fee_rate": "0.0005",
+  "slippage_bps": "2"
+}

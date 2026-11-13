@@ -827,9 +827,19 @@ class LocalSupervisor:
         return await self._io(execution.order, key)
 
     async def dispatch(self, intent_key, *, now_ms):
+        """Send one intent. An approved reversal goes out as two legs: the first call
+        sends the reduce-only close (returned row's order_key differs from
+        intent_key); after the caller reconciles the flat position and observes
+        risk, a second call sends the opening leg, re-evaluated from flat."""
         async with self._operation():
             execution = self._execution()
             await self._flush_halts()
+            if await self._io(execution.reversal_pending, self.bot_id, intent_key):
+                request = await self._io(execution.prepare_reversal_close, self.bot_id, intent_key, now_ms)
+                if request is None:
+                    await self._execution_sync()
+                    return None
+                return await self._submit_prepared(request)
             reduce_only = await self._io(lambda: self._journal.connection.execute(
                 "SELECT reduce_only FROM risk_orders WHERE intent_key=?", (intent_key,)).fetchone())
             demo_entry_authorization = None
@@ -1023,8 +1033,9 @@ class LocalSupervisor:
             await self._io(self._journal.release, self.bot_id)
             self.health = "RELEASED"
 
-    def _make_worker(self):
-        return WorkerHost(self.bot_id, self.config, checkpoint=self.checkpoint, require_commit_ack=True)
+    def _make_worker(self, history=()):
+        return WorkerHost(self.bot_id, self.config, checkpoint=self.checkpoint, require_commit_ack=True,
+                          history=history)
 
     async def process_bar(self, event_seq, bar, account=None, *, expires_at_ms, now_ms, fixture=None):
         """Persist input, evaluate in child, commit once, then send a durable ACK."""
@@ -1044,7 +1055,12 @@ class LocalSupervisor:
             if self._closing:
                 raise SupervisorUnavailable("Supervisor closing; input remains pending")
             if self._worker is None:
-                self._worker = self._make_worker()
+                history = ()
+                if self.config.deployment is not None:
+                    # Checkpoint v2: restore the Worker from committed bars only.
+                    history = await self._io(self._journal.history, self.bot_id,
+                                             self.config.deployment.lookback)
+                self._worker = self._make_worker(history)
                 await self._worker.start()
             result = await self._worker.process_bar(bar, account)
             await self._flush_halts()

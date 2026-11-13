@@ -1,4 +1,11 @@
-"""Bounded, data-only protocol for the first inspected SMA worker artifact."""
+"""Bounded, data-only protocol between the Supervisor and one strategy Worker.
+
+Two checkpoint forms exist. v1 (the built-in SMA artifact) carries the last two
+closes and the Supervisor recomputes them. v2 (an approved research deployment,
+2026-11-12) carries only the sequence and the last bar time: a restarted Worker
+is restored by re-feeding the ledger's committed bars as warm-up, which is valid
+because only strategies whose state is the last ``lookback`` bars may deploy.
+"""
 
 import asyncio
 from dataclasses import dataclass, fields
@@ -21,6 +28,11 @@ STRATEGY_ID = "sma-trend"
 STRATEGY_VERSION = 1
 _NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
 _TOKEN = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+_APPROVAL_ID = re.compile(r"[0-9a-f]{32}\Z")
+# Restart history travels in one init frame: ~61 bytes a bar, so 512 bars stay
+# near 32 KB, well inside MAX_FRAME. strategy_approvals.MAX_BOT_LOOKBACK matches.
+MAX_BOT_LOOKBACK = 512
 
 
 class ProtocolError(ValueError):
@@ -205,12 +217,63 @@ def check_envelope(message, kind, generation, seq):
 
 
 @dataclass(frozen=True)
+class Deployment:
+    """An approved research deployment: the approval record and what it binds."""
+    approval_id: str
+    source_sha256: str
+    manifest_sha256: str
+    parameters: tuple  # ((name, int), ...) in the strategy's constructor order
+    quantity: Decimal
+    lookback: int
+
+    def to_wire(self):
+        return dict(approval_id=self.approval_id, source_sha256=self.source_sha256,
+                    manifest_sha256=self.manifest_sha256,
+                    parameters=[[name, value] for name, value in self.parameters],
+                    quantity=str(self.quantity), lookback=self.lookback)
+
+    @classmethod
+    def from_wire(cls, value):
+        exact(value, ("approval_id", "source_sha256", "manifest_sha256", "parameters", "quantity", "lookback"))
+        if type(value["approval_id"]) is not str or not _APPROVAL_ID.fullmatch(value["approval_id"]):
+            raise ProtocolError("invalid deployment approval id")
+        for name in ("source_sha256", "manifest_sha256"):
+            if type(value[name]) is not str or not _SHA256.fullmatch(value[name]):
+                raise ProtocolError(f"invalid deployment {name}")
+        items = value["parameters"]
+        if type(items) is not list or not 1 <= len(items) <= 8:
+            raise ProtocolError("invalid deployment parameters")
+        parameters = []
+        for item in items:
+            if (type(item) is not list or len(item) != 2 or type(item[0]) is not str
+                    or not _TOKEN.fullmatch(item[0]) or type(item[1]) is not int
+                    or not 0 <= item[1] <= MAX_INTEGER):
+                raise ProtocolError("invalid deployment parameter")
+            parameters.append((item[0], item[1]))
+        if len({name for name, _ in parameters}) != len(parameters):
+            raise ProtocolError("duplicate deployment parameter")
+        quantity = decimal_text(value["quantity"], "deployment quantity", positive=True)
+        lookback = integer(value["lookback"], "deployment lookback", 1)
+        if lookback > MAX_BOT_LOOKBACK:
+            raise ProtocolError("deployment lookback above the restart history limit")
+        return cls(value["approval_id"], value["source_sha256"], value["manifest_sha256"],
+                   tuple(parameters), quantity, lookback)
+
+
+@dataclass(frozen=True)
 class WorkerConfig:
     contract: ContractSpec
     timeframe_ms: int
     warmup_bars: int
     strategy_artifact: str | None = None
     strategy_id: str = STRATEGY_ID
+    # None: the built-in SMA artifact with a v1 checkpoint. Set: an approved
+    # research deployment, checkpoint v2 (no strategy state on the wire).
+    deployment: Deployment | None = None
+
+    @property
+    def checkpoint_version(self):
+        return 1 if self.deployment is None else 2
 
     def to_wire(self):
         if not isinstance(self.contract, ContractSpec):
@@ -222,12 +285,20 @@ class WorkerConfig:
                     timeframe_ms=self.timeframe_ms, warmup_bars=self.warmup_bars)
         if self.strategy_artifact is not None:
             value["strategy_artifact"] = self.strategy_artifact
+        if self.deployment is not None:
+            if self.strategy_artifact is None:
+                raise ProtocolError("a deployment names its artifact version")
+            value["deployment"] = self.deployment.to_wire()
         return value
 
     @classmethod
     def from_wire(cls, value):
         keys = ("strategy_id", "strategy_version", "contract", "timeframe_ms", "warmup_bars")
-        exact(value, (*keys, "strategy_artifact") if "strategy_artifact" in value else keys)
+        optional = tuple(name for name in ("strategy_artifact", "deployment")
+                         if type(value) is dict and name in value)
+        exact(value, (*keys, *optional))
+        if "deployment" in value and "strategy_artifact" not in value:
+            raise ProtocolError("a deployment names its artifact version")
         artifact = value.get("strategy_artifact")
         if "strategy_artifact" in value and type(artifact) is not str:
             raise ProtocolError("unsupported registered strategy artifact")
@@ -235,18 +306,24 @@ class WorkerConfig:
         if (type(strategy_id) is not str or type(value["strategy_version"]) is not int
                 or value["strategy_version"] != STRATEGY_VERSION):
             raise ProtocolError("unsupported inspected strategy artifact")
-        try:
-            # Identity must resolve to exactly one approved manifest (fail-closed).
-            strategy_registry.resolve(strategy_id, artifact)
-        except strategy_registry.RegistryError as exc:
-            raise ProtocolError(f"unregistered strategy: {exc}") from exc
+        deployment = None if "deployment" not in value else Deployment.from_wire(value["deployment"])
         spec = exact(value["contract"], tuple(f.name for f in fields(ContractSpec)))
         if type(spec["inst_id"]) is not str or len(spec["inst_id"]) > 64:
             raise ProtocolError("invalid contract label")
         contract = ContractSpec(spec["inst_id"], **{
             key: decimal_text(spec[key], key, positive=True) for key in spec if key != "inst_id"})
         result = cls(contract, integer(value["timeframe_ms"], "timeframe_ms", 60_000),
-                     integer(value["warmup_bars"], "warmup_bars"), artifact, strategy_id)
+                     integer(value["warmup_bars"], "warmup_bars"), artifact, strategy_id, deployment)
+        try:
+            if deployment is None:
+                # Identity must resolve to exactly one approved manifest (fail-closed).
+                strategy_registry.resolve(strategy_id, artifact)
+            else:
+                # A research artifact resolves only through an active local approval
+                # whose every bound field matches this config (fail-closed).
+                strategy_registry.resolve_deployment(result)
+        except strategy_registry.RegistryError as exc:
+            raise ProtocolError(f"unregistered strategy: {exc}") from exc
         price = contract.tick_size
         result.validate_bar(Candle(0, price, price, price, price))
         return result
@@ -271,16 +348,35 @@ class Checkpoint:
     def to_wire(self):
         if any(not isinstance(price, Decimal) for price in self.closes):
             raise ProtocolError("checkpoint closes must be Decimal")
+        if self.config.checkpoint_version == 2:
+            if self.closes:
+                raise ProtocolError("v2 checkpoint carries no strategy state")
+            return dict(config=self.config.to_wire(), event_seq=self.event_seq,
+                        last_open_time_ms=self.last_open_time_ms)
         return dict(config=self.config.to_wire(), event_seq=self.event_seq,
                     last_open_time_ms=self.last_open_time_ms,
                     closes=[str(price) for price in self.closes])
 
     @classmethod
     def from_wire(cls, value, config):
-        exact(value, ("config", "event_seq", "last_open_time_ms", "closes"))
+        if config.checkpoint_version == 2:
+            exact(value, ("config", "event_seq", "last_open_time_ms"))
+        else:
+            exact(value, ("config", "event_seq", "last_open_time_ms", "closes"))
         if WorkerConfig.from_wire(value["config"]) != config:
             raise ProtocolError("checkpoint artifact/config mismatch")
         seq = integer(value["event_seq"], "event_seq")
+        if config.checkpoint_version == 2:
+            last = value["last_open_time_ms"]
+            if seq == 0:
+                if last is not None:
+                    raise ProtocolError("initial checkpoint cannot have a timestamp")
+            else:
+                integer(last, "last_open_time_ms")
+                if last < (seq - 1) * config.timeframe_ms:
+                    raise ProtocolError("checkpoint sequence exceeds elapsed bars")
+                integer(last + config.timeframe_ms, "close_time_ms")
+            return cls(config, seq, last, ())
         if type(value["closes"]) is not list or len(value["closes"]) != min(seq, 2):
             raise ProtocolError("invalid SMA checkpoint window")
         closes = tuple(decimal_text(p, "checkpoint close", positive=True) for p in value["closes"])
@@ -309,6 +405,39 @@ def account_to_wire(account):
         return None
     return {f.name: str(getattr(account, f.name)) if isinstance(getattr(account, f.name), Decimal)
             else getattr(account, f.name) for f in fields(AccountView)}
+
+
+def history_to_wire(bars):
+    """Compact restart history: [open_time_ms, open, high, low, close] per bar."""
+    return [[bar.open_time_ms, str(bar.open), str(bar.high), str(bar.low), str(bar.close)] for bar in bars]
+
+
+def parse_history(value, checkpoint):
+    """The committed bars a v2 Worker re-feeds as warm-up before its next event.
+
+    Exactly the last min(event_seq, lookback) bars, contiguous and ending at the
+    checkpoint's last bar; a v1 checkpoint takes no history.
+    """
+    config = checkpoint.config
+    if config.checkpoint_version != 2:
+        if value not in (None, []):
+            raise ProtocolError("v1 checkpoint takes no restart history")
+        return ()
+    if type(value) is not list or len(value) != min(checkpoint.event_seq, config.deployment.lookback):
+        raise ProtocolError("restart history must hold the last lookback committed bars")
+    bars = []
+    for item in value:
+        if type(item) is not list or len(item) != 5:
+            raise ProtocolError("invalid restart history bar")
+        bar = Candle(integer(item[0], "history open_time_ms"),
+                     *(decimal_text(price, "history price", positive=True) for price in item[1:]))
+        config.validate_bar(bar)
+        if bars and bar.open_time_ms != bars[-1].open_time_ms + config.timeframe_ms:
+            raise ProtocolError("restart history must be contiguous")
+        bars.append(bar)
+    if bars and bars[-1].open_time_ms != checkpoint.last_open_time_ms:
+        raise ProtocolError("restart history must end at the checkpoint bar")
+    return tuple(bars)
 
 
 def parse_event(payload, checkpoint):
@@ -349,12 +478,17 @@ class EventResult:
 def parse_result(payload, previous, bar, account, warmup):
     exact(payload, ("target", "checkpoint", "ready"))
     checkpoint = Checkpoint.from_wire(payload["checkpoint"], previous.config)
-    expected = Checkpoint(previous.config, previous.event_seq + 1, bar.open_time_ms,
-                          (*previous.closes, bar.close)[-2:])
+    deployment = previous.config.deployment
+    closes = () if deployment is not None else (*previous.closes, bar.close)[-2:]
+    expected = Checkpoint(previous.config, previous.event_seq + 1, bar.open_time_ms, closes)
     if checkpoint != expected:
         raise ProtocolError("checkpoint does not correspond to the supplied event")
     ready = payload["ready"]
-    if type(ready) is not bool or ready != (len(checkpoint.closes) == 2):
+    # v1: ready once two closes are held. v2: ready exactly once lookback bars
+    # were fed, which is also what a restart re-feed reproduces.
+    expected_ready = (len(checkpoint.closes) == 2 if deployment is None
+                      else checkpoint.event_seq >= deployment.lookback)
+    if type(ready) is not bool or ready != expected_ready:
         raise ProtocolError("invalid readiness result")
     if (not warmup or checkpoint.event_seq == previous.config.warmup_bars) and not ready:
         raise ProtocolError("strategy not ready at evaluation boundary")

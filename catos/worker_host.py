@@ -18,17 +18,26 @@ class WorkerError(RuntimeError):
     pass
 
 
+# The approvals file override (strategy_approvals.ENV_PATH) for isolated tests; a
+# path, never a credential. The child must resolve the same approvals as the parent.
+APPROVALS_ENV = "CATOS_STRATEGY_APPROVALS"
+
+
 def worker_environment():
     # Deliberately do not enumerate or copy the parent environment.
-    return {name: os.environ[name] for name in ("SystemRoot", "WINDIR") if name in os.environ}
+    return {name: os.environ[name] for name in ("SystemRoot", "WINDIR", APPROVALS_ENV) if name in os.environ}
 
 
 class WorkerHost:
-    def __init__(self, bot_id, config, *, checkpoint=None, timeout=5, require_commit_ack=False):
+    def __init__(self, bot_id, config, *, checkpoint=None, timeout=5, require_commit_ack=False, history=()):
         self.bot_id = ipc.token(bot_id, "bot_id")  # Bound to this pipe, never sent by the child.
         self.config = ipc.WorkerConfig.from_wire(config.to_wire())
         self.checkpoint = ipc.Checkpoint.from_wire(
             (checkpoint or ipc.Checkpoint(self.config)).to_wire(), self.config)
+        # Checkpoint v2: the Supervisor supplies the ledger's last committed bars.
+        self.history = (None if self.config.deployment is None
+                        else ipc.history_to_wire(tuple(history)))
+        ipc.parse_history(self.history, self.checkpoint)
         if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 60:
             raise ValueError("timeout must be in (0, 60] seconds")
         self.timeout = timeout  # Scheduling duration only; never a financial Float.
@@ -120,6 +129,8 @@ class WorkerHost:
             initial = dict(config=self.config.to_wire(), checkpoint=self.checkpoint.to_wire())
             if self.require_commit_ack:
                 initial["commit_ack"] = True
+            if self.history is not None:
+                initial["history"] = self.history
             payload = await self._exchange(ipc.envelope("init", self.generation,
                 self.checkpoint.event_seq, initial), "initialized")
             ipc.exact(payload, ("checkpoint",))

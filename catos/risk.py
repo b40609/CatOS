@@ -577,8 +577,16 @@ class Verdict:
 
 
 def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0"),
-             held_sell=D("0"), held_reduction=False, reconciled=False):
-    """Do not net opposite pending orders or credit reductions before fills."""
+             held_sell=D("0"), held_reduction=False, reconciled=False, allow_reversal=False):
+    """Do not net opposite pending orders or credit reductions before fills.
+
+    ``allow_reversal`` (approved deployments only, 2026-11-12 decision 8): a
+    target across zero is reserved as its opening leg from zero (quantity =
+    target) after the closing leg passes the reduction-conflict check and the
+    whole move passes the increase gates and exposure budget. The closing leg is
+    a separate reduce-only order; the opening leg is re-evaluated from the
+    verified flat position before it is sent, so it can never cross zero itself.
+    """
     decimal(target, "target")
     decimal(position, "decision position")
     decimal(held_buy, "held buys")
@@ -607,8 +615,12 @@ def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0
         if state.basis is None or state.basis.day != taipei_day(now_ms):
             return Verdict(False, "day_basis_missing")
         # A reversal must be split into a proven reduction and a later increase.
-        if position * target < 0:
+        reversal = position * target < 0
+        if reversal and not allow_reversal:
             return Verdict(False, "cross_zero_forbidden")
+        if reversal and (s.reduction_conflict or held_reduction
+                         or (s.pending_sell > 0 if position > 0 else s.pending_buy > 0)):
+            return Verdict(False, "reduction_conflict")
         buys = s.pending_buy + held_buy + max(delta, D("0"))
         sells = s.pending_sell + held_sell + max(-delta, D("0"))
         notional = worst_notional(position, buys, sells, contract.base_per_contract, s.mark)
@@ -617,4 +629,6 @@ def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0
             return Verdict(False, "account_exposure_limit")
         if notional > budget * limits.symbol_share:
             return Verdict(False, "symbol_exposure_limit")
+        if reversal:
+            return Verdict(True, "reversal_reserved", target, abs(target) * contract.base_per_contract * s.mark)
         return Verdict(True, "exposure_reserved", delta, abs(delta) * contract.base_per_contract * s.mark)

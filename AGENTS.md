@@ -1,6 +1,6 @@
 # CatOS 專案規則
 
-2026-11-11 重寫：把按日期堆疊的沿革整理成現行規則，並依使用者指示改掉擋住正常工作的流程規則。重寫前的全文在 `docs/archive/AGENTS-20261111.md`。「授權紀錄」與 INVARIANTS 兩節是原文，一字未改；之後只有 2026-11-12 依使用者決定刪除 Virtual Lots 原型時改寫了 P8。
+2026-11-11 重寫：把按日期堆疊的沿革整理成現行規則，並依使用者指示改掉擋住正常工作的流程規則。重寫前的全文在 `docs/archive/AGENTS-20261111.md`。「授權紀錄」與 INVARIANTS 兩節是原文，一字未改；之後只有 2026-11-12 依使用者決定刪除 Virtual Lots 原型時改寫了 P8，以及同日依第 2 步提案（使用者「完全同意建議」）改寫了 P1 後半段。
 
 ## GOAL
 
@@ -51,6 +51,7 @@
 - 不讀取、不輸出、不保存真實金鑰或憑證內容；不對外送出實盤下單、撤單或帳戶修改請求。只用假資料、FakeExchange 或明確授權的 Demo。
 - 埠被占用時，不停止來源不明的程序，也不自動換埠。
 - 不宣稱沒執行過的測試通過；跳過或做不到的步驟要講明。
+- 代理不得執行策略核准或撤銷指令（`python -m catos.cli strategy approve／revoke`），也不得編輯正式核准紀錄（`outputs/strategy-approvals/approvals.jsonl`）。測試與自測只用隔離路徑的測試紀錄（`CATOS_STRATEGY_APPROVALS`）。
 
 ### 驗證
 
@@ -93,6 +94,7 @@
 - 2026-11-07 使用者同意短週期研究包（「照建議做」，提案見對話與 `docs/research-real-data-plan.md`「工作包 F」）：同一工具與三個公開 GET 端點，另授權 BTC-USDT-SWAP 的 1H 最近 3 年、15m 最近 1 年、5m 最近 6 個月；每個資料集可分多次執行接續抓取，單次執行仍最多 150 次請求、間隔至少 0.25 秒；資料只存本機 `data/okx/`（git 忽略），只用於單一合約研究。其他合約、週期、更長區間或其他端點（含資金費月檔 `market-data-history`）仍須另行授權。
 - 2026-11-11 使用者同意回測保證金模型的第一步（單合約全倉、逐根以最不利價檢查維持保證金）。方案內含以 `tools/fetch_okx_candles.py` 的同一套節流與存放規則，抓取 OKX 公開端點 `GET /api/v5/public/position-tiers` 的 BTC-USDT-SWAP 部位檔位：不用金鑰、不碰帳戶，只用於回測的保證金計算。其他合約或端點仍須另行授權。
 - 2026-11-12 使用者同意放寬「研究策略 Bot 選不到」（P1 條文，2026-11-04），供第 2 步「研究驗過的策略上 local-sim Bot」使用。放寬方式在第 2 步動工前提方案、由使用者定案（建議：每個研究策略要使用者逐一明確核准，核准綁定版本與 sha256）。實作完成前，Worker 登錄表仍只有 `sma-trend`；實作時一併改寫 INVARIANTS 的 P1 條文。
+- 2026-11-12 使用者對第 2 步提案（`docs/step2-research-to-bot-proposal.md`）開頭 8 題回覆「完全同意建議」：核准採方案 A（本機只增紀錄、只能用 CLI 輸入完整 sha256 並在終端機確認，代理不得執行核准或撤銷）；核准綁定部署設定（策略、版本、來源 sha256、manifest sha256、參數、張數、合約、週期）；`donchian-breakout`／`donchian-parameters-v1`，entry 192／exit 48、預熱 192、1 張、本金 10,000；全速重播並保留每根 1 秒的展示步調；一致性門檻為成交逐筆完全相等、誤差 0，比對基準是關掉資金費與保證金模型的同一份研究回測；第 2 步先做，新風控值（0.5 倍、Soft 5%、Hard 10%）只在重播對照時另外帶入、不改預設；重播碰到 Soft／Hard 就停止並記錄、不模擬清倉；反手由 Supervisor 拆成先平倉、再開反向兩腿，同一根開盤成交。含第 1、2 題對 INVARIANTS P1 的改寫（建議文字見提案第 6 節）與「紅線」新增一條。新增合約、週期、策略或 Demo／Live 仍須另行授權。
 - 2026-11-12 使用者同意日損與曝險的新預設：單幣曝險上限 0.5 倍權益、Soft 5%、Hard 10%（現行 1.5 倍、10%／20%）。在接 OKX Demo（第 4 步）之前實作，屬風控改動，要獨立驗收；回測要用同一上限重跑。實作前現行預設不變；實作時一併改寫 INVARIANTS 的曝險與 Soft／Hard 條文。
 
 ## INVARIANTS
@@ -105,7 +107,7 @@
 - 研究核心僅使用指定週期的已收盤 K 線（Closed Bar），不載入 1m 細部資料作盤中重播。回測函式支援 `warmup_bars`；預熱期只更新指標與必要歷史窗口，不執行交易決策、不產生或保留委託意圖，也不計入交易績效。
 - 首個研究切片已確認採單合約、單週期、合成資料；僅市價意圖，本根收盤決策、下一根開盤加明示滑價成交。先交付 Decimal 核心及專屬測試，Optuna、UI、SQLite 與 OKX 連線後續再接；模型假設與未實作能力見 README.md，不把研究算術視為完整帳戶風控或實盤底座。
 - 在應用職責上，Supervisor 獨佔 API 金鑰、連網、交易、風控與 SQLite 寫入，不載入策略。Worker 僅計算並傳遞純資料訊號／目標意圖；Supervisor 不向 Worker 提供憑證、交易 client、簽名器或寫庫介面。策略按契約不主動連網，外部資料由 Supervisor 提供，不設任意 URL 代理。IPC 禁止可執行反序列化。
-- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。2026-11-03 起登錄策略由 `catos/strategy_registry.py` 依 `catos/research_artifacts/*.json` manifest 驅動：只接受 `approved`，以 (strategy_id, version) 解析 entry，載入前核對 source_files 的 sha256，不符即 fail-closed，Worker 不寫死策略模組；v1 唯一登錄仍為 `sma-trend`／`sma-parameters-v1`。2026-11-04 使用者選定第二個策略 Donchian 通道突破（`donchian-breakout`／`donchian-parameters-v1`），只供研究（回測／優化／滾動驗證）：manifest 放在 Worker 登錄表不讀的 `catos/research_only_artifacts/`，由 `catos/research_catalog.py` 以固定白名單核對 sha256，local-sim Bot 與 IPC 解析不到它。
+- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。2026-11-03 起登錄策略由 `catos/strategy_registry.py` 依 manifest 驅動：只接受 `approved`，以 (strategy_id, version) 解析 entry，載入前核對 source_files 的 sha256，不符即 fail-closed，Worker 不寫死策略模組。Worker 登錄表分兩層：`catos/research_artifacts/` 的內建製品（目前只有 `sma-trend`／`sma-parameters-v1`），以及使用者逐一核准的研究製品。研究製品的 manifest 留在 `catos/research_only_artifacts/` 不動；只有本機核准紀錄裡有一筆有效核准，且 strategy_id、version、來源 sha256、manifest sha256、參數、張數、合約與週期全部相符時，local-sim Bot 與 IPC 才解析得到，其餘研究製品仍解析不到。核准只能由使用者以 CLI 輸入完整 sha256 完成，代理不得執行核准或撤銷；撤銷寫入新紀錄，執行中的 Bot 在下一根 K 線前停止，不自動平倉、不釋放合約。核准紀錄是程序上的防呆，不是安全邊界。核准只涵蓋 local-sim；Demo／Live 另依授權。上 Bot 的策略狀態必須只由最近 `lookback` 根已收盤 K 線決定，重啟時由 Supervisor 以帳本已提交的輸入重餵恢復。2026-11-04 選定的 Donchian（`donchian-breakout`／`donchian-parameters-v1`）與工作包 E、F 的策略，在核准前仍只供研究，由 `catos/research_catalog.py` 以固定白名單核對 sha256。（2026-11-12 依使用者「完全同意建議」改寫，原文見 `docs/step2-research-to-bot-proposal.md` 與 git 歷史。）
 - 2026-11-03 起 `risk.Snapshot` 的 valuation_known／flows_known／margin_ok／position_verified 預設為 False（fail-closed）：每個產生快照的路徑必須明示宣告這些事實，未宣告即視為未知而降級／禁增倉；local-sim FakeExchange 路徑明示傳 True。
 - FastAPI 僅綁定 `127.0.0.1`。回測、Demo、Live 使用同一策略製品；Guardian 獨立監控盤中風險。
 - 曝險採帳戶有效槓桿與單幣曝險預算占比，全面參數化。沿用上限預設數值 3.0x／50%，其中總曝險預算 = 有效槓桿上限 × 風控權益，單幣上限 = 總曝險預算 × 單幣預算占比；不是單幣／當前總持倉。事前檢查包含在途與 UNKNOWN，Worker 不得覆寫帳戶風控參數；P3a 取消 equity buffer，`E_risk = E_verified`；P3b 被動超限只禁止增加曝險，合法減倉始終允許，不做自動去槓桿。

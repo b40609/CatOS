@@ -171,6 +171,18 @@ def run_cli(
 
 
 def main(argv: list[str] | None = None) -> int:
+    args_in = sys.argv[1:] if argv is None else list(argv)
+    # Step 2 (2026-11-12): `strategy` (approvals, user-only for approve/revoke),
+    # `replay` and `replay-compare` subcommands; everything else is the SMA backtest CLI.
+    if args_in and args_in[0] == "strategy":
+        from catos.strategy_approvals import cli_main
+        return cli_main(args_in[1:])
+    if args_in and args_in[0] == "replay":
+        from catos.local_sim_replay import cli_main
+        return cli_main(args_in[1:])
+    if args_in and args_in[0] == "replay-compare":
+        from catos.replay_consistency import cli_main
+        return cli_main(args_in[1:])
     parser = argparse.ArgumentParser(
         description="catOS Dual SMA Strategy Backtest CLI"
     )
@@ -185,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quantity", default="2", help="Target contract size")
     parser.add_argument("--report", required=True, help="Output HTML report path")
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args_in)
 
     try:
         run_cli(

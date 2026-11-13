@@ -125,11 +125,14 @@ def mount_workspace(app, *, evidence_root=None, ui_dist=None):
     return app
 
 
-def create_app(*, output_dir=None, evidence_root=None, simulation_root=None, ui_dist=None):
+def create_app(*, output_dir=None, evidence_root=None, simulation_root=None, ui_dist=None, replay_root=None):
     from catos.research_api import create_app as create_research_app
     from catos.local_sim_control_api import mount_simulation
+    from catos.replay_api import mount_replay
     app = mount_workspace(create_research_app(output_dir=output_dir),
                           evidence_root=evidence_root, ui_dist=ui_dist)
+    # Read-only approvals and Bot replay progress (step 2); writes stay CLI-only.
+    mount_replay(app, root=replay_root)
     return mount_simulation(app, simulation_root or ROOT / "outputs" / "local-sim-control")
 
 

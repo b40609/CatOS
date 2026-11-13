@@ -26,7 +26,7 @@ TAIPEI = timezone(timedelta(hours=8))
 PROFILES = {"smoke": (8, 1), "eight-hour": (32, 900)}
 RUNTIME_FILES = (
     "catos/local_sim_r4.py", "catos/ipc.py", "catos/worker.py",
-    "catos/worker_host.py", "catos/strategy_registry.py", "catos/research.py",
+    "catos/worker_host.py", "catos/strategy_registry.py", "catos/strategy_approvals.py", "catos/research.py",
     "catos/research_catalog.py", "catos/research_strategy.py",
     "examples/closed_bar_demo.py", "examples/research-web-synthetic.csv",
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
@@ -122,7 +122,7 @@ async def reconcile(supervisor, position, seq):
     ))
 
 
-async def observe(supervisor, view, mark, clock, evidence):
+async def observe(supervisor, view, mark, clock, evidence, initial_equity=D("1000")):
     clock.time_ms = view.time_ms
     day = risk.taipei_day(view.time_ms)
     previous = supervisor.risk_state.basis
@@ -131,7 +131,8 @@ async def observe(supervisor, view, mark, clock, evidence):
         # actually land on the pre-decision midnight boundary.
         if previous is not None and view.time_ms != day * risk.DAY_MS - risk.TAIPEI_OFFSET_MS:
             raise RuntimeError("missing_synthetic_midnight_boundary")
-        equity = D("1000") if previous is None else view.equity
+        # The first day's basis is the run's capital (R4 fixtures: 1000; replay: the profile).
+        equity = initial_equity if previous is None else view.equity
         baseline = risk.make_synthetic_baseline_evidence(
             account_alias=supervisor.account_id, environment="local-sim",
             day=day, equity=equity, evidence_id=f"r4-midnight-{day}")
