@@ -39,7 +39,7 @@
 | Worker | `catos/worker.py`、`catos/worker_host.py` | 部署設定以核准解析；重啟時以歷史 K 線預熱重餵；每根前後都重新核對核准與來源，撤銷或改檔就停。子程序只多繼承 `CATOS_STRATEGY_APPROVALS`（路徑，不是憑證）。 |
 | 帳本 | `catos/journal.py` | 部署設定的意圖 key 改為 `[環境, 帳戶, bot, strategy_id, version, approval_id, seq, 0]`（SMA 不變）；`history()` 讀已提交輸入給 Worker 重餵。schema 不變（仍是 7）。 |
 | 反手 | `catos/risk.py`、`catos/execution.py`、`catos/supervisor.py` | `evaluate(allow_reversal=True)`（只有部署設定的 commit 用）：平倉腿要過減倉衝突檢查、整體要過增倉閘門與曝險預算，保留額度＝開倉腿。`dispatch` 先送 reduce-only 平倉單（order key `{"kind":"reversal_close","intent_key":…}`，不帶 intent），呼叫端對帳、重新觀察風險後再 `dispatch` 一次送開倉腿，開倉腿由已驗證的空倉重新評估。平倉腿送不出時，平倉腿與整個意圖在同一個交易內 ABORTED 並釋放額度，開倉腿不會單獨送出。 |
-| 重播 | `catos/local_sim_replay.py` | 研究資料集（載入時核對 sha256）的真實時間戳 K 線走 Supervisor → Worker → 風控 → 執行 → FakeExchange；成交價與手續費由研究引擎同一段程式（`research._Ledger`）以下一根開盤＋滑價算出；資金費明示 0、無保證金模型；每根檢查核准；Soft／Hard 觸發、非預期判定、撤銷、故障都停止並記錄原因，不平倉、不釋放合約。可 `resume` 續跑（新 Supervisor＋新 Worker，由帳本重餵）。輸出 `manifest.json`、`status.json`、`events.jsonl`、`state.sqlite3`、`summary.json`。 |
+| 重播 | `catos/local_sim_replay.py` | 研究資料集（載入時核對 sha256）的真實時間戳 K 線走 Supervisor → Worker → 風控 → 執行 → FakeExchange；成交價與手續費由研究引擎同一段程式（`research._Ledger`）以下一根開盤＋滑價算出；資金費明示 0、無保證金模型；每根檢查核准；Soft／Hard 觸發、非預期判定、撤銷、故障都停止並記錄原因，不平倉、不釋放合約。可續跑（`replay_bars(..., resume=True)`，目前只能從 Python 呼叫，CLI 沒有續跑選項；新 Supervisor＋新 Worker，由帳本重餵；沿用第一段的 manifest，不另記續跑時的 build_id）。輸出 `manifest.json`、`status.json`、`events.jsonl`、`state.sqlite3`、`summary.json`。 |
 | 一致性 | `catos/replay_consistency.py` | 唯讀開帳本，和關掉資金費與保證金的研究回測逐筆比對：每根 Worker 目標、成交（反手兩腿合併，兩腿價格須相同）、每根收盤帳戶檢視、期末帳戶、已實現損益與手續費、期末未成交意圖、風控判定（出現 REJECTED 就失敗）。另列和已發表研究結果（含資金費與保證金模型）的差。`--repeat-of` 比對兩次重播的決策與成交摘要是否位元組相同。 |
 | 唯讀介面 | `catos/replay_api.py`、`frontend/cat-os-vite/src/components/catos/replay-panel.tsx` | `GET /api/workspace/replay`：核准清單（有效／撤銷／來源已變更）與最近 30 筆重播（進度、成交、期末權益、一致性）。沒有寫入端點。 |
 
@@ -51,7 +51,7 @@
 - 續跑只處理在 K 線之間停下的情況；中斷在成交途中（有未終結委託，或已保留額度、還沒送出的意圖）時，續跑一開始就停止（`resume_with_unresolved_orders`／`resume_with_reserved_unsent_intent`），不自動修復。
 - 沒做（列為待辦）：local-sim 控制面（`control.json`）的重播模板與介面啟動按鈕；目前只能用 CLI 啟動重播，介面只看。提案曾列「依模板驗證 control.json」，因為只做唯讀介面就不需要動它，正式資料根的 `control.json` 不受影響。
 - 資金費仍明示為 0；接進 Supervisor 屬於帳務改動，接 Demo 前另議。
-- Worker 單根回應超過 5 秒（`WorkerHost` 既有逾時）就 fail-closed。2026-11-13 同機跑前端建置時實際發生一次；用 `resume` 續跑即可，結果和不中斷的重播位元組相同。
+- Worker 單根回應超過 5 秒（`WorkerHost` 既有逾時）就 fail-closed。2026-11-13 同機跑前端建置時實際發生一次；以 `replay_bars(..., resume=True)` 續跑即可，決策與成交摘要和不中斷的重播位元組相同（帳本本身不是位元組相同：重啟會多幾次 epoch 與一次風控觀測）。
 
 ## 驗證
 

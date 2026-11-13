@@ -11,4 +11,4 @@
 | 5 | build_id 沒涵蓋比對工具 | 一致性報告新增 `tool_sha256`（`catos/replay_consistency.py`＋`catos/research.py`）；三輪既有帳本重產報告。 |
 | 6 | 反手只有合成測試覆蓋 | 不改；4H 資料上 0 次反手，已寫在文件與交接。 |
 
-另外：觀察 3 的修正動到 `catos/local_sim_replay.py`，為了讓證據對應最終程式，用最終程式再跑一次 4H 全量。那次在第 2,377 根因 Worker 單根回應超過 5 秒逾時而 fail-closed（當時同機在跑前端 build／tsc）；接著用 `resume` 以新 Supervisor＋新 Worker（由帳本已提交的 192 根重餵，未提交的那根重新處理）跑完，決策與成交摘要和 current-a 位元組相同（`selftest-evidence/evidence.json` 的 `repeat_current_a_vs_final_resumed`，build_id 不同是預期）。這同時是 4H 實際資料上的檢查點 v2 重啟證據。
+另外：觀察 3 的修正動到 `catos/local_sim_replay.py`，為了讓證據對應最終程式，用最終程式再跑一次 4H 全量。那次處理 seq 2378 時（已提交 2,377 根）因 Worker 單根回應超過 5 秒逾時而 fail-closed（當時同機在跑前端 build／tsc）；接著用 `resume` 以新 Supervisor＋新 Worker（由帳本已提交的 192 根重餵，未提交的那根重新處理）跑完，決策與成交摘要和 current-a 位元組相同（帳本本身因重啟多 3 次 epoch 與一次風控觀測，不是位元組相同）（`selftest-evidence/evidence.json` 的 `repeat_current_a_vs_final_resumed`，build_id 不同是預期）。這同時是 4H 實際資料上的檢查點 v2 重啟證據。
