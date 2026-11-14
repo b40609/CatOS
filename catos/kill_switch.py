@@ -17,9 +17,12 @@ each of them reads; it is not a ledger. Each Bot's ledger keeps its own latch
   without records: neither the record file nor its ``.lock`` sidecar exists, so
   resetting the switch means the user deliberately deletes both files. Only an
   engage creates the sidecar; a clear never does.
-- Engaging is always possible: on a missing or emptied record file it starts a
-  new chain with the engage record (a running run sees fewer records than it
-  started with, or a new engage, and stops either way).
+- Engaging works on a missing or emptied record file too: it starts a new
+  chain with the engage record. A running run remembers the last record it
+  saw at start and stops when that record is no longer at its place (a new
+  chain), so delete-engage-clear within one check interval still stops it.
+  A file with damaged content cannot be appended to (that would hide the
+  evidence); it already reads as engaged and stops every run.
 
 ``CATOS_KILL_SWITCH`` overrides the path for isolated tests and self-tests.
 """
@@ -334,8 +337,16 @@ class Watch:
 
     def __init__(self, path=None):
         self.path = kill_switch_path() if path is None else Path(path)
-        self.start_count = require_clear(self.path)
-        self._stamp = self._stat()
+        # Stamp first: a change between the stamp and the read forces a re-read at the first check.
+        stamp = self._stat()
+        records = read_records(self.path)  # one read: engaged or unreadable raises (fail closed)
+        if records and records[-1]["action"] == "engage":
+            raise KillSwitchError("kill_switch_engaged")
+        self.start_count = len(records)
+        # The chain this run started on: a new chain (file deleted or emptied, then
+        # re-engaged) has a different record here even with the same length.
+        self.anchor = records[-1]["record_id"] if records else None
+        self._stamp = stamp
         self.fired = None
         self.actor = "kill-switch"  # ledger audit actor; "kill-switch-http"/"-cli" once fired
 
@@ -360,7 +371,8 @@ class Watch:
             self.fired = "kill-switch-unreadable"
             self.error = str(error)
             return self.fired
-        if len(records) < self.start_count:
+        if len(records) < self.start_count or (
+                self.start_count and records[self.start_count - 1]["record_id"] != self.anchor):
             self.fired = "kill-switch-unreadable"
             return self.fired
         engaged = [r for r in records[self.start_count:] if r["action"] == "engage"]

@@ -164,6 +164,20 @@ class RecordFileTests(IsolatedSwitch):
         self.path.unlink()
         self.assertEqual(watch.check(), "kill-switch-unreadable")
 
+    def test_a_new_chain_of_the_same_length_still_stops_a_running_run(self):
+        # Re-verification M1: delete, engage, clear inside one check interval.
+        ks.engage(reason="r", actor="cli")
+        ks.clear(reason="r", actor="cli", confirm="解除")
+        watch = ks.Watch()
+        self.assertEqual(watch.start_count, 2)
+        for wipe in (self.path.unlink, lambda: self.path.write_bytes(b"")):
+            with self.subTest(wipe=wipe):
+                wipe()
+                ks.engage(reason="新鏈", actor="http")
+                ks.clear(reason="新鏈", actor="cli", confirm="解除")
+                self.assertEqual(len(ks.read_records()), 2)
+                self.assertEqual(watch.check(), "kill-switch-unreadable")
+
     def test_concurrent_engages_append_exactly_one_record(self):
         ids = [f"{i:032x}" for i in range(12)]
         with ThreadPoolExecutor(max_workers=12) as pool:

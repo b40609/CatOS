@@ -113,7 +113,7 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
         </p>
       ) : kill?.error ? (
         <p className="text-amber-400">
-          紀錄檔有問題，視同已觸發：{kill.error}。所有 run 會停下、新 run 無法啟動；仍可再按 Kill 重新寫入觸發紀錄。
+          紀錄檔有問題，視同已觸發：{kill.error}。所有 run 會停下、新 run 無法啟動。紀錄檔不見或變空時可以再按 Kill 重寫觸發紀錄；內容損毀時不能寫入，但已視同觸發。
           要檢查的是 outputs/controls/kill-switch.jsonl 與旁邊的 .lock 檔；只有你本人確認後同時刪除這兩個檔，才會回到全新狀態。
         </p>
       ) : engaged && last ? (
