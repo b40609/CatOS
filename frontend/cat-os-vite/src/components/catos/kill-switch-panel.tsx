@@ -25,6 +25,10 @@ const ERROR_TEXT: Record<string, string> = {
   page_version_mismatch_reload_required: "服務已更新，請重新整理頁面",
   service_instance_mismatch: "服務已重啟，請重新整理頁面",
   network_error: "沒有收到回應，請先確認狀態再重試",
+  kill_switch_file_truncated: "紀錄檔被截斷，不能寫入；已視同觸發，所有 run 會停",
+  kill_switch_chain_broken: "紀錄檔內容被改過，不能寫入；已視同觸發，所有 run 會停",
+  kill_switch_file_unavailable: "讀不到紀錄檔；已視同觸發，所有 run 會停",
+  kill_switch_file_busy: "紀錄檔正被其他程式寫入，請再按一次",
 };
 
 function errorText(err: unknown): string {

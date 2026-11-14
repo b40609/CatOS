@@ -1,6 +1,6 @@
 # v1 之後的下一步
 
-更新：2026-11-13（第 2 步完成）。研究線工作包 B＋A、D、E、F（合併 commit `368092a0`）已於 2026-11-11 推送到 GitHub；下文各項寫的「尚未推送」是 2026-11-09 當時的狀態。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`f1997bd`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。
+更新：2026-11-14（工作包 B 完成：Kill-Switch、HTTP 觸發／解除、新風控預設）。研究線工作包 B＋A、D、E、F（合併 commit `368092a0`）已於 2026-11-11 推送到 GitHub；下文各項寫的「尚未推送」是 2026-11-09 當時的狀態。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`f1997bd`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。
 
 ## 2026-11-11：目標確認與接下來的順序
 
@@ -28,8 +28,8 @@
 
 1. **回測加保證金與強平模型**（2026-11-12 完成並合併，獨立驗收 PASS，見下節）。
 2. **研究策略上 local-sim Bot 跑歷史重播**（2026-11-13 完成，見下節）。等使用者執行正式核准。
-3. 工作包 B：Kill-Switch／re-arm HTTP。接 Demo 前必備。日損與曝險的新預設可以併在這包一起做（同屬風控，同一次獨立驗收）。
-4. 工作包 D：OKX Demo 接線。這是最低試用門檻的最後一段，需要 Demo 授權與金鑰保管方式的決策。動工前日損與曝險的新預設要已上線。
+3. **工作包 B：Kill-Switch、HTTP 觸發／解除、新風控預設**（2026-11-14 完成，見下節）。門檻修改與單一 Bot re-arm 的 HTTP 依使用者決定延到工作包 D。
+4. 工作包 D：OKX Demo 接線。這是最低試用門檻的最後一段，需要 Demo 授權與金鑰保管方式的決策。新預設已上線（工作包 B）。動工時一併：`catos/demo_production_inputs.py` 仍釘舊值 3.0x／10%／20%，新 Demo 帳本要改用新預設；接交易所的 Supervisor 路徑（含 `demo_ledger_bootstrap`）要接 Kill-Switch 檢查；Kill 與 Hard 的市價清倉、門檻修改與單一 Bot re-arm 的 HTTP。
 5. Agent 提交策略的入口（`python_strategy` 上傳製品，測試目前 skip），讓「想法 → 研究」可以由 Agent 走完。
 6. 同一幣種多策略：先做訊號合成（各策略輸出目標部位，合成一個淨目標後由單一 Bot 執行，各策略績效用紙上帳歸因）；需要硬隔離時用 OKX 子帳戶；不做本地虛擬分倉。OKX 原生分倉到 2026-11-11 的 API 更新紀錄仍沒有公開介面。做法草案見下面（2026-11-12 修訂，未同意），排在單策略閉環之後。
 7. 跨平台（`AccountLock` 目前只支援 Windows）。
@@ -59,11 +59,20 @@
 - 做不到的事：資金硬隔離（同一根 K 線內的跳空，策略虧損可能超過自己的預算，超出的部分由共用權益吸收）、交易所端各策略自己的停損單、靠掛單的策略。要硬隔離就用子帳戶，排在 OKX Demo 接通之後。
 - 拆兩段：6a 組合回測、6b 上 Bot（含影子策略），都排在單策略閉環（第 2 步）之後。
 
-### 日損與曝險新預設（2026-11-12 定案，未實作）
+### 工作包 B：Kill-Switch、HTTP 觸發／解除、新風控預設（2026-11-14 完成）
 
-- 數值：單幣曝險上限 0.5 倍權益、Soft 5%、Hard 10%（現行 1.5 倍、10%／20%）。用本機 4H 五年資料估算每年最多觸發 Soft 4.4 天、Hard 0.2 天（假設整天滿倉在不利的方向）。
-- 實作時要定的細節：0.5 倍由哪個參數得到。現行單幣上限是有效槓桿上限 3.0 倍乘單幣占比 50%；建議把有效槓桿上限改成 1.0 倍、占比維持 50%。
-- 上線後，有槓桿的回測要用同一上限重跑。
+使用者 2026-11-14 對提案 5 題回覆「照建議」。提案、用法與實作紀錄在 `docs/wp-b-kill-switch-proposal.md`。
+
+- 現況：
+  - Kill-Switch 總開關：共用紀錄檔 `outputs/controls/kill-switch.jsonl`（只增不改、雜湊鏈，git 忽略）。觸發中所有新 run（控制面、歷史重播、R4）啟動不了；執行中的 run 在下一根 K 線前鎖存 `manual_kill`、寫稽核列並停止，本機模擬不平倉。紀錄檔被改、被刪、被清空或讀不到，一律視同已觸發。
+  - 觸發：風控中心按鈕（填原因）、`python -m catos.cli kill engage`、`POST /api/workspace/simulation/kill-switch/engage`。解除：只限使用者，介面填原因並打字「解除」，或互動式終端機 `kill clear`；代理不得解除（紅線）。
+  - 新預設：有效槓桿上限 1.0 倍、單幣占比 50%（單幣 0.5 倍權益）、Soft 5%／Hard 10%；舊值在 `risk.LEGACY_LIMITS`，重播用 `--limits legacy-v1`。既有帳本保存自己的上限，不會被新預設偷換。
+  - 介面：風控中心有 Kill-Switch 面板；實例監控頁與命令面板導到這裡；設定頁讀後端預設值。
+- 獨立驗收：第一次 FAIL（D1：紀錄檔被刪或清空時視同未觸發），修正後第一次重驗 FAIL（R1：全新安裝時先解除會留下 `.lock`，之後無法觸發），再修後第二次重驗 PASS（M1：刪檔後在一次檢查間隔內觸發又解除，執行中的 run 不停），M1 修正後窄範圍重驗 PASS。報告與處理紀錄在 `reports/wp-b-kill-switch-acceptance-20261114/`。
+- 介面在隔離後端（測試埠 18870）用瀏覽器實際操作過 Kill 與解除對話框。
+- 新預設下的正式重播：見本節下方「正式重播」（代理依授權沿用核准 `8ca25f97…` 代跑；結果補在合併後）。
+- 未做：門檻修改與單一 Bot re-arm 的 HTTP（延到工作包 D）；研究回測套用曝險上限（另案）；優化與滾動驗證的日損觸發次數。
+- 驗證：見本次收尾回報與 commit 訊息（後端整套、前端三項與整合測試）。
 
 ### 回測的 Soft／Hard 日損觸發次數（2026-11-12 完成）
 
@@ -77,7 +86,7 @@
 使用者 2026-11-12 對提案 8 題回覆「完全同意建議」。實作、用法與限制在 `docs/step2-research-to-bot.md`。
 
 - 現況：Donchian（`donchian-breakout`／`donchian-parameters-v1`）在使用者以 CLI 核准部署設定後，可在 local-sim Bot 上用 4H 五年資料全速或每根 1 秒重播；INVARIANTS P1 已改寫、紅線加一條。
-- **待使用者**：正式核准還沒做（代理不得執行）。指令在 `docs/step2-research-to-bot.md` 開頭；核准後跑 `replay` 與 `replay-compare`。
+- 正式核准：使用者 2026-11-13 已核准（approval_id `8ca25f97dbf9c87c552cc067f6006018`）；第一次正式重播 `8a74592b24b64159995c0e8a0a6c7038` PASS（舊預設 3.0 倍、10%／20%），報告在主資料夾 `outputs/local-sim-replay/`。
 - 一致性（自測，測試用核准紀錄、隔離資料根 `outputs/selftest-step2-replay-20261113/`）：4H 10,956 根（預熱 192），Bot 103 筆成交與研究回測（關掉資金費與保證金）逐筆相同、誤差 0；每根 Worker 目標、每根收盤帳戶檢視、期末帳戶全部相同；期末權益 10,373.8899095。已發表結果（含資金費與保證金模型）10,370.68，差 -3.21 全為資金費，強平 0、保證金拒單 0。兩次重播決策與成交摘要位元組相同；新風控值（0.5 倍、5%／10%）對照結果相同。每次約 10.5～12 分鐘，帳本 45.8 MB。摘要在 `reports/step2-research-to-bot-acceptance-20261112/selftest-evidence/`。
 - 反手在 4H 資料上 0 次，兩腿行為只由合成資料測試覆蓋（`tests/test_step2_deployment.py`）。
 - 未做：local-sim 控制面（`control.json`）的重播模板與介面啟動按鈕，重播只能用 CLI 啟動；介面只有策略中心的唯讀面板。資金費仍為 0。
@@ -107,7 +116,7 @@
 | # | 工作包 | 內容 | 成本／風險 | 需要的授權或決策 |
 | --- | --- | --- | --- | --- |
 | A | v1.1 全站真資料（已完成並合併） | 風控中心、系統日誌、策略中心改讀控制面資料；刪掉 `lib/mock/data.ts`、假即時數值 hook（`useLiveNumber`／`useLiveSeries`）與只剩測試在用的 `lib/mock/terminal.ts` | 小。只動前端三頁；資料 `catStore` 已在輪詢（`state/catStore.ts:41-48`），後端端點已在（`catos/local_sim_control_api.py:118,130,138`） | 不需新授權 |
-| B | Kill-Switch／re-arm／門檻修改 HTTP | 把 `supervisor.latch`、`set_loss_limits`、`rearm`（`catos/supervisor.py:108,952,970`）接上 HTTP 和風控中心按鈕 | 中。牽涉鎖存與人工恢復政策；Demo 前必備 | 恢復介面細節（確認步驟、誰能 re-arm）。動工前先查業界／開源做法再提方案 |
+| B | Kill-Switch／HTTP 觸發與解除／新風控預設（2026-11-14 完成） | 見上方「工作包 B」一節；門檻修改與單一 Bot re-arm HTTP 延到 D | — | — |
 | C | 真實歷史 K 線研究 | 研究目前寫死一份 96 根合成資料（`catos/research_catalog.py:21-22,222`）。改成可登錄多份資料集，用 `tools/fetch_okx_candles.py` 抓 OKX 公開歷史 K 線跑回測／優化 | 中。公開行情 GET，不用金鑰 | 採集授權（AGENTS.md：採集不因工作包自動授權） |
 | D | OKX Demo 接線 | Supervisor 持金鑰連 OKX 模擬盤、下單、對帳 | 大，多個工作包；I-b-4 Demo 對帳未通過仍是已知阻斷（`docs/demo-collection-handoff.md`） | Demo 授權、金鑰保管方式；建議 B 先完成 |
 | E | v2：策略上傳／多 Bot | python_strategy 上傳製品（測試已 skip）、多 Bot 多策略。市場情報（Yaozi）已於 2026-11-11 拆成獨立專案，完工後以獨立服務接回 | 大 | 受信策略邊界、資料模型 |
@@ -166,7 +175,9 @@
 - `AccountLock` 只支援 Windows（`catos/account_lock.py`）。
 - 後端以 `str(Decimal)` 輸出，絕對值小於 1e-6 的非零值會變成科學記號（如 `5.0E-7`）；前端 `lib/format.ts` 的 `parse()` 只接受零的科學記號，這類值會顯示「不適用」。修法二選一：後端改 `format(x, 'f')`，或前端支援非零科學記號（v1.1 驗收 O1）。
 - `simulation_catalog.risk_projection` 的 `can_increase` 沒有納入 `position_verified` 與 `reduction_conflict`；local-sim 四個旗標恆為 True 不會誤顯示，Demo／Live 前要修（v1.1 驗收 O3）。
-- 設定頁的「有效槓桿上限 3.0x · 單幣預算上限 50%」是寫死的政策說明，不是讀 `risk.limits`（v1.1 驗收 O6）。
+- ~~設定頁的有效槓桿上限是寫死的~~：工作包 B 已改讀後端 `risk.Limits()`。
+- Kill-Switch 解除的請求若遇網路中斷，重試時沿用存起來的確認字，不用重打（工作包 B 驗收 O10，風險低，未改）。
+- 整套後端測試會在工作樹 `outputs/` 留下 `workspace-w6/w8-fixture-test-*` 資料夾（既有行為，git 忽略）。
 - `pages/backtest.tsx` 用 `parseFloat` 判斷報酬正負色（既有）。
 - 命令面板等需要鍵盤操作的元件沒有自動化互動測試；要補需要引入 playwright 或 jsdom。
 - 滾動驗證：HTML 報表沒有前端入口；分類規則的預設值沿用合成示範門檻（高波動 250 bps，BTC 15m 幾乎都會分到低波動）；計算量上限 250,000 只在本機量過。

@@ -166,12 +166,16 @@ class RecordFileTests(IsolatedSwitch):
 
     def test_a_new_chain_of_the_same_length_still_stops_a_running_run(self):
         # Re-verification M1: delete, engage, clear inside one check interval.
-        ks.engage(reason="r", actor="cli")
-        ks.clear(reason="r", actor="cli", confirm="解除")
-        watch = ks.Watch()
-        self.assertEqual(watch.start_count, 2)
-        for wipe in (self.path.unlink, lambda: self.path.write_bytes(b"")):
-            with self.subTest(wipe=wipe):
+        for name, wipe in (("deleted", self.path.unlink), ("emptied", lambda: self.path.write_bytes(b""))):
+            with self.subTest(name):
+                # A fresh history of two records and a new watch for each case.
+                for leftover in (self.path, ks.lock_path(self.path)):
+                    leftover.unlink(missing_ok=True)
+                ks.engage(reason="r", actor="cli")
+                ks.clear(reason="r", actor="cli", confirm="解除")
+                watch = ks.Watch()
+                self.assertEqual(watch.start_count, 2)
+                self.assertIsNone(watch.check())
                 wipe()
                 ks.engage(reason="新鏈", actor="http")
                 ks.clear(reason="新鏈", actor="cli", confirm="解除")

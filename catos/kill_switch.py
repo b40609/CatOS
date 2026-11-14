@@ -338,7 +338,10 @@ class Watch:
     def __init__(self, path=None):
         self.path = kill_switch_path() if path is None else Path(path)
         # Stamp first: a change between the stamp and the read forces a re-read at the first check.
-        stamp = self._stat()
+        try:
+            stamp = self._stat()
+        except OSError:
+            raise KillSwitchError("kill_switch_file_unavailable") from None
         records = read_records(self.path)  # one read: engaged or unreadable raises (fail closed)
         if records and records[-1]["action"] == "engage":
             raise KillSwitchError("kill_switch_engaged")
