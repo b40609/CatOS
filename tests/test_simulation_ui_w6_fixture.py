@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from catos.local_sim_control_api import PREFIX
 from tests.simulation_ui_w6_fixture import create_fixture
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 
 class W6ReplyTests(unittest.TestCase):

@@ -15,7 +15,11 @@ each of them reads; it is not a ledger. Each Bot's ledger keeps its own latch
 - Any doubt about the file (unreadable, edited, truncated, emptied, or deleted
   after it was first used) reads as engaged. A fresh install is the only state
   without records: neither the record file nor its ``.lock`` sidecar exists, so
-  resetting the switch means the user deliberately deletes both files.
+  resetting the switch means the user deliberately deletes both files. Only an
+  engage creates the sidecar; a clear never does.
+- Engaging is always possible: on a missing or emptied record file it starts a
+  new chain with the engage record (a running run sees fewer records than it
+  started with, or a new engage, and stops either way).
 
 ``CATOS_KILL_SWITCH`` overrides the path for isolated tests and self-tests.
 """
@@ -125,13 +129,13 @@ def lock_path(path):
     return Path(str(path) + ".lock")
 
 
-def read_records(path=None, *, fresh=None):
+def read_records(path=None, *, for_engage=False):
     """Every record in order; any doubt about the file raises (fail closed).
 
     A missing record file is a fresh install only when its ``.lock`` sidecar is
-    missing too (``fresh`` overrides that check for the writer that just created
-    the sidecar). Every write appends a whole line, so an existing empty file is
-    never legitimate.
+    missing too. Every write appends a whole line, so an existing empty file is
+    never legitimate. ``for_engage`` (the engage writer, under the lock) reads a
+    missing or empty file as no records, so the safe direction is never blocked.
     """
     path = kill_switch_path() if path is None else Path(path)
     if path.is_symlink():
@@ -140,12 +144,13 @@ def read_records(path=None, *, fresh=None):
         with path.open("rb") as stream:
             raw = stream.read(MAX_FILE_BYTES + 1)
     except FileNotFoundError:
-        if fresh is None:
-            try:
-                fresh = not lock_path(path).exists()
-            except OSError:
-                fresh = False
-        if not fresh:
+        if for_engage:
+            return []
+        try:
+            used = lock_path(path).exists()
+        except OSError:
+            used = True
+        if used:
             raise KillSwitchError("kill_switch_file_missing") from None
         return []
     except OSError:
@@ -153,6 +158,8 @@ def read_records(path=None, *, fresh=None):
     if len(raw) > MAX_FILE_BYTES:
         raise KillSwitchError("kill_switch_file_too_large")
     if not raw:
+        if for_engage:
+            return []
         raise KillSwitchError("kill_switch_file_empty")
     if not raw.endswith(b"\n"):
         raise KillSwitchError("kill_switch_file_truncated")
@@ -194,12 +201,9 @@ class _FileLock:
     def __init__(self, path):
         self.path = lock_path(path)
         self.stream = None
-        self.fresh = False
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Only the writer that creates the sidecar may treat a missing record file as new.
-        self.fresh = not self.path.exists()
         stream = self.path.open("a+b")
         deadline = time.monotonic() + 5
         while True:
@@ -277,8 +281,8 @@ def engage(*, reason, actor, request_id=None, path=None):
     """Returns (record, appended). Already engaged: the active record, nothing appended."""
     _validate_command(actor, reason, request_id)
     path = kill_switch_path() if path is None else Path(path)
-    with _FileLock(path) as lock:
-        records = read_records(path, fresh=True if lock.fresh else None)
+    with _FileLock(path):
+        records = read_records(path, for_engage=True)
         replay = _replayed(records, request_id, "engage")
         if replay is not None:
             return replay, False
@@ -293,8 +297,12 @@ def clear(*, reason, actor, confirm, request_id=None, path=None, runs_active=lam
     if confirm != CONFIRM_WORD:
         raise KillSwitchError("kill_switch_confirmation_required")
     path = kill_switch_path() if path is None else Path(path)
-    with _FileLock(path) as lock:
-        records = read_records(path, fresh=True if lock.fresh else None)
+    # Read before locking: on a fresh install a clear must not create the .lock
+    # sidecar (that would turn the next read into kill_switch_file_missing).
+    if not read_records(path):
+        raise KillSwitchError("kill_switch_not_engaged")
+    with _FileLock(path):
+        records = read_records(path)
         replay = _replayed(records, request_id, "clear")
         if replay is not None:
             return replay
@@ -319,7 +327,9 @@ class Watch:
 
     Fires on the engaged state, on any engage written after the run started
     (even if it was cleared since) and on any doubt about the file. The file is
-    re-read only when its size or modification time changed.
+    re-read only when its size or modification time, or the presence of its
+    ``.lock`` sidecar, changed (a run started on a fresh install still sees an
+    engaged-then-deleted file: the sidecar stays).
     """
 
     def __init__(self, path=None):
@@ -332,9 +342,10 @@ class Watch:
     def _stat(self):
         try:
             info = self.path.stat()
+            record = (info.st_size, info.st_mtime_ns)
         except FileNotFoundError:
-            return None
-        return (info.st_size, info.st_mtime_ns)
+            record = None
+        return (record, lock_path(self.path).exists())
 
     def check(self):
         """None while clear; else the evidence string ("kill-switch-<record_id>" or the error)."""

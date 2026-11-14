@@ -107,29 +107,62 @@ class RecordFileTests(IsolatedSwitch):
     def test_deleted_or_emptied_file_after_first_use_reads_as_engaged(self):
         # Acceptance D1 (2026-11-14): only "neither file nor .lock sidecar" is a fresh install.
         ks.engage(reason="r", actor="cli")
+        ks.clear(reason="r", actor="cli", confirm="解除")
         self.assertTrue(ks.lock_path(self.path).exists())
         self.path.unlink()
         value = ks.status()
         self.assertEqual((value["engaged"], value["error"]), (True, "kill_switch_file_missing"))
-        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
-            ks.require_clear()
-        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
-            ks.Watch()
-        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
-            ks.engage(reason="r", actor="cli")
+        for call in (ks.require_clear, ks.Watch,
+                     lambda: ks.clear(reason="r", actor="cli", confirm="解除")):
+            with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_missing"):
+                call()
+        # Engaging stays possible (re-verification R1): it starts a new chain, still engaged.
+        record, appended = ks.engage(reason="重新觸發", actor="http")
+        self.assertTrue(appended)
+        self.assertEqual(record["prev_sha256"], ks.GENESIS)
+        self.assertEqual((ks.status()["engaged"], ks.status()["error"]), (True, None))
         self.path.write_bytes(b"")
         value = ks.status()
         self.assertEqual((value["engaged"], value["error"]), (True, "kill_switch_file_empty"))
         with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_file_empty"):
             ks.require_clear()
+        record, appended = ks.engage(reason="再觸發", actor="cli")
+        self.assertTrue(appended)
+        self.assertEqual([r["action"] for r in ks.read_records()], ["engage"])
         # Resetting means deleting both files on purpose.
         self.path.unlink()
         ks.lock_path(self.path).unlink()
         self.assertFalse(ks.status()["engaged"])
         self.assertEqual(ks.require_clear(), 0)
+
+    def test_clear_on_a_fresh_install_leaves_no_sidecar_and_engage_still_works(self):
+        # Re-verification R1: a clear before any engage must not create the .lock sidecar.
+        with self.assertRaisesRegex(ks.KillSwitchError, "kill_switch_not_engaged"):
+            ks.clear(reason="r", actor="http", confirm="解除")
+        self.assertFalse(ks.lock_path(self.path).exists())
+        self.assertFalse(ks.status()["engaged"])
+        watch = ks.Watch()
         record, appended = ks.engage(reason="r", actor="http")
         self.assertTrue(appended)
-        self.assertEqual(record["prev_sha256"], ks.GENESIS)
+        self.assertEqual(watch.check(), "kill-switch-" + record["record_id"])
+
+    def test_a_sidecar_without_records_still_lets_engage_through_and_stops_runs(self):
+        # A first engage that died after creating the sidecar: reads as engaged, engage recovers.
+        watch = ks.Watch()
+        ks.lock_path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        ks.lock_path(self.path).write_bytes(b"0")
+        self.assertEqual(ks.status()["error"], "kill_switch_file_missing")
+        self.assertEqual(watch.check(), "kill-switch-unreadable")
+        record, appended = ks.engage(reason="r", actor="cli")
+        self.assertTrue(appended)
+        self.assertEqual(ks.status()["engaged_record"]["record_id"], record["record_id"])
+
+    def test_run_started_fresh_stops_when_an_engaged_file_is_deleted_before_its_check(self):
+        # Re-verification N2: the sidecar stays, so the watch notices the vanished file.
+        watch = ks.Watch()
+        ks.engage(reason="r", actor="cli")
+        self.path.unlink()
+        self.assertEqual(watch.check(), "kill-switch-unreadable")
 
     def test_concurrent_engages_append_exactly_one_record(self):
         ids = [f"{i:032x}" for i in range(12)]

@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from catos import account_lock, local_sim_r4 as runner, local_sim_r4_verify as audit
+from kill_isolation import setUpModule, tearDownModule  # noqa: F401  (isolated Kill-Switch file)
 
 
 class R4VerificationTests(unittest.TestCase):

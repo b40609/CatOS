@@ -89,7 +89,7 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
         <div className="flex gap-2">
           <button
             type="button"
-            disabled={!available || engaged}
+            disabled={!available || (engaged && !kill?.error)}
             onClick={() => open("engage")}
             className="flex h-7 items-center rounded border border-red-500/60 bg-red-500/10 px-3 text-xs font-semibold text-red-300 hover:bg-red-500/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -97,7 +97,7 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
           </button>
           <button
             type="button"
-            disabled={!available || !engaged}
+            disabled={!available || !engaged || Boolean(kill?.error)}
             onClick={() => open("clear")}
             className="flex h-7 items-center rounded border border-border/80 bg-secondary/60 px-3 text-xs font-semibold text-foreground hover:bg-secondary cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -112,7 +112,10 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
           <code className="ml-1 text-foreground">.venv\Scripts\python.exe -m catos.cli kill engage --reason "原因"</code>
         </p>
       ) : kill?.error ? (
-        <p className="text-amber-400">紀錄檔有問題，視同已觸發：{kill.error}。要用終端機檢查 outputs/controls/kill-switch.jsonl。</p>
+        <p className="text-amber-400">
+          紀錄檔有問題，視同已觸發：{kill.error}。所有 run 會停下、新 run 無法啟動；仍可再按 Kill 重新寫入觸發紀錄。
+          要檢查的是 outputs/controls/kill-switch.jsonl 與旁邊的 .lock 檔；只有你本人確認後同時刪除這兩個檔，才會回到全新狀態。
+        </p>
       ) : engaged && last ? (
         <p className="text-muted-foreground">
           {stamp(last.created_at as string)} 由 {last.actor === "cli" ? "終端機" : "介面"} 觸發：{last.reason as string}。

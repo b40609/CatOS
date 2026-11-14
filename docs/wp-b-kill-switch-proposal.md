@@ -181,7 +181,9 @@ CatOS 的規則比上面都嚴（自動清倉＋鎖存），本包不放寬。�
 ### 紀錄檔的保守規則
 
 - 紀錄檔內容被改、截斷、順序被換、不是 JSON、讀不到，都當成已觸發。
-- 第一次使用後會多一個 `kill-switch.jsonl.lock` 旁檔。之後紀錄檔被刪或被清成 0 位元組，也當成已觸發（獨立驗收 D1 修正）。
+- 第一次觸發後會多一個 `kill-switch.jsonl.lock` 旁檔（只有觸發會建立，解除不會）。之後紀錄檔被刪或被清成 0 位元組，也當成已觸發（獨立驗收 D1、重驗 R1 修正）。
+- 觸發永遠做得到：紀錄檔不見或變空時，觸發會從頭寫一條新的紀錄鏈，狀態變成已觸發。
+- 執行中的 run 也看 `.lock` 旁檔：紀錄檔在觸發後被刪掉，run 仍會停下。
 - 只有「紀錄檔和 `.lock` 旁檔都不存在」才算全新安裝。要重置總開關，必須由使用者刻意刪除這兩個檔；代理不得刪除或編輯（紅線）。
 
 ### 解除時「有 run 在跑」的檢查範圍
@@ -196,7 +198,7 @@ CatOS 的規則比上面都嚴（自動清倉＋鎖存），本包不放寬。�
 - `request_id` 寫進紀錄，同一個 `request_id` 重送不會多寫一筆。
 - 鎖存寫入失敗時，run 記為失敗（控制面 `failed`、重播 `failed`），不是一般的停止（驗收 O3）。
 - 帳本稽核列的操作者記 `kill-switch-http` 或 `kill-switch-cli`，對應觸發的來源（驗收 O4）。
-- 會啟動 run 的測試模組都用 `tests/kill_isolation.py` 把總開關檔指到暫存路徑，使用者觸發 Kill 不會讓測試失敗（驗收 O2）。
+- 會啟動 run 的 10 個測試模組都用 `tests/kill_isolation.py` 把總開關檔指到暫存路徑，使用者觸發 Kill 不會讓測試失敗（驗收 O2、重驗 N1）。
 - 沒有另外建立 `docs/kill-switch.md`，用法與規則都寫在本文件。
 - 既有測試裡依舊預設數字校準的情境（3.0 倍、10%／20%），改成明確使用 `risk.LEGACY_LIMITS`，測的是機制；新預設的數值與邊界由 `tests/test_kill_switch.py` 測。
 
@@ -204,4 +206,4 @@ CatOS 的規則比上面都嚴（自動清倉＋鎖存），本包不放寬。�
 
 - 後端：新增 `catos/kill_switch.py`；`catos/risk.py`（預設值、`LEGACY_LIMITS`）、`catos/journal.py`（`audit_manual_kill`）、`catos/supervisor.py`（`manual_kill`）、`catos/local_sim_control.py`、`catos/local_sim_control_runner.py`、`catos/local_sim_control_api.py`、`catos/simulation_catalog.py`、`catos/local_sim_replay.py`、`catos/local_sim_r4.py`、`catos/cli.py`、`catos/research_loss_limits.py`。
 - 前端：新增 `src/components/catos/kill-switch-panel.tsx`；契約 `risk.ts`、`command.ts`、`workspace.ts`；`adapters/simulation-api-adapter.ts`、`adapters/types.ts`、`adapters/research-api-adapter.ts`（日損診斷鍵）；`state/catStore.ts`、`state/stateAdapter.ts`；頁面 `risk.tsx`、`bots.tsx`、`settings.tsx`；`command-palette.tsx`、`card-registry.ts`。
-- 測試：新增 `tests/test_kill_switch.py`；調整 `test_risk`、`test_risk_journal`、`test_p5`、`test_protection`、`test_execution`、`test_execution_supervisor`、`test_risk_period_r1`、`test_simulation_workspace_api`、`test_research_loss_limits`、`tests/integration_http_fixture.py`、前端 `tests/simulation_integration_test.mjs`。
+- 測試：新增 `tests/test_kill_switch.py`、`tests/kill_isolation.py`（匯入它的模組：`test_local_sim_r4`、`test_local_sim_r4_verify`、`test_workspace_f1`、`test_step2_deployment`、`test_local_sim_control`、`test_simulation_workspace_api`、`test_simulation_ui_w6_fixture`、`test_simulation_ui_w8_fixture`、`test_browser_backtest_e2e`、`test_research_web`）；調整 `test_risk`、`test_risk_journal`、`test_p5`、`test_protection`、`test_execution`、`test_execution_supervisor`、`test_risk_period_r1`、`test_simulation_workspace_api`、`test_research_loss_limits`、`tests/integration_http_fixture.py`、前端 `tests/simulation_integration_test.mjs`。
