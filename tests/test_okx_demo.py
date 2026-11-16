@@ -262,12 +262,59 @@ class CredentialFileTests(unittest.TestCase):
             okx_demo.load_credentials(Path(tempfile.gettempdir()) / "catos-no-such-file.json")
         self.assertIn("catos-no-such-file.json", str(ctx.exception))
 
-    def test_env_overrides_default_path(self):
+    def test_path_order_env_then_catos_then_desktop(self):
         with mock.patch.dict(os.environ, {okx_demo.CREDENTIALS_ENV: "X:/elsewhere.json"}):
             self.assertEqual(okx_demo.credentials_path(), Path("X:/elsewhere.json"))
-        with mock.patch.dict(os.environ, {}, clear=False):
+        with tempfile.TemporaryDirectory() as home, mock.patch.object(Path, "home", return_value=Path(home)), \
+                mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop(okx_demo.CREDENTIALS_ENV, None)
-            self.assertEqual(okx_demo.credentials_path(), Path.home() / ".catos" / "okx-demo.json")
+            primary = Path(home) / ".catos" / "okx-demo.json"
+            desktop = Path(home) / "Desktop" / "OKX_API.txt"
+            self.assertEqual(okx_demo.credentials_path(), primary)
+            desktop.parent.mkdir()
+            desktop.write_text("x")
+            self.assertEqual(okx_demo.credentials_path(), desktop)
+            primary.parent.mkdir()
+            primary.write_text("x")
+            self.assertEqual(okx_demo.credentials_path(), primary)
+
+    TEXT = ("Demo\napikey = k-one\nsecretkey = s-one\npassphrase = p-one\nIP = \n權限 讀取/交易\n\n"
+            "Demo\napikey = k-two\nsecretkey = s-two\npassphrase = p-two\nIP = \n備註名稱 catOSv1_Demo\n")
+
+    def test_labelled_text_with_several_sets(self):
+        sets = okx_demo.load_credential_sets(self.write(self.TEXT))
+        self.assertEqual([c.api_key for c in sets], ["k-one", "k-two"])
+        self.assertEqual(sets[1].secret, "s-two")
+        with self.assertRaises(DemoError):
+            okx_demo.load_credentials(self.write(self.TEXT))
+
+    def test_labelled_text_rejects_incomplete_or_duplicate(self):
+        for text in ("apikey = SECRETA\npassphrase = p\n", "secretkey = SECRETA\napikey = k\npassphrase = p\n",
+                     "apikey = k\nsecretkey = SECRETA\nsecretkey = SECRETB\npassphrase = p\n"):
+            with self.assertRaises(DemoError) as ctx:
+                okx_demo.load_credential_sets(self.write(text))
+            self.assertNotIn("SECRET", str(ctx.exception))
+
+    def config_sender(self, working_keys):
+        class Sender:
+            def send(self, method, target, headers, body):
+                if headers.get("OK-ACCESS-KEY") in working_keys:
+                    return 200, json.dumps({"code": "0", "data": [{"label": "lab-" + headers["OK-ACCESS-KEY"],
+                                                                   "perm": "read_only,trade"}]}).encode()
+                return 200, json.dumps({"code": "50119", "msg": "API key doesn't exist", "data": []}).encode()
+        return Sender()
+
+    def test_connect_picks_the_only_working_set(self):
+        client, note = okx_demo.connect(self.write(self.TEXT), sender=self.config_sender({"k-two"}))
+        self.assertEqual(client._credentials.api_key, "k-two")
+        self.assertIn("第 2 組", note)
+        self.assertIn("lab-k-two", note)
+        self.assertNotIn("s-two", note)
+
+    def test_connect_refuses_when_zero_or_several_work(self):
+        for working in (set(), {"k-one", "k-two"}):
+            with self.assertRaises(DemoError):
+                okx_demo.connect(self.write(self.TEXT), sender=self.config_sender(working))
 
     def test_cli_reports_missing_key_file(self):
         with mock.patch.dict(os.environ, {okx_demo.CREDENTIALS_ENV: str(Path(tempfile.gettempdir()) / "catos-none.json")}):

@@ -6,14 +6,14 @@
 
 | 步驟 | 內容 | 狀態 |
 | --- | --- | --- |
-| 1 | `catos/okx_demo.py` 模擬盤用戶端＋`python -m catos.cli demo status` | 程式與測試完成；公開端點已實連（時鐘差約 0.4 秒、BTC-USDT-SWAP 最小 0.01 張）。**等使用者建金鑰**（README「OKX 模擬盤」）後實測帳戶讀取 |
-| 2 | 第一張單：最小單開倉再平倉，核對部位與餘額 | `demo first-order` 完成，以假交易所測試；等金鑰後實測 |
+| 1 | `catos/okx_demo.py` 模擬盤用戶端＋`python -m catos.cli demo status` | **完成並實測**（2026-11-16）：桌面金鑰檔第 2 組 `catOSv1_Demo`（子帳戶、讀取＋交易、net_mode、acctLv 2）；第 1 組 OKX 回 50119 已不存在。讀到 5,000 USDT、無部位、無掛單 |
+| 2 | 第一張單：最小單開倉再平倉，核對部位與餘額 | **完成並實測**：買 0.01 張均價 64945.99（ordId 4105011010260422656）、只減倉賣出 64959.3（ordId 4105011044586606592），部位歸零；USDT 權益 5000 → 4999.9948357355，變化與成交損益＋手續費逐位相同 |
 | 3 | 策略在模擬盤連跑（15m） | 未開始 |
 | 4 | Kill 在模擬盤撤單、平倉 | 未開始 |
 
-- 九月那套（`okx_http`、`demo_collection`、`reconciliation_gate` 等）沒有沿用：只能 GET、和完整對帳綁在一起。新模組只沿用它驗證過的主機 `openapi.okx.com` 與簽名方式。舊模組暫不刪。
+- 九月那套（`okx_http`、`demo_collection`、`reconciliation_gate` 等）沒有沿用：只能 GET、和完整對帳綁在一起。新模組只沿用它驗證過的主機 `openapi.okx.com` 與簽名方式。使用者同意由新模組取代（2026-11-16「同意 由你重寫」）；舊模組仍被 `supervisor.py`、帳本與風控期間引用，第 3 步改走 Supervisor 時一併拆除。
 - 新模組的保證：每個請求固定帶模擬盤標記；端點白名單，寫入只有下單與撤單；委託固定帶 tag、`cross`；錯誤訊息不含金鑰（有測試）。
-- 驗證：`tests/test_okx_demo.py` 20 項通過；後端 `Ran 967 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 個測試通過、build 成功；整合測試 13 項 PASS（前端未改動）。帳戶讀取與下單尚未對真的模擬盤實測。下單路徑屬「執行」，依使用者 2026-11-14 同意的分級（會對模擬盤送單的做一輪獨立驗收），第 3 步接 Bot 時一起驗。
+- 驗證：`tests/test_okx_demo.py` 24 項通過；後端 `Ran 975 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 個測試通過、build 成功、整合測試 13 項 PASS（前一個 commit 跑的，之後前端未改動）。帳戶讀取與第一張單已在模擬盤實測（見上表）。下單路徑屬「執行」，依使用者 2026-11-14 同意的分級（會對模擬盤送單的做一輪獨立驗收），第 3 步接 Bot 時一起驗。
 - `first-order` 是 CLI 直接下單的煙霧測試，還沒經過 Supervisor；固定 tag 在用戶端層強制注入。第 3 步讓 Bot 下單時要改走 Supervisor（INVARIANTS：Supervisor 獨佔交易）。
 
 更新：2026-11-14（工作包 B 完成：Kill-Switch、HTTP 觸發／解除、新風控預設）。研究線工作包 B＋A、D、E、F（合併 commit `368092a0`）已於 2026-11-11 推送到 GitHub；下文各項寫的「尚未推送」是 2026-11-09 當時的狀態。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`f1997bd`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。

@@ -83,12 +83,51 @@ class Credentials:
 
 
 def credentials_path() -> Path:
+    """環境變數優先；否則用 ~/.catos/okx-demo.json，沒有再用桌面的 OKX_API.txt（2026-11-16 使用者指定）。"""
     raw = os.environ.get(CREDENTIALS_ENV)
-    return Path(raw) if raw else Path.home() / ".catos" / "okx-demo.json"
+    if raw:
+        return Path(raw)
+    primary = Path.home() / ".catos" / "okx-demo.json"
+    desktop = Path.home() / "Desktop" / "OKX_API.txt"
+    return desktop if not primary.exists() and desktop.exists() else primary
 
 
-def load_credentials(path: Path | None = None) -> Credentials:
-    """讀使用者指定的金鑰檔：JSON，只能有 api_key、secret、passphrase 三個欄位。"""
+_LABELS = {"apikey": "api_key", "okxapikey": "api_key",
+           "secret": "secret", "secretkey": "secret", "apisecret": "secret", "okxsecretkey": "secret",
+           "passphrase": "passphrase", "apipassphrase": "passphrase", "okxpassphrase": "passphrase"}
+_LINE = re.compile(r"\s*([^:=：]+?)\s*[:=：]\s*(.+?)\s*$")
+
+
+def _parse_text(text: str, path: Path) -> list[Credentials]:
+    """有標籤的文字檔：每組以 apikey 開頭，接 secretkey、passphrase；其他行（標題、ip、備註）略過。"""
+    sets: list[dict] = []
+    for line in text.splitlines():
+        matched = _LINE.match(line)
+        if not matched:
+            continue
+        field = _LABELS.get(re.sub(r"[ _-]", "", matched.group(1)).lower())
+        if field is None:
+            continue
+        value = matched.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if field == "api_key":
+            sets.append({})
+        elif not sets:
+            raise DemoError(f"金鑰檔裡 {field} 出現在 apikey 之前：{path}")
+        if field in sets[-1]:
+            raise DemoError(f"金鑰檔裡同一組有重複的 {field}：{path}")
+        sets[-1][field] = value
+    if not sets:
+        raise DemoError(f"金鑰檔裡找不到 apikey：{path}")
+    for index, entry in enumerate(sets, 1):
+        if set(entry) != {"api_key", "secret", "passphrase"}:
+            raise DemoError(f"金鑰檔第 {index} 組缺欄位（要有 apikey、secretkey、passphrase）：{path}")
+    return [Credentials(e["api_key"], e["secret"], e["passphrase"]) for e in sets]
+
+
+def load_credential_sets(path: Path | None = None) -> list[Credentials]:
+    """讀使用者指定的金鑰檔。JSON（api_key、secret、passphrase）或有標籤的文字檔，可含多組。"""
     path = Path(path) if path is not None else credentials_path()
     try:
         raw = path.read_bytes()
@@ -96,15 +135,51 @@ def load_credentials(path: Path | None = None) -> Credentials:
         raise DemoError(f"找不到金鑰檔：{path}") from None
     except OSError:
         raise DemoError(f"讀不到金鑰檔：{path}") from None
-    if len(raw) > 4096:
+    if len(raw) > 16384:
         raise DemoError(f"金鑰檔太大，不像金鑰檔：{path}")
     try:
-        data = json.loads(raw.decode("utf-8-sig"))
-    except (UnicodeDecodeError, ValueError):
-        raise DemoError(f"金鑰檔不是 JSON：{path}") from None
-    if not isinstance(data, dict) or set(data) != {"api_key", "secret", "passphrase"}:
-        raise DemoError(f"金鑰檔要剛好有 api_key、secret、passphrase 三個欄位：{path}")
-    return Credentials(data["api_key"], data["secret"], data["passphrase"])
+        text = raw.decode("utf-16") if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise DemoError(f"金鑰檔不是 UTF-8 或 UTF-16 文字：{path}") from None
+    if text.lstrip().startswith("{"):
+        try:
+            data = json.loads(text)
+        except ValueError:
+            raise DemoError(f"金鑰檔不是有效的 JSON：{path}") from None
+        if not isinstance(data, dict) or set(data) != {"api_key", "secret", "passphrase"}:
+            raise DemoError(f"金鑰檔要剛好有 api_key、secret、passphrase 三個欄位：{path}")
+        return [Credentials(data["api_key"], data["secret"], data["passphrase"])]
+    return _parse_text(text, path)
+
+
+def load_credentials(path: Path | None = None) -> Credentials:
+    sets = load_credential_sets(path)
+    if len(sets) != 1:
+        raise DemoError(f"金鑰檔裡有 {len(sets)} 組金鑰，這個用法只接受一組")
+    return sets[0]
+
+
+def connect(path: Path | None = None, sender: "Sender | None" = None) -> tuple["DemoClient", str]:
+    """建立用戶端。檔案有多組金鑰時逐組問 OKX 帳戶設定，剛好一組可用才採用，不猜。
+
+    回傳 (client, 說明)；說明只含第幾組與 OKX 上的金鑰名稱，不含金鑰內容。
+    """
+    sets = load_credential_sets(path)
+    if len(sets) == 1:
+        return DemoClient(sets[0], sender), "金鑰檔只有一組"
+    usable, failures = [], []
+    for index, creds in enumerate(sets, 1):
+        client = DemoClient(creds, sender)
+        try:
+            label = str(client._request("GET", "/api/v5/account/config")[0].get("label", ""))
+            usable.append((index, client, label))
+        except OkxApiError as exc:
+            failures.append(f"第 {index} 組 {exc.code}")
+    if len(usable) != 1:
+        raise DemoError(f"金鑰檔有 {len(sets)} 組，OKX 模擬盤可用的有 {len(usable)} 組，無法判斷用哪一組"
+                        f"（{'、'.join(failures) or '全部可用'}）；請只留一組")
+    index, client, label = usable[0]
+    return client, f"金鑰檔有 {len(sets)} 組，用第 {index} 組（OKX 名稱 {label}；{'、'.join(failures)} 不可用）"
 
 
 class Sender(Protocol):
@@ -490,14 +565,15 @@ def cli_main(argv: list[str]) -> int:
     p_status = sub.add_parser("status", help="讀模擬盤的餘額、部位、掛單")
     p_status.add_argument("--inst", default=DEFAULT_INST)
     p_first = sub.add_parser("first-order", help="下一張最小市價單再平掉，核對部位與餘額")
-    p_first.add_argument("--inst", default=DEFAULT_INST, choices=[DEFAULT_INST])
+    p_first.add_argument("--inst", default=DEFAULT_INST)
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         # 輸出被導到檔案或管線時，Windows 預設用舊編碼，中文會變亂碼。
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     try:
-        client = DemoClient(load_credentials())
+        client, note = connect()
+        print(f"金鑰：{credentials_path()}，{note}\n")
         if args.cmd == "status":
             print(render_status(status(client, args.inst)))
             return 0
