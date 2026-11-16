@@ -187,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
     if args_in and args_in[0] == "kill":
         from catos.kill_switch import cli_main
         return cli_main(args_in[1:])
+    # M1 (2026-11-16): OKX 模擬盤連線，只連 Demo。
+    if args_in and args_in[0] == "demo":
+        from catos.okx_demo import cli_main
+        return cli_main(args_in[1:])
     parser = argparse.ArgumentParser(
         description="catOS Dual SMA Strategy Backtest CLI"
     )
