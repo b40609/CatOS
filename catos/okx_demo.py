@@ -388,6 +388,78 @@ class DemoClient:
     def cancel_order(self, inst_id: str, ord_id: str) -> None:
         self._request("POST", "/api/v5/trade/cancel-order", payload={"instId": _inst(inst_id), "ordId": str(ord_id)})
 
+    # ---- Bot 用：Supervisor 的委託格式、以 clOrdId 查單 ----
+    SUPERVISOR_FIELDS = frozenset(("instId", "tdMode", "posSide", "ordType", "side", "sz", "reduceOnly", "clOrdId", "tag"))
+
+    def submit_supervisor_payload(self, payload: dict) -> str:
+        """送出 Supervisor 建好的委託（fake_exchange.build_payload 的欄位），原樣轉送、不增減欄位。"""
+        if (type(payload) is not dict or set(payload) != self.SUPERVISOR_FIELDS or payload["tag"] != TAG
+                or payload["tdMode"] != "cross" or payload["posSide"] != "net" or payload["ordType"] != "market"
+                or payload["side"] not in ("buy", "sell") or type(payload["reduceOnly"]) is not bool
+                or not _CL_ORD_ID.match(str(payload["clOrdId"]))):
+            raise DemoError("委託欄位不符 Supervisor 格式，拒送")
+        _inst(payload["instId"])
+        rows = self._request("POST", "/api/v5/trade/order", payload=dict(payload))
+        if len(rows) != 1 or rows[0].get("sCode") not in ("0", 0) or not rows[0].get("ordId"):
+            row = rows[0] if rows else {}
+            raise OkxApiError(str(row.get("sCode", "?")), str(row.get("sMsg", "下單回應不完整")))
+        return str(rows[0]["ordId"])
+
+    def order_by_client_id(self, inst_id: str, cl_ord_id: str) -> dict | None:
+        """查不到（51603）回 None；其他錯誤照常拋出。"""
+        try:
+            rows = self._request("GET", "/api/v5/trade/order", {"instId": _inst(inst_id), "clOrdId": cl_ord_id})
+        except OkxApiError as exc:
+            if exc.code == "51603":
+                return None
+            raise
+        if len(rows) != 1:
+            raise DemoError("查委託回應筆數不對")
+        r = rows[0]
+        return {"ord_id": str(r.get("ordId")), "cl_ord_id": r.get("clOrdId"), "state": r.get("state"),
+                "sz": _dec(r, "sz"), "acc_fill_sz": _dec(r, "accFillSz") or Decimal(0),
+                "u_time": int(r.get("uTime") or 0), "tag": r.get("tag")}
+
+    def order_fills(self, inst_id: str, ord_id: str) -> list[dict]:
+        rows = self._request("GET", "/api/v5/trade/fills", {"instType": "SWAP", "instId": _inst(inst_id),
+                                                             "ordId": str(ord_id), "limit": "100"})
+        return [{"trade_id": str(r["tradeId"]), "fill_sz": _dec(r, "fillSz"), "fill_px": _dec(r, "fillPx"),
+                 "fee": _dec(r, "fee") or Decimal(0)} for r in rows if str(r.get("ordId")) == str(ord_id)]
+
+    def cancel_by_client_id(self, inst_id: str, cl_ord_id: str) -> None:
+        self._request("POST", "/api/v5/trade/cancel-order", payload={"instId": _inst(inst_id), "clOrdId": cl_ord_id})
+
+    BARS = {300_000: "5m", 900_000: "15m", 3_600_000: "1H", 14_400_000: "4H"}
+
+    def closed_candles(self, inst_id: str, timeframe_ms: int, limit: int) -> list[dict]:
+        """最近已收盤 K 線，由舊到新（OKX market/candles，最多 300 根；confirm=1 才算收盤）。"""
+        if timeframe_ms not in self.BARS or not 1 <= limit <= 299:
+            raise DemoError("K 線週期或根數不支援")
+        rows = self._request("GET", "/api/v5/market/candles",
+                             {"instId": _inst(inst_id), "bar": self.BARS[timeframe_ms], "limit": str(limit + 1)})
+        result = []
+        for r in rows:
+            if not isinstance(r, list) or len(r) < 9:
+                raise DemoError("K 線格式不對")
+            if r[8] != "1":
+                continue
+            result.append({"open_time_ms": int(r[0]), "open": Decimal(r[1]), "high": Decimal(r[2]),
+                           "low": Decimal(r[3]), "close": Decimal(r[4])})
+        result.sort(key=lambda bar: bar["open_time_ms"])
+        return result[-limit:]
+
+    def account_snapshot(self) -> dict:
+        """風控用：USDT 權益、維持保證金率（無部位時 OKX 回空）。"""
+        rows = self._request("GET", "/api/v5/account/balance", {"ccy": "USDT"})
+        if len(rows) != 1:
+            raise DemoError("餘額回應筆數不對")
+        account = rows[0]
+        usdt = next((d for d in account.get("details", []) if d.get("ccy") == "USDT"), None)
+        if usdt is None or _dec(usdt, "eq") is None:
+            raise DemoError("餘額回應沒有 USDT 權益")
+        return {"usdt_eq": _dec(usdt, "eq"), "mgn_ratio": _dec(account, "mgnRatio"),
+                "u_time": int(account.get("uTime") or 0)}
+
 
 # ---- 帳戶檢查（第一張單前的簡單核對）----
 
@@ -560,6 +632,9 @@ def render_status(report: dict) -> str:
 def cli_main(argv: list[str]) -> int:
     import argparse
     import sys
+    if argv and argv[0] == "bot":
+        from catos.demo_bot import cli_main as bot_main
+        return bot_main(argv[1:])
     parser = argparse.ArgumentParser(prog="catos.cli demo", description="OKX 模擬盤（只連 Demo）")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_status = sub.add_parser("status", help="讀模擬盤的餘額、部位、掛單")

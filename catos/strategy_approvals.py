@@ -1,5 +1,8 @@
 """Local, append-only approvals that let one research strategy run on a local-sim Bot.
 
+Since 2026-11-16 (M1, OKX Demo authorized) an approval also covers the OKX Demo Bot
+(catos/demo_bot.py); records written before that date only cover the local-sim replay.
+
 2026-11-12 (docs/step2-research-to-bot-proposal.md, approved as "完全同意建議"):
 the unit of approval is a deployment profile (strategy, version, source sha256,
 manifest sha256, parameters, contracts, instrument, timeframe, warm-up, plus the
@@ -336,7 +339,7 @@ def deployment_identity(profile):
 
 def summary_text(profile, artifact, manifest_sha256):
     lines = [
-        "策略核准（local-sim Bot 歷史重播；不涵蓋 Demo／Live）",
+        "策略核准（local-sim Bot 歷史重播與 OKX 模擬盤 Bot；不涵蓋 Live）",
         f"  策略：{profile['strategy_id']} / {profile['version']}",
         f"  entry：{artifact['entry']}",
         f"  來源檔案：{', '.join(artifact['source_files'])}",

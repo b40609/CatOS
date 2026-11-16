@@ -41,9 +41,12 @@ class LocalSupervisor:
         if risk_limits is not None and not isinstance(risk_limits, risk.Limits):
             raise ipc.ProtocolError("risk_limits must be Supervisor Limits")
         self.risk_limits = risk_limits
-        if exchange is not None and (type(exchange) is not FakeExchange or exchange.account_id != account_id
-                                     or risk_limits is None):
-            raise SupervisorUnavailable("only a matching local FakeExchange with risk enabled is supported")
+        # M1 (2026-11-16): the OKX Demo adapter speaks the same submit/query/cancel
+        # Report contract as FakeExchange; nothing else is accepted.
+        from catos.okx_demo_exchange import OkxDemoExchange
+        if exchange is not None and (type(exchange) not in (FakeExchange, OkxDemoExchange)
+                                     or exchange.account_id != account_id or risk_limits is None):
+            raise SupervisorUnavailable("only a matching FakeExchange or OKX Demo adapter with risk enabled is supported")
         self._exchange = exchange
         if day_clock is not None and not callable(getattr(day_clock, "wall_ms", None)):
             raise ipc.ProtocolError("day_clock must provide wall_ms")

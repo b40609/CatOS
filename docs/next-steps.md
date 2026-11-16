@@ -8,13 +8,17 @@
 | --- | --- | --- |
 | 1 | `catos/okx_demo.py` 模擬盤用戶端＋`python -m catos.cli demo status` | **完成並實測**（2026-11-16）：桌面金鑰檔第 2 組 `catOSv1_Demo`（子帳戶、讀取＋交易、net_mode、acctLv 2）；第 1 組 OKX 回 50119 已不存在。讀到 5,000 USDT、無部位、無掛單 |
 | 2 | 第一張單：最小單開倉再平倉，核對部位與餘額 | **完成並實測**：買 0.01 張均價 64945.99（ordId 4105011010260422656）、只減倉賣出 64959.3（ordId 4105011044586606592），部位歸零；USDT 權益 5000 → 4999.9948357355，變化與成交損益＋手續費逐位相同 |
-| 3 | 策略在模擬盤連跑（15m） | 未開始 |
-| 4 | Kill 在模擬盤撤單、平倉 | 未開始 |
+| 3 | 策略在模擬盤連跑：`python -m catos.cli demo bot --profile …` | **程式完成並以隔離測試核准實跑**（2026-11-16 23:23–23:49 台北）：5m、Donchian 3／2、1 張，8 根 K 線；第 5 根突破買 1 張（ordId 4105099728749056000，OKX 分 12 筆撮合，全部入帳），帳本與 OKX 部位每根核對一致。**正式 15m 設定等使用者核准**（README「策略在模擬盤上跑」） |
+| 4 | Kill／Hard 在模擬盤平倉 | **完成並實測**：隔離 Kill 觸發後 4 秒內經 Supervisor 只減倉賣 1 張（ordId 4105108293048061952），OKX 部位 0 後停止。Hard 清倉、Soft 只擋加倉以假 OKX 測試 |
 
 - 九月那套（`okx_http`、`demo_collection`、`reconciliation_gate` 等）沒有沿用：只能 GET、和完整對帳綁在一起。新模組只沿用它驗證過的主機 `openapi.okx.com` 與簽名方式。使用者同意由新模組取代（2026-11-16「同意 由你重寫」）；舊模組仍被 `supervisor.py`、帳本與風控期間引用，第 3 步改走 Supervisor 時一併拆除。
 - 新模組的保證：每個請求固定帶模擬盤標記；端點白名單，寫入只有下單與撤單；委託固定帶 tag、`cross`；錯誤訊息不含金鑰（有測試）。
-- 驗證：`tests/test_okx_demo.py` 24 項通過；後端 `Ran 975 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 個測試通過、build 成功、整合測試 13 項 PASS（前一個 commit 跑的，之後前端未改動）。帳戶讀取與第一張單已在模擬盤實測（見上表）。下單路徑屬「執行」，依使用者 2026-11-14 同意的分級（會對模擬盤送單的做一輪獨立驗收），第 3 步接 Bot 時一起驗。
-- `first-order` 是 CLI 直接下單的煙霧測試，還沒經過 Supervisor；固定 tag 在用戶端層強制注入。第 3 步讓 Bot 下單時要改走 Supervisor（INVARIANTS：Supervisor 獨佔交易）。
+- 驗證：`tests/test_okx_demo.py` 24 項、`tests/test_demo_bot.py` 11 項（假 OKX：開倉、反手、Kill 平倉、Hard 平倉、Soft 擋加倉、陌生部位／掛單、被拒不重送、外部改部位即停）通過；後端 `Ran 986 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 個測試通過、build 成功、整合測試 13 項 PASS（第 1 步 commit 時跑的，之後前端未改動）。帳戶讀取與第一張單已在模擬盤實測（見上表）。下單路徑屬「執行」，依使用者 2026-11-14 同意的分級（會對模擬盤送單的做一輪獨立驗收），第 3 步接 Bot 時一起驗。
+- `first-order` 是 CLI 直接下單的煙霧測試，不經 Supervisor；Bot 的單一律經 Supervisor（`catos/okx_demo_exchange.py` 只轉送與翻譯回報）。
+- Bot 的設計（`catos/demo_bot.py` 開頭有完整說明）：沿用重播的 Supervisor → Worker → 風控 → 執行路徑；每根 K 線前查停止、Kill、核准；OKX 部位要等於帳本、合約上不能有別的掛單，否則停；台北日第一次觀測的權益當 Soft／Hard 基準（新增風控來源 `okx_demo_first_observation_v1`，R1 語意）；外部資金流在模擬盤階段不分類；委託狀態不明就停、不重送。
+- 代理決定、可推翻：帳本沿用 local-sim 的資料庫結構與標籤（不改 schema），實際交易所記在 run 的 manifest；P1 核准涵蓋範圍加上模擬盤 Bot（11/16 前的核准不算）；遲到補處理的 K 線只更新策略狀態、不下單。
+- 已知缺口：停下後不能接續同一個 run（重啟要先平倉）；交易所端災難停損（P6）沒接；介面沒有 Bot 畫面；資金費與手續費不逐筆分類。
+- 待獨立驗收：`okx_demo_exchange`、`demo_bot`、`risk` 的新基準來源、`supervisor` 接受轉接器的改動（屬執行與風控）。
 
 更新：2026-11-14（工作包 B 完成：Kill-Switch、HTTP 觸發／解除、新風控預設）。研究線工作包 B＋A、D、E、F（合併 commit `368092a0`）已於 2026-11-11 推送到 GitHub；下文各項寫的「尚未推送」是 2026-11-09 當時的狀態。v1 local-sim 已正式獨驗 PASS（`reports/v1-acceptance-20261104/acceptance.md`），合併進 `main`（`f1997bd`）並推送。本文件整合舊分支上的 `docs/v2-candidates.md`（`d8c2133`，未合併）。
 

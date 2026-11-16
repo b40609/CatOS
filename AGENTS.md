@@ -1,6 +1,6 @@
 # CatOS 專案規則
 
-2026-11-11 重寫：把按日期堆疊的沿革整理成現行規則，並依使用者指示改掉擋住正常工作的流程規則。重寫前的全文在 `docs/archive/AGENTS-20261111.md`。「授權紀錄」與 INVARIANTS 兩節是原文，一字未改；之後只有 2026-11-12 依使用者決定刪除 Virtual Lots 原型時改寫了 P8，以及同日依第 2 步提案（使用者「完全同意建議」）改寫了 P1 後半段；2026-11-14 依工作包 B 提案（使用者「照建議」）改寫了曝險與 R1 的預設數值，並在鎖存條文補上 local-sim 不模擬清倉。
+2026-11-11 重寫：把按日期堆疊的沿革整理成現行規則，並依使用者指示改掉擋住正常工作的流程規則。重寫前的全文在 `docs/archive/AGENTS-20261111.md`。「授權紀錄」與 INVARIANTS 兩節是原文，一字未改；之後只有 2026-11-12 依使用者決定刪除 Virtual Lots 原型時改寫了 P8，以及同日依第 2 步提案（使用者「完全同意建議」）改寫了 P1 後半段；2026-11-14 依工作包 B 提案（使用者「照建議」）改寫了曝險與 R1 的預設數值，並在鎖存條文補上 local-sim 不模擬清倉；2026-11-16 M1（模擬盤授權）改寫 P1 的核准涵蓋範圍（加上模擬盤 Bot）與鎖存條文（模擬盤 Bot 觸發後清倉），屬代理決定、可推翻。
 
 ## GOAL
 
@@ -18,7 +18,7 @@
 
 - 入口：`README.md`（能做什麼、怎麼啟動）與 `docs/next-steps.md`（下一步、已知缺口）。新對話先讀這兩份，不要求使用者重貼歷史。
 - 主資料夾是 `C:/dev/CatOS`。不要放回被 Google Drive 同步的桌面，同步曾在 `.git` 內產生衝突副本並弄壞 ref。
-- 交付範圍：研究（回測、優化、滾動驗證）、研究用的 stdio MCP、本機合成模擬（FakeExchange、單 Bot、單合約）。OKX 模擬盤連線（M1）進行中，見 `catos/okx_demo.py`；沒有 Live。
+- 交付範圍：研究（回測、優化、滾動驗證）、研究用的 stdio MCP、本機合成模擬（FakeExchange、單 Bot、單合約）。OKX 模擬盤（M1）：連線與第一張單 `catos/okx_demo.py`，策略 Bot `catos/demo_bot.py`（Supervisor 經 `catos/okx_demo_exchange.py` 下單）；沒有 Live。
 - 一個埠：`catos/workspace_api.py` 在 127.0.0.1:8770 提供介面與全部 API。一鍵啟動是 `start.bat`。
 - Yaozi 市場情報是獨立專案（私有 repo），完工後以獨立服務接回，不共用程式碼、不跨 repo import。
 - 執行與儲存只用 Python 3.11+ 與 SQLite（WAL），不依賴 Docker、PostgreSQL、Redis。
@@ -110,14 +110,14 @@
 - 研究核心僅使用指定週期的已收盤 K 線（Closed Bar），不載入 1m 細部資料作盤中重播。回測函式支援 `warmup_bars`；預熱期只更新指標與必要歷史窗口，不執行交易決策、不產生或保留委託意圖，也不計入交易績效。
 - 首個研究切片已確認採單合約、單週期、合成資料；僅市價意圖，本根收盤決策、下一根開盤加明示滑價成交。先交付 Decimal 核心及專屬測試，Optuna、UI、SQLite 與 OKX 連線後續再接；模型假設與未實作能力見 README.md，不把研究算術視為完整帳戶風控或實盤底座。
 - 在應用職責上，Supervisor 獨佔 API 金鑰、連網、交易、風控與 SQLite 寫入，不載入策略。Worker 僅計算並傳遞純資料訊號／目標意圖；Supervisor 不向 Worker 提供憑證、交易 client、簽名器或寫庫介面。策略按契約不主動連網，外部資料由 Supervisor 提供，不設任意 URL 代理。IPC 禁止可執行反序列化。
-- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。2026-11-03 起登錄策略由 `catos/strategy_registry.py` 依 manifest 驅動：只接受 `approved`，以 (strategy_id, version) 解析 entry，載入前核對 source_files 的 sha256，不符即 fail-closed，Worker 不寫死策略模組。Worker 登錄表分兩層：`catos/research_artifacts/` 的內建製品（目前只有 `sma-trend`／`sma-parameters-v1`），以及使用者逐一核准的研究製品。研究製品的 manifest 留在 `catos/research_only_artifacts/` 不動；只有本機核准紀錄裡有一筆有效核准，且 strategy_id、version、來源 sha256、manifest sha256、參數、張數、合約與週期全部相符時，local-sim Bot 與 IPC 才解析得到，其餘研究製品仍解析不到。核准只能由使用者以 CLI 輸入完整 sha256 完成，代理不得執行核准或撤銷；撤銷寫入新紀錄，執行中的 Bot 在下一根 K 線前停止，不自動平倉、不釋放合約。核准紀錄是程序上的防呆，不是安全邊界。核准只涵蓋 local-sim；Demo／Live 另依授權。上 Bot 的策略狀態必須只由最近 `lookback` 根已收盤 K 線決定，重啟時由 Supervisor 以帳本已提交的輸入重餵恢復。2026-11-04 選定的 Donchian（`donchian-breakout`／`donchian-parameters-v1`）與工作包 E、F 的策略，在核准前仍只供研究，由 `catos/research_catalog.py` 以固定白名單核對 sha256。（2026-11-12 依使用者「完全同意建議」改寫，原文見 `docs/step2-research-to-bot-proposal.md` 與 git 歷史。）
+- P1 已確認採受信策略邊界：只執行使用者選定並經檢查的策略及依賴，使用普通獨立 Python Worker、JSON IPC、不傳遞憑證及有界輸出／逾時處理。不使用 AppContainer，不建置跨平台原生沙箱；不提供 OS 層防止惡意策略讀檔、連網或越權的保證，也不得把程序故障隔離宣稱為安全沙箱。2026-11-03 起登錄策略由 `catos/strategy_registry.py` 依 manifest 驅動：只接受 `approved`，以 (strategy_id, version) 解析 entry，載入前核對 source_files 的 sha256，不符即 fail-closed，Worker 不寫死策略模組。Worker 登錄表分兩層：`catos/research_artifacts/` 的內建製品（目前只有 `sma-trend`／`sma-parameters-v1`），以及使用者逐一核准的研究製品。研究製品的 manifest 留在 `catos/research_only_artifacts/` 不動；只有本機核准紀錄裡有一筆有效核准，且 strategy_id、version、來源 sha256、manifest sha256、參數、張數、合約與週期全部相符時，local-sim Bot 與 IPC 才解析得到，其餘研究製品仍解析不到。核准只能由使用者以 CLI 輸入完整 sha256 完成，代理不得執行核准或撤銷；撤銷寫入新紀錄，執行中的 Bot 在下一根 K 線前停止，不自動平倉、不釋放合約。核准紀錄是程序上的防呆，不是安全邊界。核准涵蓋 local-sim；2026-11-16 起寫入的核准也涵蓋 OKX 模擬盤 Bot（`catos/demo_bot.py`，依 M1 模擬盤授權；之前的核准不算數）；Live 另依授權。上 Bot 的策略狀態必須只由最近 `lookback` 根已收盤 K 線決定，重啟時由 Supervisor 以帳本已提交的輸入重餵恢復。2026-11-04 選定的 Donchian（`donchian-breakout`／`donchian-parameters-v1`）與工作包 E、F 的策略，在核准前仍只供研究，由 `catos/research_catalog.py` 以固定白名單核對 sha256。（2026-11-12 依使用者「完全同意建議」改寫，原文見 `docs/step2-research-to-bot-proposal.md` 與 git 歷史。）
 - 2026-11-03 起 `risk.Snapshot` 的 valuation_known／flows_known／margin_ok／position_verified 預設為 False（fail-closed）：每個產生快照的路徑必須明示宣告這些事實，未宣告即視為未知而降級／禁增倉；local-sim FakeExchange 路徑明示傳 True。
 - FastAPI 僅綁定 `127.0.0.1`。回測、Demo、Live 使用同一策略製品；Guardian 獨立監控盤中風險。
 - 曝險採帳戶有效槓桿與單幣曝險預算占比，全面參數化。上限預設數值 1.0x／50%（單幣 0.5 倍權益；2026-11-14 工作包 B 起，之前為 3.0x／50%），其中總曝險預算 = 有效槓桿上限 × 風控權益，單幣上限 = 總曝險預算 × 單幣預算占比；不是單幣／當前總持倉。事前檢查包含在途與 UNKNOWN，Worker 不得覆寫帳戶風控參數；P3a 取消 equity buffer，`E_risk = E_verified`；P3b 被動超限只禁止增加曝險，合法減倉始終允許，不做自動去槓桿。
 - 2026-10-20 使用者核准 R1：依 Asia/Taipei（UTC+08:00）每日 00:00 切日，以當日首次合格帳戶觀測建立固定「風控期間基準」，綁定帳戶、環境、台北日、實際起算時間、Decimal 權益與來源證據，經單 writer 持久化後才可使用。首次／新日資料暫缺可重試，成功前禁止增倉；同日既存基準不得因重啟、虧損或入金替換，曾建立或已有本日執行責任卻遺失／損壞時不得當作首次建立。此決策取代精確午夜 E0 與首次暫缺即封鎖整天的 E1 政策；R1 local-sim 已實作、自測並取得 2026-10-20 指定 GPT-6 Sol 歷史獨驗 PASS，適用來源與限制見 reports/risk-period-r1-independent-acceptance-20261020-gpt6sol/acceptance.md，尚未接入 HTTP／UI／Demo／Live。完整契約見 docs/retail-v1-simplification-assessment-20261020.md 第 5 節，交付與限制見 docs/risk-period-r1-local-sim.md。
 - R1 損失分母固定，僅排除實際起算後、白名單且歸屬已證明的非策略外部淨資金流；邊界不明不得視為零。UI／報告須顯示「風控期間損益」與起算時間，不涵蓋起算前的當日損失或離線閾值穿越。Soft／Hard 可配置，預設損失 5%／10%（2026-11-14 工作包 B 起，之前為 10%／20%；既有帳本沿用建立時的值）；Soft 停止增倉，Hard 啟動市價清倉及 Kill-Switch；未定義的帳務分類與其他基準重建政策不得自行定案。
 - 2026-09-23 使用者核准分類縮減：全目錄 classification coverage 僅供資訊，不因未使用的 subtype 尚未分類而阻擋；完整採集的實際流水遇 unknown／forbidden 仍阻擋增倉，合法減倉維持既有路徑。不將未知金額視為零，不取消成交損益、手續費、資金費及入出金／反佣的既有帳務分類與其他 reconciliation 條件。
-- Soft／Hard 日損與手動 Kill Switch 一律鎖存，當日不重設預算，僅限人工恢復；反彈、跨日、重啟或入金不自動解除。人工恢復仍不得覆蓋有效風險原因；原風險原因消失且恢復條件合格後，可隨時人工 re-arm；修改門檻不直接解除 latch。手動 Kill 由共用的總開關紀錄觸發（`catos/kill_switch.py`），每個持有 Supervisor 的程序在每根 K 線前檢查；local-sim（含歷史重播）觸發後鎖存並停止、不模擬清倉，市價清倉在接上交易所後執行（2026-11-14 定案）。
+- Soft／Hard 日損與手動 Kill Switch 一律鎖存，當日不重設預算，僅限人工恢復；反彈、跨日、重啟或入金不自動解除。人工恢復仍不得覆蓋有效風險原因；原風險原因消失且恢復條件合格後，可隨時人工 re-arm；修改門檻不直接解除 latch。手動 Kill 由共用的總開關紀錄觸發（`catos/kill_switch.py`），每個持有 Supervisor 的程序在每根 K 線前檢查；local-sim（含歷史重播）觸發後鎖存並停止、不模擬清倉（2026-11-14 定案）；OKX 模擬盤 Bot 觸發後鎖存，經 Supervisor 以只減倉市價單清倉到 OKX 部位為 0 再停止（2026-11-16，M1）。
 - 風控與額度保留原子化；UNKNOWN 不盲目重送或釋放額度；重啟先對帳且保留硬熔斷。
 - P6 已確認：每個 Bot 可獨立設定災難停損比例，不同幣種可不同，預設 0% 表示不啟用。使用 OKX 交易所端整倉停損作斷線／主機故障時最後保險；正常仍由策略自身停損處理，不取代帳戶級 Soft／Hard。觸發來源採 mark；tick 向提早觸發方向取整（多倉向上、空倉向下）；非零比例改為 0% 時必須等完整取消終態才完成停用，UNKNOWN 期間禁增倉並告警。部位平均成本改變時更新；保護建立／更新失敗時禁止繼續增加曝險並告警，不做自動減持。儲存失效繞過持久化的 emergency 下單通道仍延後，不宣稱離線精確帳戶日損清倉。
 - P8：現行 v1 執行仍為單合約單 Bot、`cross`＋`net_mode`。Virtual Lots 原型（IPC v2、S2 快照持久化、S3 合成逐筆成交帳務）已於 2026-11-12 依使用者決定刪除；帳本保留 6 張空的 lot 表以維持 schema 7，不升級使用者既有 DB。

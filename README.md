@@ -105,7 +105,7 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 
 ## OKX 模擬盤
 
-2026-11-16 起可以連 OKX 模擬盤（Demo），程式只連模擬盤：每個請求都帶模擬盤標記，沒有實盤模式。目前能讀餘額、部位與掛單，並用一張最小單驗證下單與平倉；策略在模擬盤連跑是下一步。
+2026-11-16 起可以連 OKX 模擬盤（Demo），程式只連模擬盤：每個請求都帶模擬盤標記，沒有實盤模式。能讀餘額、部位與掛單，用一張最小單驗證下單與平倉，並讓核准過的策略在模擬盤上逐根 K 線自己跑。
 
 **一次性設定：建立模擬盤金鑰**
 
@@ -135,6 +135,29 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 ```
 
 預設在 BTC-USDT-SWAP（`--inst` 可換其他 USDT 永續合約）市價買進最小張數（0.01 張，約 0.0001 BTC），核對 OKX 的部位，再用「只減倉」賣出平掉，核對部位歸零、USDT 權益的變化等於成交損益加手續費。開始前這個合約有部位或掛單就不動手；中途出錯就停、不重送，已開的部位會試一次平倉，並告訴你要不要去 OKX 網頁確認。
+
+**策略在模擬盤上跑（Bot）**
+
+1. 核准一份部署設定（只能由你在終端機操作，代理不能代做；2026-11-16 之前的核准只涵蓋本機重播，不算數）。內建的 15 分鐘 Donchian 設定：
+
+```bash
+.venv/Scripts/python.exe -m catos.cli strategy approve --strategy donchian-breakout --version donchian-parameters-v1 --sha256 <用 strategy identity 查到的 64 碼> --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json
+```
+
+2. 啟動（前景執行，視窗要開著；從 `C:\dev\CatOS` 執行，才會用到你的正式核准與 Kill-Switch）：
+
+```bash
+.venv/Scripts/python.exe -m catos.cli demo bot --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json
+```
+
+- 啟動前這個合約在模擬盤上要沒有部位、沒有掛單，否則不啟動。
+- 先抓最近的已收盤 K 線預熱，之後每根收盤做一次決策；有交易就經 Supervisor 用市價單送出，成交後核對 OKX 部位與帳本一致。
+- 每天（台北時間）第一次讀到的權益是當天的虧損基準：虧 5% 停止加倉、虧 10% 自動清倉並停止。
+- Kill-Switch（介面右上角或 `python -m catos.cli kill engage`）：Bot 在 1 秒內鎖住，用只減倉的市價單平倉到 0 再停止。
+- 部位對不上、委託狀態不明、K 線斷掉都會停下並寫明原因，不重送、不接管。
+- Ctrl+C 或在紀錄資料夾建立 `stop.request`：停止，**部位留著不平**。
+- 紀錄在 `outputs/okx-demo-bot/<run_id>/`：`events.jsonl`（每根 K 線、成交、風控）、`status.json`、`fills.json`、帳本 `state.sqlite3`。
+- 還沒做：停下後接續同一個 run（重新啟動要先把部位平掉）、交易所端災難停損、介面上的啟動按鈕。
 
 ## 研究資料
 

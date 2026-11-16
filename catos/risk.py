@@ -59,10 +59,17 @@ DEMO_QUIESCENT_BASELINE_EVENT_SEMANTICS = "quiescent_interval_equivalent_midnigh
 DAY_CONTEXT_CONTRACT = "taipei_day_context_v1"
 RISK_PERIOD_SOURCE = "local_sim_risk_period_v1"
 RISK_PERIOD_CONTRACT = "risk_period_observation_v1"
+# M1 (2026-11-16): OKX Demo Bot. R1 semantics: the first account observation of the
+# Taipei day fixes the basis; report_content_digest is the sha256 of the observed
+# balance facts. External flows are not classified at the Demo stage (user decision 3).
+DEMO_OBSERVED_BASELINE_SOURCE = "okx_demo_first_observation_v1"
+DEMO_OBSERVED_BASELINE_CONTRACT = "okx_demo_first_observation_evidence_v1"
+DEMO_OBSERVED_BASELINE_EVENT_SEMANTICS = "first_observed_day_equity"
 AUTHORIZED_BASELINE_SOURCES = frozenset({
     SYNTHETIC_BASELINE_SOURCE,
     DEMO_QUIESCENT_BASELINE_SOURCE,
     RISK_PERIOD_SOURCE,
+    DEMO_OBSERVED_BASELINE_SOURCE,
 })
 
 
@@ -151,6 +158,14 @@ class BaselineEvidence:
                         self.balance_content_digest, self.collection_evidence_digest, self.zero_event_digest))):
                 raise ipc.ProtocolError("invalid local risk period evidence")
             _sha256_text(self.report_content_digest, "period report digest")
+        elif self.source == DEMO_OBSERVED_BASELINE_SOURCE:
+            if (self.contract_id != DEMO_OBSERVED_BASELINE_CONTRACT
+                    or self.event_semantics != DEMO_OBSERVED_BASELINE_EVENT_SEMANTICS
+                    or not self.trading_day_start_ms <= self.observed_at_ms < self.trading_day_start_ms + DAY_MS
+                    or any(value is not None for value in (self.expected_uid_sha256, self.cutoff_ms,
+                        self.balance_content_digest, self.collection_evidence_digest, self.zero_event_digest))):
+                raise ipc.ProtocolError("invalid Demo first-observation evidence")
+            _sha256_text(self.report_content_digest, "Demo observation digest")
         elif self.source == DEMO_QUIESCENT_BASELINE_SOURCE:
             if (self.contract_id != DEMO_QUIESCENT_BASELINE_CONTRACT
                     or self.event_semantics != DEMO_QUIESCENT_BASELINE_EVENT_SEMANTICS
@@ -181,7 +196,7 @@ class BaselineEvidence:
                 collection_evidence_digest=self.collection_evidence_digest,
                 zero_event_digest=self.zero_event_digest,
             )
-        elif self.source == RISK_PERIOD_SOURCE:
+        elif self.source in (RISK_PERIOD_SOURCE, DEMO_OBSERVED_BASELINE_SOURCE):
             data["report_content_digest"] = self.report_content_digest
         return data
 
@@ -325,6 +340,9 @@ def is_verified_baseline(basis: DayBasis | None, *, account_alias: str, environm
             return False
     elif basis.source == RISK_PERIOD_SOURCE:
         if environment != "local-sim" or not trading_day_start_ms <= evidence.observed_at_ms < trading_day_start_ms + DAY_MS:
+            return False
+    elif basis.source == DEMO_OBSERVED_BASELINE_SOURCE:
+        if not trading_day_start_ms <= evidence.observed_at_ms < trading_day_start_ms + DAY_MS:
             return False
     else:
         return False
@@ -641,3 +659,21 @@ def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0
         if reversal:
             return Verdict(True, "reversal_reserved", target, abs(target) * contract.base_per_contract * s.mark)
         return Verdict(True, "exposure_reserved", delta, abs(delta) * contract.base_per_contract * s.mark)
+
+
+def make_demo_observed_basis(*, account_alias: str, environment: str, observed_at_ms: int,
+                             equity: Decimal, observation_digest: str, evidence_id: str) -> DayBasis:
+    """R1 basis for the OKX Demo Bot: the first qualified observation of the Taipei day."""
+    ipc.integer(observed_at_ms, "observation time")
+    day = taipei_day(observed_at_ms)
+    start_ms = day * DAY_MS - TAIPEI_OFFSET_MS
+    evidence = BaselineEvidence(
+        DEMO_OBSERVED_BASELINE_CONTRACT, account_alias, environment, DEMO_OBSERVED_BASELINE_SOURCE,
+        start_ms, observed_at_ms, equity, DEMO_OBSERVED_BASELINE_EVENT_SEMANTICS, evidence_id,
+        report_content_digest=observation_digest)
+    return DayBasis(day, equity, evidence_id, account_alias=account_alias, environment=environment,
+                    source=DEMO_OBSERVED_BASELINE_SOURCE,
+                    digest=compute_baseline_digest(account_alias=account_alias, environment=environment, day=day,
+                                                   equity=equity, source=DEMO_OBSERVED_BASELINE_SOURCE,
+                                                   evidence_id=evidence_id, evidence=evidence),
+                    evidence=evidence)
