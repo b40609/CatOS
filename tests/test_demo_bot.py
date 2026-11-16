@@ -4,6 +4,7 @@ Isolated approval file, Kill-Switch file, account locks and output directory.
 """
 
 import asyncio
+import io
 from decimal import Decimal
 import json
 import os
@@ -13,7 +14,7 @@ import unittest
 from unittest import mock
 from urllib.parse import parse_qs
 
-from catos import account_lock, kill_switch, risk, strategy_approvals
+from catos import account_lock, demo_bot, kill_switch, risk, strategy_approvals
 from catos.demo_bot import DemoBot, find_demo_approval
 from catos.okx_demo import TAG, Credentials, DemoClient
 from catos.okx_demo_exchange import OkxDemoExchange
@@ -46,7 +47,8 @@ class Clock:
 class FakeOkx:
     """Market orders fill immediately at the last closed bar's close; fee 0.05% of notional."""
 
-    def __init__(self, clock, *, start_index, position="0", pending=0, reject=False, lose_after_fill=None):
+    def __init__(self, clock, *, start_index, position="0", pending=0, reject=False, lose_after_fill=None,
+                 loss="600", uid="u1"):
         self.clock = clock
         self.start_index = start_index  # bar index that is forming at clock start
         self.position = D(position)
@@ -57,6 +59,10 @@ class FakeOkx:
         self.fills = {}
         self.posts = []
         self.lose_after_fill = lose_after_fill
+        self.loss = D(loss)
+        self.uid = uid
+        self.others = []          # (instId, pos) rows on other contracts
+        self.balance_failures = 0  # next N balance reads answer HTTP 503
 
     def bar_time(self, index):
         return BASE + (index - self.start_index) * TF
@@ -74,18 +80,22 @@ class FakeOkx:
         q = {k: v[0] for k, v in parse_qs(query).items()}
         ok = lambda data: (200, json.dumps({"code": "0", "data": data}).encode())
         if path == "/api/v5/account/config":
-            return ok([{"acctLv": "2", "posMode": "net_mode", "perm": "read_only,trade", "label": "t"}])
+            return ok([{"acctLv": "2", "posMode": "net_mode", "perm": "read_only,trade", "label": "t", "uid": self.uid}])
         if path == "/api/v5/public/instruments":
             return ok([{"instId": "BTC-USDT-SWAP", "ctVal": "0.01", "lotSz": "0.01", "minSz": "0.01",
                         "tickSz": "0.1", "state": "live"}])
         if path == "/api/v5/public/mark-price":
             return ok([{"markPx": str(self.mark())}])
         if path == "/api/v5/account/balance":
+            if self.balance_failures:
+                self.balance_failures -= 1
+                return 503, b'{"code":"50001","msg":"Service temporarily unavailable","data":[]}'
             return ok([{"totalEq": str(self.equity), "mgnRatio": "50" if self.position else "",
                         "details": [{"ccy": "USDT", "eq": str(self.equity), "availEq": str(self.equity)}]}])
         if path == "/api/v5/account/positions":
-            return ok([{"instId": "BTC-USDT-SWAP", "pos": str(self.position), "mgnMode": "cross", "avgPx": "100"}]
-                      if self.position else [])
+            rows = [{"instId": inst, "pos": pos, "mgnMode": "cross", "avgPx": "10"} for inst, pos in self.others]
+            return ok(rows + ([{"instId": "BTC-USDT-SWAP", "pos": str(self.position), "mgnMode": "cross", "avgPx": "100"}]
+                              if self.position else []))
         if path == "/api/v5/trade/orders-pending":
             return ok([{"instId": "BTC-USDT-SWAP", "ordId": str(9000 + i), "side": "buy", "sz": "1", "state": "live"}
                        for i in range(self.pending)])
@@ -120,7 +130,7 @@ class FakeOkx:
             self.fills[ord_id] = [{"ordId": ord_id, "tradeId": "t" + ord_id, "fillSz": p["sz"],
                                    "fillPx": str(price), "fee": str(fee)}]
             if self.lose_after_fill is not None and len(self.orders) == self.lose_after_fill:
-                self.equity -= D("600")  # an outside loss of 12% of the day basis
+                self.equity -= self.loss  # an outside loss (600 = 12% of the day basis)
             return ok([{"ordId": ord_id, "clOrdId": p["clOrdId"], "sCode": "0"}])
         if method == "GET" and path == "/api/v5/trade/order":
             order = self.orders.get(q.get("clOrdId"))
@@ -137,6 +147,7 @@ class DemoBotTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: __import__("shutil").rmtree(self.root, ignore_errors=True))
         patches = [mock.patch.object(account_lock, "LOCK_DIRECTORY", self.root / "locks"),
+                   mock.patch.object(demo_bot, "ACCOUNTS_DIRECTORY", self.root / "accounts"),
                    mock.patch.dict(os.environ, {strategy_approvals.ENV_PATH: str(self.root / "approvals.jsonl"),
                                                 kill_switch.ENV_PATH: str(self.root / "kill.jsonl")})]
         for p in patches:
@@ -147,7 +158,8 @@ class DemoBotTests(unittest.TestCase):
                                    profile=PROFILE, confirm=lambda text, word: True)
         self.record = find_demo_approval(PROFILE)
 
-    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None):
+    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None, run="run"):
+        """``run`` may be a nested path: another output root shares the same account files."""
         client = DemoClient(Credentials("k", "s", "p"), fake, clock_ms=clock, sleep=lambda s: None, monotonic=lambda: 0.0)
         lines = [] if events is None else events
 
@@ -156,14 +168,14 @@ class DemoBotTests(unittest.TestCase):
             if on_sleep is not None:
                 on_sleep(clock.ms)
 
-        return DemoBot(client=client, record=self.record, output_dir=self.root / "run", echo=lines.append,
+        return DemoBot(client=client, record=self.record, output_dir=self.root / run, echo=lines.append,
                        wall_ms=clock, sleep=sleep, limits=limits)
 
     def run_bot(self, bot):
         return asyncio.run(bot.run())
 
-    def events(self):
-        return [json.loads(line) for line in (self.root / "run" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    def events(self, run="run"):
+        return [json.loads(line) for line in (self.root / run / "events.jsonl").read_text(encoding="utf-8").splitlines()]
 
     def test_trades_reverses_and_kill_flattens_through_supervisor(self):
         clock = Clock(BASE + 1_000)  # bar index 3 is forming; bars 0..2 are the warm-up
@@ -200,10 +212,10 @@ class DemoBotTests(unittest.TestCase):
             self.assertEqual(fake.posts, [])
             self.assertFalse((self.root / "run").exists())
 
-    def run_bot_quietly(self, fake, clock):
+    def run_bot_quietly(self, fake, clock, run="run"):
         from catos.demo_bot import BotStopped
         try:
-            self.run_bot(self.make_bot(fake, clock))
+            self.run_bot(self.make_bot(fake, clock, run=run))
         except BotStopped as exc:
             return exc.reason
         return "ran"
@@ -266,6 +278,145 @@ class DemoBotTests(unittest.TestCase):
         self.assertIn(("REJECTED", "increase_gate_closed"), dispositions)
         self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
         self.assertEqual(fake.position, 0)
+
+    # ---- independent acceptance 2026-11-17: D1–D4 and observations ----
+    def test_flatten_survives_a_failed_read(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        engaged = []
+
+        def on_sleep(now):
+            if not engaged and fake.position == 1 and now > fake.bar_time(4) + 10_000:
+                kill_switch.engage(reason="test stop", actor="cli")
+                fake.balance_failures = 1  # the flatten's first account read answers 503
+                engaged.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        kinds = [e["kind"] for e in self.events()]
+        self.assertIn("read_retry", kinds)
+        self.assertIn("flatten_done", kinds)
+
+    def test_hard_loss_engages_kill_switch_and_blocks_a_restart(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3, lose_after_fill=1)
+        status = self.run_bot(self.make_bot(fake, clock))
+        self.assertIn("hard_loss", status["stop_reason"])
+        self.assertEqual(fake.position, 0)
+        # Flattened by the minute check, before the bar that was open at the loss closed.
+        self.assertLess(clock.ms, fake.bar_time(5))
+        records = kill_switch.read_records(Path(os.environ[kill_switch.ENV_PATH]))
+        self.assertEqual((records[-1]["action"], records[-1]["actor"]), ("engage", "demo-bot"))
+        with self.assertRaises(kill_switch.KillSwitchError):
+            kill_switch.clear(reason="agent", actor="demo-bot", confirm=kill_switch.CONFIRM_WORD)
+        with self.assertRaises(kill_switch.KillSwitchError):
+            self.run_bot(self.make_bot(FakeOkx(clock, start_index=3), clock, run="run2"))
+
+    def test_same_day_restart_keeps_the_basis_and_the_soft_latch(self):
+        from catos.demo_bot import rearm_main
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def on_sleep(now):
+            if fake.posts and fake.equity > D("4800"):
+                fake.equity -= D("300")  # 6%: Soft
+            if fake.equity < D("4800") and now > fake.bar_time(5) + 10_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertEqual(status["stop_reason"], "operator_stop_file", status)
+        fake.position = D("0")  # closed by hand on OKX before the restart
+        (self.root / "other-root").mkdir()
+        second = self.make_bot(fake, clock, run="other-root/run2")  # a different --output-root
+        self.run_bot(second)
+        events = self.events("other-root/run2")
+        basis = [e for e in events if e["kind"] == "day_basis"]
+        self.assertEqual(basis[0]["basis"]["equity"], "5000")  # not the equity after the loss
+        self.assertIn("soft_latched", [e["kind"] for e in events])
+        state_file = next((self.root / "accounts").glob("*.json"))
+        self.assertTrue(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
+        self.assertNotIn("u1", state_file.read_text(encoding="utf-8"))
+        # Only an interactive confirmation clears it.
+        with mock.patch("sys.stdout", new=io.StringIO()), mock.patch("sys.stderr", new=io.StringIO()):
+            self.assertEqual(rearm_main(["--reason", "test"]), 1)
+            self.assertEqual(rearm_main(["--reason", "test"], confirm=lambda text, word: word), 0)
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        self.assertFalse(state["soft_latched"])
+        self.assertEqual(state["rearms"][0]["reason"], "test")
+
+    def test_unreadable_account_file_is_not_rebuilt(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.run_bot_quietly(fake, clock)
+        state_file = next((self.root / "accounts").glob("*.json"))
+        state_file.write_text("{", encoding="utf-8")
+        reason = self.run_bot_quietly(FakeOkx(clock, start_index=3), clock, run="run2")
+        self.assertTrue(reason.startswith("account_state_unreadable"), reason)
+        # Deleted next to its lock: lost, not new; no first observation is rebuilt.
+        state_file.unlink()
+        reason = self.run_bot_quietly(FakeOkx(clock, start_index=3), clock, run="run3")
+        self.assertTrue(reason.startswith("account_state_missing"), reason)
+        self.assertFalse((self.root / "run3").exists())
+        # Only deleting both files (the user's decision) starts over.
+        state_file.with_suffix(".lock").unlink()
+        self.assertEqual(self.run_bot_quietly(FakeOkx(clock, start_index=3), clock, run="run4"), "ran")
+
+    def test_positions_on_other_contracts_are_foreign(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.others = [("ETH-USDT-SWAP", "1")]
+        self.assertEqual(self.run_bot_quietly(fake, clock), "foreign_positions_or_orders_in_account:ETH-USDT-SWAP")
+        self.assertEqual(fake.posts, [])
+
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def on_sleep(now):
+            if fake.position == 1 and not fake.others:
+                fake.others = [("ETH-USDT-SWAP", "1")]
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, run="run2"))
+        self.assertEqual(status["stop_reason"], "foreign_positions_or_orders_in_account:ETH-USDT-SWAP", status)
+        self.assertEqual(len(fake.posts), 1)
+
+    def test_one_bot_per_okx_account(self):
+        from catos.demo_bot import AccountGuard
+        guard = AccountGuard(self.root / "accounts", "u1")
+        guard.acquire()
+        try:
+            clock = Clock(BASE + 1_000)
+            fake = FakeOkx(clock, start_index=3)
+            self.assertTrue(self.run_bot_quietly(fake, clock).startswith("account_busy"))
+            self.assertEqual(fake.posts, [])
+            self.assertFalse((self.root / "run").exists())
+        finally:
+            guard.release()
+
+    def test_soft_between_reversal_legs_keeps_running_flat(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3, lose_after_fill=2, loss="300")
+        engaged = []
+
+        def on_sleep(now):
+            if not engaged and now > fake.bar_time(7) + 10_000:
+                kill_switch.engage(reason="end", actor="cli")
+                engaged.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertEqual(fake.position, 0)
+        orders = [e for e in self.events() if e["kind"] == "order"]
+        self.assertEqual(len(orders), 1)  # the refused opening leg; the run went on to the Kill
+
+    def test_only_the_authorized_contract(self):
+        from catos.demo_bot import BotStopped
+        record = dict(self.record, profile=dict(PROFILE, inst_id="ETH-USDT-SWAP"))
+        clock = Clock(BASE)
+        with self.assertRaises(BotStopped):
+            DemoBot(client=DemoClient(Credentials("k", "s", "p"), FakeOkx(clock, start_index=3)), record=record,
+                    output_dir=self.root / "run")
 
     def test_old_approval_does_not_cover_demo(self):
         record = dict(self.record, created_at="2026-11-13T10:32:37+00:00")

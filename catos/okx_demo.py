@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import re
 import ssl
+import threading
 import time
 from typing import Callable, Protocol
 from urllib.parse import urlencode
@@ -249,6 +250,8 @@ class DemoClient:
         self._sleep = sleep or time.sleep
         self._monotonic = monotonic or time.monotonic
         self._last = None
+        # One request at a time: a request the Supervisor stopped waiting for can still be running.
+        self._gate = threading.Lock()
 
     def __repr__(self):
         return "DemoClient(<demo>)"
@@ -267,21 +270,27 @@ class DemoClient:
                             "OK-ACCESS-PASSPHRASE": self._credentials.passphrase,
                             "OK-ACCESS-TIMESTAMP": stamp,
                             "OK-ACCESS-SIGN": sign(self._credentials.secret, stamp, method, target, body)})
-        if self._last is not None:
-            wait = MIN_INTERVAL_S - (self._monotonic() - self._last)
-            if wait > 0:
-                self._sleep(wait)
+        with self._gate:
+            if self._last is not None:
+                wait = MIN_INTERVAL_S - (self._monotonic() - self._last)
+                if wait > 0:
+                    self._sleep(wait)
+            if not path.startswith(_PUBLIC_PREFIXES):
+                # Re-stamp after the wait so the signature time is the send time.
+                stamp = _timestamp(self._clock_ms())
+                headers["OK-ACCESS-TIMESTAMP"] = stamp
+                headers["OK-ACCESS-SIGN"] = sign(self._credentials.secret, stamp, method, target, body)
+            try:
+                status, raw = self._sender.send(method, target, headers, body.encode("utf-8"))
+            except DemoError:
+                raise
+            except Exception as exc:
+                # 任何送出層的例外都不往外帶內文：可能含 header 或金鑰。
+                raise DemoError(f"連線 OKX 模擬盤失敗（{type(exc).__name__}）") from None
+            finally:
+                self._last = self._monotonic()
         try:
-            status, raw = self._sender.send(method, target, headers, body.encode("utf-8"))
-        except DemoError:
-            raise
-        except Exception as exc:
-            # 任何送出層的例外都不往外帶內文：可能含 header 或金鑰。
-            raise DemoError(f"連線 OKX 模擬盤失敗（{type(exc).__name__}）") from None
-        finally:
-            self._last = self._monotonic()
-        try:
-            doc = json.loads(raw.decode("utf-8")) if raw else None
+            doc = json.loads(raw.decode("utf-8"), parse_float=Decimal) if raw else None
         except (UnicodeDecodeError, ValueError):
             doc = None
         if not isinstance(doc, dict):
@@ -322,7 +331,7 @@ class DemoClient:
             raise DemoError("帳戶設定回應筆數不對")
         row = rows[0]
         return {"acct_lv": str(row.get("acctLv", "")), "pos_mode": str(row.get("posMode", "")),
-                "perm": str(row.get("perm", ""))}
+                "perm": str(row.get("perm", "")), "uid": str(row.get("uid", ""))}
 
     def usdt_balance(self) -> dict:
         rows = self._request("GET", "/api/v5/account/balance", {"ccy": "USDT"})
@@ -424,7 +433,7 @@ class DemoClient:
         rows = self._request("GET", "/api/v5/trade/fills", {"instType": "SWAP", "instId": _inst(inst_id),
                                                              "ordId": str(ord_id), "limit": "100"})
         return [{"trade_id": str(r["tradeId"]), "fill_sz": _dec(r, "fillSz"), "fill_px": _dec(r, "fillPx"),
-                 "fee": _dec(r, "fee") or Decimal(0)} for r in rows if str(r.get("ordId")) == str(ord_id)]
+                 "fee": _dec(r, "fee") or Decimal(0), "fee_ccy": str(r.get("feeCcy") or "")} for r in rows if str(r.get("ordId")) == str(ord_id)]
 
     def cancel_by_client_id(self, inst_id: str, cl_ord_id: str) -> None:
         self._request("POST", "/api/v5/trade/cancel-order", payload={"instId": _inst(inst_id), "clOrdId": cl_ord_id})
@@ -635,12 +644,15 @@ def cli_main(argv: list[str]) -> int:
     if argv and argv[0] == "bot":
         from catos.demo_bot import cli_main as bot_main
         return bot_main(argv[1:])
+    if argv and argv[0] == "rearm":
+        from catos.demo_bot import rearm_main
+        return rearm_main(argv[1:])
     parser = argparse.ArgumentParser(prog="catos.cli demo", description="OKX 模擬盤（只連 Demo）")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_status = sub.add_parser("status", help="讀模擬盤的餘額、部位、掛單")
     p_status.add_argument("--inst", default=DEFAULT_INST)
     p_first = sub.add_parser("first-order", help="下一張最小市價單再平掉，核對部位與餘額")
-    p_first.add_argument("--inst", default=DEFAULT_INST)
+    p_first.add_argument("--inst", default=DEFAULT_INST, choices=[DEFAULT_INST])  # M1: one contract only
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         # 輸出被導到檔案或管線時，Windows 預設用舊編碼，中文會變亂碼。

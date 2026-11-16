@@ -19,6 +19,16 @@ starts a market close and the Kill-Switch). Soft blocks increases and the run go
 Anything uncertain (UNKNOWN order, position mismatch, missing bars) stops the run with
 the reason; nothing is resent blindly and nothing is adopted.
 
+Across runs (independent acceptance 2026-11-17, D2/D4): one Bot per OKX account (a file
+lock keyed by the account uid), and the account's Taipei-day basis and Soft latch live in
+an account file next to the runs, so a restart on the same day reuses the basis and a
+Soft latch stays until the user runs ``demo rearm``. A Hard loss also engages the shared
+Kill-Switch record (actor ``demo-bot``), which only the user can clear.
+
+Reads from OKX are retried with backoff before the run stops; while flattening they are
+retried for about two minutes. Between bars, with a position open, the account is
+observed every minute so Hard/Soft and foreign changes do not wait for the bar close.
+
 Not covered yet: resuming a stopped run (a new run refuses a non-zero position), and
 the exchange-side disaster stop (P6, default 0%).
 """
@@ -38,6 +48,7 @@ import time
 import uuid
 
 from catos import ipc, kill_switch, research, risk, strategy_approvals, strategy_registry
+from catos.kill_switch import KillSwitchError, terminal_confirm
 from catos.journal import Reconciliation
 from catos.local_sim_r4 import atomic_json, durable_view
 from catos.local_sim_replay import fill_config, worker_config
@@ -55,6 +66,18 @@ BAR_GRACE_MS = 3_000
 BAR_WAIT_MS = 90_000
 SETTLE_TRIES = 30
 FLATTEN_ROUNDS = 5
+READ_TRIES = 4            # about 14 s of backoff before an ordinary read stops the run
+FLATTEN_READ_TRIES = 12   # about two minutes while flattening
+INTRABAR_CHECK_MS = 60_000
+AUTHORIZED_INSTRUMENTS = frozenset({"BTC-USDT-SWAP"})  # M1 agent decision: one contract only
+ACCOUNT_SCHEMA = "catos.okx-demo-account"
+ACCOUNTS_DIRECTORY = None  # Resolved lazily (~/.catos/okx-demo-accounts); tests replace only this constant.
+
+
+def accounts_directory():
+    """Fixed per user, not per output root: a different --output-root must not reset the basis or the latch."""
+    return ACCOUNTS_DIRECTORY if ACCOUNTS_DIRECTORY is not None else Path.home() / ".catos" / "okx-demo-accounts"
+REARM_WORD = "解除"
 
 
 class BotStopped(Exception):
@@ -98,11 +121,104 @@ def _candle(row):
     return research.Candle(row["open_time_ms"], row["open"], row["high"], row["low"], row["close"])
 
 
+class AccountGuard:
+    """One Bot per OKX Demo account, and the account's day basis and Soft latch across runs.
+
+    Files in ``accounts_directory()``: ``<digest>.lock`` is held for the whole run;
+    ``<digest>.json`` holds the current Taipei day's basis and the Soft latch. The digest
+    is of the OKX uid; the uid itself is not written. The lock file is never removed, so a
+    state file that is missing next to it was lost, not new: the run refuses (R1: a basis
+    that existed is never rebuilt as a first observation). Starting over is the user's
+    decision: delete both files.
+    """
+
+    def __init__(self, directory, uid):
+        if not uid:
+            raise BotStopped("account_uid_missing")
+        self.uid_sha256 = hashlib.sha256(("okx-demo:" + uid).encode("utf-8")).hexdigest()
+        self.directory = Path(directory)
+        self.state_path = self.directory / f"{self.uid_sha256[:32]}.json"
+        self.lock_path = self.directory / f"{self.uid_sha256[:32]}.lock"
+        self._handle = None
+
+    def acquire(self):
+        self.directory.mkdir(parents=True, exist_ok=True)
+        fresh = not self.lock_path.exists()
+        handle = self.lock_path.open("a+b")
+        try:
+            handle.seek(0, 2)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            handle.close()
+            raise BotStopped("account_busy:another_demo_bot_runs_on_this_okx_account") from None
+        self._handle = handle
+        if not self.state_path.exists():
+            if not fresh:
+                self.release()
+                raise BotStopped(f"account_state_missing:{self.state_path.name}")
+            self.save(dict(day=None, basis=None, soft_latched=False, soft_reason=None, rearms=[]))
+
+    def release(self):
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
+
+    def load(self):
+        """Call with the lock held (acquire creates the file for a new account)."""
+        try:
+            state = json.loads(self.state_path.read_text(encoding="utf-8"))
+            ok = (type(state) is dict and state.get("schema") == ACCOUNT_SCHEMA
+                  and state.get("uid_sha256") == self.uid_sha256 and type(state.get("soft_latched")) is bool)
+            if ok and state.get("day") is None:
+                ok = state.get("basis") is None
+            elif ok:
+                ok = (type(state.get("day")) is int and type(state.get("basis")) is dict
+                      and type(state["basis"].get("observed_at_ms")) is int
+                      and D(state["basis"]["equity"]) > 0 and type(state["basis"].get("digest")) is str)
+        except (OSError, ValueError, ArithmeticError, KeyError, TypeError):
+            ok = False
+        if not ok:
+            # A basis that existed and is now unreadable is never rebuilt as a first observation (R1).
+            raise BotStopped(f"account_state_unreadable:{self.state_path.name}")
+        return state
+
+    @classmethod
+    def for_file(cls, path):
+        """The guard of an existing account file (``demo rearm``); the uid is not needed."""
+        guard = cls.__new__(cls)
+        path = Path(path)
+        guard.directory = path.parent
+        guard.state_path = path
+        guard.lock_path = path.with_suffix(".lock")
+        guard._handle = None
+        try:
+            guard.uid_sha256 = json.loads(path.read_text(encoding="utf-8"))["uid_sha256"]
+        except (OSError, ValueError, KeyError, TypeError):
+            raise BotStopped(f"account_state_unreadable:{path.name}") from None
+        if type(guard.uid_sha256) is not str or guard.uid_sha256[:32] != path.stem:
+            raise BotStopped(f"account_state_unreadable:{path.name}")
+        return guard
+
+    def save(self, state):
+        atomic_json(self.state_path, dict(state, schema=ACCOUNT_SCHEMA, uid_sha256=self.uid_sha256,
+                                          updated_at=_now_text()))
+
+
 class DemoBot:
     def __init__(self, *, client: DemoClient, record: dict, output_dir: Path, limits: risk.Limits | None = None,
                  stop: asyncio.Event | None = None, echo=print, wall_ms=_wall_ms, sleep=asyncio.sleep,
-                 kill_path=None):
+                 kill_path=None, accounts_dir=None):
         self.client = client
+        self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
         self.record = record
         self.profile = record["profile"]
         self.inst_id = self.profile["inst_id"]
@@ -115,7 +231,13 @@ class DemoBot:
         self.wall_ms = wall_ms
         self.sleep = sleep
         self.kill_path = kill_path
+        if self.inst_id not in AUTHORIZED_INSTRUMENTS:
+            raise BotStopped(f"instrument_not_authorized:{self.inst_id}")
         self.supervisor = None
+        self.guard = None
+        self.account_state = None
+        self.hard_engaged = False
+        self.log = None
         self.status = dict(state="starting", bars=0, fills=0, last_bar_open_ms=None, stop_reason=None,
                            position=None, started_at=_now_text())
         self.fills = []
@@ -124,21 +246,41 @@ class DemoBot:
     def _account(self):
         """OKX facts at one moment; raises BotStopped on anything that would be adopted or guessed."""
         snapshot = self.client.account_snapshot()
-        rows = self.client.positions(self.inst_id)
+        every = self.client.positions()  # the whole account: other contracts count as foreign
+        rows = [row for row in every if row["inst_id"] == self.inst_id]
         if any(row["mgn_mode"] != "cross" for row in rows):
             raise BotStopped("foreign_isolated_position")
         position = sum((row["pos"] for row in rows), D("0"))
-        pending = self.client.pending_orders(self.inst_id)
+        orders = self.client.pending_orders()
+        pending = [row for row in orders if row["inst_id"] == self.inst_id]
+        others = sorted({row["inst_id"] for row in every + orders if row["inst_id"] != self.inst_id})
         mark = self.client.mark_price(self.inst_id)
         return dict(equity=snapshot["usdt_eq"], mgn_ratio=snapshot["mgn_ratio"], position=position,
-                    pending=len(pending), mark=mark, avg_px=rows[0]["avg_px"] if rows else None)
+                    pending=len(pending), others=others, mark=mark, avg_px=rows[0]["avg_px"] if rows else None)
+
+    async def _call(self, fn, *args, tries=READ_TRIES):
+        """An OKX read, retried with backoff; still failing, the run stops with the reason."""
+        delay = 2
+        for attempt in range(tries):
+            try:
+                return await asyncio.to_thread(fn, *args)
+            except DemoError as exc:
+                code = getattr(exc, "code", None) or type(exc).__name__
+                if attempt == tries - 1:
+                    raise BotStopped(f"okx_read_failed:{code}") from None
+                if self.log is not None:
+                    self.log.event("read_retry", f"讀 OKX 失敗（{code}），{delay} 秒後重試", attempt=attempt + 1, code=code)
+                await self.sleep(delay)
+                delay = min(delay * 2, 15)
 
     async def _owned_position(self):
         row = await self.supervisor._io(lambda: self.supervisor._journal.connection.execute(
             "SELECT position FROM ownership WHERE bot_id=?", (BOT_ID,)).fetchone())
         return D("0") if row is None or row[0] is None else D(row[0])
 
-    async def _reconcile(self, facts, label):
+    async def _reconcile(self, facts, label, *, flattening=False):
+        if facts["others"] and not flattening:
+            raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
         unresolved = await self.supervisor._io(self.supervisor._journal.execution.unresolved)
         if unresolved:
             raise BotStopped("unresolved_orders_before_reconcile")
@@ -157,14 +299,26 @@ class DemoBot:
         state = self.supervisor.risk_state
         day = risk.taipei_day(now_ms)
         if state.basis is None or state.basis.day != day:
-            digest = hashlib.sha256(json.dumps(
-                dict(inst=self.inst_id, time_ms=now_ms, equity=str(facts["equity"]), position=str(facts["position"]),
-                     mark=str(facts["mark"])), sort_keys=True).encode()).hexdigest()
+            stored = self.account_state
+            if stored is not None and stored["day"] == day:
+                # Same Taipei day as an earlier run on this account: the basis is not replaced (R1).
+                observed = stored["basis"]["observed_at_ms"]
+                equity, digest = D(stored["basis"]["equity"]), stored["basis"]["digest"]
+                message = f"沿用今天稍早的風控基準權益 {equity} USDT"
+            else:
+                observed, equity = now_ms, facts["equity"]
+                digest = hashlib.sha256(json.dumps(
+                    dict(inst=self.inst_id, time_ms=now_ms, equity=str(equity), position=str(facts["position"]),
+                         mark=str(facts["mark"])), sort_keys=True).encode()).hexdigest()
+                self.account_state = dict(stored or dict(soft_latched=False, soft_reason=None, rearms=[]),
+                                          day=day, basis=dict(observed_at_ms=observed, equity=str(equity), digest=digest))
+                self.guard.save(self.account_state)  # durable before it is used
+                message = f"新的一天：風控基準權益 {equity} USDT"
             basis = risk.make_demo_observed_basis(
-                account_alias=self.supervisor.account_id, environment="local-sim", observed_at_ms=now_ms,
-                equity=facts["equity"], observation_digest=digest, evidence_id=f"okx-demo-day-{day}")
+                account_alias=self.supervisor.account_id, environment="local-sim", observed_at_ms=observed,
+                equity=equity, observation_digest=digest, evidence_id=f"okx-demo-day-{day}")
             await self.supervisor.commit_day_basis(basis)
-            self.log.event("day_basis", f"新的一天：風控基準權益 {facts['equity']} USDT", basis=basis.to_wire())
+            self.log.event("day_basis", message, basis=basis.to_wire())
         # Margin: no position needs nothing; with one, OKX's maintenance ratio must be reported and above 300%.
         margin_ok = facts["position"] == 0 or (facts["mgn_ratio"] is not None and facts["mgn_ratio"] >= 3)
         state = self.supervisor.observe_risk(risk.Snapshot(
@@ -174,6 +328,21 @@ class DemoBot:
         await self.supervisor.persist_controls()
         if state.reasons:
             self.log.event("risk", None, reasons=sorted(state.reasons), mode=state.mode)
+        if "soft_loss" in state.reasons and not self.account_state["soft_latched"]:
+            self.account_state = dict(self.account_state, soft_latched=True,
+                                      soft_reason=f"soft_loss {_now_text()} equity={facts['equity']}")
+            self.guard.save(self.account_state)
+            self.log.event("soft_latched", "Soft 日損鎖住：停止加倉（重啟也一樣，要你執行 demo rearm 才解除）")
+        if "hard_loss" in state.reasons and not self.hard_engaged:
+            self.hard_engaged = True
+            try:
+                record, _ = await asyncio.to_thread(
+                    kill_switch.engage, reason=f"模擬盤 Bot Hard 日損（權益 {facts['equity']} USDT）",
+                    actor="demo-bot", path=self.kill_path)
+                self.log.event("hard_kill_switch", "Hard 日損：已觸發 Kill-Switch，只有你能解除",
+                               record_id=record["record_id"])
+            except (KillSwitchError, OSError) as exc:  # the flatten below still runs
+                self.log.event("hard_kill_switch_failed", f"Hard 日損：寫入 Kill-Switch 失敗（{exc}）")
         return state
 
     async def _view(self, facts, now_ms):
@@ -209,8 +378,13 @@ class DemoBot:
 
     async def _execute(self, receipt, facts, now_ms):
         intent_key = receipt.intent_key
+        closed_first = False
         while True:
             row = await self.supervisor.dispatch(intent_key, now_ms=now_ms)
+            if row is None and closed_first:
+                # The opening leg of a reversal was re-evaluated from flat and refused (e.g. Soft).
+                self.log.event("order", "反手的開倉腿被風控擋下，維持空倉繼續跑")
+                return facts
             if row is None:
                 raise BotStopped("dispatch_returned_nothing")
             closing_leg = row["order_key"] != intent_key
@@ -219,31 +393,42 @@ class DemoBot:
                 self.log.event("order", f"委託未成交：{row['state']}", row={k: row[k] for k in ("cl_ord_id", "state")})
                 raise BotStopped(f"order_{row['state'].lower()}")
             await self._record_fill(row, "反手平倉" if closing_leg else "開倉／調整")
-            facts = await asyncio.to_thread(self._account)
+            facts = await self._call(self._account)
             await self._reconcile(facts, f"fill-{row['cl_ord_id']}")
             if not closing_leg:
                 return facts
+            closed_first = True
             now_ms = self.wall_ms()
-            await self._observe(facts, now_ms)
+            state = await self._observe(facts, now_ms)
+            if state.mode == "FLAT":
+                return facts  # the next bar (or minute check) flattens and stops
 
     async def _flatten(self, reason):
         """FLAT latched (Kill-Switch or Hard): reduce-only market orders until OKX shows zero."""
         self.log.event("flatten", f"清倉開始（{reason}）")
+        try:
+            await self._flatten_rounds()
+        except BotStopped as exc:
+            self.log.event("flatten_failed", f"清倉沒有完成（{exc.reason}）：部位可能還在 OKX 上，"
+                           "請到 OKX 網頁確認並手動平倉；Kill-Switch 維持觸發")
+            raise BotStopped(f"flatten_failed:{exc.reason}") from None
+
+    async def _flatten_rounds(self):
         for attempt in range(FLATTEN_ROUNDS):
-            facts = await asyncio.to_thread(self._account)
+            facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
             if facts["position"] == 0 and not await self.supervisor._io(self.supervisor._journal.execution.unresolved):
-                await self._reconcile(facts, f"flat-{attempt}")
+                await self._reconcile(facts, f"flat-{attempt}", flattening=True)
                 self.log.event("flatten_done", "清倉完成：模擬盤部位 0")
                 return
             now_ms = self.wall_ms()
-            await self._reconcile(facts, f"flatten-{attempt}")
+            await self._reconcile(facts, f"flatten-{attempt}", flattening=True)
             await self._observe(facts, now_ms)
             row = await self.supervisor.flatten_step(now_ms=now_ms, expires_at_ms=now_ms + 60_000)
             if row is not None:
                 row = await self._settle(row)
                 if row["state"] == "FILLED":
                     await self._record_fill(row, "清倉")
-        facts = await asyncio.to_thread(self._account)
+        facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
         raise BotStopped(f"flatten_incomplete:okx_position={facts['position']}")
 
     async def _kill_check(self):
@@ -255,19 +440,44 @@ class DemoBot:
         await self._flatten("Kill-Switch")
         raise BotStopped("manual_kill:" + fired)
 
+    async def _stop_checks(self):
+        if self.stop is not None and self.stop.is_set():
+            raise BotStopped("operator_stop")
+        if (self.output_dir / "stop.request").exists():
+            raise BotStopped("operator_stop_file")
+        await self._kill_check()
+
+    async def _intrabar_check(self):
+        """With a position open, observe the account between bars (Hard/Soft, foreign changes)."""
+        owned = await self._owned_position()
+        if owned == 0:
+            return
+        facts = await self._call(self._account)
+        if facts["others"]:
+            raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
+        if facts["pending"]:
+            raise BotStopped(f"foreign_open_orders_on_contract:{facts['pending']}")
+        if facts["position"] != owned:
+            raise BotStopped(f"position_mismatch:okx={facts['position']}:ledger={owned}")
+        state = await self._observe(facts, self.wall_ms())
+        if state.mode == "FLAT":
+            await self._flatten(",".join(sorted(state.reasons)))
+            raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
+
     async def _wait_for_bar(self, open_ms):
         """Wait for the bar opening at ``open_ms`` to close; checks stop/kill every second."""
         close_ms = open_ms + self.tf
+        next_check = self.wall_ms() + INTRABAR_CHECK_MS
         while self.wall_ms() < close_ms + BAR_GRACE_MS:
-            if self.stop is not None and self.stop.is_set():
-                raise BotStopped("operator_stop")
-            if (self.output_dir / "stop.request").exists():
-                raise BotStopped("operator_stop_file")
-            await self._kill_check()
+            await self._stop_checks()
+            if self.wall_ms() >= next_check:
+                await self._intrabar_check()
+                next_check = self.wall_ms() + INTRABAR_CHECK_MS
             await self.sleep(min(1.0, max(0.05, (close_ms + BAR_GRACE_MS - self.wall_ms()) / 1000)))
         deadline = self.wall_ms() + BAR_WAIT_MS
         while True:
-            bars = await asyncio.to_thread(self.client.closed_candles, self.inst_id, self.tf, 5)
+            await self._stop_checks()
+            bars = await self._call(self.client.closed_candles, self.inst_id, self.tf, 5)
             newer = [b for b in bars if b["open_time_ms"] >= open_ms]
             if newer and newer[0]["open_time_ms"] != open_ms:
                 raise BotStopped(f"bar_gap:expected={open_ms}:got={newer[0]['open_time_ms']}")
@@ -288,10 +498,44 @@ class DemoBot:
         contract = await asyncio.to_thread(_contract, self.client, self.inst_id)
         self.fill_config = fill_config(profile, contract)
         self.worker = worker_config(self.record, contract)  # resolves through the approval (fail closed)
-        facts = await asyncio.to_thread(self._account)
-        if facts["position"] != 0 or facts["pending"]:
-            raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}")
-        self.output_dir.mkdir(parents=True, exist_ok=False)
+        guard = AccountGuard(self.accounts_dir, config.get("uid", ""))
+        guard.acquire()
+        try:
+            self.account_state = guard.load()
+            facts = await asyncio.to_thread(self._account)
+            if facts["position"] != 0 or facts["pending"]:
+                raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}")
+            if facts["others"]:
+                raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
+            self.output_dir.mkdir(parents=True, exist_ok=False)
+        except BaseException:
+            guard.release()
+            raise
+        self.guard = guard
+        try:
+            self._open_run(facts, contract)
+        except BaseException:
+            guard.release()
+            self.guard = None
+            raise
+        try:
+            await self.supervisor.start()
+            if self.account_state["soft_latched"]:
+                self.supervisor.latch("soft_loss")
+                await self.supervisor.persist_controls()
+                self.log.event("soft_latched", "Soft 日損仍鎖住（之前的 run 觸發）：只能減倉，要你執行 demo rearm 才解除")
+            await self._main_loop(facts)
+        except BotStopped as exc:
+            self.status.update(state="stopped", stop_reason=exc.reason)
+        except Exception as exc:  # recorded; nothing is resent or flattened outside the Supervisor
+            self.status.update(state="failed", stop_reason=f"{type(exc).__name__}: {str(exc)[:300]}")
+        finally:
+            await self._close()
+        return self.status
+
+    def _open_run(self, facts, contract):
+        """Run folder, log, manifest and Supervisor (not started yet)."""
+        profile = self.profile
         self.log = _Log(self.output_dir, self.echo)
         account_id = "okxdemo-" + uuid.uuid4().hex[:24]
         manifest = dict(run_id=self.output_dir.name, created_at=_now_text(), mode="okx-demo-bot",
@@ -310,42 +554,37 @@ class DemoBot:
         self.supervisor = LocalSupervisor(self.output_dir / "state.sqlite3", account_id=account_id, bot_id=BOT_ID,
                                           config=self.worker, fixture_budget=facts["equity"], risk_limits=self.limits,
                                           exchange=exchange, day_clock=self, require_new_database=True)
-        try:
-            await self.supervisor.start()
-            await self._reconcile(facts, "start")
-            history = await asyncio.to_thread(self.client.closed_candles, self.inst_id, self.tf, self.warmup)
-            if len(history) != self.warmup or any(b["open_time_ms"] - a["open_time_ms"] != self.tf
-                                                  for a, b in zip(history, history[1:])):
-                raise BotStopped("warmup_history_incomplete")
-            seq = 0
-            for row in history:
+        self.manifest = manifest
+
+    async def _main_loop(self, facts):
+        profile = self.profile
+        await self._reconcile(facts, "start")
+        history = await self._call(self.client.closed_candles, self.inst_id, self.tf, self.warmup)
+        if len(history) != self.warmup or any(b["open_time_ms"] - a["open_time_ms"] != self.tf
+                                              for a, b in zip(history, history[1:])):
+            raise BotStopped("warmup_history_incomplete")
+        seq = 0
+        for row in history:
+            seq += 1
+            bar = _candle(row)
+            receipt = await self.supervisor.process_bar(seq, bar, None, now_ms=bar.open_time_ms + self.tf,
+                                                        expires_at_ms=bar.open_time_ms + 2 * self.tf)
+            if receipt.target_position is not None:
+                raise BotStopped("warmup_produced_intent")
+        last_open = history[-1]["open_time_ms"]
+        self.status.update(state="running", bars=seq, last_bar_open_ms=last_open)
+        self._write_status()
+        self.log.event("started", f"Bot 啟動：{profile['strategy_id']} {profile['parameters']}，"
+                       f"{self.inst_id} {self.tf // 60000} 分鐘，{profile['quantity']} 張；"
+                       f"預熱 {seq} 根完成，權益 {facts['equity']} USDT", manifest=self.manifest)
+        while True:
+            bars = await self._wait_for_bar(last_open + self.tf)
+            for row in bars:
                 seq += 1
-                bar = _candle(row)
-                receipt = await self.supervisor.process_bar(seq, bar, None, now_ms=bar.open_time_ms + self.tf,
-                                                            expires_at_ms=bar.open_time_ms + 2 * self.tf)
-                if receipt.target_position is not None:
-                    raise BotStopped("warmup_produced_intent")
-            last_open = history[-1]["open_time_ms"]
-            self.status.update(state="running", bars=seq, last_bar_open_ms=last_open)
-            self._write_status()
-            self.log.event("started", f"Bot 啟動：{profile['strategy_id']} {profile['parameters']}，"
-                           f"{self.inst_id} {self.tf // 60000} 分鐘，{profile['quantity']} 張；"
-                           f"預熱 {seq} 根完成，權益 {facts['equity']} USDT", manifest=manifest)
-            while True:
-                bars = await self._wait_for_bar(last_open + self.tf)
-                for row in bars:
-                    seq += 1
-                    await self._bar(seq, _candle(row), is_latest=row is bars[-1])
-                    last_open = row["open_time_ms"]
-                    self.status.update(bars=seq, last_bar_open_ms=last_open)
-                    self._write_status()
-        except BotStopped as exc:
-            self.status.update(state="stopped", stop_reason=exc.reason)
-        except Exception as exc:  # recorded; nothing is resent or flattened outside the Supervisor
-            self.status.update(state="failed", stop_reason=f"{type(exc).__name__}: {str(exc)[:300]}")
-        finally:
-            await self._close()
-        return self.status
+                await self._bar(seq, _candle(row), is_latest=row is bars[-1])
+                last_open = row["open_time_ms"]
+                self.status.update(bars=seq, last_bar_open_ms=last_open)
+                self._write_status()
 
     async def _bar(self, seq, bar, *, is_latest):
         await self._kill_check()
@@ -355,7 +594,7 @@ class DemoBot:
             raise BotStopped(f"approval_or_source_invalid:{exc}") from None
         if self.supervisor.failure:
             raise BotStopped("supervisor_failed:" + str(self.supervisor.failure))
-        facts = await asyncio.to_thread(self._account)
+        facts = await self._call(self._account)
         await self._reconcile(facts, f"bar-{seq}")
         now_ms = self.wall_ms()
         state = await self._observe(facts, now_ms)
@@ -394,7 +633,9 @@ class DemoBot:
         if self.output_dir.exists():
             self._write_status()
             atomic_json(self.output_dir / "fills.json", self.fills)
-        if getattr(self, "log", None) is not None:
+        if self.guard is not None:
+            self.guard.release()
+        if self.log is not None:
             self.log.event("stopped", f"Bot 停止：{self.status['state']}（{self.status['stop_reason']}）"
                            f"；最後部位 {self.status['position']}", status=self.status)
             self.log.close()
@@ -428,11 +669,72 @@ def cli_main(argv):
     directory = Path(args.output_root) / uuid.uuid4().hex
     print(f"紀錄資料夾：{directory}")
     print("停止：按 Ctrl+C，或在紀錄資料夾建立 stop.request；緊急停止用 Kill-Switch（會平倉）。\n")
-    bot = DemoBot(client=client, record=record, output_dir=directory)
     try:
+        bot = DemoBot(client=client, record=record, output_dir=directory)
         status = asyncio.run(bot.run())
     except KeyboardInterrupt:
         print("\n已收到 Ctrl+C；部位留在模擬盤上，沒有平倉。")
         return 1
+    except BotStopped as exc:
+        sys.stderr.write(f"沒有啟動：{exc.reason}\n")
+        return 1
+    except KillSwitchError as exc:
+        sys.stderr.write(f"沒有啟動：Kill-Switch（{exc}）。要先由你本人解除\n")
+        return 1
+    except DemoError as exc:
+        sys.stderr.write(f"沒有啟動：{exc}\n")
+        return 1
     print(f"\n結束：{status['state']}（{status['stop_reason']}），最後部位 {status['position']}")
+    if str(status["stop_reason"]).startswith("flatten_failed"):
+        print("清倉沒有完成：請到 OKX 網頁確認模擬盤部位，必要時手動平倉。")
+        return 2
     return 0 if status["state"] == "stopped" else 1
+
+
+def rearm_main(argv, confirm=terminal_confirm):
+    """User only: clear the Soft latch of an OKX Demo account (no Bot may be running on it)."""
+    parser = argparse.ArgumentParser(prog="catos.cli demo rearm",
+                                     description="解除模擬盤 Bot 的 Soft 日損鎖住（只限你本人，在終端機輸入確認）")
+    parser.add_argument("--reason", required=True, help="解除原因，會記在帳戶紀錄裡")
+    parser.add_argument("--accounts-dir", default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    if not kill_switch.valid_reason(args.reason):
+        sys.stderr.write("錯誤：原因要是 1～200 個可見字元\n")
+        return 1
+    latched = 0
+    directory = accounts_directory() if args.accounts_dir is None else Path(args.accounts_dir)
+    for path in sorted(directory.glob("*.json")):
+        try:
+            guard = AccountGuard.for_file(path)
+            guard.acquire()  # a running Bot holds this lock; read only while holding it
+        except BotStopped as exc:
+            sys.stderr.write(f"錯誤：{path.name}：{exc.reason}\n")
+            return 1
+        try:
+            try:
+                state = guard.load()
+            except BotStopped as exc:
+                sys.stderr.write(f"錯誤：{path.name}：{exc.reason}\n")
+                return 1
+            if not state["soft_latched"]:
+                continue
+            latched += 1
+            text = (f"模擬盤帳戶 {path.stem[:8]}… 的 Soft 日損鎖住：{state['soft_reason']}\n"
+                    "解除後 Bot 又可以加倉；同一天虧損仍超過 Soft 門檻時，下一根 K 線會再鎖住。")
+            try:
+                word = confirm(text, REARM_WORD)
+            except KillSwitchError as exc:
+                sys.stderr.write(f"錯誤：{exc}（要在互動式終端機由你本人輸入）\n")
+                return 1
+            if word != REARM_WORD:
+                print("沒有解除。")
+                return 1
+            rearms = list(state.get("rearms") or []) + [dict(at=_now_text(), reason=args.reason,
+                                                             cleared=state["soft_reason"])]
+            guard.save(dict(state, soft_latched=False, soft_reason=None, rearms=rearms))
+            print("已解除 Soft 鎖住。")
+        finally:
+            guard.release()
+    if latched == 0:
+        print("沒有被 Soft 鎖住的模擬盤帳戶。")
+    return 0

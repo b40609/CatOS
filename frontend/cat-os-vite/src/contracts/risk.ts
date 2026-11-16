@@ -25,7 +25,7 @@ export interface RiskLimitsDTO {
 export interface KillSwitchRecordDTO {
   record_id: string;
   action: 'engage' | 'clear';
-  actor: 'http' | 'cli';
+  actor: 'http' | 'cli' | 'demo-bot';
   reason: string;
   created_at: string;
 }

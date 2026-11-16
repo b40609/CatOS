@@ -45,7 +45,9 @@ SCHEMA = "catos.kill-switch"
 SCHEMA_VERSION = 1
 GENESIS = "0" * 64
 CONFIRM_WORD = "解除"
-ACTORS = frozenset({"http", "cli"})
+# "demo-bot": the OKX Demo Bot engages on a Hard loss (INVARIANTS: Hard starts the Kill-Switch). Only http/cli clear.
+ACTORS = frozenset({"http", "cli", "demo-bot"})
+CLEAR_ACTORS = frozenset({"http", "cli"})
 MAX_FILE_BYTES = 4_000_000
 MAX_RECORDS = 10_000
 MAX_REASON = 200
@@ -297,6 +299,8 @@ def engage(*, reason, actor, request_id=None, path=None):
 def clear(*, reason, actor, confirm, request_id=None, path=None, runs_active=lambda: False):
     """User-only. ``runs_active`` is the caller's check that no run of its own is still going."""
     _validate_command(actor, reason, request_id)
+    if actor not in CLEAR_ACTORS:
+        raise KillSwitchError("kill_switch_actor_invalid")
     if confirm != CONFIRM_WORD:
         raise KillSwitchError("kill_switch_confirmation_required")
     path = kill_switch_path() if path is None else Path(path)

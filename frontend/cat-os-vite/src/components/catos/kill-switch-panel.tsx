@@ -31,6 +31,10 @@ const ERROR_TEXT: Record<string, string> = {
   kill_switch_file_busy: "紀錄檔正被其他程式寫入，請再按一次",
 };
 
+function actorLabel(actor: string): string {
+  return actor === "cli" ? "終端機" : actor === "demo-bot" ? "模擬盤 Bot（Hard 日損）" : "介面";
+}
+
 function errorText(err: unknown): string {
   const detail = err instanceof ResearchApiError ? err.detail : "network_error";
   return ERROR_TEXT[detail] ?? detail;
@@ -122,7 +126,7 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
         </p>
       ) : engaged && last ? (
         <p className="text-muted-foreground">
-          {stamp(last.created_at as string)} 由 {last.actor === "cli" ? "終端機" : "介面"} 觸發：{last.reason as string}。
+          {stamp(last.created_at as string)} 由 {actorLabel(last.actor as string)} 觸發：{last.reason as string}。
           所有模擬 run 已在下一根 K 線前停止，新 run 無法啟動；本機模擬不平倉，部位留在該 run 的帳本。
         </p>
       ) : (
@@ -139,7 +143,7 @@ export function KillSwitchPanel({ compact = false }: { compact?: boolean }) {
               <span className={cn("w-10 shrink-0", record.action === "engage" ? "text-red-400" : "text-emerald-400")}>
                 {record.action === "engage" ? "觸發" : "解除"}
               </span>
-              <span className="w-12 shrink-0">{record.actor === "cli" ? "終端機" : "介面"}</span>
+              <span className="w-12 shrink-0">{actorLabel(record.actor)}</span>
               <span className="truncate" title={record.reason}>{record.reason}</span>
             </div>
           ))}

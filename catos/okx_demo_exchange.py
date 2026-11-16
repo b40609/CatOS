@@ -104,6 +104,9 @@ class OkxDemoExchange:
             if order["acc_fill_sz"] > 0:
                 rows = await self._call(self._client.order_fills, self.inst_id, order["ord_id"])
                 fills = tuple(Fill(row["trade_id"], row["fill_sz"], row["fill_px"], -row["fee"]) for row in rows)
+                # Fees are booked in USDT; a fee in another currency is never settled silently.
+                if any(row["fee_ccy"] not in ("", "USDT") for row in rows):
+                    raise OSError("okx_demo_fee_currency_not_usdt")
         except DemoError:
             raise OSError("okx_demo_query_uncertain") from None
         listed = sum((fill.quantity for fill in fills), Decimal("0"))
