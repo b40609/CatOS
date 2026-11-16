@@ -165,7 +165,16 @@ class AccountGuard:
             if not fresh:
                 self.release()
                 raise BotStopped(f"account_state_missing:{self.state_path.name}")
-            self.save(dict(day=None, basis=None, soft_latched=False, soft_reason=None, rearms=[]))
+            try:
+                self.save(dict(day=None, basis=None, soft_latched=False, soft_reason=None, rearms=[]))
+            except BaseException:
+                # Nothing was ever recorded for this account: undo the lock file so it is still new.
+                self.release()
+                try:
+                    self.lock_path.unlink()
+                except OSError:
+                    pass
+                raise
 
     def release(self):
         if self._handle is not None:
@@ -517,6 +526,9 @@ class DemoBot:
         except BaseException:
             guard.release()
             self.guard = None
+            if self.log is not None:
+                self.log.close()
+                self.log = None
             raise
         try:
             await self.supervisor.start()
@@ -529,6 +541,9 @@ class DemoBot:
             self.status.update(state="stopped", stop_reason=exc.reason)
         except Exception as exc:  # recorded; nothing is resent or flattened outside the Supervisor
             self.status.update(state="failed", stop_reason=f"{type(exc).__name__}: {str(exc)[:300]}")
+        except BaseException:  # Ctrl+C / cancellation: the position is kept, nothing is flattened
+            self.status.update(state="stopped", stop_reason="interrupted")
+            raise
         finally:
             await self._close()
         return self.status
@@ -623,22 +638,27 @@ class DemoBot:
         atomic_json(self.output_dir / "status.json", dict(self.status, updated_at=_now_text()))
 
     async def _close(self):
-        if self.supervisor is not None:
-            try:
-                self.status["position"] = str(await self._owned_position()) if self.supervisor._journal else None
-            except Exception:
-                pass
-            await self.supervisor.close()
-        self.status["finished_at"] = _now_text()
-        if self.output_dir.exists():
-            self._write_status()
-            atomic_json(self.output_dir / "fills.json", self.fills)
-        if self.guard is not None:
-            self.guard.release()
-        if self.log is not None:
-            self.log.event("stopped", f"Bot 停止：{self.status['state']}（{self.status['stop_reason']}）"
-                           f"；最後部位 {self.status['position']}", status=self.status)
-            self.log.close()
+        try:
+            if self.supervisor is not None:
+                try:
+                    self.status["position"] = str(await self._owned_position()) if self.supervisor._journal else None
+                except Exception:
+                    pass
+                try:
+                    await self.supervisor.close()
+                except Exception as exc:
+                    self.status["close_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            self.status["finished_at"] = _now_text()
+            if self.output_dir.exists():
+                self._write_status()
+                atomic_json(self.output_dir / "fills.json", self.fills)
+        finally:
+            if self.guard is not None:
+                self.guard.release()
+            if self.log is not None:
+                self.log.event("stopped", f"Bot 停止：{self.status['state']}（{self.status['stop_reason']}）"
+                               f"；最後部位 {self.status['position']}", status=self.status)
+                self.log.close()
 
 
 def find_demo_approval(profile):
@@ -646,6 +666,15 @@ def find_demo_approval(profile):
     if record["created_at"] < APPROVALS_COVER_DEMO_SINCE:
         raise strategy_approvals.ApprovalError("approval_predates_demo_coverage")
     return record
+
+
+START_HINTS = {
+    "account_state_missing": "這個模擬盤帳戶的風控紀錄不見了（~/.catos/okx-demo-accounts/）。要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉；當天的虧損基準會重新起算。",
+    "account_state_unreadable": "這個模擬盤帳戶的風控紀錄壞了（~/.catos/okx-demo-accounts/）。請先檢查；要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉。",
+    "account_busy": "這個 OKX 帳戶已經有一個 Bot 在跑；同一個帳戶一次只能跑一個。",
+    "contract_not_flat_at_start": "模擬盤上 BTC-USDT-SWAP 還有部位或掛單，先到 OKX 網頁平倉、撤單再啟動。",
+    "foreign_positions_or_orders_in_account": "模擬盤帳戶裡有別的合約的部位或掛單，先到 OKX 網頁處理掉再啟動。",
+}
 
 
 def cli_main(argv):
@@ -677,6 +706,9 @@ def cli_main(argv):
         return 1
     except BotStopped as exc:
         sys.stderr.write(f"沒有啟動：{exc.reason}\n")
+        hint = next((text for prefix, text in START_HINTS.items() if exc.reason.startswith(prefix)), None)
+        if hint:
+            sys.stderr.write(hint + "\n")
         return 1
     except KillSwitchError as exc:
         sys.stderr.write(f"沒有啟動：Kill-Switch（{exc}）。要先由你本人解除\n")

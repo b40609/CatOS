@@ -418,6 +418,33 @@ class DemoBotTests(unittest.TestCase):
             DemoBot(client=DemoClient(Credentials("k", "s", "p"), FakeOkx(clock, start_index=3)), record=record,
                     output_dir=self.root / "run")
 
+    # ---- third recheck observations O1/O3 ----
+    def test_failed_first_write_leaves_the_account_new(self):
+        from catos.demo_bot import AccountGuard
+        clock = Clock(BASE + 1_000)
+        with mock.patch.object(AccountGuard, "save", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.run_bot(self.make_bot(FakeOkx(clock, start_index=3), clock))
+        self.assertEqual(list((self.root / "accounts").glob("*")), [])
+        self.assertEqual(self.run_bot_quietly(FakeOkx(clock, start_index=3), clock, run="run2"), "ran")
+
+    def test_lock_is_released_when_closing_the_supervisor_fails(self):
+        from catos.demo_bot import AccountGuard
+        from catos.supervisor import LocalSupervisor
+        clock = Clock(BASE + 1_000)
+        real_close = LocalSupervisor.close
+
+        async def failing_close(supervisor):
+            await real_close(supervisor)  # the Worker still stops; only the result is an error
+            raise RuntimeError("close failed")
+
+        with mock.patch.object(LocalSupervisor, "close", failing_close):
+            status = self.run_bot(self.make_bot(FakeOkx(clock, start_index=3), clock))
+        self.assertIn("close_error", status)
+        guard = AccountGuard(self.root / "accounts", "u1")
+        guard.acquire()  # would raise BotStopped(account_busy) if the run kept the lock
+        guard.release()
+
     def test_old_approval_does_not_cover_demo(self):
         record = dict(self.record, created_at="2026-11-13T10:32:37+00:00")
         with mock.patch.object(strategy_approvals, "find_active", return_value=record):

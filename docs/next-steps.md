@@ -33,7 +33,16 @@
   - D3：讀整個帳戶，其他合約有部位或掛單就視為陌生部位。
   - D4：用 OKX uid 的檔案鎖，一個帳戶只能跑一個 Bot。
   - 另外依觀察補了幾項：有部位時每分鐘看一次帳戶；等 K 線期間也檢查 Kill；反手的第二腿被 Soft 擋下時以空倉繼續跑；只允許 BTC-USDT-SWAP；手續費不是 USDT 就不結清；清倉失敗時 CLI 回 2。
-- 重驗 PASS（有觀察）：`reports/okx-demo-m1-acceptance-20261117/recheck.md`，D1～D4 都用驗收者自寫的情境重現過。重驗找到的 N1（帳戶檔被刪除會當成首次建立）、N2（帳戶檔跟著 output root 走）已依上面的方式修正，只有開發者自測，沒有再做第三輪驗收。
+- 第二輪重驗 PASS（有觀察）：`reports/okx-demo-m1-acceptance-20261117/recheck.md`，D1～D4 都用驗收者自寫的情境重現過。這輪找到 N1（帳戶檔被刪除會當成首次建立）與 N2（帳戶檔跟著 output root 走），已依上面的方式修正。
+- 第三輪重驗 PASS（有觀察）：`reports/okx-demo-m1-acceptance-20261117/recheck3.md`。N1、N2 修好，D1～D4 沒有回歸，沒有新缺陷。之後依觀察 O1～O4、O6 補了以下幾項，只有開發者自測：
+  - 第一次寫帳戶紀錄失敗時不留下鎖檔。
+  - 建 run 失敗會關掉 log。
+  - 關閉 Supervisor 失敗時仍會釋放鎖。
+  - Ctrl+C 後 `status.json` 寫成 stopped／interrupted。
+  - 啟動被拒時附上處理提示。
+- 還沒處理的觀察：
+  - O5：任一帳戶檔損壞時，`demo rearm` 整個停下。
+  - O7：少數啟動例外仍會印 traceback。這時鎖已釋放，也還沒下單。
 - 驗證：後端整套與前端四項檢查見 commit 訊息。
 
 ## 代理決定（可推翻）
