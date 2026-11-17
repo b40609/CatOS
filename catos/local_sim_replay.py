@@ -132,7 +132,8 @@ async def _reconcile(supervisor, position, evidence_id):
 
 
 async def _fill_intent(supervisor, exchange, config, receipt, view, bar, next_bar, now_ms, events, observe_again):
-    """Dispatch one reserved intent at the next open; a reversal as close leg then opening leg."""
+    """Dispatch one reserved intent at the next open; a reversal as close leg then opening leg,
+    or as one reduce-only close when the gates refused the opening leg (reversal_close_only)."""
     execution = supervisor._journal.execution
     # A reversal the increase gates refused is one reduce-only close to zero under the intent's
     # own key (risk.evaluate "reversal_close_only", 2026-11-17); a reserved reversal is two legs.
@@ -339,8 +340,10 @@ async def replay_bars(*, record, contract, bars, output_dir, risk_limits=None, p
                 if receipt.disposition == "RESERVED_SIMULATION":
                     if index + 1 == len(bars):
                         # Like the backtest's pending_intent: decided at the last close, never filled.
+                        # What would actually go out: a refused reversal only closes to zero.
+                        target = "0" if receipt.reason == "reversal_close_only" else str(receipt.target_position)
                         pending = dict(decision_seq=seq, decision_time_ms=now_ms,
-                                       target=str(receipt.target_position), intent_key=receipt.intent_key)
+                                       target=target, intent_key=receipt.intent_key, reason=receipt.reason)
                         events.event("pending_intent", **pending)
                     else:
                         _, legs = await _fill_intent(supervisor, exchange, config, receipt, view, bar,

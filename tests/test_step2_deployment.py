@@ -371,6 +371,17 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
         # The research backtest reversed; the replay did not, and the comparison says so.
         self.assertFalse(replay_consistency.compare_run(self.temp / "over", series, CONTRACT)["passed"])
 
+    async def test_a_close_only_decision_on_the_last_bar_fails_consistency(self):  # recheck N1
+        series = bars(("100",) * 4 + ("90",) * 4 + ("130",))
+        limits = risk.Limits(D("0.002"), D("0.5"), D("0.05"), D("0.10"))
+        summary = await self.replay("last", series, risk_limits=limits)
+        self.assertEqual((summary["pending_intent"]["target"], summary["pending_intent"]["reason"]),
+                         ("0", "reversal_close_only"))
+        report = replay_consistency.compare_run(self.temp / "last", series, CONTRACT)
+        self.assertFalse(report["passed"])
+        self.assertFalse(report["checks"]["pending_intent_equal"])
+        self.assertFalse(report["checks"]["risk_verdicts_ok"])
+
     async def test_reversals_go_out_as_two_legs_and_match_research_exactly(self):
         summary = await self.replay("a")
         self.assertEqual(summary["status"]["state"], "completed", summary["status"])

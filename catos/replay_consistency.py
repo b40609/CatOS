@@ -237,8 +237,10 @@ def compare_run(run_dir, bars, contract, *, published=None):
     for intent in intents.values():
         dispositions[intent["disposition"]] = dispositions.get(intent["disposition"], 0) + 1
         reasons[intent["reason"]] = reasons.get(intent["reason"], 0) + 1
+    # A reversal the gates cut down to a close (reversal_close_only, 2026-11-17) is a refusal of the
+    # strategy's target too, wherever it falls (also on the last bar, where no fill shows it).
     rejected = [dict(seq=i["seq"], disposition=i["disposition"], reason=i["reason"]) for i in intents.values()
-                if i["disposition"] not in ("RESERVED_SIMULATION", "NO_CHANGE")]
+                if i["disposition"] not in ("RESERVED_SIMULATION", "NO_CHANGE") or i["reason"] == "reversal_close_only"]
     checks["risk_verdicts_ok"] = not rejected
     checks["orders_terminal"] = all(o["state"] == "FILLED" and o["settled"] for o in orders)
     mismatches["rejected_verdicts"] = rejected[:MAX_LISTED]

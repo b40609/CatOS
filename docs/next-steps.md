@@ -104,6 +104,6 @@
    - 驗證（commit 6c2d2b8c）：後端 `Ran 1016 tests`、`OK`；前端 typecheck 0 錯誤、22 項通過、build 成功；整合測試 13 項 PASS。
    - 正式 Bot 仍是 11-17 上午啟動的舊版（e09da051），要使用者重開一次才會用到接續 run 與新的核准檢查。
 3. P6 交易所端保底停損：2026-11-17 使用者要求現在做，三題選建議（10%、觸發後停下並提示、啟動指令加 `--disaster-stop`）。程式與假 OKX 測試完成（`DisasterStopTests` 11 項）。獨立驗收第一次 FAIL（D1：停損沒確認時 Kill／Hard 不清倉），修正後窄範圍重驗 PASS（有觀察），重驗提出的兩則訊息問題（N1、N2）由開發者修好、只有自測；報告 `reports/p6-cleanup-acceptance-20261117/acceptance.md`、`recheck.md`。同一份驗收也驗了第 5 項的清理：通過。沒有在模擬盤實測。帳本的保護狀態機原本在保護「暫時不一致」的瞬間把待送的加倉意圖永久作廢，會讓反手的開倉腿消失；改成只在決策與送單時檢查（兩處原本就有），屬帳本改動，列入驗收。
-   - 2026-11-17 使用者對驗收觀察回覆「改」：反手被加倉閘門擋下時照樣平掉原部位，只拒絕反向開倉（`reversal_close_only`，改在 `risk.py`、`journal.py`、`execution.py`）。等獨立驗收。
+   - 2026-11-17 使用者對驗收觀察回覆「改」：反手被加倉閘門擋下時照樣平掉原部位，只拒絕反向開倉（`reversal_close_only`，改在 `risk.py`、`journal.py`、`execution.py`）。獨立驗收：風控核心正確（新舊版約 216 萬組輸入比對，沒有任何組合會加倉或穿越零點），但 FAIL 在 local-sim 重播不認得新判定（D1）；修好後窄範圍重驗 PASS（有觀察），重驗提出的「最後一根只平倉時一致性誤報通過」（N1）由開發者修好、只有自測。報告在 `reports/reversal-close-only-acceptance-20261117/`。使用者 rearm 之後下一根才開反向倉，開倉價和研究回測不同（驗收觀察 O3）。
 4. Bot 的介面：等前端定案。
 5. 拆掉九月模組：2026-11-17 使用者要求做。刪掉 Demo 連線（`okx_http`、`demo_collection`）、帳本綁定（`demo_ledger_*`）、E0 對帳流程（`demo_reconciliation`、`demo_production_inputs`）、一次性交易授權（`trade_authorization` 與 Supervisor／execution 裡的授權碼）、兩個 tools 與對應測試，約 6,600 行；正式對帳核心保留（見已知缺口）。資料庫結構不變。
