@@ -78,7 +78,7 @@
 
 ## 工作順序（2026-11-17 使用者「按照你建議執行」）
 
-1. 接續 run：Bot 停下時有部位，重開能接著跑。程式與假 OKX 測試完成（`tests/test_demo_bot.py` 新增 8 項），等獨立驗收；正式 Bot 在跑，沒有在模擬盤實測接續。
+1. 接續 run：Bot 停下時有部位，重開能接著跑。完成（2026-11-17）：獨立驗收 FAIL（E1：帳戶紀錄寫入失敗時接續會自動解除 Soft），修正後窄範圍重驗 PASS；報告 `reports/okx-demo-m1-acceptance-20261117/resume-acceptance.md`、`resume-recheck-e1.md`。只用假 OKX 測過，沒有在模擬盤實測接續（正式 Bot 在跑）。驗證：後端 `Ran 1005 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 項通過、build 成功；整合測試 13 項 PASS。
 2. 讓 Agent 提交策略：動工前先提方案給使用者定案。
 3. P6 交易所端災難停損：上實盤前做。
 4. Bot 的介面：等前端定案。
