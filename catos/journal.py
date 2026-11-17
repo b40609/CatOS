@@ -689,8 +689,9 @@ class Journal:
         position = account.position
         target = result.target_position
         reduction = position != 0 and (target == 0 or (target * position > 0 and abs(target) < abs(position)))
-        if not reduction and self.protection.blocked(bot['bot_id']):
-            return risk.Verdict(False, 'protection_gate_closed')
+        # An unconfirmed disaster stop refuses increases; risk.evaluate turns a refused
+        # reversal into a close of the old position (2026-11-17), anything else is rejected.
+        refuse = 'protection_gate_closed' if not reduction and self.protection.blocked(bot['bot_id']) else None
         if not reduction and self.execution is not None and (self.execution.unresolved()
                 or self.connection.execute("SELECT 1 FROM risk_orders").fetchone()):
             return risk.Verdict(False, "order_pending")
@@ -713,7 +714,7 @@ class Journal:
         return risk.evaluate(state, self.risk_limits, config.contract,
                              result.target_position, account.position, now_ms,
                              held_buy=buys, held_sell=sells, held_reduction=reducing, reconciled=bool(known),
-                             allow_reversal=config.deployment is not None)
+                             allow_reversal=config.deployment is not None, refuse_increase=refuse)
 
     def _intent_key(self, config, bot_id, seq):
         """v1 keeps its original key; a deployment names its strategy, version and approval."""

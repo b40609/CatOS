@@ -265,12 +265,20 @@ class ReversalRiskTests(unittest.TestCase):
         self.assertEqual(self.evaluate("-5", held_reduction=True, allow_reversal=True).reason, "reduction_conflict")
         self.assertEqual(self.evaluate("-5", self.state(pending_sell=D("1")), allow_reversal=True).reason,
                          "reduction_conflict")
-        self.assertEqual(self.evaluate("-5", self.state(margin_ok=False), allow_reversal=True).reason,
-                         "increase_gate_closed")
         # Defaults since 2026-11-14: 500 USDT single-coin budget (0.5x of 1000) at mark 100 and
         # 0.01 per contract = 500 contracts.
-        self.assertTrue(self.evaluate("-500", allow_reversal=True).accepted)
-        self.assertEqual(self.evaluate("-501", allow_reversal=True).reason, "symbol_exposure_limit")
+        self.assertEqual(self.evaluate("-500", allow_reversal=True).reason, "reversal_reserved")
+        # 2026-11-17 (user "改"): a reversal the increase gates, the budget or an unconfirmed disaster
+        # stop refuse still closes the old long of 10, as a reduce-only order; only the short is refused.
+        for verdict in (self.evaluate("-5", self.state(margin_ok=False), allow_reversal=True),
+                        self.evaluate("-501", allow_reversal=True),
+                        self.evaluate("-5", allow_reversal=True, refuse_increase="protection_gate_closed")):
+            self.assertEqual((verdict.accepted, verdict.reason, verdict.quantity, verdict.reduce_only,
+                              verdict.reservation), (True, "reversal_close_only", D("-10"), True, D("0")))
+        # Increases and reversals outside an approved deployment are refused whole, as before.
+        self.assertEqual(self.evaluate("-5", self.state(margin_ok=False)).reason, "increase_gate_closed")
+        self.assertEqual(self.evaluate("501").reason, "symbol_exposure_limit")
+        self.assertEqual(self.evaluate("20", refuse_increase="protection_gate_closed").reason, "protection_gate_closed")
 
 
 class WorkerV2Tests(unittest.IsolatedAsyncioTestCase):

@@ -329,10 +329,13 @@ class DemoBotTests(unittest.TestCase):
 
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
-        # The reversal (an increase across zero) is refused under Soft; the run went on to the Kill.
-        dispositions = [(e["disposition"], e["reason"]) for e in self.events() if e["kind"] == "bar"]
-        self.assertIn(("REJECTED", "increase_gate_closed"), dispositions)
+        # Under Soft the reversal's short is refused, but the long is still closed (2026-11-17,
+        # user "改"): one reduce-only sell at the reversal bar; the Kill then has nothing to flatten.
+        bars = [e for e in self.events() if e["kind"] == "bar"]
+        self.assertIn(("RESERVED_SIMULATION", "reversal_close_only"), [(e["disposition"], e["reason"]) for e in bars])
         self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        closed_at = next(e for e in bars if e["reason"] == "reversal_close_only")["bar"]["open_time_ms"]
+        self.assertEqual(closed_at, fake.bar_time(5))
         self.assertEqual(fake.position, 0)
 
     # ---- independent acceptance 2026-11-17: D1–D4 and observations ----
@@ -845,6 +848,20 @@ class DisasterStopTests(unittest.TestCase):
         self.assertEqual((fake.position, fake.algos), (0, {}))  # flattened; nothing was resent
         alerts = [e.get("alert") for e in self.events() if e["kind"] == "protection_alert"]
         self.assertIn("protection_unconfirmed", alerts)
+
+    def test_a_reversal_under_an_unconfirmed_stop_only_closes(self):  # 2026-11-17, user "改"
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.lose_algo_create = True  # the long's stop stays unconfirmed: increases are refused
+        lines = []
+        status = self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 7),
+                                            disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        # Bar 5 wants long 1 -> short 1: the long is closed, the short is not opened.
+        self.assertEqual([(p["side"], p["sz"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", "1", False), ("sell", "1", True)])
+        self.assertEqual(fake.position, 0)
+        self.assertTrue(any("只平掉原部位" in line for line in lines))
 
     def test_an_unconfirmed_stop_never_blocks_the_hard_flatten(self):
         clock = Clock(BASE + 1_000)

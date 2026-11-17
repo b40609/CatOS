@@ -105,8 +105,11 @@ class ExecutionJournal:
             s = state.snapshot
             position = D(owner["position"]) if owner["position"] is not None else D("0")
             reduction |= self.reduction_conflict(position)
+            # A reversal refused at the decision was reserved as a close only (2026-11-17): it is
+            # re-evaluated as that reduction to zero, never as the strategy's opposite target.
+            target = D("0") if row["reason"] == "reversal_close_only" else D(row["target"])
             verdict = risk.evaluate(state, self.j.risk_limits, self.j._checkpoint(bot).config.contract,
-                D(row["target"]), position, now_ms, held_buy=buys, held_sell=sells,
+                target, position, now_ms, held_buy=buys, held_sell=sells,
                 held_reduction=reduction, reconciled=self._known(owner, position))
             allowed = (s is not None and row["eligible"] and row["epoch"] == state.epoch
                        and (verdict.reduce_only or not self.j.protection.blocked(bot_id))

@@ -604,7 +604,8 @@ class Verdict:
 
 
 def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0"),
-             held_sell=D("0"), held_reduction=False, reconciled=False, allow_reversal=False):
+             held_sell=D("0"), held_reduction=False, reconciled=False, allow_reversal=False,
+             refuse_increase=None):
     """Do not net opposite pending orders or credit reductions before fills.
 
     ``allow_reversal`` (approved deployments only, 2026-11-12 decision 8): a
@@ -613,6 +614,13 @@ def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0
     whole move passes the increase gates and exposure budget. The closing leg is
     a separate reduce-only order; the opening leg is re-evaluated from the
     verified flat position before it is sent, so it can never cross zero itself.
+
+    2026-11-17 (user "改"): when the increase gates refuse such a reversal (the latch
+    mode, risk health, a missing day basis, the exposure budget, or a caller's
+    ``refuse_increase`` reason such as an unconfirmed disaster stop), the old
+    position is still closed: the verdict is a reduce-only close to zero
+    (``reversal_close_only``), exactly like a legal reduction. Only the opening
+    leg is refused.
     """
     decimal(target, "target")
     decimal(position, "decision position")
@@ -637,28 +645,48 @@ def evaluate(state, limits, contract, target, position, now_ms, *, held_buy=D("0
             conflict = s.reduction_conflict or held_reduction or (s.pending_sell > 0 if position > 0 else s.pending_buy > 0)
             return Verdict(not conflict, "reduction_conflict" if conflict else "legal_reduction",
                            delta if not conflict else D("0"), D("0"), not conflict)
+        # A reversal must be split into a proven reduction and a later increase.
+        reversal = position * target < 0
+        if reversal and allow_reversal:
+            if (s.reduction_conflict or held_reduction
+                    or (s.pending_sell > 0 if position > 0 else s.pending_buy > 0)):
+                return Verdict(False, "reduction_conflict")
+            refused = refuse_increase or _increase_refusal(state, limits, contract, s, position, delta,
+                                                           held_buy, held_sell, now_ms)
+            if refused is not None:
+                # The opening leg is refused; the old position is still closed (a legal reduction).
+                return Verdict(True, "reversal_close_only", -position, D("0"), True)
+            return Verdict(True, "reversal_reserved", target, abs(target) * contract.base_per_contract * s.mark)
+        if refuse_increase is not None:
+            return Verdict(False, refuse_increase)
         if state.mode != "RUN" or state.health != "HEALTHY":
             return Verdict(False, "increase_gate_closed")
         if state.basis is None or state.basis.day != taipei_day(now_ms):
             return Verdict(False, "day_basis_missing")
-        # A reversal must be split into a proven reduction and a later increase.
-        reversal = position * target < 0
-        if reversal and not allow_reversal:
+        if reversal:
             return Verdict(False, "cross_zero_forbidden")
-        if reversal and (s.reduction_conflict or held_reduction
-                         or (s.pending_sell > 0 if position > 0 else s.pending_buy > 0)):
-            return Verdict(False, "reduction_conflict")
+        refused = _increase_refusal(state, limits, contract, s, position, delta, held_buy, held_sell, now_ms)
+        if refused is not None:
+            return Verdict(False, refused)
+        return Verdict(True, "exposure_reserved", delta, abs(delta) * contract.base_per_contract * s.mark)
+
+
+def _increase_refusal(state, limits, contract, s, position, delta, held_buy, held_sell, now_ms):
+    """The increase gates and the exposure budget for a move of ``delta``; None when it fits."""
+    if state.mode != "RUN" or state.health != "HEALTHY":
+        return "increase_gate_closed"
+    if state.basis is None or state.basis.day != taipei_day(now_ms):
+        return "day_basis_missing"
+    with localcontext(research._CONTEXT):
         buys = s.pending_buy + held_buy + max(delta, D("0"))
         sells = s.pending_sell + held_sell + max(-delta, D("0"))
         notional = worst_notional(position, buys, sells, contract.base_per_contract, s.mark)
         budget = limits.leverage * s.risk_equity
         if notional + s.other_notional > budget:
-            return Verdict(False, "account_exposure_limit")
+            return "account_exposure_limit"
         if notional > budget * limits.symbol_share:
-            return Verdict(False, "symbol_exposure_limit")
-        if reversal:
-            return Verdict(True, "reversal_reserved", target, abs(target) * contract.base_per_contract * s.mark)
-        return Verdict(True, "exposure_reserved", delta, abs(delta) * contract.base_per_contract * s.mark)
+            return "symbol_exposure_limit"
+    return None
 
 
 def make_demo_observed_basis(*, account_alias: str, environment: str, observed_at_ms: int,

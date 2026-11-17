@@ -990,6 +990,8 @@ class DemoBot:
                        target=None if receipt.target_position is None else str(receipt.target_position),
                        risk_reasons=sorted(state.reasons))
         if receipt.disposition == "RESERVED_SIMULATION":
+            if receipt.reason == "reversal_close_only":
+                self.log.event("order", "反手的開新倉被風控擋下：只平掉原部位")
             await self._execute(receipt, facts, now_ms)
         elif receipt.disposition not in ("NO_INTENT", "NO_CHANGE", "REJECTED", "EXPIRED"):
             raise BotStopped(f"unexpected_disposition:{receipt.disposition}")
