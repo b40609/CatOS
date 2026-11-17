@@ -10,9 +10,9 @@ from contextlib import asynccontextmanager
 from decimal import Decimal, localcontext
 from pathlib import Path
 
-from catos import (account_report, demo_ledger_binding, ipc,
+from catos import (account_report, ipc,
                    okx_collection as reconciliation_collection,
-                   reconciliation_gate, research, risk, trade_authorization)
+                   reconciliation_gate, research, risk)
 from catos.account_lock import AccountLock, ENVIRONMENT
 from catos.journal import (FixtureDecision, HALT_REASONS, Journal, JournalError,
                            OwnershipError, Reconciliation, money)
@@ -31,7 +31,6 @@ class SupervisorUnavailable(RuntimeError):
 class LocalSupervisor:
     def __init__(self, database, *, account_id, bot_id, config, fixture_budget,
                  environment=ENVIRONMENT, risk_limits=None, exchange=None, day_clock=None,
-                 require_demo_trade_grant=False, demo_ledger_binding_proof=None,
                  expected_demo_uid_sha256=None, require_new_database=False):
         self._lock = AccountLock(account_id, environment)
         self.database = Path(database).resolve()
@@ -51,21 +50,12 @@ class LocalSupervisor:
         if day_clock is not None and not callable(getattr(day_clock, "wall_ms", None)):
             raise ipc.ProtocolError("day_clock must provide wall_ms")
         self._day_clock = day_clock
-        if type(require_demo_trade_grant) is not bool:
-            raise ipc.ProtocolError("require_demo_trade_grant must be bool")
         if type(require_new_database) is not bool:
             raise ipc.ProtocolError("require_new_database must be bool")
-        if ((demo_ledger_binding_proof is None) != (expected_demo_uid_sha256 is None)
-                or (demo_ledger_binding_proof is not None
-                    and not isinstance(demo_ledger_binding_proof, demo_ledger_binding.DemoLedgerBinding))):
-            raise ipc.ProtocolError("Demo ledger binding proof and expected UID digest must be paired")
-        self._require_demo_trade_grant = require_demo_trade_grant
         self._require_new_database = require_new_database
-        self._demo_ledger_binding_proof = demo_ledger_binding_proof
+        # Formal reconciliation (kept for the pre-Live accounting work): the account UID
+        # digest a collected report must carry.
         self._expected_demo_uid_sha256 = expected_demo_uid_sha256
-        self._demo_trade_grant = None
-        self._demo_grant_generation = 0
-        self._demo_consumed_authorization_ids = set()
         self.risk_state = risk.State() if risk_limits is not None else None
         self._risk_loaded = False
         self._risk_persisted = None
@@ -92,16 +82,6 @@ class LocalSupervisor:
         self._busy_task = None
         self._drained = asyncio.Event()
         self._drained.set()
-
-    def verify_demo_ledger_binding(self, *, account_alias, remote_environment):
-        """Fail closed on Demo account-to-ledger mismatch before collection."""
-        demo_ledger_binding.verify_runtime_binding(
-            self._demo_ledger_binding_proof,
-            expected_uid_sha256=self._expected_demo_uid_sha256,
-            account_alias=account_alias,
-            remote_environment=remote_environment,
-            database_path=self.database,
-        )
 
     @property
     def available_fixture_budget(self):
@@ -281,10 +261,6 @@ class LocalSupervisor:
             self._busy = True
             self._drained.clear()
             self._load(await self._io(open_journal))
-            if self._require_demo_trade_grant and self._journal.execution is not None:
-                recovered = await self._io(
-                    self._journal.execution.consumed_demo_authorization_ids)
-                self._demo_consumed_authorization_ids.update(recovered)
             self._lock.bind_database(self.database)
             await self._flush_halts()
             if self._exchange is not None:
@@ -657,99 +633,6 @@ class LocalSupervisor:
             raise SupervisorUnavailable(self.failure or "Supervisor not running")
         return await self._io(self._journal.load_day_basis, day)
 
-    async def authorize_demo_trading(self, grant):
-        """Install one explicit in-memory Demo entry grant after reconciliation.
-
-        The grant is deliberately not persisted.  A restarted Supervisor must be
-        reconciled and explicitly authorized again before increasing exposure.
-        """
-        if not self._require_demo_trade_grant:
-            raise SupervisorUnavailable("Demo trade authorization mode is not enabled")
-        if not isinstance(grant, trade_authorization.DemoTradeGrant):
-            raise ipc.ProtocolError("DemoTradeGrant required")
-        async with self._operation():
-            if grant.authorization_id in self._demo_consumed_authorization_ids:
-                raise SupervisorUnavailable("demo_trade_grant_consumed")
-            generation = self._demo_grant_generation
-            await self._flush_halts()
-            stored = await self._io(self._journal.snapshot, self.bot_id)
-            owner = stored["owner"]
-            if self.health != "LOCAL_READY":
-                raise SupervisorUnavailable("demo_trade_reconciliation_required")
-            blocker = trade_authorization.entry_blocker(
-                grant,
-                now_ms=self._trusted_wall_ms(),
-                account_id=self.account_id,
-                bot_id=self.bot_id,
-                inst_id=self.config.contract.inst_id,
-                reconciliation_evidence_id=owner["evidence_id"],
-                reconciled_revision=owner["reconciled_revision"],
-            )
-            if blocker is not None:
-                raise SupervisorUnavailable(blocker)
-            if self._closing or generation != self._demo_grant_generation:
-                raise SupervisorUnavailable("demo_trade_grant_revoked_during_authorization")
-            self._demo_trade_grant = grant
-            return grant
-
-    async def revoke_demo_trading(self):
-        # Control input on the owning event loop: must work during writer I/O.
-        self._demo_grant_generation += 1
-        self._demo_trade_grant = None
-
-    async def _demo_entry_authorization(self):
-        if not self._require_demo_trade_grant:
-            return None
-        stored = await self._io(self._journal.snapshot, self.bot_id)
-        owner = stored["owner"]
-        if self.health != "LOCAL_READY":
-            raise SupervisorUnavailable("demo_trade_reconciliation_required")
-        blocker = trade_authorization.entry_blocker(
-            self._demo_trade_grant,
-            now_ms=self._trusted_wall_ms(),
-            account_id=self.account_id,
-            bot_id=self.bot_id,
-            inst_id=self.config.contract.inst_id,
-            reconciliation_evidence_id=owner["evidence_id"],
-            reconciled_revision=owner["reconciled_revision"],
-        )
-        if blocker is not None:
-            raise SupervisorUnavailable(blocker)
-        authorization_id = self._demo_trade_grant.authorization_id
-        if authorization_id in self._demo_consumed_authorization_ids:
-            raise SupervisorUnavailable("demo_trade_grant_consumed")
-        return authorization_id, self._demo_grant_generation
-
-    def _demo_entry_handoff_blocker(self, request, authorization):
-        """Revalidate one entry immediately before transport without awaiting."""
-        if authorization is None:
-            return "demo_trade_grant_required"
-        authorization_id, generation = authorization
-        grant = self._demo_trade_grant
-        now_ms = self._trusted_wall_ms()
-        if (generation != self._demo_grant_generation
-                or not isinstance(grant, trade_authorization.DemoTradeGrant)
-                or grant.authorization_id != authorization_id):
-            return "demo_trade_grant_expired_or_changed"
-        if authorization_id in self._demo_consumed_authorization_ids:
-            return "demo_trade_grant_consumed"
-        if now_ms < grant.starts_at_ms or now_ms > grant.entry_cutoff_ms:
-            return "demo_trade_grant_expired_or_changed"
-        state = self.risk_state
-        snapshot = None if state is None else state.snapshot
-        if (snapshot is None or now_ms < state.time_ms
-                or not snapshot.time_ms <= now_ms < snapshot.valid_until_ms
-                or state.epoch != request["epoch"]
-                or state.seq != request["risk_seq"]
-                or state.time_ms != request["risk_time"]):
-            return "demo_trade_risk_snapshot_changed"
-        quantity = Decimal(request["payload"]["sz"])
-        notional = trade_authorization.entry_mark_notional(
-            quantity, self.config.contract.base_per_contract, snapshot.mark)
-        if notional > grant.max_entry_mark_notional_usdt:
-            return "demo_trade_grant_limit_exceeded"
-        return None
-
     def _execution(self):
         if self._exchange is None or self._journal.execution is None:
             raise SupervisorUnavailable("local execution is not enabled")
@@ -788,39 +671,21 @@ class LocalSupervisor:
         await self._execution_sync()
         return await self._io(execution.order, key)
 
-    async def _submit_prepared(self, request, *, demo_entry_authorization=None):
+    async def _submit_prepared(self, request):
         if request is None:
             await self._execution_sync()
             return None
         execution = self._execution()
         key = request["order_key"]
         await self._flush_halts()
-        entry_request = request["payload"].get("reduceOnly") is not True
-        if self._require_demo_trade_grant and entry_request:
-            blocker = self._demo_entry_handoff_blocker(request, demo_entry_authorization)
-            if blocker is not None:
-                await self._io(execution.abort_unsent, key)
-                await self._execution_sync()
-                raise SupervisorUnavailable(blocker)
         entered = False
-        handoff_blocker = None
 
         async def handoff():
-            nonlocal entered, handoff_blocker
-            if self._require_demo_trade_grant and entry_request:
-                handoff_blocker = self._demo_entry_handoff_blocker(
-                    request, demo_entry_authorization)
-                if handoff_blocker is not None:
-                    return None
+            nonlocal entered
             if (self._closing or self.risk_state.epoch != request["epoch"]
                     or self.risk_state.seq != request["risk_seq"]
                     or self.risk_state.time_ms != request["risk_time"]):
                 return None
-            if self._require_demo_trade_grant and entry_request:
-                authorization_id = demo_entry_authorization[0]
-                # No await between the final checks, one-shot consumption, and
-                # entering transport. Any transport outcome keeps this tombstone.
-                self._demo_consumed_authorization_ids.add(authorization_id)
             entered = True
             return await self._exchange.submit(request["payload"])
 
@@ -834,9 +699,6 @@ class LocalSupervisor:
         else:
             if not entered:
                 await self._io(execution.abort_unsent, key)
-                await self._execution_sync()
-                if handoff_blocker is not None:
-                    raise SupervisorUnavailable(handoff_blocker)
             else:
                 try:
                     await self._io(execution.apply, key, report)
@@ -859,17 +721,8 @@ class LocalSupervisor:
                     await self._execution_sync()
                     return None
                 return await self._submit_prepared(request)
-            reduce_only = await self._io(lambda: self._journal.connection.execute(
-                "SELECT reduce_only FROM risk_orders WHERE intent_key=?", (intent_key,)).fetchone())
-            demo_entry_authorization = None
-            if reduce_only is not None and not bool(reduce_only[0]):
-                demo_entry_authorization = await self._demo_entry_authorization()
-            authorization_id = (None if demo_entry_authorization is None
-                                else demo_entry_authorization[0])
-            request = await self._io(
-                execution.prepare, self.bot_id, intent_key, now_ms, authorization_id)
-            return await self._submit_prepared(
-                request, demo_entry_authorization=demo_entry_authorization)
+            request = await self._io(execution.prepare, self.bot_id, intent_key, now_ms)
+            return await self._submit_prepared(request)
 
     async def query_order(self, order_key):
         async with self._operation():
@@ -1105,8 +958,6 @@ class LocalSupervisor:
 
     async def close(self):
         self._closing = True
-        self._demo_grant_generation += 1
-        self._demo_trade_grant = None
         await self._stop_worker()
         await self._drained.wait()
         await self._stop_worker()
