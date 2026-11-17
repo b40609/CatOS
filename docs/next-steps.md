@@ -5,7 +5,7 @@
 ## 現況
 
 - v1 local-sim、研究線、工作包 B（Kill-Switch 與新風控預設）都已完成並合併進 `main`。
-- **M1 接 OKX 模擬盤**：程式完成、在模擬盤實測、獨立驗收通過（有觀察）。只差使用者核准正式設定並啟動。
+- **M1 接 OKX 模擬盤**：程式完成、在模擬盤實測、獨立驗收通過（有觀察）。使用者 11-17 已核准正式設定並啟動正式 Bot，見下方「正式 Bot」。
 
 | 步驟 | 內容 | 狀態與證據 |
 | --- | --- | --- |
@@ -14,11 +14,13 @@
 | 3 | 策略 Bot `demo bot`，逐根 K 線經 Supervisor 下單 | 完成。11-16 用隔離核准跑 5m：買 1 張，ordId 4105099728749056000，12 筆成交全部入帳。11-17 修正後又跑一次：買 1 張，ordId 4105945336137371648 |
 | 4 | Kill／Hard 在模擬盤平倉 | 完成。11-16 Kill 後 4 秒平倉（ordId 4105108293048061952）；11-17 修正後同樣 4 秒平倉（ordId 4105971616673157120，14 筆成交），部位 0 |
 
-## 使用者要做的
+## 正式 Bot（2026-11-17 起）
 
-1. 在 `C:\dev\CatOS` 的終端機核准正式設定（15m、Donchian 192／48、1 張），代理不能代做：
-   `.venv\Scripts\python.exe -m catos.cli strategy approve --strategy donchian-breakout --version donchian-parameters-v1 --sha256 1596e3ace639379086f6fd5ff2ba73948697c2b34884366c3b32b15ba9ba6817 --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json`
-2. 啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json`。視窗要開著，電腦不能睡眠。
+- 使用者本人核准：`approval_id=10d7846fe1adfef05a5e25825c7d884d`（15m、Donchian 192／48、1 張、本金 5000）。
+- 11:21 台北時間在 `C:\dev\CatOS` 啟動，run 是 `outputs/okx-demo-bot/63e5c1a15105485687e003007e478f69`。預熱 192 根完成，起始權益 4998.81 USDT，部位 0。
+- 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11:21 新建。當日基準在第一根正式 K 線（11:30）建立。
+- 看狀態：讀 run 資料夾的 `status.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
+- 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json`。整個模擬盤帳戶要先空倉；核准仍有效就不用重做。
 
 ## M1 獨立驗收（2026-11-17）
 
