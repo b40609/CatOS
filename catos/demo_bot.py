@@ -35,8 +35,10 @@ ledger owns exactly this position under the same approval, settings and risk lim
 (nothing is adopted). Its uncertain orders are queried first, an unfinished bar input is
 re-fed byte for byte, intents it decided but never sent are waited out and ended unsent,
 and the missed closed bars are fed in order: they update the strategy only, and only the
-newest closed bar may trade, as in the main loop. Resuming itself sends nothing. A gap
-longer than one OKX candles page (299 bars) is not bridged.
+newest closed bar may trade, as in the main loop. Recovering sends nothing; after it, a
+ledger already FLAT is flattened and the newest bar may trade. A Soft latch in the ledger is
+cleared only by a ``demo rearm`` made after the run stopped. A gap longer than one OKX
+candles page (299 bars) is not bridged.
 
 Not covered yet: the exchange-side disaster stop (P6, default 0%).
 """
@@ -99,6 +101,17 @@ class BotStopped(Exception):
 
 def _now_text():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _iso_ms(text):
+    """Milliseconds of an ISO time written by ``_now_text``; anything unreadable counts as never."""
+    try:
+        moment = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return -1
+    if moment.tzinfo is None:
+        return -1
+    return int(moment.timestamp() * 1000)
 
 
 def _wall_ms():
@@ -757,6 +770,8 @@ class DemoBot:
 
     async def _resume(self):
         """Continue the stopped run: recover, observe, then feed the closed bars it missed."""
+        # The stopped run's last risk observation: a Soft latch in its ledger is no later than this.
+        stopped_risk_ms = self.supervisor.risk_state.time_ms
         facts = await self._recover()
         now_ms = self.wall_ms()
         state = await self._observe(facts, now_ms)
@@ -764,14 +779,22 @@ class DemoBot:
             await self._flatten(",".join(sorted(state.reasons)))
             raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
         if state.reasons == frozenset({"soft_loss"}) and not self.account_state["soft_latched"]:
-            # The user cleared Soft with demo rearm while the run was stopped; the ledger follows,
-            # unless the loss is still past the threshold (then it stays latched).
-            try:
-                await self.supervisor.rearm(now_ms=now_ms, actor="cli",
-                                            evidence_id=f"demo-rearm-{len(self.account_state.get('rearms') or [])}")
-                self.log.event("soft_rearmed", "Soft 鎖住已由你解除（demo rearm），接續的 run 也解除")
-            except SupervisorUnavailable as exc:
-                self.log.event("soft_rearm_refused", f"Soft 仍鎖住：{exc}")
+            rearms = list(self.account_state.get("rearms") or [])
+            if rearms and _iso_ms(rearms[-1].get("at")) > stopped_risk_ms:
+                # The user cleared Soft with demo rearm after the run stopped; the ledger follows,
+                # unless the loss is still past the threshold (then it stays latched).
+                try:
+                    await self.supervisor.rearm(now_ms=now_ms, actor="cli", evidence_id=f"demo-rearm-{len(rearms) - 1}")
+                    self.log.event("soft_rearmed", "Soft 鎖住已由你解除（demo rearm），接續的 run 也解除")
+                except SupervisorUnavailable as exc:
+                    self.log.event("soft_rearm_refused", f"Soft 仍鎖住：{exc}")
+            else:
+                # No rearm after the run stopped (e.g. saving the account file failed when Soft
+                # latched): the ledger's latch stands and the account file is brought back in line.
+                self.account_state = dict(self.account_state, soft_latched=True,
+                                          soft_reason=f"soft_loss（接續時從帳本補回）{_now_text()}")
+                self.guard.save(self.account_state)
+                self.log.event("soft_latched", "帳本的 Soft 鎖住沒有對應的 demo rearm：維持鎖住，帳戶紀錄已補回")
         seq = self.supervisor.checkpoint.event_seq
         last_open = self.supervisor.checkpoint.last_open_time_ms
         candles = await self._call(self.client.closed_candles, self.inst_id, self.tf, RESUME_CANDLES)

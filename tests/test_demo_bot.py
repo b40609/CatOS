@@ -632,6 +632,42 @@ class DemoBotTests(unittest.TestCase):
                          [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
         self.assertFalse(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
 
+    def test_resume_without_a_rearm_keeps_the_ledger_soft_latch(self):
+        """Saving the account file failed when Soft latched: resuming must not clear Soft by itself."""
+        from catos.demo_bot import AccountGuard
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        real_save = AccountGuard.save
+
+        def failing_save(guard, state):
+            if state.get("soft_latched"):
+                raise OSError("disk full")
+            return real_save(guard, state)
+
+        def on_sleep(now):
+            if fake.posts and fake.equity > D("4800") and now > fake.bar_time(4) + 70_000:
+                fake.equity -= D("300")  # 6%: Soft
+
+        with mock.patch.object(AccountGuard, "save", failing_save):
+            status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertEqual((status["state"], status["position"]), ("failed", "1"), status)
+        state_file = next((self.root / "accounts").glob("*.json"))
+        stored = json.loads(state_file.read_text(encoding="utf-8"))
+        self.assertFalse(stored["soft_latched"])
+        # A rearm from before this run stopped does not count either.
+        stored["rearms"] = [dict(at="2026-11-16T01:00:00+00:00", reason="old", cleared="x")]
+        state_file.write_text(json.dumps(stored), encoding="utf-8")
+        fake.equity += D("300")  # recovered, but nobody ran demo rearm
+        clock.ms = fake.bar_time(5) + 1_000
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        kinds = [e["kind"] for e in self.events()]
+        self.assertNotIn("soft_rearmed", kinds)
+        self.assertIn("soft_latched", kinds)
+        # Only the closing leg of the reversal went out: Soft still blocks the opening leg.
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertTrue(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
+
 
 class AdapterTests(unittest.TestCase):
     def test_reports_translate_fills_and_fee_sign(self):
