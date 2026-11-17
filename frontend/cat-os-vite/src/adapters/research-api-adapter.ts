@@ -312,6 +312,9 @@ export interface OverfittingReport {
   expected_max_sharpe_annualized: string | null;
   psr_vs_zero: string | null;
   dsr: string | null;
+  // N = every parameter set tried on this strategy so far (trials.jsonl); null when not above this search's N.
+  history_trials?: number | null;
+  dsr_with_history?: string | null;
   pbo: {
     pbo: string;
     logit_median: string;

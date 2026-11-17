@@ -420,7 +420,8 @@ function BacktestPage() {
     const meta = pickStrategy(catalog.strategies, sid);
     if (meta?.preset) {
       setParams({ ...meta.preset.parameters });
-      setWarmupBars(minWarmupBars(meta, target));
+      // Whole days for a daily strategy; at least the look-back window for a strategies/ folder one.
+      setWarmupBars(Math.max(minWarmupBars(meta, target), meta.preset.parameters[meta.warmup.covers] ?? 0));
       setQuantity(meta.preset.quantity);
       return;
     }

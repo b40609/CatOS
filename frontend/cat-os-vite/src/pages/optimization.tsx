@@ -74,9 +74,10 @@ function OptimizationPage() {
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const dataset = pickDataset(catalog?.datasets, datasetId);
   const strategy = pickStrategy(catalog?.strategies, strategyId);
-  // SMA keeps a warm-up of at least 8 bars; Donchian covers its highest entry channel.
+  // SMA keeps a warm-up of at least 8 bars; Donchian covers its highest entry channel; a preset
+  // strategy covers whole days (daily) and its highest searched look-back (strategies/ folders).
   const warmup = !strategy ? 0
-    : strategy.preset ? minWarmupBars(strategy, dataset)
+    : strategy.preset ? Math.max(minWarmupBars(strategy, dataset), gridWarmup(strategy, axes))
     : strategy.id === DONCHIAN_ID ? gridWarmup(strategy, axes) : Math.max(8, gridWarmup(strategy, axes));
   const problems = strategy ? [...gridProblems(strategy, axes), ...warmupBarsProblems(warmup, dataset)] : [];
 
@@ -245,7 +246,7 @@ function OptimizationPage() {
                     <strong className="text-foreground">數值精確度:</strong> 原始帳務、淨損益、費用與報酬率一律強制使用 Decimal 字串儲存；僅交給 Optuna 進行尋優排序之數值轉為 Float，不得回流為帳務依據。
                   </p>
                   <p>
-                    <strong className="text-foreground">能力限制:</strong> 後端只搜尋固定白名單策略（SMA 週期、Donchian 進出場通道）的樣本內參數，目標 return_pct 最大化；未提供 Sharpe 自訂目標、多 Worker 平行、多目標 Pareto 或未審計之策略檔匯出。
+                    <strong className="text-foreground">能力限制:</strong> 後端只搜尋目錄裡策略（內建策略與 strategies/ 資料夾策略）的整數參數，屬樣本內搜尋，目標 return_pct 最大化；未提供 Sharpe 自訂目標、多 Worker 平行、多目標 Pareto 或未審計之策略檔匯出。
                   </p>
                 </div>
               </Panel>

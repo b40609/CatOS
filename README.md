@@ -45,7 +45,7 @@ CatOS 啟動後，把這個 stdio MCP 伺服器加進你的 Agent，工作目錄
 }
 ```
 
-工具有 `research_catalog`、`research_check_strategy`、`research_list_runs`、`research_submit_backtest`、`research_submit_optimization`、`research_submit_validation`、`research_get_run`、`research_get_result`、`research_get_report`。它只連本機 8770，和網頁介面共用同一個研究服務，同一時間只跑一個任務。
+工具有 `research_catalog`、`research_check_strategy`、`research_list_runs`、`research_submit_backtest`、`research_submit_optimization`、`research_submit_validation`、`research_get_run`、`research_get_result`、`research_get_report`。它只連本機 8770（另開的測試服務用 `--port` 指定，例如 `"args": ["-B", "-m", "catos.research_mcp", "--port", "18770"]`），和網頁介面共用同一個研究服務，同一時間只跑一個任務。
 
 ### 讓 Agent 寫策略
 

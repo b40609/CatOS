@@ -286,8 +286,18 @@ def create_mcp_server(bridge=None):
     return server
 
 
-def main():
-    create_mcp_server().run(transport="stdio")
+def main(argv=None):
+    import argparse
+
+    parser = argparse.ArgumentParser(description="CatOS research MCP (stdio) for the local research service.")
+    parser.add_argument("--port", type=int, default=8770,
+                        help="port of the CatOS service on 127.0.0.1 (default 8770; another port for an isolated test service)")
+    args = parser.parse_args(argv)
+    try:
+        bridge = ResearchHttpBridge(f"http://127.0.0.1:{args.port}")
+    except ValueError as error:
+        parser.error(str(error))
+    create_mcp_server(bridge).run(transport="stdio")
     return 0
 
 

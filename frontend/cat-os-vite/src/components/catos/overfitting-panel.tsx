@@ -58,6 +58,10 @@ export function OverfittingPanel({ report, earlierSearches }: { report: Overfitt
               <Row label="PSR（真實 Sharpe > 0）" value={report.psr_vs_zero ?? "不適用"} tone={dsrTone(report.psr_vs_zero)} />
               <Row label="DSR（扣多重試驗後）" value={report.dsr ?? "不適用"} tone={dsrTone(report.dsr)}
                 hint="≥ 0.95 才算顯著" />
+              {report.history_trials ? (
+                <Row label={`DSR（N = 這個策略累計 ${report.history_trials} 組）`} value={report.dsr_with_history ?? "不適用"}
+                  tone={dsrTone(report.dsr_with_history ?? null)} hint="把之前送過的回測、優化、滾動驗證都算成試驗" />
+              ) : null}
               <Row label="PBO（CSCV）" value={report.pbo ? `${report.pbo.pbo}（${report.pbo.splits} 種切法）` : "樣本不足"}
                 tone={pboTone(report.pbo?.pbo)} hint="樣本內冠軍在樣本外落到中位數以下的比例" />
               <Row label="樣本外虧損比例" value={report.pbo?.prob_oos_loss ?? "不適用"} />

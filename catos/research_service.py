@@ -192,9 +192,10 @@ class ResearchService:
                     "strategy_id": base["strategy_id"], "version": source["strategy"]["version"],
                     "sha256": source["strategy"]["sha256"], "configurations": configurations}
             history = [*earlier, line]
+            # The worker reads at most 8 KB of envelope: the notice is added to the status and result only.
             trial_log = {"runs": len(history), "configurations": sum(item["configurations"] for item in history),
                          "versions": len({item["sha256"] for item in history}),
-                         "since": history[0]["created_at"], "notice": TRIAL_LOG_NOTICE}
+                         "since": history[0]["created_at"]}
             with open(self.output_dir / TRIAL_LOG, "a", encoding="utf-8", newline="\n") as stream:
                 stream.write(json_text(line) + "\n")
                 stream.flush()
@@ -205,7 +206,7 @@ class ResearchService:
             status = {"run_id": run_id, "kind": kind, "status": "queued", "error": None,
                       "created_at": envelope["created_at"], "started_at": None,
                       "finished_at": None, "request": snapshot, "provenance": source,
-                      "build_id": build_id, "trial_log": trial_log}
+                      "build_id": build_id, "trial_log": {**trial_log, "notice": TRIAL_LOG_NOTICE}}
             self._write_status(status)
             self._active = run_id
             try:
@@ -233,7 +234,7 @@ class ResearchService:
             directory = self._run_dir(status["run_id"])
             payload = {**reply["payload"], "run_id": envelope["run_id"],
                        "created_at": envelope["created_at"], "build_id": envelope["build_id"],
-                       "trial_log": envelope["trial_log"]}
+                       "trial_log": status["trial_log"]}
             self._write_new(directory / "result.json", json_text(payload))
             binding = html.escape(json_text(envelope))
             synthetic = envelope["provenance"]["dataset"]["source"] == "synthetic_closed_bars"

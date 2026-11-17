@@ -2,7 +2,7 @@ import type { ResearchStrategyMeta } from "@/adapters/research-api-adapter";
 import { pickStrategy } from "@/lib/research-strategies";
 import { cn } from "@/lib/utils";
 
-/** 研究策略單選清單：catalog 登錄的固定白名單策略。 */
+/** 研究策略單選清單：catalog 的內建策略與 strategies/ 資料夾策略。 */
 export function StrategyPicker({
   strategies,
   value,
