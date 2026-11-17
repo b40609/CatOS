@@ -66,3 +66,9 @@ Desktop.ini
 /frontend/prototypes/
 /frontend/rebuilt-dist-local-resume-20261005/
 /frontend/cat-os-upstream/
+
+# User strategies (docs/agent-strategy-submission-proposal.md, 2026-11-17): only the
+# guide and the example are tracked; your own strategies stay on this machine.
+/strategies/*
+!/strategies/README.md
+!/strategies/example-sma-cross/

@@ -46,8 +46,13 @@ export interface ResearchStrategyMeta {
   warmup: { covers: string; below: number; min_days?: number };
   // "vol_target": quantity caps contracts sized from equity; "fixed": quantity is traded as is.
   sizing?: 'fixed' | 'vol_target';
-  // Preregistered strategies (package E) carry their frontend defaults.
+  // Preregistered strategies (package E) and strategies/ folders carry their frontend defaults.
   preset?: { parameters: Record<string, number>; quantity: string; warmup_days: number } | null;
+  // "folder": written into strategies/<id>/ (an Agent or the user); "builtin": shipped with CatOS.
+  origin?: 'builtin' | 'folder';
+  // [a, "<" | "<=", b]: every parameter set (and every grid point) keeps a below b.
+  constraints?: [string, '<' | '<=', string][];
+  description?: string;
 }
 
 export interface ResearchDatasetMeta {

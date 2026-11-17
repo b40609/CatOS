@@ -106,14 +106,19 @@ def _reproduction(expected_source):
     # manifest hashes, so it is referenced by sha256 instead of embedded.
     dataset = resolve_dataset(expected_source["dataset"]["id"])
     spec = strategy_spec(expected_source["strategy"]["id"])
-    manifest = spec.manifest.relative_to(ROOT).as_posix()
+    manifest = spec.manifest.relative_to(spec.base).as_posix()
     data_files = tuple(path for path, _ in dataset.files)
     referenced = data_files if dataset.source == FETCHED_SOURCE else ()
     names = tuple(dict.fromkeys((*ENGINE_FILES, *spec.files, manifest,
                                  *(path for path in data_files if path not in referenced))))
+    strategy_names = {*spec.files, manifest}  # folder strategies live under their own base
+
+    def path_of(name):
+        return (spec.base if name in strategy_names else ROOT) / name
+
     files = []
     for name in names:
-        content = (ROOT / name).read_bytes()
+        content = path_of(name).read_bytes()
         files.append({"path": name, "sha256": sha256(content).hexdigest(),
                       "content_utf8": content.decode("utf-8")})
     references = [{"path": name, "sha256": sha256((ROOT / name).read_bytes()).hexdigest()}

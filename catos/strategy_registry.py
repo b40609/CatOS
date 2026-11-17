@@ -161,6 +161,24 @@ class RegisteredStrategy:
         return tuple(strategy.closes)
 
 
+@dataclass(frozen=True)
+class FolderDeployment:
+    """An approved strategies/ folder strategy; built only from bytes matching the approved sha256."""
+    spec: object
+    source_sha256: str
+
+    def instantiate_deployment(self, deployment):
+        if deployment.source_sha256 != self.source_sha256:
+            raise RegistryError("deployment_does_not_match_approval")
+        try:
+            strategy_class = research_catalog.verified_strategy_class(self.spec)
+        except ValueError as exc:
+            raise RegistryError(str(exc)) from None
+        if self.spec.sha256 != self.source_sha256:
+            raise RegistryError("artifact_hash_mismatch")
+        return research_catalog.construct(self.spec, strategy_class, dict(deployment.parameters), deployment.quantity)
+
+
 def read_manifest(path, root=None):
     root = ROOT if root is None else root
     if path.is_symlink():
@@ -247,9 +265,9 @@ def resolve_deployment(config, *, approvals_path=None):
     try:
         bot = strategy_approvals.bot_strategy(config.strategy_id, config.strategy_artifact)
         record = strategy_approvals.active_approval(deployment.approval_id, approvals_path)
-    except strategy_approvals.ApprovalError as exc:
+        spec = bot.research
+    except (strategy_approvals.ApprovalError, ValueError) as exc:
         raise RegistryError(str(exc)) from None
-    spec = bot.research
     profile = record["profile"]
     names = [name for name, _, _ in spec.parameters]
     expected_parameters = tuple((name, profile["parameters"][name]) for name in names)
@@ -263,6 +281,17 @@ def resolve_deployment(config, *, approvals_path=None):
             or profile["timeframe_ms"] != config.timeframe_ms
             or profile["warmup_bars"] != config.warmup_bars):
         raise RegistryError("deployment_does_not_match_approval")
+    if spec.origin == "folder":
+        try:
+            artifact = research_catalog.load_strategy_manifest(spec)  # re-read and re-hashed now
+        except ValueError as exc:
+            raise RegistryError(str(exc)) from None
+        if ((artifact["artifact_id"], artifact["version"]) != (config.strategy_id, config.strategy_artifact)
+                or artifact["sha256"] != record["source_sha256"] or artifact["entry"] != record["entry"]):
+            raise RegistryError("deployment_manifest_mismatch")
+        if research_catalog.file_hash(spec.manifest) != record["manifest_sha256"]:
+            raise RegistryError("deployment_manifest_changed")
+        return FolderDeployment(spec, record["source_sha256"])
     entry = read_manifest(spec.manifest, ROOT)
     if (not entry.approved or (entry.strategy_id, entry.version) != (config.strategy_id, config.strategy_artifact)
             or entry.sha256 != spec.sha256 or entry.sha256 != record["source_sha256"]

@@ -202,7 +202,7 @@ def verdict(dsr, pbo, trials=None, wiped_out=0, best_wiped_out=False):
     return "".join(parts) + wiped
 
 
-def search_report(candidates, best_params, timeframe_ms):
+def search_report(candidates, best_params, timeframe_ms, history_trials=None):
     """Overfitting summary for one search.
 
     candidates: {params tuple: BacktestResult} for every distinct completed trial,
@@ -214,6 +214,11 @@ def search_report(candidates, best_params, timeframe_ms):
     and PSR are None. If fewer than two trials survive out of two or more, the
     variance cannot be estimated, so DSR is None as well (it would otherwise fall
     back to PSR against 0 and ignore N; acceptance N5, 2026-11-08).
+
+    history_trials: parameter sets tried on this strategy across every research run so
+    far (ResearchService trials.jsonl, this search included). When it exceeds this
+    search's N, DSR is computed once more with that N and the same cross-trial Sharpe
+    variance, so trying many ideas one search at a time is not hidden.
     """
     names = list(candidates)
     lengths = {len(candidates[params].equity_curve) for params in names}
@@ -234,6 +239,9 @@ def search_report(candidates, best_params, timeframe_ms):
     variance_known = len(alive) >= 2 or trials < 2
     dsr = None if best is None or not variance_known else probabilistic_sharpe(best, benchmark, best_stats)
     psr = None if best is None else probabilistic_sharpe(best, 0.0, best_stats)
+    history = history_trials if type(history_trials) is int and history_trials > trials else None
+    dsr_history = (None if dsr is None or history is None
+                   else probabilistic_sharpe(best, expected_max_sharpe(variance, history), best_stats))
     pbo = pbo_cscv([returns[params] for params in alive]) if len(alive) >= 2 else None
     per_year = sqrt(YEAR_MS / timeframe_ms)
 
@@ -254,6 +262,7 @@ def search_report(candidates, best_params, timeframe_ms):
         "expected_max_sharpe_per_bar": _fmt(benchmark, 6) if variance_known else None,
         "expected_max_sharpe_annualized": _fmt(benchmark * per_year, 3) if variance_known else None,
         "psr_vs_zero": _fmt(psr), "dsr": _fmt(dsr),
+        "history_trials": history, "dsr_with_history": _fmt(dsr_history),
         "pbo": None if pbo is None else {**pbo, "pbo": _fmt(pbo["pbo"]),
                                          "logit_median": _fmt(pbo["logit_median"]),
                                          "prob_oos_loss": _fmt(pbo["prob_oos_loss"]),

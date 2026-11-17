@@ -22,13 +22,15 @@ def overfit_rows(report):
         ("N 組純運氣可期待的最大 Sharpe（年化）", "不適用" if report["expected_max_sharpe_annualized"] is None
          else report["expected_max_sharpe_annualized"]),
         ("PSR（真實 Sharpe > 0 的機率）", report["psr_vs_zero"]), ("DSR", report["dsr"]),
+        *([(f"DSR（N 改用這個策略累計試過的 {report['history_trials']} 組）", report["dsr_with_history"])]
+          if report.get("history_trials") else []),
         ("權益跌破 0（爆倉）的參數組", report.get("wiped_out_trials", 0)),
         ("PBO（CSCV）", "樣本不足" if pbo is None else f"{pbo['pbo']}（{pbo['blocks']} 區塊、{pbo['splits']} 種切法）"),
         ("判讀", report["verdict"]), ("說明", report["notice"]),
     ]
 
 
-def execute_optimization(request, expected_source):
+def execute_optimization(request, expected_source, trial_log=None):
     snapshot, config, quantity = validate_optimization_request(request)
     strategy_id = snapshot["backtest"]["strategy_id"]
     # Keep the strategy import in the calculation process and share the same
@@ -60,7 +62,9 @@ def execute_optimization(request, expected_source):
         best_costs = costs_for(rerun, bars, quantity, dataset, strategy_id)
     overfitting = None
     if result.best_trial_number is not None:
-        overfitting = research_overfit.search_report(candidates, best.params, dataset.timeframe_ms)
+        history = None if trial_log is None else trial_log.get("configurations")
+        overfitting = research_overfit.search_report(candidates, best.params, dataset.timeframe_ms,
+                                                     history_trials=history)
     if provenance(dataset.dataset_id, strategy_id) != expected_source:
         raise ValueError("source_changed_during_run")
     trials = [{"number": trial.number, "state": trial.state,

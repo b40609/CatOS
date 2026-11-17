@@ -11,10 +11,15 @@ import sys
 import threading
 import uuid
 
+from catos import strategy_folder
 from catos.research_catalog import (
-    MAX_OUTPUT_BYTES, MAX_RUNS, ROOT, TIMEOUT_SECONDS,
-    json_text, provenance, validate_optimization_request, validate_request,
+    DATASET_ID, MAX_OUTPUT_BYTES, MAX_RUNS, ROOT, TIMEOUT_SECONDS,
+    json_text, provenance, validate_check_request, validate_optimization_request, validate_request,
 )
+
+TRIAL_LOG = "trials.jsonl"
+TRIAL_LOG_NOTICE = ("這個策略（所有版本）在這個研究資料夾累計送出的回測、優化與滾動驗證；"
+                    "configurations 是試過的參數組數，換參數或改程式都算試驗。優化結果的 DSR 另外用這個數字算一次。")
 
 
 class ResearchError(Exception):
@@ -125,25 +130,55 @@ class ResearchService:
 
     def submit(self, request, build_id):
         snapshot, _, _, _ = validate_request(request)
-        return self._submit(snapshot, build_id, "backtest")
+        return self._submit(snapshot, build_id, "backtest", 1)
 
     def submit_optimization(self, request, build_id):
         snapshot, _, _ = validate_optimization_request(request)
-        return self._submit(snapshot, build_id, "optimization")
+        return self._submit(snapshot, build_id, "optimization",
+                            min(snapshot["n_trials"], _grid_size(snapshot["search_space"])))
 
     def submit_validation(self, request, build_id):
         from catos.research_validation_job import validate_validation_request
 
         snapshot, *_ = validate_validation_request(request)
-        return self._submit(snapshot, build_id, "validation")
+        return self._submit(snapshot, build_id, "validation", _grid_size(snapshot["search_space"]))
 
-    def _submit(self, snapshot, build_id, kind):
+    def check(self, request):
+        """Run the folder-strategy check now in the research worker; the report is not persisted."""
+        snapshot, spec, _, _ = validate_check_request(request)
         with self._guard:
             if self._closing or self._owner_file is None:
                 raise ResearchError("research_service_not_ready", 503)
             if self._active is not None:
                 raise ResearchError("research_busy", 409)
-            if len(list(self.output_dir.iterdir())) >= MAX_RUNS + 1:
+            self._active = "strategy-check"
+        try:
+            envelope = {"kind": "check", "request": snapshot,
+                        "provenance": provenance(DATASET_ID, spec.strategy_id)}
+            return self._compute(envelope)["payload"]
+        finally:
+            with self._guard:
+                self._active = None
+
+    def _trial_log(self, strategy_id):
+        """Every earlier line for this strategy; an unreadable log refuses the run (never undercounts)."""
+        path = self.output_dir / TRIAL_LOG
+        try:
+            raw = path.read_bytes() if path.exists() else b""
+            lines = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
+        except (OSError, UnicodeDecodeError, ValueError):
+            raise ResearchError("trial_log_unreadable", 500) from None
+        if any(type(line) is not dict or type(line.get("configurations")) is not int for line in lines):
+            raise ResearchError("trial_log_unreadable", 500)
+        return [line for line in lines if line.get("strategy_id") == strategy_id]
+
+    def _submit(self, snapshot, build_id, kind, configurations):
+        with self._guard:
+            if self._closing or self._owner_file is None:
+                raise ResearchError("research_service_not_ready", 503)
+            if self._active is not None:
+                raise ResearchError("research_busy", 409)
+            if sum(1 for path in self.output_dir.iterdir() if path.is_dir()) >= MAX_RUNS:
                 raise ResearchError("research_run_limit_reached", 409)
             run_id = uuid.uuid4().hex
             directory = self.output_dir / run_id
@@ -151,13 +186,26 @@ class ResearchService:
             # Backtests carry dataset/strategy at the top level; optimization/validation inside "backtest".
             base = snapshot.get("backtest", snapshot)
             source = provenance(base["dataset_id"], base["strategy_id"])
-            envelope = {"run_id": run_id, "created_at": now(), "build_id": build_id,
-                        "kind": kind, "request": snapshot, "provenance": source}
+            created_at = now()
+            earlier = self._trial_log(base["strategy_id"])
+            line = {"run_id": run_id, "created_at": created_at, "kind": kind,
+                    "strategy_id": base["strategy_id"], "version": source["strategy"]["version"],
+                    "sha256": source["strategy"]["sha256"], "configurations": configurations}
+            history = [*earlier, line]
+            trial_log = {"runs": len(history), "configurations": sum(item["configurations"] for item in history),
+                         "versions": len({item["sha256"] for item in history}),
+                         "since": history[0]["created_at"], "notice": TRIAL_LOG_NOTICE}
+            with open(self.output_dir / TRIAL_LOG, "a", encoding="utf-8", newline="\n") as stream:
+                stream.write(json_text(line) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            envelope = {"run_id": run_id, "created_at": created_at, "build_id": build_id,
+                        "kind": kind, "request": snapshot, "provenance": source, "trial_log": trial_log}
             self._write_new(directory / "request.json", json_text(envelope))
             status = {"run_id": run_id, "kind": kind, "status": "queued", "error": None,
                       "created_at": envelope["created_at"], "started_at": None,
                       "finished_at": None, "request": snapshot, "provenance": source,
-                      "build_id": build_id}
+                      "build_id": build_id, "trial_log": trial_log}
             self._write_status(status)
             self._active = run_id
             try:
@@ -174,76 +222,7 @@ class ResearchService:
             return json.loads(json_text(status))
 
     def _compute(self, envelope):
-        # Only benign OS bootstrap variables. No inherited API credentials, user
-        # profile, proxy, Python hooks, clients, signer, or database write handle.
-        environment = {key: os.environ[key] for key in ("SystemRoot", "WINDIR") if key in os.environ}
-        if envelope.get("kind") in ("optimization", "validation"):
-            import importlib.util
-
-            packaging_spec = importlib.util.find_spec("packaging")
-            if packaging_spec is None or packaging_spec.origin is None:
-                raise ResearchError("optuna_dependency_packaging_missing")
-            environment["CATOS_OPTUNA_PACKAGING"] = str(Path(packaging_spec.origin).resolve())
-        process = subprocess.Popen(
-            [sys.executable, "-B", "-s", "-m", "catos.research_worker"], cwd=ROOT,
-            env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        chunks = {"stdout": bytearray(), "stderr": bytearray()}
-        overflow = threading.Event()
-
-        def drain(stream, name, limit):
-            while True:
-                block = stream.read(8192)
-                if not block:
-                    return
-                room = limit - len(chunks[name])
-                chunks[name].extend(block[:max(0, room)])
-                if len(block) > room:
-                    overflow.set()
-                    try:
-                        process.kill()
-                    except OSError:
-                        pass
-                    return
-
-        readers = []
-        try:
-            for stream, name, limit in ((process.stdout, "stdout", MAX_OUTPUT_BYTES),
-                                        (process.stderr, "stderr", 65536)):
-                reader = threading.Thread(target=drain, args=(stream, name, limit))
-                reader.start()
-                readers.append(reader)
-            process.stdin.write(json_text(envelope).encode("utf-8"))
-            process.stdin.close()
-            try:
-                process.wait(timeout=TIMEOUT_SECONDS)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
-                raise ResearchError("research_timeout") from None
-        finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-            for reader in readers:
-                reader.join()
-            process.stdout.close()
-            process.stderr.close()
-            if not process.stdin.closed:
-                process.stdin.close()
-        if overflow.is_set():
-            raise ResearchError("research_output_limit")
-        if process.returncode:
-            raise ResearchError("research_worker_failed")
-        reply = json.loads(chunks["stdout"].decode("utf-8"))
-        if "error" in reply:
-            raise ResearchError(reply["error"])
-        source = envelope["provenance"]
-        if (reply["payload"]["provenance"] != source
-                or provenance(source["dataset"]["id"], source["strategy"]["id"]) != source):
-            raise ResearchError("source_changed_during_run")
-        return reply
+        return run_worker(envelope)
 
     def _execute(self, envelope, status):
         try:
@@ -253,7 +232,8 @@ class ResearchService:
             reply = self._compute(envelope)
             directory = self._run_dir(status["run_id"])
             payload = {**reply["payload"], "run_id": envelope["run_id"],
-                       "created_at": envelope["created_at"], "build_id": envelope["build_id"]}
+                       "created_at": envelope["created_at"], "build_id": envelope["build_id"],
+                       "trial_log": envelope["trial_log"]}
             self._write_new(directory / "result.json", json_text(payload))
             binding = html.escape(json_text(envelope))
             synthetic = envelope["provenance"]["dataset"]["source"] == "synthetic_closed_bars"
@@ -274,3 +254,86 @@ class ResearchService:
         finally:
             with self._guard:
                 self._active = None
+
+
+def _grid_size(space):
+    """Parameter sets in an integer search space ({name: {low, high, step}})."""
+    size = 1
+    for item in space.values():
+        size *= (item["high"] - item["low"]) // item["step"] + 1
+    return size
+
+
+def run_worker(envelope):
+    """One research computation in a fresh child process; the reply, or ResearchError."""
+    # Only benign OS bootstrap variables. No inherited API credentials, user
+    # profile, proxy, Python hooks, clients, signer, or database write handle.
+    environment = {key: os.environ[key] for key in ("SystemRoot", "WINDIR", strategy_folder.HOME_ENV)
+                   if key in os.environ}
+    if envelope.get("kind") in ("optimization", "validation"):
+        import importlib.util
+
+        packaging_spec = importlib.util.find_spec("packaging")
+        if packaging_spec is None or packaging_spec.origin is None:
+            raise ResearchError("optuna_dependency_packaging_missing")
+        environment["CATOS_OPTUNA_PACKAGING"] = str(Path(packaging_spec.origin).resolve())
+    process = subprocess.Popen(
+        [sys.executable, "-B", "-s", "-m", "catos.research_worker"], cwd=ROOT,
+        env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    chunks = {"stdout": bytearray(), "stderr": bytearray()}
+    overflow = threading.Event()
+
+    def drain(stream, name, limit):
+        while True:
+            block = stream.read(8192)
+            if not block:
+                return
+            room = limit - len(chunks[name])
+            chunks[name].extend(block[:max(0, room)])
+            if len(block) > room:
+                overflow.set()
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+                return
+
+    readers = []
+    try:
+        for stream, name, limit in ((process.stdout, "stdout", MAX_OUTPUT_BYTES),
+                                    (process.stderr, "stderr", 65536)):
+            reader = threading.Thread(target=drain, args=(stream, name, limit))
+            reader.start()
+            readers.append(reader)
+        process.stdin.write(json_text(envelope).encode("utf-8"))
+        process.stdin.close()
+        try:
+            process.wait(timeout=TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            raise ResearchError("research_timeout") from None
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        for reader in readers:
+            reader.join()
+        process.stdout.close()
+        process.stderr.close()
+        if not process.stdin.closed:
+            process.stdin.close()
+    if overflow.is_set():
+        raise ResearchError("research_output_limit")
+    if process.returncode:
+        raise ResearchError("research_worker_failed")
+    reply = json.loads(chunks["stdout"].decode("utf-8"))
+    if "error" in reply:
+        raise ResearchError(reply["error"])
+    source = envelope["provenance"]
+    if (reply["payload"]["provenance"] != source
+            or provenance(source["dataset"]["id"], source["strategy"]["id"]) != source):
+        raise ResearchError("source_changed_during_run")
+    return reply

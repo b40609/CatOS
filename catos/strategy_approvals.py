@@ -93,7 +93,19 @@ BOT_STRATEGIES = {
 
 
 def bot_strategy(strategy_id, version):
+    """A built-in Bot strategy, or a strategies/ folder strategy at the version on disk now.
+
+    A folder strategy is approved only after it passes the restart-consistency check
+    (``folder_check``); after that the approval's sha256 pins it.
+    """
     entry = BOT_STRATEGIES.get((strategy_id, version)) if type(strategy_id) is str and type(version) is str else None
+    if entry is None and type(strategy_id) is str and type(version) is str and strategy_id not in research_catalog.STRATEGIES:
+        try:
+            spec = research_catalog.strategy_spec(strategy_id)
+        except ValueError as error:
+            raise ApprovalError(str(error)) from None
+        if spec.origin == "folder" and spec.version == version:
+            entry = BotStrategy(strategy_id, version, spec.lookback)
     if entry is None:
         raise ApprovalError("strategy_not_bot_eligible")
     return entry
@@ -158,7 +170,10 @@ def validate_profile(value):
     if value["schema"] != PROFILE_SCHEMA or type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise ApprovalError("profile_schema_mismatch")
     bot = bot_strategy(value["strategy_id"], value["version"])
-    spec = bot.research
+    try:
+        spec = bot.research
+    except ValueError as error:
+        raise ApprovalError(str(error)) from None
     parameters = value["parameters"]
     names = [name for name, _, _ in spec.parameters]
     if type(parameters) is not dict or set(parameters) != set(names):
@@ -166,8 +181,9 @@ def validate_profile(value):
     for name, low, high in spec.parameters:
         if type(parameters[name]) is not int or not low <= parameters[name] <= high:
             raise ApprovalError(f"profile_{name}_out_of_range")
-    if spec.strategy_id == research_catalog.DONCHIAN_ID and parameters["exit_bars"] >= parameters["entry_bars"]:
-        raise ApprovalError("profile_exit_bars_must_be_below_entry_bars")
+    for a, op, b in spec.constraints:
+        if not (parameters[a] < parameters[b] if op == "<" else parameters[a] <= parameters[b]):
+            raise ApprovalError(f"profile_{a}_must_be_below_{b}" if op == "<" else f"profile_{a}_must_not_exceed_{b}")
     lookback = bot.lookback(parameters)
     if lookback > MAX_BOT_LOOKBACK:
         raise ApprovalError("profile_lookback_above_bot_limit")
@@ -337,7 +353,33 @@ def deployment_identity(profile):
     return artifact, research_catalog.file_hash(spec.manifest)
 
 
-def summary_text(profile, artifact, manifest_sha256):
+def folder_check(profile, artifact, manifest_sha256):
+    """Run the restart-consistency check of a folder strategy on the profile's own parameters.
+
+    It runs in the research worker (a child process), exactly as research_check_strategy
+    does, and must have checked the very source and manifest being approved.
+    """
+    from catos.research_service import ResearchError, run_worker
+
+    envelope = {"kind": "check",
+                "request": {"strategy_id": profile["strategy_id"], "parameters": profile["parameters"],
+                            "quantity": profile["quantity"]},
+                "provenance": research_catalog.provenance(research_catalog.DATASET_ID, profile["strategy_id"])}
+    try:
+        report = run_worker(envelope)["payload"]
+    except (ResearchError, ValueError) as error:
+        raise ApprovalError(f"restart_check_failed: {error}") from None
+    if (report["strategy"]["sha256"], report["strategy"]["manifest_sha256"]) != (artifact["sha256"], manifest_sha256):
+        raise ApprovalError("restart_check_source_mismatch")
+    if not report["ok"]:
+        failed = next((item for item in report["stages"] if not item["ok"]), {"detail": None})
+        raise ApprovalError(f"strategy_check_failed: {failed['detail']}")
+    if not report["bot_eligible"]:
+        raise ApprovalError(f"restart_consistency_failed: {report['bot_reason']}")
+    return report
+
+
+def summary_text(profile, artifact, manifest_sha256, check=None):
     lines = [
         "策略核准（local-sim Bot 歷史重播與 OKX 模擬盤 Bot；不涵蓋 Live）",
         f"  策略：{profile['strategy_id']} / {profile['version']}",
@@ -349,6 +391,9 @@ def summary_text(profile, artifact, manifest_sha256):
         f"  合約／週期：{profile['inst_id']} / {profile['timeframe_ms']} ms；預熱 {profile['warmup_bars']} 根",
         f"  本金 {profile['initial_balance']}；手續費率 {profile['fee_rate']}；滑價 {profile['slippage_bps']} bps",
     ]
+    if check is not None:
+        lines.append(f"  策略資料夾 {artifact['source_files'][0].rsplit('/', 1)[0]}/：重啟一致性檢查通過"
+                     f"（合成資料 {check['bars']} 根、{check['trades']} 筆成交、檢查 {check['decisions_checked']} 個時點）")
     return "\n".join(lines)
 
 
@@ -364,7 +409,12 @@ def approve(*, strategy_id, version, sha256, profile, confirm, research_basis=No
         raise ApprovalError("sha256_does_not_match_current_source")
     if research_basis is not None and (type(research_basis) is not str or _BASIS.fullmatch(research_basis) is None):
         raise ApprovalError("approval_research_basis_invalid")
-    if confirm(summary_text(profile, artifact, manifest_sha256), "approve") is not True:
+    check = None
+    if bot_strategy(strategy_id, version).research.origin == "folder":
+        check = folder_check(profile, artifact, manifest_sha256)
+        if deployment_identity(profile)[0]["sha256"] != artifact["sha256"]:  # edited while it was checked
+            raise ApprovalError("sha256_does_not_match_current_source")
+    if confirm(summary_text(profile, artifact, manifest_sha256, check), "approve") is not True:
         raise ApprovalError("approval_not_confirmed")
     target = approvals_path() if path is None else Path(path)
     return _append({"action": "approve", "created_at": _now(), "strategy_id": strategy_id,
@@ -435,6 +485,13 @@ def cli_main(argv=None):
                 artifact = research_catalog.load_strategy_manifest(spec)
                 print(f"{strategy_id} {version} sha256={artifact['sha256']} "
                       f"manifest_sha256={research_catalog.file_hash(spec.manifest)}")
+            specs, errors = research_catalog.all_strategies()
+            for spec in specs:
+                if spec.origin == "folder":
+                    print(f"{spec.strategy_id} {spec.version} sha256={spec.sha256} "
+                          f"manifest_sha256={spec.manifest_sha256}（strategies/ 資料夾；核准前會先跑重啟一致性檢查）")
+            for error in errors:
+                print(f"{error['strategy_id']}：資料夾有問題，無法核准：{error['error']}")
         return 0
     except (ApprovalError, ValueError, OSError) as error:
         print(f"錯誤：{error}", file=sys.stderr)

@@ -245,7 +245,7 @@ class ResearchMcpTests(unittest.TestCase):
         self.assertEqual({tool.name for tool in tools}, {
             "research_catalog", "research_list_runs", "research_submit_backtest",
             "research_submit_optimization", "research_get_run", "research_get_result",
-            "research_get_report",
+            "research_get_report", "research_check_strategy", "research_submit_validation",
         })
         serialized = json.dumps([tool.model_dump(mode="json") for tool in tools])
         for forbidden in ("url", "path", "python", "credential", "database"):

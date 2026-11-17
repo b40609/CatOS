@@ -112,17 +112,13 @@ def research_run(profile, contract, bars):
     """The baseline backtest (funding and margin off) with every on_bar target recorded."""
     strategy_id = profile["strategy_id"]
     spec = research_catalog.strategy_spec(strategy_id)
-    artifact = research_catalog.load_strategy_manifest(spec)
-    snapshot, source_hash = research_catalog._verified_strategy_source_snapshot(artifact["source_files"], spec)
-    if source_hash != spec.sha256:
-        raise ValueError("artifact_hash_mismatch")
-    strategy_class = research_catalog._module_strategy_from_verified_snapshot(snapshot, spec)
-    names = [name for name, _, _ in spec.parameters]
+    strategy_class = research_catalog.verified_strategy_class(spec)  # artifact_hash_mismatch on any edit
+    source_hash = spec.sha256
     targets = {}
 
     class Recorded(research.Strategy):
         def __init__(self):
-            self.inner = strategy_class(*(profile["parameters"][name] for name in names), D(profile["quantity"]))
+            self.inner = research_catalog.construct(spec, strategy_class, profile["parameters"], D(profile["quantity"]))
 
         def update_indicators(self, bar):
             return self.inner.update_indicators(bar)
@@ -305,11 +301,8 @@ def compare(run_dir):
 
 def _strategy(profile):
     spec = research_catalog.strategy_spec(profile["strategy_id"])
-    artifact = research_catalog.load_strategy_manifest(spec)
-    snapshot, _ = research_catalog._verified_strategy_source_snapshot(artifact["source_files"], spec)
-    strategy_class = research_catalog._module_strategy_from_verified_snapshot(snapshot, spec)
-    names = [name for name, _, _ in spec.parameters]
-    return strategy_class(*(profile["parameters"][name] for name in names), D(profile["quantity"]))
+    strategy_class = research_catalog.verified_strategy_class(spec)
+    return research_catalog.construct(spec, strategy_class, profile["parameters"], D(profile["quantity"]))
 
 
 def compare_repeat(run_a, run_b):

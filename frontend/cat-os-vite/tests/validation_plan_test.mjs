@@ -31,7 +31,7 @@ const SMA = { id: 'sma-trend', parameters: { period: { min: 2, max: 32 }, quanti
   warmup: { covers: 'period', below: 64 } };
 const DONCHIAN = { id: 'donchian-breakout',
   parameters: { entry_bars: { min: 2, max: 960 }, exit_bars: { min: 1, max: 959 }, quantity: { unit: 'contracts' } },
-  warmup: { covers: 'entry_bars', below: 961 } };
+  warmup: { covers: 'entry_bars', below: 961 }, constraints: [['exit_bars', '<', 'entry_bars']] };
 const period = (low, high, step) => ({ axes: { period: { low, high, step } } });
 
 test('synthetic defaults rebuild the catalog example request exactly', () => {
@@ -153,6 +153,22 @@ test('daily strategies need whole days of warm-up on the dataset timeframe', () 
   assert.deepEqual(strategies.minWarmupProblems(ENSEMBLE, 2201, FOUR_HOUR), ['預熱根數需至少 2202 根（367 天）']);
   assert.deepEqual(strategies.minWarmupProblems(ENSEMBLE, 2202, FOUR_HOUR), []);
   assert.deepEqual(strategies.presetAxes(ENSEMBLE), { vol_scaling: { low: 0, high: 1, step: 1 } });
+});
+
+test('a strategies/ folder strategy takes its constraints and start axes from the catalog', () => {
+  const FOLDER = { id: 'my-cross', origin: 'folder',
+    parameters: { fast: { min: 2, max: 200 }, slow: { min: 3, max: 500 }, quantity: { unit: 'contracts' } },
+    warmup: { covers: 'slow', below: 60000 }, constraints: [['fast', '<', 'slow']],
+    preset: { parameters: { fast: 20, slow: 50 }, quantity: '1', warmup_days: 0 } };
+  assert.deepEqual(strategies.presetAxes(FOLDER),
+    { fast: { low: 20, high: 20, step: 1 }, slow: { low: 50, high: 100, step: 50 } });
+  assert.equal(strategies.gridCount(FOLDER, strategies.presetAxes(FOLDER)), 2);
+  assert.deepEqual(strategies.gridProblems(FOLDER, strategies.presetAxes(FOLDER)), []);
+  assert.ok(strategies.paramProblems(FOLDER, { fast: 50, slow: 50 }, 50).some((p) => p.includes('fast需小於slow')));
+  const loose = { ...FOLDER, constraints: [['fast', '<=', 'slow']] };
+  assert.deepEqual(strategies.paramProblems(loose, { fast: 50, slow: 50 }, 50), []);
+  assert.ok(strategies.gridProblems(loose, { fast: { low: 2, high: 60, step: 2 }, slow: { low: 50, high: 100, step: 50 } })
+    .some((p) => p.includes('不大於')));
 });
 
 test('walk-forward defaults for a preset strategy keep its warm-up and quantity', () => {

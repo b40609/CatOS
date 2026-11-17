@@ -10,7 +10,7 @@ import re
 from types import ModuleType
 
 from catos import (research, research_costs, research_datasets, research_loss_limits, research_overfit,
-                   research_trades)
+                   research_trades, strategy_folder)
 from catos.reporting import render_report
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -87,6 +87,10 @@ class ResearchStrategy:
     # contracts sized from equity, and the strategy receives the contract spec.
     sizing: str = "fixed"
     preset: dict | None = None  # frontend defaults for preregistered strategies
+    # (a, "<" or "<=", b) between two parameters, checked on requests, grids and profiles.
+    constraints: tuple = ()
+    origin: str = "builtin"  # "folder": strategy_folder.FolderStrategy, read from strategies/
+    base: Path = ROOT  # the directory the source files are relative to
 
 
 STRATEGIES = {spec.strategy_id: spec for spec in (
@@ -97,7 +101,7 @@ STRATEGIES = {spec.strategy_id: spec for spec in (
                      DONCHIAN_FILES, DONCHIAN_MANIFEST, DONCHIAN_PROVENANCE,
                      "Donchian 通道突破（Long / Short）",
                      (("entry_bars", 2, DONCHIAN_MAX_BARS), ("exit_bars", 1, DONCHIAN_MAX_BARS - 1)),
-                     "entry_bars", DONCHIAN_MAX_BARS + 1),
+                     "entry_bars", DONCHIAN_MAX_BARS + 1, constraints=(("exit_bars", "<", "entry_bars"),)),
     *(ResearchStrategy(artifact_id, version, f"catos.research_daily:{entry}", DAILY_SHA256, DAILY_FILES,
                        DAILY_MANIFESTS / f"{artifact_id}-{version}.json", DAILY_PROVENANCE, name,
                        ((param, 0, 1),), param, DAILY_WARMUP_LIMIT, DAILY_WARMUP_DAYS, sizing,
@@ -124,10 +128,23 @@ STRATEGIES = {spec.strategy_id: spec for spec in (
 
 
 def strategy_spec(strategy_id):
+    """A built-in strategy, else the folder ``strategies/<strategy_id>/`` as it is on disk now."""
     spec = STRATEGIES.get(strategy_id) if type(strategy_id) is str else None
+    if spec is None and type(strategy_id) is str and strategy_folder.STRATEGY_ID.fullmatch(strategy_id):
+        if (strategy_folder.folder_root() / strategy_id).is_dir():
+            try:
+                spec = strategy_folder.load(strategy_id)
+            except strategy_folder.StrategyFolderError as error:
+                raise ValueError(f"strategy_folder_invalid: {error}") from None
     if spec is None:
         raise ValueError("unknown_strategy")
     return spec
+
+
+def all_strategies():
+    """Built-in strategies, then valid folder strategies; plus the folder problems for the catalog."""
+    folders, errors = strategy_folder.discover(reserved=STRATEGIES)
+    return [*STRATEGIES.values(), *folders.values()], errors
 SHA256 = re.compile(r"[0-9a-f]{64}")
 ENGINE_FILES = (
     "catos/research.py", "catos/data_io.py", "catos/reporting.py",
@@ -228,20 +245,20 @@ def _strict_json(raw):
 def _verified_strategy_source_snapshot(source_files, spec=STRATEGIES[STRATEGY_ID]):
     if type(source_files) is not list or source_files != list(spec.files):
         raise ValueError("artifact_source_files_mismatch")
-    root = ROOT.resolve()
+    root = spec.base.resolve()
     snapshot = {}
     entries = []
     for name in source_files:
         if type(name) is not str or name not in spec.files:
             raise ValueError("artifact_source_files_mismatch")
-        path = ROOT / name
+        path = spec.base / name
         try:
             resolved = path.resolve(strict=True)
             resolved.relative_to(root)
         except (OSError, ValueError):
             raise ValueError("artifact_source_path_invalid") from None
         cursor = path
-        while cursor != ROOT:
+        while cursor != spec.base:
             if cursor.is_symlink():
                 raise ValueError("artifact_source_symlink_rejected")
             cursor = cursor.parent
@@ -284,6 +301,11 @@ def validate_strategy_manifest(value, spec=STRATEGIES[STRATEGY_ID]):
 
 
 def load_strategy_manifest(spec=STRATEGIES[STRATEGY_ID]):
+    if spec.origin == "folder":
+        try:
+            return strategy_folder.artifact(spec)  # re-read now; any edit since spec was read raises
+        except strategy_folder.StrategyFolderError as error:
+            raise ValueError(str(error)) from None
     manifest = spec.manifest
     if manifest.is_symlink():
         raise ValueError("artifact_manifest_symlink_rejected")
@@ -339,7 +361,8 @@ def provenance(dataset_id=DATASET_ID, strategy_id=STRATEGY_ID):
     return {
         "strategy": {
             "id": artifact["artifact_id"], "version": artifact["version"],
-            "sha256": artifact["sha256"], "source": "approved_fixed_artifact_manifest",
+            "sha256": artifact["sha256"],
+            "source": "user_strategy_folder" if spec.origin == "folder" else "approved_fixed_artifact_manifest",
             "source_files": list(artifact["source_files"]), "entry": artifact["entry"],
             "approval_state": artifact["approval_state"],
             "artifact_manifest": {
@@ -379,8 +402,8 @@ def validate_request(value):
     for name, low, high in spec.parameters:
         if type(params[name]) is not int or not low <= params[name] <= high:
             raise ValueError(f"{name}: integer in [{low}, {high}] required")
-    if spec.strategy_id == DONCHIAN_ID and params["exit_bars"] >= params["entry_bars"]:
-        raise ValueError("exit_bars: must be below entry_bars")
+    for problem in strategy_folder.constraint_problems(spec.constraints, params):
+        raise ValueError(problem)
     warmup = value["warmup_bars"]
     if type(warmup) is not int or not params[spec.lookback] <= warmup < spec.warmup_limit:
         raise ValueError(f"warmup_bars: integer >= {spec.lookback} and < {spec.warmup_limit} required")
@@ -421,8 +444,10 @@ def require_search_names(spec, space):
 
 def check_search_grid(spec, ranges, warmup):
     """Rules every grid point must meet; ``ranges`` maps a parameter to its (low, high)."""
-    if spec.strategy_id == DONCHIAN_ID and ranges["exit_bars"][1] >= ranges["entry_bars"][0]:
-        raise ValueError("exit_bars: highest searched value must be below lowest entry_bars")
+    for a, op, b in spec.constraints:  # the highest a against the lowest b covers every grid point
+        if ranges[a][1] >= ranges[b][0] if op == "<" else ranges[a][1] > ranges[b][0]:
+            wording = "must be below" if op == "<" else "must not exceed"
+            raise ValueError(f"{a}: highest searched value {wording} lowest {b}")
     if warmup < ranges[spec.lookback][1]:
         raise ValueError(f"warmup_bars: must cover highest searched {spec.lookback}")
 
@@ -452,16 +477,34 @@ def validate_optimization_request(value):
     return snapshot, config, quantity
 
 
+def _catalog_strategy(spec):
+    item = {**provenance(strategy_id=spec.strategy_id)["strategy"], "name": spec.name,
+            "parameters": {**{name: {"min": low, "max": high}
+                              for name, low, high in spec.parameters},
+                           "quantity": {"unit": "contracts"}},
+            "warmup": {"covers": spec.lookback, "below": spec.warmup_limit,
+                       "min_days": spec.min_warmup_days},
+            "sizing": spec.sizing, "preset": spec.preset, "origin": spec.origin,
+            "constraints": [list(item) for item in spec.constraints]}
+    if spec.origin == "folder":
+        item["description"] = spec.description
+    return item
+
+
 def catalog():
+    specs, folder_errors = all_strategies()
+    strategies = []
+    for spec in specs:
+        try:
+            strategies.append(_catalog_strategy(spec))
+        except ValueError as error:  # edited between discovery and now
+            folder_errors.append({"strategy_id": spec.strategy_id, "error": str(error)})
     return {
-        "strategies": [{**provenance(strategy_id=spec.strategy_id)["strategy"], "name": spec.name,
-                        "parameters": {**{name: {"min": low, "max": high}
-                                          for name, low, high in spec.parameters},
-                                       "quantity": {"unit": "contracts"}},
-                        "warmup": {"covers": spec.lookback, "below": spec.warmup_limit,
-                                   "min_days": spec.min_warmup_days},
-                        "sizing": spec.sizing, "preset": spec.preset}
-                       for spec in STRATEGIES.values()],
+        "strategies": strategies,
+        "strategy_folder": {"path": f"{strategy_folder.FOLDER}/", "guide": f"{strategy_folder.FOLDER}/README.md",
+                            "errors": folder_errors,
+                            "notice": ("strategies/<id>/ 裡的 strategy.json＋strategy.py；每次讀檔重算 sha256，"
+                                       "改了就是新版本。先用 research_check_strategy 檢查；研究不需核准，上 Bot 要使用者核准。")},
         "datasets": [{**dataset.describe(), "contract": asdict(dataset.contract)}
                      for dataset in datasets()],
         "defaults": DEFAULT_REQUEST,
@@ -528,18 +571,35 @@ def _module_strategy_from_verified_snapshot(snapshot, spec):
     return strategy
 
 
+def verified_strategy_class(spec):
+    """The strategy class built from a source snapshot whose hash matches the manifest and spec."""
+    artifact = load_strategy_manifest(spec)
+    snapshot, source_hash = _verified_strategy_source_snapshot(artifact["source_files"], spec)
+    if source_hash != artifact["sha256"] or source_hash != spec.sha256:
+        raise ValueError("artifact_hash_mismatch")
+    if spec.origin == "folder":
+        return strategy_folder.build_class(spec, snapshot)
+    return (_strategy_from_verified_snapshot(snapshot) if spec.strategy_id == STRATEGY_ID
+            else _module_strategy_from_verified_snapshot(snapshot, spec))
+
+
+def construct(spec, strategy_class, parameters, quantity, contract=None):
+    """One instance: folder strategies take keywords, built-ins their constructor order."""
+    if spec.origin == "folder":
+        return strategy_class(quantity=quantity, **{name: parameters[name] for name, _, _ in spec.parameters})
+    values = [parameters[name] for name, _, _ in spec.parameters]
+    if spec.sizing == "vol_target":
+        return strategy_class(*values, quantity, contract)
+    return strategy_class(*values, quantity)
+
+
 def load_registered_strategy(expected_source):
     """Execute only a verified immutable snapshot of the approved strategy source."""
     spec = strategy_spec(expected_source["strategy"]["id"])
     dataset_id = expected_source["dataset"]["id"]
     if provenance(dataset_id, spec.strategy_id) != expected_source:
         raise ValueError("source_changed_restart_required")
-    artifact = load_strategy_manifest(spec)
-    snapshot, source_hash = _verified_strategy_source_snapshot(artifact["source_files"], spec)
-    if source_hash != artifact["sha256"] or source_hash != spec.sha256:
-        raise ValueError("artifact_hash_mismatch")
-    strategy = (_strategy_from_verified_snapshot(snapshot) if spec.strategy_id == STRATEGY_ID
-                else _module_strategy_from_verified_snapshot(snapshot, spec))
+    strategy = verified_strategy_class(spec)
     if provenance(dataset_id, spec.strategy_id) != expected_source:
         raise ValueError("source_changed_during_strategy_load")
     return strategy
@@ -556,10 +616,7 @@ def registered_factory(expected_source, strategy_id, quantity, contract=None):
     if spec.sizing == "vol_target" and contract is None:
         raise ValueError("contract_required_for_vol_target")
     strategy = load_registered_strategy(expected_source)
-    names = [name for name, _, _ in spec.parameters]
-    if spec.sizing == "vol_target":
-        return lambda params: strategy(*(params[name] for name in names), quantity, contract)
-    return lambda params: strategy(*(params[name] for name in names), quantity)
+    return lambda params: construct(spec, strategy, params, quantity, contract)
 
 
 def load_dataset_bars(dataset_id, config):
@@ -689,6 +746,62 @@ def margin_rows(summary, result=None):
                      f"強平手續費 {liq.fee_charged}、清算費 {liq.clearance_charged}、保險基金補足 {liq.deficit_covered}"))
         rows.append(("初始保證金不足拒單", result.margin_rejection_count))
     return rows
+
+
+# Restart-consistency check of a folder strategy (strategy_folder.check): synthetic bars
+# of 3 x lookback + 300 capped at 6,000, so the longest window it can cover is 1,900.
+MAX_CHECK_LOOKBACK = 1900
+
+
+def validate_check_request(value):
+    """{"strategy_id", optional "parameters" (default: the manifest defaults), optional "quantity"}."""
+    if type(value) is not dict or not {"strategy_id"} <= set(value) <= {"strategy_id", "parameters", "quantity"}:
+        raise ValueError("check: strategy_id with optional parameters and quantity required")
+    spec = strategy_spec(value["strategy_id"])
+    if spec.origin != "folder":
+        raise ValueError("check: only strategies/ folder strategies are checked here")
+    params = value.get("parameters")
+    if params is None:
+        params = dict(spec.defaults)
+    names = [name for name, _, _ in spec.parameters]
+    if type(params) is not dict or set(params) != set(names):
+        raise ValueError(f"parameters: {', '.join(names)} required")
+    for name, low, high in spec.parameters:
+        if type(params[name]) is not int or not low <= params[name] <= high:
+            raise ValueError(f"{name}: integer in [{low}, {high}] required")
+    for problem in strategy_folder.constraint_problems(spec.constraints, params):
+        raise ValueError(problem)
+    if params[spec.lookback] > MAX_CHECK_LOOKBACK:
+        raise ValueError(f"{spec.lookback}: the check covers windows up to {MAX_CHECK_LOOKBACK} bars")
+    quantity = decimal_string(value.get("quantity", "1"), "quantity", positive=True)
+    if quantity > Decimal("1000") or quantity % Decimal("1"):
+        raise ValueError("quantity: whole contracts in [1, 1000] required")
+    snapshot = {"strategy_id": spec.strategy_id, "parameters": {name: params[name] for name in names},
+                "quantity": str(quantity)}
+    return snapshot, spec, snapshot["parameters"], quantity
+
+
+def execute_check(request, expected_source):
+    """Load and check a folder strategy in this (worker) process; the report is the payload."""
+    snapshot, spec, params, quantity = validate_check_request(request)
+    if provenance(DATASET_ID, spec.strategy_id) != expected_source:
+        raise ValueError("source_changed_restart_required")
+    try:
+        strategy_class = verified_strategy_class(spec)
+    except Exception as error:  # the module failed to run, or the class is not a Strategy
+        report = {"parameters": params, "quantity": str(quantity), "ok": False, "bot_eligible": False,
+                  "bot_reason": None, "trades": None, "decisions_checked": 0,
+                  "stages": [{"name": "load", "ok": False,
+                              "detail": f"{type(error).__name__}: {error}{strategy_folder.where(error, spec)}"}]}
+    else:
+        report = strategy_folder.check(spec, strategy_class, params, quantity)
+        report["stages"].insert(0, {"name": "load", "ok": True, "detail": None})
+    if provenance(DATASET_ID, spec.strategy_id) != expected_source:
+        raise ValueError("source_changed_during_check")
+    strategy = {"id": spec.strategy_id, "version": spec.version, "sha256": spec.sha256,
+                "manifest_sha256": spec.manifest_sha256}
+    return json.loads(json_text({"kind": "check", "request": snapshot, "provenance": expected_source,
+                                 "strategy": strategy, **report}))
 
 
 def execute_request(request, expected_source):

@@ -10,6 +10,8 @@ from urllib.request import ProxyHandler, Request, build_opener
 
 SERVICE_BASE = "http://127.0.0.1:8770"
 REQUEST_TIMEOUT_SECONDS = 5
+# A strategy check runs synchronously in the research worker (TIMEOUT_SECONDS = 30).
+CHECK_TIMEOUT_SECONDS = 40
 MAX_REQUEST_BYTES = 8192
 MAX_REPLY_BYTES = 2_100_000
 RUN_ID = re.compile(r"[0-9a-f]{32}")
@@ -63,7 +65,7 @@ class ResearchHttpBridge:
             return str(value["detail"])
         return "http_error"
 
-    def _json(self, path, *, method="GET", payload=None, build_id=None):
+    def _json(self, path, *, method="GET", payload=None, build_id=None, timeout=None):
         if not path.startswith("/api/research/") or ".." in path:
             raise ResearchMcpError("research_mcp_invalid_api_path")
         body = None
@@ -82,7 +84,7 @@ class ResearchHttpBridge:
             headers["X-CatOS-Build"] = build_id
         request = Request(self.base_url + path, data=body, headers=headers, method=method)
         try:
-            with self._open(request, timeout=self.timeout_seconds) as response:
+            with self._open(request, timeout=timeout or self.timeout_seconds) as response:
                 raw = response.read(MAX_REPLY_BYTES + 1)
         except HTTPError as error:
             try:
@@ -147,6 +149,23 @@ class ResearchHttpBridge:
     def submit_backtest(self, strategy_binding: StrategyBinding, request: dict[str, Any]):
         return self._mutation("/api/research/backtests", strategy_binding, request)
 
+    def submit_validation(self, strategy_binding: StrategyBinding, request: dict[str, Any]):
+        return self._mutation("/api/research/validations", strategy_binding, request)
+
+    def check_strategy(self, strategy_id: str, parameters=None, quantity=None):
+        if type(strategy_id) is not str or not strategy_id:
+            raise ResearchMcpError("strategy_id_required")
+        version = self.version()
+        if version.get("restart_required") is not False:
+            raise ResearchMcpError("source_changed_restart_required")
+        request = {"strategy_id": strategy_id}
+        if parameters is not None:
+            request["parameters"] = parameters
+        if quantity is not None:
+            request["quantity"] = quantity
+        return self._json("/api/research/strategy-checks", method="POST", payload=request,
+                          build_id=version.get("build_id"), timeout=CHECK_TIMEOUT_SECONDS)
+
     def submit_optimization(self, strategy_binding: StrategyBinding, request: dict[str, Any]):
         return self._mutation("/api/research/optimizations", strategy_binding, request)
 
@@ -196,8 +215,13 @@ def create_mcp_server(bridge=None):
         "catOS Research R3",
         instructions=(
             "Local research on registered datasets only (the synthetic fixture or hash-checked "
-            "OKX public history fetched beforehand). Use the registered strategy/dataset catalog; "
-            "no arbitrary Python, path, URL, trading, credentials, or database access."
+            "OKX public history fetched beforehand). Strategies are the built-ins plus folders "
+            "strategies/<id>/ (strategy.json + strategy.py, contract in strategies/README.md) "
+            "that you write with your own file tools. Loop: write files -> research_catalog "
+            "(sha256, or the folder's error) -> research_check_strategy -> backtest / optimization "
+            "/ validation bound to that sha256. Every submission is counted in the strategy's "
+            "trial_log. No URL, trading, credentials or database access; a Bot needs the user's "
+            "own CLI approval, which you must not run."
         ),
         log_level="ERROR",
     )
@@ -219,10 +243,24 @@ def create_mcp_server(bridge=None):
         return call(client.list_runs)
 
     @server.tool(name="research_submit_backtest",
-                 description="Create one synthetic backtest after binding the exact registered strategy version and SHA256.")
+                 description="Create one backtest after binding the exact strategy version and SHA256 from research_catalog.")
     def research_submit_backtest(strategy: StrategyBinding,
                                  request: dict[str, Any]) -> dict[str, Any]:
         return call(client.submit_backtest, strategy, request)
+
+    @server.tool(name="research_check_strategy",
+                 description=("Check a strategies/<id>/ folder strategy now: load it, backtest it twice on "
+                              "synthetic bars, and test restart consistency (needed for a Bot). Optional "
+                              "parameters (default: the manifest defaults) and quantity. Not persisted."))
+    def research_check_strategy(strategy_id: str, parameters: dict[str, int] | None = None,
+                                quantity: str | None = None) -> dict[str, Any]:
+        return call(client.check_strategy, strategy_id, parameters, quantity)
+
+    @server.tool(name="research_submit_validation",
+                 description="Create one walk-forward validation after binding the exact strategy version and SHA256.")
+    def research_submit_validation(strategy: StrategyBinding,
+                                   request: dict[str, Any]) -> dict[str, Any]:
+        return call(client.submit_validation, strategy, request)
 
     @server.tool(name="research_submit_optimization",
                  description="Create one bounded Optuna job after binding the exact registered strategy version and SHA256.")

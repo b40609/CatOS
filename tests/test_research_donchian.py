@@ -115,8 +115,8 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(manifest["provenance"]["scope"], "research-only")
         strategies = catalog()["strategies"]
         # Package E (2026-11-06) appended three preregistered daily strategies after these two,
-        # package F (2026-11-07) two intraday DCM strategies.
-        self.assertEqual([item["id"] for item in strategies],
+        # package F (2026-11-07) two intraday DCM strategies; strategies/ folders follow them.
+        self.assertEqual([item["id"] for item in strategies if item["origin"] == "builtin"],
                          ["sma-trend", DONCHIAN_ID, "donchian-ensemble", "tsmom-multi", "dcm-daily",
                           "dcm-fade", "dcm-pullback"])
         donchian = strategies[1]

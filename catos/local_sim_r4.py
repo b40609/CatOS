@@ -32,7 +32,7 @@ RUNTIME_FILES = (
     "catos/research_artifacts/sma-trend-sma-parameters-v1.json",
     "catos/supervisor.py", "catos/journal.py", "catos/risk.py",
     "catos/execution.py", "catos/fake_exchange.py", "catos/account_lock.py",
-    "catos/protection.py", "catos/data_io.py", "catos/kill_switch.py",
+    "catos/protection.py", "catos/data_io.py", "catos/kill_switch.py", "catos/strategy_folder.py",
 )
 
 

@@ -1,0 +1,15 @@
+{
+  "schema": "catos.user-strategy",
+  "schema_version": 1,
+  "strategy_id": "example-sma-cross",
+  "version": "v1",
+  "name": "範例：均線交叉（多／空）",
+  "description": "快線在慢線之上做多、之下做空。只示範格式，不是推薦的策略。",
+  "entry": "SmaCross",
+  "parameters": [
+    {"name": "fast", "min": 2, "max": 200, "default": 20},
+    {"name": "slow", "min": 3, "max": 500, "default": 50}
+  ],
+  "lookback": "slow",
+  "constraints": [["fast", "<", "slow"]]
+}

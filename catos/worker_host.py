@@ -18,14 +18,17 @@ class WorkerError(RuntimeError):
     pass
 
 
-# The approvals file override (strategy_approvals.ENV_PATH) for isolated tests; a
-# path, never a credential. The child must resolve the same approvals as the parent.
+# The approvals file override (strategy_approvals.ENV_PATH) and the strategies/ folder
+# home (strategy_folder.HOME_ENV) for isolated tests; paths, never credentials. The child
+# must resolve the same approvals and strategy files as the parent.
 APPROVALS_ENV = "CATOS_STRATEGY_APPROVALS"
+STRATEGY_HOME_ENV = "CATOS_STRATEGY_HOME"
 
 
 def worker_environment():
     # Deliberately do not enumerate or copy the parent environment.
-    return {name: os.environ[name] for name in ("SystemRoot", "WINDIR", APPROVALS_ENV) if name in os.environ}
+    return {name: os.environ[name] for name in ("SystemRoot", "WINDIR", APPROVALS_ENV, STRATEGY_HOME_ENV)
+            if name in os.environ}
 
 
 class WorkerHost:

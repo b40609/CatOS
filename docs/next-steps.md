@@ -69,6 +69,11 @@
   - OKX 回報空的 tag 時仍接受。
   - 清倉單送出時遇到 503，依規則停下，要手動平倉。
   - 8770 服務要重啟，才看得懂 `demo-bot` 來源的 Kill-Switch 紀錄。舊版會把整份紀錄當成無法讀取，結果是擋下所有 run。
+- 策略資料夾（Agent 提交策略）：
+  - 研究資料夾最多 200 次研究結果（`MAX_RUNS`），Agent 反覆試驗會用完，要由使用者清理，沒有清理指令。
+  - 介面的回測、優化頁會列出資料夾策略並帶入預設參數，但參數之間的限制（例如 fast < slow）只由後端檢查，前端不先提示。
+  - 滾動驗證沒有「含累計試驗次數的 DSR」，只有優化有。
+  - 重啟一致性檢查用合成資料：沒有成交的路徑檢查不到，結果會提示；它是上 Bot 前的必要條件，不是充分條件。
 - 其他小缺口沿用舊清單：`docs/archive/next-steps-20261117.md`「已知小缺口」。
 
 ## 等使用者決定
@@ -79,7 +84,7 @@
 ## 工作順序（2026-11-17 使用者「按照你建議執行」）
 
 1. 接續 run：Bot 停下時有部位，重開能接著跑。完成（2026-11-17）：獨立驗收 FAIL（E1：帳戶紀錄寫入失敗時接續會自動解除 Soft），修正後窄範圍重驗 PASS；報告 `reports/okx-demo-m1-acceptance-20261117/resume-acceptance.md`、`resume-recheck-e1.md`。只用假 OKX 測過，沒有在模擬盤實測接續（正式 Bot 在跑）。驗證：後端 `Ran 1005 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 項通過、build 成功；整合測試 13 項 PASS。
-2. 讓 Agent 提交策略：方案已寫好（`docs/agent-strategy-submission-proposal.md`），等使用者回答 3 題。
+2. 讓 Agent 提交策略：使用者 2026-11-17 回覆「完全同意你的所有建議」。實作見 `docs/agent-strategy-submission-proposal.md` 末節「實作紀錄」；狀態：WIP_STATUS。
 3. P6 交易所端災難停損：上實盤前做。
 4. Bot 的介面：等前端定案。
 5. 拆掉九月模組：順手做。

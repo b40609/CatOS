@@ -21,7 +21,7 @@ RUNTIME_FILES = (
     "catos/research_validation.py", "catos/research_regimes.py",
     "catos/research_validation_job.py", "catos/research_datasets.py", "catos/research_donchian.py",
     "catos/research_costs.py", "catos/research_overfit.py", "catos/research_daily.py",
-    "catos/research_trades.py", "catos/research_intraday.py",
+    "catos/research_trades.py", "catos/research_intraday.py", "catos/strategy_folder.py",
     "catos/research_only_artifacts/dcm-fade-dcm-fade-preregistered-v1.json",
     "catos/research_only_artifacts/dcm-pullback-dcm-pullback-preregistered-v1.json",
     "catos/research_only_artifacts/donchian-ensemble-donchian-ensemble-preregistered-v1.json",
@@ -145,6 +145,15 @@ def create_app(*, output_dir=None):
         value = await parse_submission(request)
         try:
             return service.submit_validation(value, loaded_build)
+        except (ValueError, TypeError) as error:
+            raise HTTPException(422, str(error)) from None
+
+    @app.post("/api/research/strategy-checks")
+    async def strategy_check(request: Request):
+        """Check a strategies/ folder strategy now (load, run, restart consistency); not persisted."""
+        value = await parse_submission(request)
+        try:
+            return JSONResponse(json.loads(json_text(service.check(value))))
         except (ValueError, TypeError) as error:
             raise HTTPException(422, str(error)) from None
 

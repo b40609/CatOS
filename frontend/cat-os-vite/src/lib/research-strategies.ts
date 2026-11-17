@@ -32,10 +32,12 @@ const TIMEFRAME_MS: Record<string, number> = {
   '1m': 60_000, '5m': 300_000, '15m': 900_000, '1H': 3_600_000, '4H': 14_400_000,
 };
 const DAY_MS = 86_400_000;
-// [lower, upper]: every parameter set keeps lower strictly below upper (a Donchian exit
-// channel shorter than its entry channel), so every grid point is a valid request.
-const ORDERED: Record<string, [string, string][]> = { [DONCHIAN_ID]: [['exit_bars', 'entry_bars']] };
 const SYNTHETIC_SOURCE = 'synthetic_closed_bars';
+
+/** The catalog's [lower, upper, strict] parameter orderings (e.g. a Donchian exit below its entry). */
+function ordered(meta: ResearchStrategyMeta): [string, string, boolean][] {
+  return (meta.constraints ?? []).map(([lower, op, upper]) => [lower, upper, op === '<']);
+}
 
 export const paramLabel = (name: string) => LABELS[name] ?? name;
 export const shortName = (strategyId?: string | null) => (strategyId && SHORT_NAMES[strategyId]) || strategyId || '未知策略';
@@ -85,8 +87,20 @@ export function minWarmupProblems(meta: ResearchStrategyMeta, warmup: number, da
   return bars && warmup < bars ? [`預熱根數需至少 ${bars} 根（${meta.warmup.min_days} 天）`] : [];
 }
 
-/** The full 0~1 axis for each switch parameter of a preregistered strategy. */
+/**
+ * Starting axes for strategies with a preset. A preregistered strategy gets the full 0~1 axis of
+ * each switch; a strategies/ folder strategy its defaults, with the look-back window doubled once
+ * so a search or walk-forward has two candidates to start from.
+ */
 export function presetAxes(meta: ResearchStrategyMeta): Record<string, Axis> {
+  if (meta.origin === 'folder') {
+    return Object.fromEntries(paramSpecs(meta).map((spec) => {
+      const value = meta.preset?.parameters[spec.name] ?? spec.min;
+      if (spec.name !== meta.warmup.covers) return [spec.name, { low: value, high: value, step: 1 }];
+      const high = Math.min(spec.max, value * 2);
+      return [spec.name, { low: value, high, step: Math.max(1, high - value) }];
+    }));
+  }
   return Object.fromEntries(paramSpecs(meta).map((spec) => [spec.name, { low: spec.min, high: spec.max, step: 1 }]));
 }
 
@@ -104,8 +118,10 @@ export function paramProblems(meta: ResearchStrategyMeta, values: Record<string,
       problems.push(`${paramLabel(spec.name)}（${spec.name}）需為 ${spec.min}~${spec.max} 的整數`);
     }
   }
-  for (const [lower, upper] of ORDERED[meta.id] ?? []) {
-    if (values[lower] >= values[upper]) problems.push(`${paramLabel(lower)}需小於${paramLabel(upper)}`);
+  for (const [lower, upper, strict] of ordered(meta)) {
+    if (strict ? values[lower] >= values[upper] : values[lower] > values[upper]) {
+      problems.push(`${paramLabel(lower)}需${strict ? '小於' : '不大於'}${paramLabel(upper)}`);
+    }
   }
   const covers = values[meta.warmup.covers];
   if (!Number.isInteger(warmup) || warmup < covers || warmup >= meta.warmup.below) {
@@ -143,9 +159,9 @@ export function gridProblems(meta: ResearchStrategyMeta, axes: Record<string, Ax
       problems.push(`${paramLabel(spec.name)}需在 ${spec.min}~${spec.max}、最大值不小於最小值，且差距為步進的整數倍`);
     }
   }
-  for (const [lower, upper] of ORDERED[meta.id] ?? []) {
-    if (axes[lower] && axes[upper] && axes[lower].high >= axes[upper].low) {
-      problems.push(`${paramLabel(lower)}的最大值需小於${paramLabel(upper)}的最小值`);
+  for (const [lower, upper, strict] of ordered(meta)) {
+    if (axes[lower] && axes[upper] && (strict ? axes[lower].high >= axes[upper].low : axes[lower].high > axes[upper].low)) {
+      problems.push(`${paramLabel(lower)}的最大值需${strict ? '小於' : '不大於'}${paramLabel(upper)}的最小值`);
     }
   }
   return problems;

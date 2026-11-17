@@ -44,11 +44,15 @@ def main():
         elif kind == "optimization":
             load_registered_optuna_dependency()
             from catos.research_optimization import execute_optimization
-            payload, report = execute_optimization(envelope["request"], envelope["provenance"])
+            payload, report = execute_optimization(envelope["request"], envelope["provenance"],
+                                                   envelope.get("trial_log"))
         elif kind == "validation":
             load_registered_optuna_dependency()
             from catos.research_validation_job import execute_validation
             payload, report = execute_validation(envelope["request"], envelope["provenance"])
+        elif kind == "check":
+            from catos.research_catalog import execute_check
+            payload, report = execute_check(envelope["request"], envelope["provenance"]), ""
         else:
             raise ValueError("unknown_research_kind")
         reply = {"payload": payload, "report": report}
