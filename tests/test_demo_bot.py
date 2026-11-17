@@ -63,6 +63,8 @@ class FakeOkx:
         self.uid = uid
         self.others = []          # (instId, pos) rows on other contracts
         self.balance_failures = 0  # next N balance reads answer HTTP 503
+        self.lose_post_response = False  # the next order is accepted but its response is lost
+        self.hide_orders = 0       # order queries answer "does not exist" while this is set
 
     def bar_time(self, index):
         return BASE + (index - self.start_index) * TF
@@ -131,10 +133,13 @@ class FakeOkx:
                                    "fillPx": str(price), "fee": str(fee)}]
             if self.lose_after_fill is not None and len(self.orders) == self.lose_after_fill:
                 self.equity -= self.loss  # an outside loss (600 = 12% of the day basis)
+            if self.lose_post_response:
+                self.lose_post_response = False
+                raise ConnectionError("accepted, response lost")
             return ok([{"ordId": ord_id, "clOrdId": p["clOrdId"], "sCode": "0"}])
         if method == "GET" and path == "/api/v5/trade/order":
             order = self.orders.get(q.get("clOrdId"))
-            if order is None:
+            if order is None or self.hide_orders:
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             return ok([order])
         if path == "/api/v5/trade/fills":
@@ -450,6 +455,182 @@ class DemoBotTests(unittest.TestCase):
         with mock.patch.object(strategy_approvals, "find_active", return_value=record):
             with self.assertRaises(strategy_approvals.ApprovalError):
                 find_demo_approval(PROFILE)
+
+    # ---- resuming a stopped run (2026-11-17) ----
+    def stop_while_long(self, fake, clock, *, delay=5_000, extra=None):
+        """Run until the long from bar 3 is held, then stop with stop.request (position kept)."""
+        def on_sleep(now):
+            if extra is not None:
+                extra(now)
+            if fake.position == 1 and now > fake.bar_time(4) + delay:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertEqual((status["stop_reason"], status["position"]), ("operator_stop_file", "1"), status)
+        return status
+
+    def kill_after(self, fake, index):
+        engaged = []
+
+        def on_sleep(now):
+            if not engaged and now > fake.bar_time(index) + 10_000:
+                kill_switch.engage(reason="end", actor="cli")
+                engaged.append(now)
+        return on_sleep
+
+    def test_resume_continues_the_stopped_run_and_its_position(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.stop_while_long(fake, clock)
+        state_file = next((self.root / "accounts").glob("*.json"))
+        pointer = json.loads(state_file.read_text(encoding="utf-8"))["run"]
+        self.assertEqual(Path(pointer["dir"]), (self.root / "run").resolve())
+        clock.ms = fake.bar_time(6) + 1_000  # bars 4 and 5 closed while stopped
+        lines = []
+        status = self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 7), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertFalse((self.root / "run2").exists())  # the stopped run's folder is reused
+        # Bar 4 was only fed to the strategy; bar 5 (the newest closed bar) reversed the position.
+        self.assertEqual([(p["side"], p["sz"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", "1", False), ("sell", "1", True), ("sell", "1", False), ("buy", "1", True)])
+        self.assertEqual(fake.position, 0)
+        events = self.events()
+        catch_up = [e for e in events if e["kind"] == "bar" and e.get("catch_up")]
+        self.assertEqual([(e["seq"], e["bar"]["open_time_ms"]) for e in catch_up], [(5, fake.bar_time(4))])
+        self.assertTrue(any(e["kind"] == "started" and e.get("resumed") for e in events))
+        self.assertTrue(any("接續" in line for line in lines))
+        manifest = json.loads((self.root / "run" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(manifest["resumes"]), 1)
+        fills = json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(fills), 4)  # the first run's fill is kept
+        self.assertTrue(list((self.root / "run").glob("stop.request.used-*")))
+
+    def test_resume_refuses_what_the_ledger_does_not_own(self):
+        import shutil
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.stop_while_long(fake, clock)
+        manifest_before = (self.root / "run" / "manifest.json").read_text(encoding="utf-8")
+        fake.position = D("2")  # someone added by hand on OKX
+        reason = self.run_bot_quietly(fake, clock, run="run2")
+        self.assertEqual(reason, "resume_position_mismatch:okx=2:ledger=1")
+        self.assertEqual(len(fake.posts), 1)
+        self.assertEqual((self.root / "run" / "manifest.json").read_text(encoding="utf-8"), manifest_before)
+        fake.position = D("1")
+        shutil.rmtree(self.root / "run")
+        self.assertTrue(self.run_bot_quietly(fake, clock, run="run3").startswith("resume_run_unreadable"))
+        self.assertEqual(len(fake.posts), 1)
+
+    def test_resume_refuses_after_a_new_approval(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.stop_while_long(fake, clock)
+        strategy_approvals.revoke(approval_id=self.record["record_id"], confirm=lambda text, word: True)
+        sha = strategy_approvals.deployment_identity(PROFILE)[0]["sha256"]
+        strategy_approvals.approve(strategy_id=PROFILE["strategy_id"], version=PROFILE["version"], sha256=sha,
+                                   profile=PROFILE, confirm=lambda text, word: True)
+        self.record = find_demo_approval(PROFILE)
+        self.assertEqual(self.run_bot_quietly(fake, clock, run="run2"), "resume_approval_changed")
+        self.assertEqual(len(fake.posts), 1)
+
+    def test_resume_does_not_bridge_a_gap_longer_than_one_candles_page(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.stop_while_long(fake, clock)
+        clock.ms = fake.bar_time(6) + 1_000
+        with mock.patch.object(demo_bot, "RESUME_CANDLES", 1):
+            status = self.run_bot(self.make_bot(fake, clock, run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("resume_gap_too_long"), status)
+        self.assertEqual(len(fake.posts), 1)
+        self.assertEqual(fake.position, 1)
+
+    def test_resume_settles_an_uncertain_order_first(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.lose_post_response = True  # the buy is accepted, its response lost: UNKNOWN
+        fake.hide_orders = 1
+        status = self.run_bot(self.make_bot(fake, clock))
+        self.assertTrue(status["stop_reason"].startswith("order_not_settled:UNKNOWN"), status)
+        self.assertEqual(fake.position, 1)
+        fake.hide_orders = 0  # OKX answers again
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 4), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        legs = [f["leg"] for f in json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))]
+        self.assertEqual(legs, ["接續時補查", "清倉"])
+
+    def test_resume_refeeds_an_unfinished_bar_with_the_same_bytes(self):
+        from catos.worker_host import WorkerHost
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        real = WorkerHost.process_bar
+        calls = []
+
+        async def interrupted(host, bar, account):
+            calls.append(bar.open_time_ms)
+            if len(calls) == 5:  # bar 4, after the long from bar 3
+                raise KeyboardInterrupt
+            return await real(host, bar, account)
+
+        with mock.patch.object(WorkerHost, "process_bar", interrupted):
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_bot(self.make_bot(fake, clock))
+        state = json.loads((self.root / "run" / "status.json").read_text(encoding="utf-8"))
+        self.assertEqual((state["state"], state["stop_reason"], fake.position), ("stopped", "interrupted", 1))
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        events = self.events()
+        self.assertIn("resume_input", [e["kind"] for e in events])
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+
+    def test_resume_never_sends_an_intent_the_stopped_run_did_not_send(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        real = DemoBot._execute
+        calls = []
+
+        async def interrupted(bot, receipt, facts, now_ms):
+            calls.append(receipt.intent_key)
+            if len(calls) == 2:  # the reversal from bar 5 is committed, then the process dies
+                raise KeyboardInterrupt
+            return await real(bot, receipt, facts, now_ms)
+
+        with mock.patch.object(DemoBot, "_execute", interrupted):
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_bot(self.make_bot(fake, clock))
+        self.assertEqual(len(fake.posts), 1)
+        # Restarted at once, inside the intent's deadline: it is waited out and ended unsent.
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertIn("resume_intent", [e["kind"] for e in self.events()])
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+
+    def test_resume_follows_a_soft_rearm_made_while_stopped(self):
+        from catos.demo_bot import rearm_main
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        dropped = []
+
+        def drop(now):
+            if fake.posts and not dropped:
+                fake.equity -= D("300")  # 6%: Soft
+                dropped.append(now)
+
+        self.stop_while_long(fake, clock, delay=70_000, extra=drop)  # after a minute check saw the loss
+        state_file = next((self.root / "accounts").glob("*.json"))
+        self.assertTrue(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
+        with mock.patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(rearm_main(["--reason", "checked"], confirm=lambda text, word: word), 0)
+        fake.equity += D("300")  # recovered: the cause is gone
+        clock.ms = fake.bar_time(5) + 1_000
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertIn("soft_rearmed", [e["kind"] for e in self.events()])
+        # Both legs of the reversal went out: Soft no longer blocks the opening leg.
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+        self.assertFalse(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
 
 
 class AdapterTests(unittest.TestCase):

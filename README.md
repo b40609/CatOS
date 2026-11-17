@@ -152,16 +152,17 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 .venv/Scripts/python.exe -m catos.cli demo bot --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json
 ```
 
-- 啟動前整個模擬盤帳戶要沒有部位、沒有掛單（其他合約的也算），否則不啟動。同一個 OKX 帳戶同時只能跑一個 Bot。
+- 啟動前整個模擬盤帳戶要沒有掛單、其他合約沒有部位，否則不啟動。同一個 OKX 帳戶同時只能跑一個 Bot。
+- BTC-USDT-SWAP 有部位時會**接續**上一次的 run（帳戶紀錄記著最後一個 run 的資料夾）：那個 run 的帳本必須剛好擁有這個部位，而且核准、策略設定、風控門檻都沒變，否則不啟動、不接管。接續時先查清狀態不明的委託、補完沒處理完的那根 K 線；上一次決定了但沒送出的委託等過期限後結束、不送出。停下期間錯過的 K 線依序補進策略，只有最新收盤的那根可以下單。停超過 299 根 K 線（15 分鐘線約 3 天）不接續。
 - 先抓最近的已收盤 K 線預熱，之後每根收盤做一次決策；有交易就經 Supervisor 用市價單送出，成交後核對 OKX 部位與帳本一致。
 - 每天（台北時間）第一次讀到的權益是當天的虧損基準，記在 `~/.catos/okx-demo-accounts/`（每個 OKX 帳戶一份，同一天重啟或換 `--output-root` 都沿用；這份紀錄不見或壞掉時 Bot 拒絕啟動，要重來只能由你本人連同旁邊的 `.lock` 一起刪掉）。有部位時每分鐘看一次帳戶，不必等 K 線收盤。
 - 虧 5%（Soft）：停止加倉，只能減倉。重啟、跨日都不會自己解除，要你本人執行 `.venv/Scripts/python.exe -m catos.cli demo rearm --reason "原因"` 並輸入「解除」。
 - 虧 10%（Hard）：自動清倉並停止，同時觸發 Kill-Switch（紀錄的來源是「模擬盤 Bot」），解除前任何 run 都不能啟動。
 - Kill-Switch（介面右上角或 `python -m catos.cli kill engage`）：Bot 在 1 秒內鎖住，用只減倉的市價單平倉到 0 再停止。清倉途中讀 OKX 失敗會重試約 2 分鐘；還是失敗就停下、結束碼 2，並提示你到 OKX 網頁手動平倉。清倉單送出時遇到網路錯誤也一樣停下（狀態不明的委託不重送）。
 - 部位對不上、帳戶出現別的部位或掛單、委託狀態不明、K 線斷掉都會停下並寫明原因，不重送、不接管。讀 OKX 短暫失敗會先退避重試幾次。
-- Ctrl+C 或在紀錄資料夾建立 `stop.request`：停止，**部位留著不平**。
-- 紀錄在 `outputs/okx-demo-bot/<run_id>/`：`events.jsonl`（每根 K 線、成交、風控）、`status.json`、`fills.json`、帳本 `state.sqlite3`。
-- 還沒做：停下後接續同一個 run（重新啟動要先把部位平掉）、交易所端災難停損、介面上的啟動按鈕。
+- Ctrl+C 或在紀錄資料夾建立 `stop.request`：停止，**部位留著不平**；用同一個指令重開會接續。
+- 紀錄在 `outputs/okx-demo-bot/<run_id>/`：`events.jsonl`（每根 K 線、成交、風控）、`status.json`、`fills.json`、帳本 `state.sqlite3`；接續的 run 寫在同一個資料夾，`manifest.json` 的 `resumes` 記每次接續。
+- 還沒做：交易所端災難停損、介面上的啟動按鈕。
 
 ## 研究資料
 

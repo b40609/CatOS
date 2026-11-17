@@ -29,8 +29,16 @@ Reads from OKX are retried with backoff before the run stops; while flattening t
 retried for about two minutes. Between bars, with a position open, the account is
 observed every minute so Hard/Soft and foreign changes do not wait for the bar close.
 
-Not covered yet: resuming a stopped run (a new run refuses a non-zero position), and
-the exchange-side disaster stop (P6, default 0%).
+Resuming (2026-11-17, user "按照你建議執行"): when OKX shows a position at start, the
+run the account file points to is reopened instead of refusing, but only if that run's
+ledger owns exactly this position under the same approval, settings and risk limits
+(nothing is adopted). Its uncertain orders are queried first, an unfinished bar input is
+re-fed byte for byte, intents it decided but never sent are waited out and ended unsent,
+and the missed closed bars are fed in order: they update the strategy only, and only the
+newest closed bar may trade, as in the main loop. Resuming itself sends nothing. A gap
+longer than one OKX candles page (299 bars) is not bridged.
+
+Not covered yet: the exchange-side disaster stop (P6, default 0%).
 """
 
 from __future__ import annotations
@@ -43,6 +51,7 @@ from decimal import Decimal
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 import sys
 import time
 import uuid
@@ -55,7 +64,7 @@ from catos.local_sim_replay import fill_config, worker_config
 from catos.okx_demo import DemoClient, DemoError, account_issues, connect, credentials_path
 from catos.okx_demo_exchange import OkxDemoExchange
 from catos.research_catalog import ROOT
-from catos.supervisor import LocalSupervisor
+from catos.supervisor import LocalSupervisor, SupervisorUnavailable
 
 D = Decimal
 BOT_ID = "demo-bot"
@@ -70,6 +79,8 @@ READ_TRIES = 4            # about 14 s of backoff before an ordinary read stops 
 FLATTEN_READ_TRIES = 12   # about two minutes while flattening
 INTRABAR_CHECK_MS = 60_000
 AUTHORIZED_INSTRUMENTS = frozenset({"BTC-USDT-SWAP"})  # M1 agent decision: one contract only
+RESUME_CANDLES = 299      # one OKX market/candles page: the longest gap a resume bridges
+RESUME_QUERY_ROUNDS = 10  # uncertain orders left by the stopped run are queried this many times
 ACCOUNT_SCHEMA = "catos.okx-demo-account"
 ACCOUNTS_DIRECTORY = None  # Resolved lazily (~/.catos/okx-demo-accounts); tests replace only this constant.
 
@@ -193,6 +204,9 @@ class AccountGuard:
                 ok = (type(state.get("day")) is int and type(state.get("basis")) is dict
                       and type(state["basis"].get("observed_at_ms")) is int
                       and D(state["basis"]["equity"]) > 0 and type(state["basis"].get("digest")) is str)
+            run = state.get("run") if ok else None
+            if run is not None:  # the last run started on this account (absent in files written before resuming)
+                ok = type(run) is dict and type(run.get("dir")) is str and type(run.get("account_id")) is str
         except (OSError, ValueError, ArithmeticError, KeyError, TypeError):
             ok = False
         if not ok:
@@ -247,6 +261,7 @@ class DemoBot:
         self.account_state = None
         self.hard_engaged = False
         self.log = None
+        self.resumed = None  # the stopped run being continued, if any
         self.status = dict(state="starting", bars=0, fills=0, last_bar_open_ms=None, stop_reason=None,
                            position=None, started_at=_now_text())
         self.fills = []
@@ -337,7 +352,9 @@ class DemoBot:
         await self.supervisor.persist_controls()
         if state.reasons:
             self.log.event("risk", None, reasons=sorted(state.reasons), mode=state.mode)
-        if "soft_loss" in state.reasons and not self.account_state["soft_latched"]:
+        # The account file latches on an actual crossing (a resumed ledger may still hold a
+        # Soft latch the user has since cleared with demo rearm; that one is not re-recorded).
+        if "soft_loss" in risk.loss_reasons(state, self.limits) and not self.account_state["soft_latched"]:
             self.account_state = dict(self.account_state, soft_latched=True,
                                       soft_reason=f"soft_loss {_now_text()} equity={facts['equity']}")
             self.guard.save(self.account_state)
@@ -512,15 +529,20 @@ class DemoBot:
         try:
             self.account_state = guard.load()
             facts = await asyncio.to_thread(self._account)
-            if facts["position"] != 0 or facts["pending"]:
+            if facts["pending"]:
                 raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}")
+            if facts["position"] != 0:
+                self.resumed = self._resumable_run(facts)  # refuses unless the last run's ledger owns it
+                self.output_dir = self.resumed["dir"]
             if facts["others"]:
                 raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
-            self.output_dir.mkdir(parents=True, exist_ok=False)
+            if self.resumed is None:
+                self.output_dir.mkdir(parents=True, exist_ok=False)
         except BaseException:
             guard.release()
             raise
         self.guard = guard
+        self.echo(f"紀錄資料夾：{self.output_dir}" + ("（接續上一次的 run）" if self.resumed else ""))
         try:
             self._open_run(facts, contract)
         except BaseException:
@@ -532,6 +554,8 @@ class DemoBot:
             raise
         try:
             await self.supervisor.start()
+            # A resumed ledger that already latched Hard engaged the Kill-Switch back then.
+            self.hard_engaged = "hard_loss" in self.supervisor.risk_state.reasons
             if self.account_state["soft_latched"]:
                 self.supervisor.latch("soft_loss")
                 await self.supervisor.persist_controls()
@@ -548,8 +572,60 @@ class DemoBot:
             await self._close()
         return self.status
 
+    def _resumable_run(self, facts):
+        """The account's last run, if its ledger owns exactly the OKX position; otherwise refuse.
+
+        Read-only: nothing in the old run changes before every check here has passed.
+        """
+        pointer = self.account_state.get("run")
+        if pointer is None:
+            raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}")
+        directory = Path(pointer["dir"])
+        try:
+            manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+            database = directory / manifest["database"]
+            ok = (manifest.get("mode") == "okx-demo-bot" and manifest.get("bot_id") == BOT_ID
+                  and manifest.get("account_id") == pointer["account_id"] and database.is_file())
+            budget = D(manifest["starting_equity"])
+        except (OSError, ValueError, KeyError, TypeError, ArithmeticError):
+            ok = False
+        if not ok:
+            raise BotStopped(f"resume_run_unreadable:{directory}")
+        if manifest.get("approval_id") != self.record["record_id"]:
+            raise BotStopped("resume_approval_changed")
+        if (manifest.get("worker_config") != json.loads(json.dumps(self.worker.to_wire(), default=str))
+                or manifest.get("risk_limits") != json.loads(json.dumps(self.limits.to_wire(), default=str))):
+            raise BotStopped("resume_config_changed")
+        try:
+            connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
+            try:
+                owner = connection.execute("SELECT position FROM ownership WHERE bot_id=?", (BOT_ID,)).fetchone()
+                bot = connection.execute("SELECT isolated FROM bots WHERE bot_id=?", (BOT_ID,)).fetchone()
+                unresolved = connection.execute("SELECT COUNT(*) FROM execution_orders WHERE settled=0").fetchone()[0]
+            finally:
+                connection.close()
+        except sqlite3.Error:
+            raise BotStopped(f"resume_run_unreadable:{database}") from None
+        if bot is None or bot[0] or owner is None:
+            raise BotStopped("resume_run_unreadable:ledger_not_resumable")
+        owned = D("0") if owner[0] is None else D(owner[0])
+        # Uncertain orders are queried after the ledger opens; they may explain the difference.
+        if not unresolved and owned != facts["position"]:
+            raise BotStopped(f"resume_position_mismatch:okx={facts['position']}:ledger={owned}")
+        try:
+            fills = json.loads((directory / "fills.json").read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            fills = []  # stopped before writing it; every fill is still in the ledger and events.jsonl
+        except (OSError, ValueError):
+            raise BotStopped(f"resume_run_unreadable:{directory / 'fills.json'}") from None
+        if type(fills) is not list:
+            raise BotStopped(f"resume_run_unreadable:{directory / 'fills.json'}")
+        return dict(dir=directory, manifest=manifest, budget=budget, fills=fills)
+
     def _open_run(self, facts, contract):
         """Run folder, log, manifest and Supervisor (not started yet)."""
+        if self.resumed is not None:
+            return self._reopen_run(facts)
         profile = self.profile
         self.log = _Log(self.output_dir, self.echo)
         account_id = "okxdemo-" + uuid.uuid4().hex[:24]
@@ -565,13 +641,51 @@ class DemoBot:
                         notice=("帳本沿用 local-sim 的結構與標籤（不改資料庫結構）；實際交易所是 OKX 模擬盤。"
                                 "外部資金流在模擬盤階段不分類（2026-11-16 使用者決定）。"))
         atomic_json(self.output_dir / "manifest.json", manifest)
+        # The account remembers its last run, so a restart with a position can resume it.
+        self.account_state = dict(self.account_state, run=dict(dir=str(self.output_dir.resolve()),
+                                                               account_id=account_id))
+        self.guard.save(self.account_state)
         exchange = OkxDemoExchange(self.client, account_id, self.inst_id)
         self.supervisor = LocalSupervisor(self.output_dir / "state.sqlite3", account_id=account_id, bot_id=BOT_ID,
                                           config=self.worker, fixture_budget=facts["equity"], risk_limits=self.limits,
                                           exchange=exchange, day_clock=self, require_new_database=True)
         self.manifest = manifest
 
+    def _reopen_run(self, facts):
+        """Resume: the same folder, log, ledger and account id; the manifest records the resume."""
+        resumed = self.resumed
+        stop_file = self.output_dir / "stop.request"
+        if stop_file.exists():  # the request that stopped the old run is used up, not obeyed again
+            stop_file.replace(self.output_dir / f"stop.request.used-{_wall_ms()}")
+        self.log = _Log(self.output_dir, self.echo)
+        manifest = resumed["manifest"]
+        manifest = dict(manifest, resumes=[*manifest.get("resumes", []), dict(
+            at=_now_text(), equity=str(facts["equity"]), okx_position=str(facts["position"]))])
+        atomic_json(self.output_dir / "manifest.json", manifest)
+        self.fills = list(resumed["fills"])
+        self.status.update(fills=len(self.fills), resumed=True)
+        exchange = OkxDemoExchange(self.client, manifest["account_id"], self.inst_id)
+        self.supervisor = LocalSupervisor(self.output_dir / manifest["database"], account_id=manifest["account_id"],
+                                          bot_id=BOT_ID, config=self.worker, fixture_budget=resumed["budget"],
+                                          risk_limits=self.limits, exchange=exchange, day_clock=self,
+                                          require_new_database=False)
+        self.manifest = manifest
+
     async def _main_loop(self, facts):
+        if self.resumed is None:
+            seq, last_open = await self._warm_up(facts)
+        else:
+            seq, last_open = await self._resume()
+        while True:
+            bars = await self._wait_for_bar(last_open + self.tf)
+            for row in bars:
+                seq += 1
+                await self._bar(seq, _candle(row), is_latest=row is bars[-1])
+                last_open = row["open_time_ms"]
+                self.status.update(bars=seq, last_bar_open_ms=last_open)
+                self._write_status()
+
+    async def _warm_up(self, facts):
         profile = self.profile
         await self._reconcile(facts, "start")
         history = await self._call(self.client.closed_candles, self.inst_id, self.tf, self.warmup)
@@ -592,14 +706,104 @@ class DemoBot:
         self.log.event("started", f"Bot 啟動：{profile['strategy_id']} {profile['parameters']}，"
                        f"{self.inst_id} {self.tf // 60000} 分鐘，{profile['quantity']} 張；"
                        f"預熱 {seq} 根完成，權益 {facts['equity']} USDT", manifest=self.manifest)
-        while True:
-            bars = await self._wait_for_bar(last_open + self.tf)
-            for row in bars:
-                seq += 1
-                await self._bar(seq, _candle(row), is_latest=row is bars[-1])
-                last_open = row["open_time_ms"]
-                self.status.update(bars=seq, last_bar_open_ms=last_open)
-                self._write_status()
+        return seq, last_open
+
+    # ---- resume ----
+    async def _recover(self):
+        """What the stopped run left behind, settled before anything new. Nothing is sent here.
+
+        Uncertain orders are queried (never resent); an input written but not finished is
+        re-fed with the same bytes; intents decided but never sent end unsent once their
+        deadline has passed. The OKX position must then equal the ledger's.
+        """
+        journal = self.supervisor._journal
+        for _ in range(RESUME_QUERY_ROUNDS):
+            unresolved = await self.supervisor._io(journal.execution.unresolved)
+            if not unresolved:
+                break
+            for row in unresolved:
+                row = await self.supervisor.query_order(row["order_key"])
+                if row["settled"] and row["state"] == "FILLED":
+                    await self._record_fill(row, "接續時補查")
+            await self.sleep(1)
+        unresolved = await self.supervisor._io(journal.execution.unresolved)
+        if unresolved:
+            raise BotStopped("resume_unresolved_orders:" + ",".join(row["cl_ord_id"] for row in unresolved))
+        facts = await self._call(self._account)
+        await self._reconcile(facts, "resume")
+        pending = await self.supervisor._io(lambda: journal.connection.execute(
+            "SELECT seq,input_json FROM inputs WHERE bot_id=? AND state='PENDING'", (BOT_ID,)).fetchone())
+        if pending is not None:
+            stored = ipc.decode_payload(pending["input_json"].encode("utf-8"))
+            bar, account, _ = ipc.parse_event(stored["payload"], self.supervisor.checkpoint)
+            receipt = await self.supervisor.process_bar(pending["seq"], bar, account, now_ms=self.wall_ms(),
+                                                        expires_at_ms=stored["expires_at_ms"])
+            self.log.event("resume_input", f"補完上一次 run 沒處理完的那根 K 線：{receipt.disposition}",
+                           seq=pending["seq"], disposition=receipt.disposition, reason=receipt.reason)
+        held = await self.supervisor._io(lambda: [tuple(row) for row in journal.connection.execute(
+            """SELECT o.intent_key,p.input_json FROM outbox o JOIN intents i USING(intent_key)
+               JOIN inputs p ON p.bot_id=i.bot_id AND p.seq=i.seq ORDER BY i.seq""")])
+        for intent_key, input_json in held:
+            deadline = json.loads(input_json)["expires_at_ms"]
+            while self.wall_ms() <= deadline:
+                await self.sleep(min(1.0, max(0.05, (deadline + 1 - self.wall_ms()) / 1000)))
+            row = await self.supervisor.dispatch(intent_key, now_ms=self.wall_ms())
+            if row is not None:  # past its deadline nothing may go out; stop rather than guess
+                raise BotStopped("resume_sent_an_order:" + row["cl_ord_id"])
+            self.log.event("resume_intent", "上一次 run 決定了但沒送出的委託：已過期限，結束、不送出", intent_key=intent_key)
+        facts = await self._call(self._account)
+        await self._reconcile(facts, "resume-ready")
+        return facts
+
+    async def _resume(self):
+        """Continue the stopped run: recover, observe, then feed the closed bars it missed."""
+        facts = await self._recover()
+        now_ms = self.wall_ms()
+        state = await self._observe(facts, now_ms)
+        if state.mode == "FLAT":
+            await self._flatten(",".join(sorted(state.reasons)))
+            raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
+        if state.reasons == frozenset({"soft_loss"}) and not self.account_state["soft_latched"]:
+            # The user cleared Soft with demo rearm while the run was stopped; the ledger follows,
+            # unless the loss is still past the threshold (then it stays latched).
+            try:
+                await self.supervisor.rearm(now_ms=now_ms, actor="cli",
+                                            evidence_id=f"demo-rearm-{len(self.account_state.get('rearms') or [])}")
+                self.log.event("soft_rearmed", "Soft 鎖住已由你解除（demo rearm），接續的 run 也解除")
+            except SupervisorUnavailable as exc:
+                self.log.event("soft_rearm_refused", f"Soft 仍鎖住：{exc}")
+        seq = self.supervisor.checkpoint.event_seq
+        last_open = self.supervisor.checkpoint.last_open_time_ms
+        candles = await self._call(self.client.closed_candles, self.inst_id, self.tf, RESUME_CANDLES)
+        if any(b["open_time_ms"] - a["open_time_ms"] != self.tf for a, b in zip(candles, candles[1:])):
+            raise BotStopped("resume_candles_not_contiguous")
+        missed = [row for row in candles if row["open_time_ms"] > last_open]
+        if missed and missed[0]["open_time_ms"] != last_open + self.tf:
+            raise BotStopped(f"resume_gap_too_long:last_bar={last_open}:oldest_available={missed[0]['open_time_ms']}")
+        for row in missed[:-1]:  # missed while stopped: the strategy sees them, nothing trades
+            seq += 1
+            await self._catch_up_bar(seq, _candle(row), facts)
+        if missed:  # the newest closed bar is decided like any latest bar
+            seq += 1
+            await self._bar(seq, _candle(missed[-1]), is_latest=True)
+            last_open = missed[-1]["open_time_ms"]
+        self.status.update(state="running", bars=seq, last_bar_open_ms=last_open)
+        self._write_status()
+        self.log.event("started", f"Bot 接續：補上停下期間的 {len(missed)} 根 K 線；"
+                       f"部位 {self.status['position']}，權益 {facts['equity']} USDT", resumed=True,
+                       missed=len(missed), manifest=self.manifest)
+        return seq, last_open
+
+    async def _catch_up_bar(self, seq, bar, facts):
+        """A closed bar missed while stopped: its deadline is now, so an intent can only expire."""
+        view = await self._view(facts, bar.open_time_ms + self.tf)
+        now_ms = self.wall_ms()
+        receipt = await self.supervisor.process_bar(seq, bar, view, now_ms=now_ms, expires_at_ms=now_ms)
+        if receipt.disposition not in ("NO_INTENT", "NO_CHANGE", "REJECTED", "EXPIRED"):
+            raise BotStopped(f"unexpected_disposition:{receipt.disposition}")
+        self.log.event("bar", None, seq=seq, bar=ipc.bar_to_wire(bar), catch_up=True,
+                       disposition=receipt.disposition, reason=receipt.reason,
+                       target=None if receipt.target_position is None else str(receipt.target_position))
 
     async def _bar(self, seq, bar, *, is_latest):
         await self._kill_check()
@@ -672,9 +876,19 @@ START_HINTS = {
     "account_state_missing": "這個模擬盤帳戶的風控紀錄不見了（~/.catos/okx-demo-accounts/）。要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉；當天的虧損基準會重新起算。",
     "account_state_unreadable": "這個模擬盤帳戶的風控紀錄壞了（~/.catos/okx-demo-accounts/）。請先檢查；要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉。",
     "account_busy": "這個 OKX 帳戶已經有一個 Bot 在跑；同一個帳戶一次只能跑一個。",
-    "contract_not_flat_at_start": "模擬盤上 BTC-USDT-SWAP 還有部位或掛單，先到 OKX 網頁平倉、撤單再啟動。",
+    "contract_not_flat_at_start": "模擬盤上 BTC-USDT-SWAP 有掛單，或有部位但帳戶紀錄沒有可以接續的上一次 run，先到 OKX 網頁平倉、撤單再啟動。",
     "foreign_positions_or_orders_in_account": "模擬盤帳戶裡有別的合約的部位或掛單，先到 OKX 網頁處理掉再啟動。",
+    "resume_run_unreadable": "模擬盤上有部位，但上一次 run 的資料夾不見了或讀不到，不能接續。先到 OKX 網頁平倉再啟動。",
+    "resume_approval_changed": "上一次 run 用的核准跟現在有效的核准不同（重新核准或撤銷過），不能接續。先到 OKX 網頁平倉再啟動。",
+    "resume_config_changed": "上一次 run 的策略設定或風控門檻跟現在不同，不能接續。先到 OKX 網頁平倉再啟動。",
+    "resume_position_mismatch": "OKX 上的部位跟上一次 run 的帳本對不上（可能有人手動下過單），不會接手。先到 OKX 網頁處理部位再啟動。",
+    "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動。",
+    "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
 }
+
+
+def _hint(reason):
+    return next((text for prefix, text in START_HINTS.items() if str(reason).startswith(prefix)), None)
 
 
 def cli_main(argv):
@@ -695,18 +909,17 @@ def cli_main(argv):
         sys.stderr.write(f"錯誤：{exc}\n")
         return 1
     print(f"金鑰：{credentials_path()}，{note}")
-    directory = Path(args.output_root) / uuid.uuid4().hex
-    print(f"紀錄資料夾：{directory}")
-    print("停止：按 Ctrl+C，或在紀錄資料夾建立 stop.request；緊急停止用 Kill-Switch（會平倉）。\n")
+    directory = Path(args.output_root) / uuid.uuid4().hex  # a resumed run keeps its own folder instead
+    print("停止：按 Ctrl+C（部位保留，重開會接續），或在紀錄資料夾建立 stop.request；緊急停止用 Kill-Switch（會平倉）。\n")
     try:
         bot = DemoBot(client=client, record=record, output_dir=directory)
         status = asyncio.run(bot.run())
     except KeyboardInterrupt:
-        print("\n已收到 Ctrl+C；部位留在模擬盤上，沒有平倉。")
+        print("\n已收到 Ctrl+C；部位留在模擬盤上，沒有平倉。用同一個指令重開會接續這個 run。")
         return 1
     except BotStopped as exc:
         sys.stderr.write(f"沒有啟動：{exc.reason}\n")
-        hint = next((text for prefix, text in START_HINTS.items() if exc.reason.startswith(prefix)), None)
+        hint = _hint(exc.reason)
         if hint:
             sys.stderr.write(hint + "\n")
         return 1
@@ -717,6 +930,9 @@ def cli_main(argv):
         sys.stderr.write(f"沒有啟動：{exc}\n")
         return 1
     print(f"\n結束：{status['state']}（{status['stop_reason']}），最後部位 {status['position']}")
+    hint = _hint(status["stop_reason"])
+    if hint:
+        print(hint)
     if str(status["stop_reason"]).startswith("flatten_failed"):
         print("清倉沒有完成：請到 OKX 網頁確認模擬盤部位，必要時手動平倉。")
         return 2
