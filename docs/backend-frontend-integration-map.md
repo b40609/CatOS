@@ -348,7 +348,7 @@ reader 的 available／empty／partial／stale／unavailable／error 要如實�
 
 ## 6. 只有 Python／local-sim、尚不能接成 HTTP 的項目
 
-- **策略／Bot**：2026-11-03 起已掛載唯讀 GET `/api/workspace/simulation/strategies`、GET `/bots`、GET `/bots/{bot_id}` 與 POST `/bots/start`（固定登錄 SMA＋固定 Bot `sim-control-sma`，見第 5 節）。[python_strategy.py](../catos/python_strategy.py)、[strategy_library.py](../catos/strategy_library.py) 的上傳製品／`allocate` 流程仍未接通：`LocalSimControlService` 沒有 `library`，下列路徑仍不存在，`tests/test_python_strategy_api.py` 對應案例仍是 ERROR：
+- **策略／Bot**（2026-11-17 註：下文提到的 `python_strategy.py`、`strategy_library.py` 與對應測試已刪除，Agent 提交策略改走 `strategies/` 資料夾，見 `docs/agent-strategy-submission-proposal.md`）：2026-11-03 起已掛載唯讀 GET `/api/workspace/simulation/strategies`、GET `/bots`、GET `/bots/{bot_id}` 與 POST `/bots/start`（固定登錄 SMA＋固定 Bot `sim-control-sma`，見第 5 節）。[python_strategy.py](../catos/python_strategy.py)、[strategy_library.py](../catos/strategy_library.py) 的上傳製品／`allocate` 流程仍未接通：`LocalSimControlService` 沒有 `library`，下列路徑仍不存在，`tests/test_python_strategy_api.py` 對應案例仍是 ERROR：
   - GET `/api/workspace/simulation/strategy-contract`
   - POST `/api/workspace/simulation/strategies`
   - POST `/api/workspace/simulation/bots`

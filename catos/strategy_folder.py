@@ -22,6 +22,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 import traceback
 from types import ModuleType
 
@@ -52,9 +53,11 @@ CLASS_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}\Z")
 # One hashed file: anything else a strategy imported would escape its sha256. No float
 # module (math, statistics): prices and targets stay Decimal (AGENTS.md INVARIANTS).
 ALLOWED_IMPORTS = frozenset({
-    "__future__", "collections", "dataclasses", "decimal", "enum", "functools", "itertools",
-    "typing", "catos.research",
+    "__future__", "collections", "collections.abc", "dataclasses", "decimal", "enum", "functools",
+    "itertools", "typing", "catos.research",
 })
+# print/input would write to or read from the worker's stdin/stdout, which carry its replies.
+FORBIDDEN_NAMES = ("float", "__import__", "eval", "exec", "compile", "open", "print", "input")
 CONSTRAINT_OPERATORS = {"<": "must be below", "<=": "must not exceed"}
 ORIGIN = "user-strategy-folder"
 PROVENANCE = {"origin": ORIGIN, "scope": "research; a Bot only through the user's CLI approval"}
@@ -222,11 +225,12 @@ def _source_problems(tree, entry):
                 if alias.name not in ALLOWED_IMPORTS:
                     problems.append(f"line {node.lineno}: import {alias.name} is not allowed")
         elif isinstance(node, ast.ImportFrom):
-            if node.level or node.module not in ALLOWED_IMPORTS:
+            research_only = node.module == "catos" and all(alias.name == "research" for alias in node.names)
+            if node.level or not (node.module in ALLOWED_IMPORTS or research_only):
                 problems.append(f"line {node.lineno}: from {'.' * node.level}{node.module or ''} import is not allowed")
         elif isinstance(node, ast.Constant) and type(node.value) in (float, complex):
             problems.append(f"line {node.lineno}: float literal {node.value!r}; use Decimal(\"{node.value}\")")
-        elif isinstance(node, ast.Name) and node.id in ("float", "__import__", "eval", "exec", "compile", "open"):
+        elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
             problems.append(f"line {node.lineno}: {node.id} is not allowed in a strategy")
     classes = [node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == entry]
     if len(classes) != 1:
@@ -299,13 +303,23 @@ def artifact(spec):
 
 
 def build_class(spec, snapshot):
-    """The entry class executed from already hash-verified bytes; never put in sys.modules."""
+    """The entry class executed from already hash-verified bytes.
+
+    The module is in sys.modules only while its body runs (``@dataclass`` with postponed
+    annotations looks it up there) and is removed again; nothing imports it later.
+    """
     (name,) = spec.files
     if set(snapshot) != {name}:
         raise StrategyFolderError("artifact_source_snapshot_mismatch")
     module = ModuleType("catos_strategy_" + spec.strategy_id.replace("-", "_"))
     module.__file__ = str(spec.base / name)
-    exec(compile(snapshot[name], module.__file__, "exec"), module.__dict__)
+    if module.__name__ in sys.modules:
+        raise StrategyFolderError("strategy_module_name_in_use")
+    sys.modules[module.__name__] = module
+    try:
+        exec(compile(snapshot[name], module.__file__, "exec"), module.__dict__)
+    finally:
+        sys.modules.pop(module.__name__, None)
     value = getattr(module, spec.entry_class, None)
     if not isinstance(value, type) or not issubclass(value, research.Strategy):
         raise StrategyFolderError(f"{spec.entry_class} must be a class derived from catos.research.Strategy")
@@ -316,8 +330,10 @@ def build_class(spec, snapshot):
 
 CHECK_TIMEFRAME_MS = 900_000
 CHECK_START_MS = 1_704_067_200_000  # 2024-01-01T00:00Z
-CHECK_SAMPLES = 60
-CHECK_MAX_DECISIONS = 200
+# Strategy update calls the restart test may spend: every evaluation bar is a restart point
+# while (bars x (lookback + 1)) fits (always for a Bot's lookback <= 512); beyond it the
+# trade decisions come first, then evenly spaced bars.
+CHECK_UPDATE_BUDGET = 2_000_000
 
 
 def synthetic_bars(count, seed=20261117):
@@ -351,11 +367,13 @@ def where(error, spec):
 def check(spec, strategy_class, parameters, quantity):
     """Load, run and restart-test one parameter set on synthetic bars; a JSON-ready report.
 
-    Restart consistency: a Bot Worker that restarts is rebuilt from the last ``lookback``
-    closed bars only (ipc.parse_history). At every decision and at evenly spaced bars,
-    a fresh instance fed only those bars must return the same target as the instance
-    that saw the whole history. Otherwise the strategy can still be researched but
-    cannot go on a Bot.
+    Two Bot rules (ipc.parse_result, ipc.parse_history):
+    - readiness: ``ready`` is False until exactly ``lookback`` bars were fed, then True;
+    - restart consistency: a restarted Worker is rebuilt from the last ``lookback`` closed
+      bars only. At every evaluation bar (within CHECK_UPDATE_BUDGET), a fresh instance fed
+      only those bars must return the same target as the instance that saw everything.
+    Otherwise the strategy can still be researched but cannot go on a Bot. Passing is
+    necessary, not sufficient: a restarted instance that later drifts is not simulated.
     """
     from catos import research_catalog
 
@@ -366,8 +384,8 @@ def check(spec, strategy_class, parameters, quantity):
                                      Decimal("0.0005"), Decimal("2"), ())
     report = {"parameters": dict(parameters), "quantity": str(quantity), "bars": count, "warmup_bars": lookback,
               "data": "合成 15m K 線（固定種子的趨勢隨機漫步），只用來檢查程式，不代表績效。",
-              "stages": [], "trades": None, "decisions_checked": 0, "ok": False, "bot_eligible": False,
-              "bot_reason": None}
+              "stages": [], "trades": None, "decisions_checked": 0, "restart_points": 0, "exhaustive": False,
+              "ok": False, "bot_eligible": False, "bot_reason": None}
     stages = report["stages"]
 
     def stage(name, function):
@@ -400,8 +418,13 @@ def check(spec, strategy_class, parameters, quantity):
     evaluation = bars[lookback:]
     views = first.equity_curve[1:]
     reference = factory()
-    for bar in bars[:lookback]:
+    for count, bar in enumerate(bars[:lookback], start=1):
         research._call(reference.update_indicators, bar)
+        ready = research._ready(reference)
+        if report["bot_reason"] is None and ready != (count >= lookback):
+            report["bot_reason"] = (f"餵到第 {count} 根時 ready 是 {ready}：Bot 要求 ready 在剛好餵滿 lookback"
+                                    f"（{spec.lookback} = {lookback}）根時才變成 True，之前都是 False。"
+                                    "基底類別預設的 ready 永遠是 True，要自己寫")
     targets = []
     decisions = []
     for index, (bar, view) in enumerate(zip(evaluation, views)):
@@ -410,8 +433,17 @@ def check(spec, strategy_class, parameters, quantity):
         targets.append(target)
         if target is not None and target != view.position:
             decisions.append(index)
-    step = max(1, len(evaluation) // CHECK_SAMPLES)
-    indices = sorted(set(decisions[:CHECK_MAX_DECISIONS]) | set(range(0, len(evaluation), step)))
+    room = CHECK_UPDATE_BUDGET // (lookback + 1)
+    report["restart_points"] = len(evaluation)
+    report["exhaustive"] = room >= len(evaluation)
+    if report["exhaustive"]:
+        indices = list(range(len(evaluation)))
+    else:
+        chosen = set(decisions[:room // 2])
+        step = max(1, len(evaluation) // max(1, room - len(chosen)))
+        indices = sorted(chosen | set(range(0, len(evaluation), step)))
+    if report["bot_reason"] is not None:
+        indices = []
     for index in indices:
         restarted = factory()
         start = lookback + index
@@ -429,7 +461,7 @@ def check(spec, strategy_class, parameters, quantity):
                                     "移動停損或計數器），可以研究，但不能上 Bot")
             break
     else:
-        report["bot_eligible"] = True
+        report["bot_eligible"] = report["bot_reason"] is None
     report["decisions_checked"] = len(indices)
     stages.append({"name": "restart_consistency", "ok": report["bot_eligible"], "detail": report["bot_reason"]})
     if report["trades"] == 0:

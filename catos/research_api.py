@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from catos.research_catalog import ROOT, catalog, files_hash, json_text
 from catos.research_service import ResearchError, ResearchService
@@ -153,7 +154,7 @@ def create_app(*, output_dir=None):
         """Check a strategies/ folder strategy now (load, run, restart consistency); not persisted."""
         value = await parse_submission(request)
         try:
-            return JSONResponse(json.loads(json_text(service.check(value))))
+            return JSONResponse(json.loads(json_text(await run_in_threadpool(service.check, value))))
         except (ValueError, TypeError) as error:
             raise HTTPException(422, str(error)) from None
 

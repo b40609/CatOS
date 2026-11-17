@@ -157,6 +157,14 @@ def compare_run(run_dir, bars, contract, *, published=None):
     if (len(bars) != manifest["bars"] or bars[0].open_time_ms != manifest["first_open_ms"]
             or bars[-1].open_time_ms != manifest["last_open_ms"]):
         raise ValueError("bars_do_not_match_replay_manifest")
+    record = manifest["approval_record"]
+    spec = research_catalog.strategy_spec(profile["strategy_id"])
+    artifact = research_catalog.load_strategy_manifest(spec)
+    if (artifact["sha256"], research_catalog.file_hash(spec.manifest)) != (record["source_sha256"],
+                                                                           record["manifest_sha256"]):
+        # A strategies/ folder can be edited after its replay; comparing against another
+        # version would mislabel the report or blame the Bot (acceptance D3, 2026-11-17).
+        raise ValueError("strategy_source_changed_since_replay")
     inputs, intents, fills, orders = ledger_facts(run_dir / manifest["database"])
     result, research_targets, source_hash = research_run(profile, contract, bars)
     config = result.config

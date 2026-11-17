@@ -272,10 +272,15 @@ class ServiceTests(Home):
         other = self.service.submit(dict(research_catalog.DEFAULT_REQUEST), "build")
         self.assertEqual(other["trial_log"]["runs"], 1)  # another strategy has its own count
         self.wait(other["run_id"])
-        (self.temp / "research" / "trials.jsonl").write_text("not json\n", encoding="utf-8")
-        with self.assertRaises(ResearchError) as caught:
-            self.service.submit(self.request(), "build")
-        self.assertEqual(str(caught.exception), "trial_log_unreadable")
+        good = (self.temp / "research" / "trials.jsonl").read_text(encoding="utf-8")
+        line = json.loads(good.splitlines()[0])
+        for broken in ("not json\n", json.dumps({**line, "configurations": -5}) + "\n",
+                       json.dumps({key: value for key, value in line.items() if key != "sha256"}) + "\n"):
+            with self.subTest(broken=broken[:30]):
+                (self.temp / "research" / "trials.jsonl").write_text(good + broken, encoding="utf-8")
+                with self.assertRaises(ResearchError) as caught:
+                    self.service.submit(self.request(), "build")
+                self.assertEqual(str(caught.exception), "trial_log_unreadable")
 
 
 class ApiTests(Home):
@@ -381,6 +386,109 @@ class FolderBotTests(Home):
             approvals.validate_profile(self.profile(version="v2"))
 
 
+class AcceptanceFixTests(FolderBotTests):
+    """Regressions for the 2026-11-17 acceptance (reports/agent-strategy-acceptance-20261117)."""
+
+    def test_editing_an_approved_folder_never_breaks_other_approvals(self):  # D1
+        from test_step2_deployment import profile as donchian_profile
+
+        self.write()
+        donchian, _ = self.approve(donchian_profile())
+        folder, _ = self.approve(self.profile())
+        directory = self.temp / "strategies" / SID
+        edits = {
+            "version": lambda: self.write(version="v2"),
+            "float literal": lambda: self.write(source=SOURCE.replace('Decimal("0")', "0.0")),
+            "broken json": lambda: (directory / "strategy.json").write_text("{", encoding="utf-8"),
+            "narrower range": lambda: self.write(parameters=[{"name": "fast", "min": 2, "max": 3, "default": 2},
+                                                             {"name": "slow", "min": 3, "max": 500, "default": 50}]),
+        }
+        donchian_config = local_sim_replay.worker_config(donchian, research_catalog.SYNTHETIC_CONTRACT)
+        folder_config = local_sim_replay.worker_config(folder, research_catalog.SYNTHETIC_CONTRACT)
+        for name, edit in edits.items():
+            with self.subTest(name):
+                self.write()
+                edit()
+                self.assertEqual(len(approvals.read_records()), 2)
+                strategy_registry.resolve_deployment(donchian_config)
+                with self.assertRaises(strategy_registry.RegistryError):
+                    strategy_registry.resolve_deployment(folder_config)
+        import shutil
+        shutil.rmtree(directory)
+        approvals.revoke(approval_id=folder["record_id"], confirm=yes)
+        self.assertEqual([r["action"] for r in approvals.read_records()], ["approve", "approve", "revoke"])
+        strategy_registry.resolve_deployment(donchian_config)
+
+    def test_default_ready_is_refused_for_a_bot(self):  # D2
+        source = SOURCE.replace("""    @property
+    def ready(self) -> bool:
+        return len(self.closes) == self.closes.maxlen
+
+""", "")
+        self.assertNotIn("def ready", source)
+        self.write(source=source)
+        report = research_catalog.execute_check({"strategy_id": SID, "parameters": {"fast": 2, "slow": 4}},
+                                                research_catalog.provenance(research_catalog.DATASET_ID, SID))
+        self.assertTrue(report["ok"])
+        self.assertFalse(report["bot_eligible"])
+        self.assertIn("ready", report["bot_reason"])
+        with self.assertRaisesRegex(approvals.ApprovalError, "restart_consistency_failed"):
+            self.approve(self.profile())
+
+    def test_restart_check_compares_every_bar_and_catches_on_bar_state(self):  # O1
+        self.write()
+        report = research_catalog.execute_check({"strategy_id": SID},
+                                                research_catalog.provenance(research_catalog.DATASET_ID, SID))
+        self.assertTrue(report["exhaustive"])
+        self.assertEqual(report["decisions_checked"], report["restart_points"])
+        held = SOURCE.replace("        self.quantity = quantity\n",
+                              "        self.quantity = quantity\n        self.held = 3\n        self.side = None\n").replace(
+            """        if fast > slow:
+            return self.quantity
+        if fast < slow:
+            return -self.quantity
+        return None""", """        want = self.quantity if fast > slow else -self.quantity
+        self.held += 1
+        if want != self.side and self.held >= 3:
+            self.side, self.held = want, 0
+        return self.side""")
+        self.write(source=held)
+        report = research_catalog.execute_check({"strategy_id": SID, "parameters": {"fast": 3, "slow": 10}},
+                                                research_catalog.provenance(research_catalog.DATASET_ID, SID))
+        self.assertTrue(report["ok"], report)
+        self.assertFalse(report["bot_eligible"])
+
+    def test_contract_details_from_the_acceptance(self):  # O5, O6, O7
+        self.write(source=SOURCE.replace("        closes = list(self.closes)", "        print(1)\n        closes = list(self.closes)"))
+        with self.assertRaisesRegex(ValueError, "print is not allowed"):
+            research_catalog.strategy_spec(SID)
+        allowed = ("from __future__ import annotations\nfrom collections.abc import Sequence\n"
+                   "from dataclasses import dataclass\nfrom catos import research\n" + SOURCE
+                   + "\n\n@dataclass\nclass Window:\n    size: int\n")
+        self.write(source=allowed)
+        report = research_catalog.execute_check({"strategy_id": SID},
+                                                research_catalog.provenance(research_catalog.DATASET_ID, SID))
+        self.assertTrue(report["ok"] and report["bot_eligible"], report)
+        import sys
+        self.assertFalse(any(name.startswith("catos_strategy_") for name in sys.modules))
+
+    def test_single_trial_search_has_no_history_dsr(self):  # O3
+        self.write()
+        optimization = {"backtest": self.request(warmup=4), "n_trials": 1, "seed": 1,
+                        "search_space": {"fast": {"low": 2, "high": 2, "step": 1}, "slow": {"low": 4, "high": 4, "step": 1}}}
+        source = research_catalog.provenance(research_catalog.DATASET_ID, SID)
+        payload, _ = research_optimization.execute_optimization(optimization, source, {"configurations": 60})
+        self.assertIsNone(payload["overfitting"]["history_trials"])
+        self.assertIsNone(payload["overfitting"]["dsr_with_history"])
+
+    def test_edited_folder_reports_resubmission_not_restart(self):  # O8
+        directory = self.write()
+        source = research_catalog.provenance(research_catalog.DATASET_ID, SID)
+        (directory / "strategy.py").write_text(SOURCE + "\n# edited\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "strategy_changed_since_submission"):
+            research_catalog.execute_request(self.request(), source)
+
+
 class FolderReplayTests(Home):
     def test_replay_on_the_bot_matches_the_research_backtest(self):
         import asyncio
@@ -397,6 +505,10 @@ class FolderReplayTests(Home):
         report = replay_consistency.compare_run(self.temp / "replay", series, research_catalog.SYNTHETIC_CONTRACT)
         self.assertTrue(report["passed"], json.dumps(report["checks"], ensure_ascii=False))
         self.assertGreater(report["counts"]["reversal_decisions"], 0)
+        # D3: once the folder changes, this replay is not compared against another version.
+        (self.temp / "strategies" / SID / "strategy.py").write_text(SOURCE + "\n# edited\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "strategy_source_changed_since_replay"):
+            replay_consistency.compare_run(self.temp / "replay", series, research_catalog.SYNTHETIC_CONTRACT)
 
 
 if __name__ == "__main__":

@@ -71,13 +71,14 @@
 ### 和方案不同、由代理決定的細節（可推翻）
 
 - **參數只接受整數**，最多 8 個。`lookback` 指向一個參數。參數間的大小限制寫在 `constraints`，例如 `fast < slow`，研究請求、優化格點與部署設定都會檢查。
-- **單一檔案**：只能 import 白名單模組（`collections`、`decimal` 等與 `catos.research`），不能寫小數點數字或呼叫 `float(...)`。
+- **單一檔案**：只能 import 白名單模組（`collections`、`collections.abc`、`decimal` 等與 `catos.research`），不能寫小數點數字、用 `float`，也不能用 `print`、`input`（worker 的 stdout 是回傳通道）。
   - 原因：雜湊只涵蓋 `strategy.py`。另外，價格與部位要維持 Decimal。
   - 這是約定，不是沙箱。
 - **建構子用關鍵字參數**（各參數名稱加 `quantity`），只支援固定張數，不支援依權益調整張數。
 - **重啟一致性檢查**：在合成 15m 資料上做，資料是固定種子的趨勢隨機漫步，長度為 3 倍 lookback 加 300 根，介於 600 到 6,000 根。
-  - 檢查時點：每個交易決策點，加上平均取樣的 60 個時點。
+  - 檢查時點：每一根評估 K 線都是一個重啟點，逐根比對。工作量（根數 ×（lookback＋1））超過 200 萬次 update 才改抽樣，抽樣時交易決策點優先；核准一律要求逐根，Bot 的 lookback 上限 512 時一定是逐根。
   - 比法：只餵最近 lookback 根重建的實例，要和看過全部歷史的實例回同一個目標部位。
+  - `ready` 規則：餵滿 lookback 根之前必須是 False，剛好餵滿時變 True，和 Bot 的 IPC 規則相同。
   - 同時檢查：載入、建立實例、回測兩次結果相同。
   - lookback 上限 1,900 根；Bot 本身的上限是 512 根。
 - **核准**：資料夾策略在核准時，用部署設定的參數在研究 worker 子程序重跑這個檢查，不通過就拒絕。核准紀錄綁定來源 sha256、`strategy.json` 的 sha256 與 entry。之後任何一個檔案改了，Bot 和 Worker 都解析不到。
@@ -89,3 +90,27 @@
 - **check 不留紀錄**：它在研究 worker 裡同步執行，和回測共用「同一時間一個任務」的限制。結果不存檔，也不算試驗。
 - **介面**：回測、優化、滾動驗證頁會列出資料夾策略，參數限制改讀目錄的 `constraints`，不再寫死 Donchian。資料夾策略的優化預設格點是預設值，lookback 參數再加一個兩倍值。
 - **一併刪掉的檔案**：上傳合約 `catos/python_strategy.py` 依賴的 `strategy_library.py`、`strategy_mcp.py`，以及兩個證據腳本 `tests/strategy_v1_evidence.py`、`tests/strategy_v1_mcp_probe.py`。原本 skip 的 11 個測試也一起刪了，後端整套不再有 skipped。
+
+### 獨立驗收（2026-11-17）
+
+第一次驗收 FAIL，報告在 `reports/agent-strategy-acceptance-20261117/acceptance.md`。
+
+- **D1**：讀核准紀錄時，用資料夾目前的內容重驗每一筆舊紀錄。改一次已核准的資料夾，整份紀錄就讀不了，Donchian 模擬盤 Bot 也會停。
+  - 修正：讀紀錄時，資料夾策略的紀錄只做不依賴檔案的結構檢查。依檔案的檢查只在核准當下，以及該筆核准被解析時做。
+- **D2**：檢查沒有重現 Bot 的 `ready` 規則，沿用預設 `ready` 的策略會通過檢查，上 Bot 卻第一根就停。
+  - 修正：檢查加上這條規則，`strategies/README.md` 寫明。
+- **D3**：重播一致性比對讀的是資料夾目前的版本。
+  - 修正：改成先核對核准綁定的來源與 manifest 雜湊，不符就拒絕比對（`strategy_source_changed_since_replay`）。
+- **觀察 O1**：重啟檢查從抽樣改成逐根，核准一律要求逐根。
+- **其他觀察**：
+  - O2：check 端點改在執行緒池跑，不再卡住整個 8770 服務。
+  - O3：只剩 1 組有效試驗時，不算累計版 DSR。
+  - O4：試驗紀錄每一行都檢查格式。
+  - O5：禁止 `print`、`input`。
+  - O6：`@dataclass` 搭配 `__future__` 可以載入。
+  - O7：允許 `collections.abc` 與 `from catos import research`。
+  - O8：資料夾改過之後，錯誤碼改成 `strategy_changed_since_submission`。
+  - O9：核准前再比對一次 manifest。
+  - O10、O11：文件更正。
+  - O12：部署解析直接比對 spec 的 manifest 雜湊。
+- 修正後的窄範圍重驗結果見同一資料夾的 `recheck.md`。

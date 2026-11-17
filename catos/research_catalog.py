@@ -593,12 +593,17 @@ def construct(spec, strategy_class, parameters, quantity, contract=None):
     return strategy_class(*values, quantity)
 
 
+def _changed(spec):
+    """Why a run's source no longer matches: a folder was edited (submit again) or CatOS changed."""
+    return "strategy_changed_since_submission" if spec.origin == "folder" else "source_changed_restart_required"
+
+
 def load_registered_strategy(expected_source):
     """Execute only a verified immutable snapshot of the approved strategy source."""
     spec = strategy_spec(expected_source["strategy"]["id"])
     dataset_id = expected_source["dataset"]["id"]
     if provenance(dataset_id, spec.strategy_id) != expected_source:
-        raise ValueError("source_changed_restart_required")
+        raise ValueError(_changed(spec))
     strategy = verified_strategy_class(spec)
     if provenance(dataset_id, spec.strategy_id) != expected_source:
         raise ValueError("source_changed_during_strategy_load")
@@ -785,7 +790,7 @@ def execute_check(request, expected_source):
     """Load and check a folder strategy in this (worker) process; the report is the payload."""
     snapshot, spec, params, quantity = validate_check_request(request)
     if provenance(DATASET_ID, spec.strategy_id) != expected_source:
-        raise ValueError("source_changed_restart_required")
+        raise ValueError(_changed(spec))
     try:
         strategy_class = verified_strategy_class(spec)
     except Exception as error:  # the module failed to run, or the class is not a Strategy

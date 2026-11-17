@@ -168,7 +168,9 @@ class ResearchService:
             lines = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
         except (OSError, UnicodeDecodeError, ValueError):
             raise ResearchError("trial_log_unreadable", 500) from None
-        if any(type(line) is not dict or type(line.get("configurations")) is not int for line in lines):
+        if any(type(line) is not dict or type(line.get("configurations")) is not int or line["configurations"] < 1
+               or any(type(line.get(key)) is not str for key in ("strategy_id", "sha256", "created_at"))
+               for line in lines):
             raise ResearchError("trial_log_unreadable", 500)
         return [line for line in lines if line.get("strategy_id") == strategy_id]
 

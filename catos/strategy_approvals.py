@@ -31,7 +31,7 @@ from pathlib import Path
 import re
 import sys
 
-from catos import research_catalog
+from catos import research_catalog, strategy_folder
 
 ENV_PATH = "CATOS_STRATEGY_APPROVALS"
 DEFAULT_PATH = research_catalog.ROOT / "outputs" / "strategy-approvals" / "approvals.jsonl"
@@ -163,12 +163,52 @@ def _decimal(value, name, low, high, *, whole=False):
     return number
 
 
-def validate_profile(value):
-    """The approval unit; every field must be present and canonical (fail closed)."""
+def _common_profile_fields(value):
+    """Checks every profile gets whatever its strategy: fields, schema, money and market fields."""
     if type(value) is not dict or set(value) != PROFILE_FIELDS:
         raise ApprovalError("profile_exact_fields_required")
     if value["schema"] != PROFILE_SCHEMA or type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise ApprovalError("profile_schema_mismatch")
+    _decimal(value["quantity"], "quantity", Decimal("1"), Decimal("1000"), whole=True)
+    if type(value["inst_id"]) is not str or _INST_ID.fullmatch(value["inst_id"]) is None:
+        raise ApprovalError("profile_inst_id_invalid")
+    if type(value["timeframe_ms"]) is not int or value["timeframe_ms"] not in TIMEFRAMES_MS:
+        raise ApprovalError("profile_timeframe_invalid")
+    _decimal(value["initial_balance"], "initial_balance", Decimal("1"), Decimal("1000000000"))
+    _decimal(value["fee_rate"], "fee_rate", Decimal("0"), Decimal("0.01"))
+    _decimal(value["slippage_bps"], "slippage_bps", Decimal("0"), Decimal("100"))
+
+
+def _recorded_profile(value):
+    """A profile already in the hash chain, checked without reading any strategies/ folder.
+
+    Built-in Bot strategies are fixed, so their profiles get the full check. A folder
+    strategy can be edited or removed at any time; validating old records against the
+    folder as it is now would let one edit make the whole file unreadable and stop every
+    Bot (acceptance D1, 2026-11-17). Its ranges were checked when it was approved, and
+    resolve_deployment re-checks the files of the one approval a Bot uses.
+    """
+    if type(value) is dict and (value.get("strategy_id"), value.get("version")) in BOT_STRATEGIES:
+        validate_profile(value)
+        return
+    _common_profile_fields(value)
+    if (type(value["strategy_id"]) is not str or strategy_folder.STRATEGY_ID.fullmatch(value["strategy_id"]) is None
+            or type(value["version"]) is not str or strategy_folder.VERSION.fullmatch(value["version"]) is None):
+        raise ApprovalError("profile_identity_invalid")
+    parameters = value["parameters"]
+    if (type(parameters) is not dict or not 1 <= len(parameters) <= strategy_folder.MAX_PARAMETERS
+            or any(type(name) is not str or strategy_folder.PARAMETER.fullmatch(name) is None
+                   or type(number) is not int or not 0 <= number <= strategy_folder.MAX_PARAMETER_VALUE
+                   for name, number in parameters.items())):
+        raise ApprovalError("profile_parameters_invalid")
+    warmup = value["warmup_bars"]
+    if type(warmup) is not int or not 1 <= warmup < strategy_folder.WARMUP_LIMIT:
+        raise ApprovalError("profile_warmup_bars_invalid")
+
+
+def validate_profile(value):
+    """The approval unit against its strategy as it is now; every field present and canonical (fail closed)."""
+    _common_profile_fields(value)
     bot = bot_strategy(value["strategy_id"], value["version"])
     try:
         spec = bot.research
@@ -187,17 +227,9 @@ def validate_profile(value):
     lookback = bot.lookback(parameters)
     if lookback > MAX_BOT_LOOKBACK:
         raise ApprovalError("profile_lookback_above_bot_limit")
-    _decimal(value["quantity"], "quantity", Decimal("1"), Decimal("1000"), whole=True)
-    if type(value["inst_id"]) is not str or _INST_ID.fullmatch(value["inst_id"]) is None:
-        raise ApprovalError("profile_inst_id_invalid")
-    if type(value["timeframe_ms"]) is not int or value["timeframe_ms"] not in TIMEFRAMES_MS:
-        raise ApprovalError("profile_timeframe_invalid")
     warmup = value["warmup_bars"]
     if type(warmup) is not int or not lookback <= warmup < spec.warmup_limit:
         raise ApprovalError("profile_warmup_bars_invalid")
-    _decimal(value["initial_balance"], "initial_balance", Decimal("1"), Decimal("1000000000"))
-    _decimal(value["fee_rate"], "fee_rate", Decimal("0"), Decimal("0.01"))
-    _decimal(value["slippage_bps"], "slippage_bps", Decimal("0"), Decimal("100"))
     return json.loads(canonical(value))
 
 
@@ -246,7 +278,8 @@ def _check_record(record, prev):
     basis = record["research_basis"]
     if basis is not None and (type(basis) is not str or _BASIS.fullmatch(basis) is None):
         raise ApprovalError("approval_research_basis_invalid")
-    profile = validate_profile(record["profile"])
+    profile = record["profile"]
+    _recorded_profile(profile)
     if (profile["strategy_id"], profile["version"]) != (record["strategy_id"], record["version"]):
         raise ApprovalError("approval_profile_identity_mismatch")
 
@@ -376,6 +409,8 @@ def folder_check(profile, artifact, manifest_sha256):
         raise ApprovalError(f"strategy_check_failed: {failed['detail']}")
     if not report["bot_eligible"]:
         raise ApprovalError(f"restart_consistency_failed: {report['bot_reason']}")
+    if not report["exhaustive"]:
+        raise ApprovalError("restart_check_not_exhaustive")
     return report
 
 
@@ -393,7 +428,7 @@ def summary_text(profile, artifact, manifest_sha256, check=None):
     ]
     if check is not None:
         lines.append(f"  策略資料夾 {artifact['source_files'][0].rsplit('/', 1)[0]}/：重啟一致性檢查通過"
-                     f"（合成資料 {check['bars']} 根、{check['trades']} 筆成交、檢查 {check['decisions_checked']} 個時點）")
+                     f"（合成資料 {check['bars']} 根、{check['trades']} 筆成交、逐根比對 {check['decisions_checked']} 個重啟時點）")
     return "\n".join(lines)
 
 
@@ -412,7 +447,8 @@ def approve(*, strategy_id, version, sha256, profile, confirm, research_basis=No
     check = None
     if bot_strategy(strategy_id, version).research.origin == "folder":
         check = folder_check(profile, artifact, manifest_sha256)
-        if deployment_identity(profile)[0]["sha256"] != artifact["sha256"]:  # edited while it was checked
+        current, current_manifest = deployment_identity(profile)
+        if (current["sha256"], current_manifest) != (artifact["sha256"], manifest_sha256):  # edited while checked
             raise ApprovalError("sha256_does_not_match_current_source")
     if confirm(summary_text(profile, artifact, manifest_sha256, check), "approve") is not True:
         raise ApprovalError("approval_not_confirmed")

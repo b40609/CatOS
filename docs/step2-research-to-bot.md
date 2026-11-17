@@ -34,7 +34,7 @@
 
 | 部分 | 檔案 | 內容 |
 | --- | --- | --- |
-| 核准紀錄 | `catos/strategy_approvals.py` | 只增 JSON Lines，每行存前一行 sha256；改一行、刪中間的行、換順序、截斷半行、非正規 JSON 或非 UTF-8 一律讀取失敗（fail-closed）。**偵測不到**：整行刪掉結尾的幾行，或把檔案還原成較早的版本（例如刪掉最後一筆撤銷，核准會恢復有效）；這需要檔案以外的錨點，和「程序上的防呆、不是安全邊界」一致（驗收觀察 1）。核准單位是部署設定（`catos/deployment_profiles/*.json`）。CLI 要完整 64 碼 sha256 且必須是互動式終端機。只有 `BOT_STRATEGIES` 列的策略可核准（目前只有 Donchian；工作包 E／F 的策略狀態取決於全部歷史，不可上 Bot）。lookback 上限 512 根。 |
+| 核准紀錄 | `catos/strategy_approvals.py` | 只增 JSON Lines，每行存前一行 sha256；改一行、刪中間的行、換順序、截斷半行、非正規 JSON 或非 UTF-8 一律讀取失敗（fail-closed）。**偵測不到**：整行刪掉結尾的幾行，或把檔案還原成較早的版本（例如刪掉最後一筆撤銷，核准會恢復有效）；這需要檔案以外的錨點，和「程序上的防呆、不是安全邊界」一致（驗收觀察 1）。核准單位是部署設定（`catos/deployment_profiles/*.json`）。CLI 要完整 64 碼 sha256 且必須是互動式終端機。可核准的是 `BOT_STRATEGIES` 列的內建策略（目前只有 Donchian；工作包 E／F 的策略狀態取決於全部歷史，不可上 Bot），以及 2026-11-17 起通過重啟一致性檢查的 `strategies/` 資料夾策略（見 `docs/agent-strategy-submission-proposal.md`）。lookback 上限 512 根。 |
 | 兩層登錄 | `catos/strategy_registry.py` `resolve_deployment` | 內建層不變。研究製品只透過有效核准解析：策略、版本、來源 sha256（也核對研究白名單與磁碟上的檔案）、manifest 檔 sha256、entry、參數、張數、合約、週期、預熱、lookback 全部相符才通過。 |
 | IPC | `catos/ipc.py` | `WorkerConfig.deployment`；檢查點 v2 只存 `event_seq` 與最後一根時間，不存策略狀態；`ready` 必須恰好在餵滿 lookback 根時為真；重啟歷史（最近 lookback 根已提交 K 線）在 init 訊框傳給 Worker。SMA 的 v1 檢查點與 wire 格式不變。 |
 | Worker | `catos/worker.py`、`catos/worker_host.py` | 部署設定以核准解析；重啟時以歷史 K 線預熱重餵；每根前後都重新核對核准與來源，撤銷或改檔就停。子程序只多繼承 `CATOS_STRATEGY_APPROVALS`（路徑，不是憑證）。 |

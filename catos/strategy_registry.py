@@ -289,7 +289,7 @@ def resolve_deployment(config, *, approvals_path=None):
         if ((artifact["artifact_id"], artifact["version"]) != (config.strategy_id, config.strategy_artifact)
                 or artifact["sha256"] != record["source_sha256"] or artifact["entry"] != record["entry"]):
             raise RegistryError("deployment_manifest_mismatch")
-        if research_catalog.file_hash(spec.manifest) != record["manifest_sha256"]:
+        if spec.manifest_sha256 != record["manifest_sha256"]:
             raise RegistryError("deployment_manifest_changed")
         return FolderDeployment(spec, record["source_sha256"])
     entry = read_manifest(spec.manifest, ROOT)

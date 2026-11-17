@@ -239,7 +239,8 @@ def search_report(candidates, best_params, timeframe_ms, history_trials=None):
     variance_known = len(alive) >= 2 or trials < 2
     dsr = None if best is None or not variance_known else probabilistic_sharpe(best, benchmark, best_stats)
     psr = None if best is None else probabilistic_sharpe(best, 0.0, best_stats)
-    history = history_trials if type(history_trials) is int and history_trials > trials else None
+    history = (history_trials if type(history_trials) is int and history_trials > trials and len(alive) >= 2
+               else None)
     dsr_history = (None if dsr is None or history is None
                    else probabilistic_sharpe(best, expected_max_sharpe(variance, history), best_stats))
     pbo = pbo_cscv([returns[params] for params in alive]) if len(alive) >= 2 else None

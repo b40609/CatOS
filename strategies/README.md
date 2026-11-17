@@ -45,21 +45,23 @@
 ## `strategy.py`
 
 - 只能有這一個檔案。雜湊只涵蓋它，所以不能 import 同資料夾的其他檔案。
-- 可以 import 的只有 `__future__`、`collections`、`dataclasses`、`decimal`、`enum`、`functools`、`itertools`、`typing`、`catos.research`。
-- 不能用 float：不能寫小數點數字，也不能呼叫 `float(...)`。價格、部位一律用 `Decimal`，例如 `Decimal("0.5")`。
+- 可以 import 的只有 `__future__`、`collections`、`collections.abc`、`dataclasses`、`decimal`、`enum`、`functools`、`itertools`、`typing`、`catos.research`（也可寫 `from catos import research`）。
+- 不能用 float：不能寫小數點數字，也不能用 `float`。價格、部位一律用 `Decimal`，例如 `Decimal("0.5")`。
+- 不能用 `print`、`input`：研究 worker 和 Bot Worker 的標準輸出是回傳結果的通道。
 - 類別繼承 `catos.research.Strategy`，建構子用關鍵字參數：每個參數名稱，加上 `quantity`（`Decimal`，張數）。
 - `update_indicators(bar)`：每根已收盤 K 線都會呼叫，預熱期間也會。只能更新狀態，回傳 `None`。
-- `ready`（property）：資料夠了才回 `True`。
+- `ready`（property）：餵滿 `lookback` 根之前回 `False`，剛好餵滿時變成 `True`。Bot 會逐根檢查這條規則；基底類別預設永遠回 `True`，要上 Bot 就得自己寫。
 - `on_bar(bar, account)`：只在評估期呼叫。回傳目標部位（`Decimal`，正數做多、負數做空、`0` 平倉），或回 `None` 表示不變。成交在下一根開盤加滑價。
 - 不能連網、讀檔、用亂數或時間。這是約定，不是沙箱，CatOS 不會阻止。
 
 ## 上 Bot 的條件
 
-Bot 重啟時，只用最近 `lookback` 根 K 線重建策略。所以策略狀態必須只由這些 K 線決定。
+Bot 重啟時，只用最近 `lookback` 根 K 線重建策略。所以策略狀態必須只由這些 K 線決定。Bot 的 `lookback` 上限是 512 根。
 
 - 不能記住進場價、移動停損、計數器或累計值，除非它們也能從最近 `lookback` 根算回來。
 - `research_check_strategy` 的 `bot_eligible` 為 `false` 時，策略仍可研究，但使用者核准會被拒絕。
-- 使用者用 `python -m catos.cli strategy approve` 核准時，會用部署設定的參數再跑一次這個檢查。
+- 使用者用 `python -m catos.cli strategy approve` 核准時，會用部署設定的參數再跑一次這個檢查，而且逐根比對。
+- 核准後改了或刪了這個資料夾，用這筆核准的 Bot 會在下一根 K 線前停下（不平倉），要重新核准新版本；其他核准不受影響。正在跑 Bot 的策略不要改，改版請另開一個資料夾或先停 Bot。
 
 ## 其他
 
