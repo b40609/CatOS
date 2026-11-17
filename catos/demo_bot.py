@@ -40,7 +40,15 @@ ledger already FLAT is flattened and the newest bar may trade. A Soft latch in t
 cleared only by a ``demo rearm`` made after the run stopped. A gap longer than one OKX
 candles page (299 bars) is not bridged.
 
-Not covered yet: the exchange-side disaster stop (P6, default 0%).
+Disaster stop (P6, 2026-11-17, user: 10%, stop and tell me when it fires, a start option):
+with ``--disaster-stop`` above 0, every position carries one OKX conditional order that
+closes the whole position at market when the mark price moves that fraction against the
+average entry (catos/protection.py computes the price; the Supervisor sends it). It is
+created after an entry fill, moved when the average changes, canceled when the position
+closes (a reversal's old stop is canceled before the opening leg) and after a Kill/Hard
+flatten. Until OKX confirms it, increases stay blocked. A stop that OKX has fired ends the
+run (``disaster_stop_triggered``); OKX is then flat and the next start is a new run. Any
+other conditional, OCO, trigger or trailing order on the account is foreign. Default 0: off.
 """
 
 from __future__ import annotations
@@ -58,7 +66,7 @@ import sys
 import time
 import uuid
 
-from catos import ipc, kill_switch, research, risk, strategy_approvals, strategy_registry
+from catos import ipc, kill_switch, protection, research, risk, strategy_approvals, strategy_registry
 from catos.kill_switch import KillSwitchError, terminal_confirm
 from catos.journal import Reconciliation
 from catos.local_sim_r4 import atomic_json, durable_view
@@ -252,8 +260,12 @@ class AccountGuard:
 class DemoBot:
     def __init__(self, *, client: DemoClient, record: dict, output_dir: Path, limits: risk.Limits | None = None,
                  stop: asyncio.Event | None = None, echo=print, wall_ms=_wall_ms, sleep=asyncio.sleep,
-                 kill_path=None, accounts_dir=None):
+                 kill_path=None, accounts_dir=None, disaster_stop=D("0")):
         self.client = client
+        # P6 (2026-11-17): exchange-side disaster stop as a fraction of the average entry price; 0 = off.
+        if type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5"):
+            raise BotStopped("disaster_stop_out_of_range")
+        self.disaster_stop = disaster_stop
         self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
         self.record = record
         self.profile = record["profile"]
@@ -290,10 +302,12 @@ class DemoBot:
         position = sum((row["pos"] for row in rows), D("0"))
         orders = self.client.pending_orders()
         pending = [row for row in orders if row["inst_id"] == self.inst_id]
-        others = sorted({row["inst_id"] for row in every + orders if row["inst_id"] != self.inst_id})
+        algos = self.client.pending_algos()  # conditional/OCO/trigger/trailing orders count too
+        others = sorted({row["inst_id"] for row in every + orders + algos if row["inst_id"] != self.inst_id})
         mark = self.client.mark_price(self.inst_id)
         return dict(equity=snapshot["usdt_eq"], mgn_ratio=snapshot["mgn_ratio"], position=position,
-                    pending=len(pending), others=others, mark=mark, avg_px=rows[0]["avg_px"] if rows else None)
+                    pending=len(pending), others=others, mark=mark, avg_px=rows[0]["avg_px"] if rows else None,
+                    algos=[row for row in algos if row["inst_id"] == self.inst_id])
 
     async def _call(self, fn, *args, tries=READ_TRIES):
         """An OKX read, retried with backoff; still failing, the run stops with the reason."""
@@ -324,13 +338,80 @@ class DemoBot:
         owned = await self._owned_position()
         if facts["pending"]:
             raise BotStopped(f"foreign_open_orders_on_contract:{facts['pending']}")
+        guard = await self._protection_settled()
+        listed = {row["algo_cl_ord_id"] for row in facts["algos"]}
+        if guard["active"] is not None and guard["active"]["payload"]["algoClOrdId"] not in listed:
+            # OKX no longer lists the disaster stop: triggered (the run stops) or canceled there.
+            await self.supervisor.protection_verify(now_ms=self.wall_ms())
+            guard = await self._protection_settled()
         if facts["position"] != owned:
             raise BotStopped(f"position_mismatch:okx={facts['position']}:ledger={owned}")
+        known = set() if guard["active"] is None else {guard["active"]["payload"]["algoClOrdId"]}
+        foreign = sorted(row["algo_cl_ord_id"] or row["algo_id"] for row in facts["algos"]
+                         if row["algo_cl_ord_id"] not in known)
+        if foreign and not flattening:
+            raise BotStopped("foreign_algo_orders_on_contract:" + ",".join(foreign))
         position = facts["position"]
         await self.supervisor.reconcile(Reconciliation(
-            self.supervisor.revision, f"okx-demo-{label}"[:64], position, 0, 0, 0, True,
+            self.supervisor.revision, f"okx-demo-{label}"[:64], position, 0, int(guard["active"] is not None), 0, True,
             BOT_ID if position else None, ("okx-net-" + self.inst_id) if position else None))
         self.status["position"] = str(position)
+
+    async def _protection_settled(self):
+        """The ledger's disaster stop with any unconfirmed request settled by a query (never resent)."""
+        state = await self.supervisor.protection_state()
+        for attempt in range(3):
+            if state["triggered"]:
+                raise BotStopped("disaster_stop_triggered")
+            if not (state["pending"] or (state["uncertain"] and state["active"])):
+                return state
+            if attempt:
+                await self.sleep(1)
+            state = await self.supervisor.protection_step(now_ms=self.wall_ms())
+        if state["triggered"]:
+            raise BotStopped("disaster_stop_triggered")
+        if state["pending"] or (state["uncertain"] and state["active"]):
+            raise BotStopped("protection_unconfirmed")
+        return state
+
+    async def _configure_protection(self):
+        config = protection.Config(self.disaster_stop, "mark", "earlier", "cancel_confirm")
+        try:
+            await self.supervisor.configure_protection(config)
+        except SupervisorUnavailable as exc:
+            raise BotStopped(f"protection_config_failed:{exc}") from None
+        if self.disaster_stop:
+            self.log.event("protection_config", f"保底停損：價格從進場均價反向 {self.disaster_stop * 100:g}% 時，"
+                           "由 OKX 以市價整倉平倉（標記價格觸發）", ratio=str(self.disaster_stop))
+
+    async def _protect(self, facts):
+        """One disaster-stop step after a fresh observation: create, move or cancel the OKX stop.
+
+        A step that cannot run now leaves increases blocked by the journal and is retried
+        at the next check. Returns the facts to continue with (re-read after a change).
+        """
+        before = await self.supervisor.protection_state()
+        try:
+            state = await self.supervisor.protection_step(now_ms=self.wall_ms())
+        except SupervisorUnavailable as exc:
+            self.log.event("protection_wait", None, reason=str(exc))
+            return facts
+        if state["triggered"]:
+            raise BotStopped("disaster_stop_triggered")
+        active, old = state["active"], before["active"]
+        if active is not None and (old is None or active["price"] != old["price"]):
+            self.log.event("protection", f"保底停損已{'掛上' if old is None else '更新'}："
+                           f"{'賣出' if active['side'] == 'sell' else '買入'}平倉，標記價格到 {active['price']} 觸發",
+                           price=active["price"], side=active["side"], algo_id=active.get("algo_id"))
+        elif active is None and old is not None:
+            self.log.event("protection", "保底停損已撤銷")
+        if state["alert"] and state["alert"] != before["alert"]:
+            self.log.event("protection_alert", None, alert=state["alert"])
+        if (active is None) != (old is None):
+            # The ledger was marked for reconciliation: confirm against OKX before going on.
+            facts = await self._call(self._account)
+            await self._reconcile(facts, "protection")
+        return facts
 
     async def _observe(self, facts, now_ms):
         state = self.supervisor.risk_state
@@ -434,13 +515,17 @@ class DemoBot:
             await self._record_fill(row, "反手平倉" if closing_leg else "開倉／調整")
             facts = await self._call(self._account)
             await self._reconcile(facts, f"fill-{row['cl_ord_id']}")
+            state = await self._observe(facts, self.wall_ms())
+            if state.mode == "FLAT":  # e.g. Hard right after the fill: flatten now, as a minute check would
+                await self._flatten(",".join(sorted(state.reasons)))
+                raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
+            # The disaster stop follows the new position. A reversal's old stop is canceled before
+            # the opening leg, which the journal would otherwise refuse as an unprotected increase.
+            facts = await self._protect(facts)
             if not closing_leg:
                 return facts
             closed_first = True
             now_ms = self.wall_ms()
-            state = await self._observe(facts, now_ms)
-            if state.mode == "FLAT":
-                return facts  # the next bar (or minute check) flattens and stops
 
     async def _flatten(self, reason):
         """FLAT latched (Kill-Switch or Hard): reduce-only market orders until OKX shows zero."""
@@ -458,6 +543,7 @@ class DemoBot:
             if facts["position"] == 0 and not await self.supervisor._io(self.supervisor._journal.execution.unresolved):
                 await self._reconcile(facts, f"flat-{attempt}", flattening=True)
                 self.log.event("flatten_done", "清倉完成：模擬盤部位 0")
+                await self._remove_stop_after_flat(facts)
                 return
             now_ms = self.wall_ms()
             await self._reconcile(facts, f"flatten-{attempt}", flattening=True)
@@ -469,6 +555,20 @@ class DemoBot:
                     await self._record_fill(row, "清倉")
         facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
         raise BotStopped(f"flatten_incomplete:okx_position={facts['position']}")
+
+    async def _remove_stop_after_flat(self, facts):
+        """Flat after Kill/Hard: cancel the disaster stop too; a failure here only warns (the position is 0)."""
+        if (await self.supervisor.protection_state())["active"] is None:
+            return
+        try:
+            await self._observe(facts, self.wall_ms())
+            await self._protect(facts)
+        except BotStopped as exc:
+            self.log.event("protection_left", f"保底停損單沒有確認撤掉（{exc.reason}）：部位已是 0，"
+                           "請到 OKX 網頁的條件單確認並撤銷", reason=exc.reason)
+            return
+        if (await self.supervisor.protection_state())["active"] is not None:
+            self.log.event("protection_left", "保底停損單還沒確認撤掉：部位已是 0，請到 OKX 網頁的條件單確認並撤銷")
 
     async def _kill_check(self):
         fired = self.watch.check()
@@ -492,16 +592,14 @@ class DemoBot:
         if owned == 0:
             return
         facts = await self._call(self._account)
-        if facts["others"]:
-            raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
-        if facts["pending"]:
-            raise BotStopped(f"foreign_open_orders_on_contract:{facts['pending']}")
-        if facts["position"] != owned:
-            raise BotStopped(f"position_mismatch:okx={facts['position']}:ledger={owned}")
+        # Foreign positions/orders/conditional orders, the position and the disaster stop's
+        # presence on OKX (a triggered stop ends the run here, between bars).
+        await self._reconcile(facts, "minute")
         state = await self._observe(facts, self.wall_ms())
         if state.mode == "FLAT":
             await self._flatten(",".join(sorted(state.reasons)))
             raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
+        await self._protect(facts)
 
     async def _wait_for_bar(self, open_ms):
         """Wait for the bar opening at ``open_ms`` to close; checks stop/kill every second."""
@@ -542,8 +640,9 @@ class DemoBot:
         try:
             self.account_state = guard.load()
             facts = await asyncio.to_thread(self._account)
-            if facts["pending"]:
-                raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}")
+            if facts["pending"] or (facts["position"] == 0 and facts["algos"]):
+                raise BotStopped(f"contract_not_flat_at_start:position={facts['position']}:orders={facts['pending']}"
+                                 f":algo_orders={len(facts['algos'])}")
             if facts["position"] != 0:
                 self.resumed = self._resumable_run(facts)  # refuses unless the last run's ledger owns it
                 self.output_dir = self.resumed["dir"]
@@ -648,7 +747,8 @@ class DemoBot:
                         contract=dict(inst_id=contract.inst_id, base_per_contract=str(contract.base_per_contract),
                                       tick_size=str(contract.tick_size), lot_size=str(contract.lot_size),
                                       min_size=str(contract.min_size)),
-                        risk_limits=self.limits.to_wire(), account_id=account_id, bot_id=BOT_ID,
+                        risk_limits=self.limits.to_wire(), disaster_stop=str(self.disaster_stop),
+                        account_id=account_id, bot_id=BOT_ID,
                         starting_equity=str(facts["equity"]), database="state.sqlite3",
                         ledger_environment_label="local-sim",
                         notice=("帳本沿用 local-sim 的結構與標籤（不改資料庫結構）；實際交易所是 OKX 模擬盤。"
@@ -673,7 +773,8 @@ class DemoBot:
         self.log = _Log(self.output_dir, self.echo)
         manifest = resumed["manifest"]
         manifest = dict(manifest, resumes=[*manifest.get("resumes", []), dict(
-            at=_now_text(), equity=str(facts["equity"]), okx_position=str(facts["position"]))])
+            at=_now_text(), equity=str(facts["equity"]), okx_position=str(facts["position"]),
+            disaster_stop=str(self.disaster_stop))])
         atomic_json(self.output_dir / "manifest.json", manifest)
         self.fills = list(resumed["fills"])
         self.status.update(fills=len(self.fills), resumed=True)
@@ -701,6 +802,7 @@ class DemoBot:
     async def _warm_up(self, facts):
         profile = self.profile
         await self._reconcile(facts, "start")
+        await self._configure_protection()
         history = await self._call(self.client.closed_candles, self.inst_id, self.tf, self.warmup)
         if len(history) != self.warmup or any(b["open_time_ms"] - a["open_time_ms"] != self.tf
                                               for a, b in zip(history, history[1:])):
@@ -795,6 +897,9 @@ class DemoBot:
                                           soft_reason=f"soft_loss（接續時從帳本補回）{_now_text()}")
                 self.guard.save(self.account_state)
                 self.log.event("soft_latched", "帳本的 Soft 鎖住沒有對應的 demo rearm：維持鎖住，帳戶紀錄已補回")
+        # This start's --disaster-stop applies (it may differ from the stopped run's); the OKX stop follows.
+        await self._configure_protection()
+        facts = await self._protect(facts)
         seq = self.supervisor.checkpoint.event_seq
         last_open = self.supervisor.checkpoint.last_open_time_ms
         candles = await self._call(self.client.closed_candles, self.inst_id, self.tf, RESUME_CANDLES)
@@ -843,6 +948,7 @@ class DemoBot:
         if state.mode == "FLAT":
             await self._flatten(",".join(sorted(state.reasons)))
             raise BotStopped("risk_flat:" + ",".join(sorted(state.reasons)))
+        facts = await self._protect(facts)  # a missing or stale disaster stop is fixed before deciding
         # The Worker contract: the account view is stamped with this bar's close time.
         view = await self._view(facts, bar.open_time_ms + self.tf)
         # A bar caught up after a delay is processed for the strategy state, but its intent
@@ -899,7 +1005,7 @@ START_HINTS = {
     "account_state_missing": "這個模擬盤帳戶的風控紀錄不見了（~/.catos/okx-demo-accounts/）。要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉；當天的虧損基準會重新起算。",
     "account_state_unreadable": "這個模擬盤帳戶的風控紀錄壞了（~/.catos/okx-demo-accounts/）。請先檢查；要從頭開始，由你本人把同名的 .json 與 .lock 一起刪掉。",
     "account_busy": "這個 OKX 帳戶已經有一個 Bot 在跑；同一個帳戶一次只能跑一個。",
-    "contract_not_flat_at_start": "模擬盤上 BTC-USDT-SWAP 有掛單，或有部位但帳戶紀錄沒有可以接續的上一次 run，先到 OKX 網頁平倉、撤單再啟動。",
+    "contract_not_flat_at_start": "模擬盤上 BTC-USDT-SWAP 有掛單或條件單，或有部位但帳戶紀錄沒有可以接續的上一次 run，先到 OKX 網頁平倉、撤單再啟動。",
     "foreign_positions_or_orders_in_account": "模擬盤帳戶裡有別的合約的部位或掛單，先到 OKX 網頁處理掉再啟動。",
     "resume_run_unreadable": "模擬盤上有部位，但上一次 run 的資料夾不見了或讀不到，不能接續。先到 OKX 網頁平倉再啟動。",
     "resume_approval_changed": "上一次 run 用的核准跟現在有效的核准不同（重新核准或撤銷過），不能接續。先到 OKX 網頁平倉再啟動。",
@@ -907,7 +1013,24 @@ START_HINTS = {
     "resume_position_mismatch": "OKX 上的部位跟上一次 run 的帳本對不上（可能有人手動下過單），不會接手。先到 OKX 網頁處理部位再啟動。",
     "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動。",
     "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
+    "disaster_stop_triggered": "OKX 的保底停損已觸發（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
+    "protection_unconfirmed": "保底停損單的狀態查不清楚（OKX 沒回應或查不到），Bot 先停下、部位保留。到 OKX 網頁確認條件單與部位後，用同一個指令重開會接續。",
+    "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
+    "protection_config_failed": "保底停損設定沒有生效，Bot 先停下。把錯誤訊息截圖給我。",
+    "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
 }
+
+
+def _percent(text):
+    """'10%', '10' or '0' -> Decimal fraction (0.1); argparse reports anything else."""
+    raw = str(text).strip().removesuffix("%")
+    try:
+        value = Decimal(raw)
+    except ArithmeticError:
+        raise argparse.ArgumentTypeError("要寫成百分比，例如 10%") from None
+    if not value.is_finite() or not 0 <= value < 50:
+        raise argparse.ArgumentTypeError("要在 0% 到 50% 之間（0 表示不掛保底停損）")
+    return value / 100
 
 
 def _hint(reason):
@@ -918,6 +1041,9 @@ def cli_main(argv):
     parser = argparse.ArgumentParser(prog="catos.cli demo bot", description="核准過的策略在 OKX 模擬盤上跑（前景執行，Ctrl+C 停止）")
     parser.add_argument("--profile", required=True, help="部署設定 JSON（要先由使用者核准）")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--disaster-stop", type=_percent, default=Decimal("0"), metavar="10%",
+                        help="保底停損：價格從進場均價反向這麼多時，由 OKX 以市價整倉平倉（電腦當機、斷線時的最後保險）。"
+                             "預設 0（不掛）")
     args = parser.parse_args(argv)
     try:
         profile = strategy_approvals.load_profile(args.profile)
@@ -935,7 +1061,7 @@ def cli_main(argv):
     directory = Path(args.output_root) / uuid.uuid4().hex  # a resumed run keeps its own folder instead
     print("停止：按 Ctrl+C（部位保留，重開會接續），或在紀錄資料夾建立 stop.request；緊急停止用 Kill-Switch（會平倉）。\n")
     try:
-        bot = DemoBot(client=client, record=record, output_dir=directory)
+        bot = DemoBot(client=client, record=record, output_dir=directory, disaster_stop=args.disaster_stop)
         status = asyncio.run(bot.run())
     except KeyboardInterrupt:
         print("\n已收到 Ctrl+C；部位留在模擬盤上，沒有平倉。用同一個指令重開會接續這個 run。")

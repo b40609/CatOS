@@ -50,8 +50,11 @@ _GET_PATHS = frozenset((
     "/api/v5/trade/order",
     "/api/v5/trade/orders-pending",
     "/api/v5/trade/fills",
+    "/api/v5/trade/order-algo",            # P6 disaster stop (2026-11-17): one conditional order
+    "/api/v5/trade/orders-algo-pending",   # and the account's pending algo orders (foreign check)
 ))
-_POST_PATHS = frozenset(("/api/v5/trade/order", "/api/v5/trade/cancel-order"))
+_POST_PATHS = frozenset(("/api/v5/trade/order", "/api/v5/trade/cancel-order",
+                         "/api/v5/trade/order-algo", "/api/v5/trade/amend-algos", "/api/v5/trade/cancel-algos"))
 _PUBLIC_PREFIXES = ("/api/v5/public/", "/api/v5/market/")
 _INST = re.compile(r"[A-Z0-9]{1,16}-USDT-SWAP\Z")
 _CL_ORD_ID = re.compile(r"[A-Za-z0-9]{1,32}\Z")
@@ -230,6 +233,14 @@ def _dec(row: dict, field: str) -> Decimal | None:
     if not result.is_finite():
         raise DemoError(f"OKX 回應的 {field} 不是有限數字")
     return result
+
+
+def _positive_text(value) -> bool:
+    try:
+        number = Decimal(value) if type(value) is str else None
+    except InvalidOperation:
+        return False
+    return number is not None and number.is_finite() and number > 0
 
 
 def _inst(inst_id: str) -> str:
@@ -437,6 +448,88 @@ class DemoClient:
 
     def cancel_by_client_id(self, inst_id: str, cl_ord_id: str) -> None:
         self._request("POST", "/api/v5/trade/cancel-order", payload={"instId": _inst(inst_id), "clOrdId": cl_ord_id})
+
+    # ---- P6 保底停損：OKX 條件單（2026-11-17 使用者：10%、觸發後停下、啟動參數設定）----
+    # Supervisor（catos/protection.py）建好的格式原樣轉送：整倉（closeFraction=1）、只減倉、標記價格觸發、市價執行。
+    PROTECTION_BASE = frozenset(("instId", "tdMode", "posSide", "ordType", "closeFraction", "reduceOnly", "tag",
+                                 "requestId", "algoClOrdId"))
+    PROTECTION_PRICE = frozenset(("side", "slTriggerPx", "slTriggerPxType", "slOrdPx"))
+    ALGO_TYPES = ("conditional", "oco", "trigger", "move_order_stop")
+
+    def _protection(self, payload: dict, *, priced: bool) -> dict:
+        keys = self.PROTECTION_BASE | (self.PROTECTION_PRICE if priced else frozenset())
+        if (type(payload) is not dict or set(payload) != keys or payload["tag"] != TAG
+                or payload["tdMode"] != "cross" or payload["posSide"] != "net" or payload["ordType"] != "conditional"
+                or payload["closeFraction"] != "1" or payload["reduceOnly"] is not True
+                or not _CL_ORD_ID.match(str(payload["algoClOrdId"])) or not _CL_ORD_ID.match(str(payload["requestId"]))
+                or (priced and (payload["side"] not in ("buy", "sell") or payload["slOrdPx"] != "-1"
+                                or payload["slTriggerPxType"] not in ("mark", "last", "index")
+                                or not _positive_text(payload["slTriggerPx"])))):
+            raise DemoError("保底停損欄位不符 Supervisor 格式，拒送")
+        _inst(payload["instId"])
+        return payload
+
+    def place_protection(self, payload: dict) -> str:
+        p = self._protection(payload, priced=True)
+        body = {k: p[k] for k in ("instId", "tdMode", "side", "posSide", "ordType", "closeFraction", "reduceOnly",
+                                  "slTriggerPx", "slTriggerPxType", "slOrdPx", "algoClOrdId", "tag")}
+        rows = self._request("POST", "/api/v5/trade/order-algo", payload=body)
+        if len(rows) != 1 or rows[0].get("sCode") not in ("0", 0) or not rows[0].get("algoId"):
+            row = rows[0] if rows else {}
+            raise OkxApiError(str(row.get("sCode", "?")), str(row.get("sMsg", "條件單回應不完整")))
+        return str(rows[0]["algoId"])
+
+    def amend_protection(self, payload: dict) -> None:
+        p = self._protection(payload, priced=True)
+        body = {"instId": p["instId"], "algoClOrdId": p["algoClOrdId"], "reqId": p["requestId"],
+                "newSlTriggerPx": p["slTriggerPx"], "newSlOrdPx": p["slOrdPx"], "newSlTriggerPxType": p["slTriggerPxType"]}
+        rows = self._request("POST", "/api/v5/trade/amend-algos", payload=body)
+        if len(rows) != 1 or rows[0].get("sCode") not in ("0", 0):
+            row = rows[0] if rows else {}
+            raise OkxApiError(str(row.get("sCode", "?")), str(row.get("sMsg", "改條件單回應不完整")))
+
+    def cancel_protection(self, inst_id: str, algo_id: str) -> None:
+        if not re.fullmatch(r"[0-9]{1,32}", str(algo_id)):
+            raise DemoError("algoId 格式不對")
+        rows = self._request("POST", "/api/v5/trade/cancel-algos", payload=[{"instId": _inst(inst_id), "algoId": str(algo_id)}])
+        if len(rows) != 1 or rows[0].get("sCode") not in ("0", 0):
+            row = rows[0] if rows else {}
+            raise OkxApiError(str(row.get("sCode", "?")), str(row.get("sMsg", "撤條件單回應不完整")))
+
+    @staticmethod
+    def _algo_row(r: dict) -> dict:
+        return {"inst_id": r.get("instId"), "algo_id": str(r.get("algoId") or ""),
+                "algo_cl_ord_id": str(r.get("algoClOrdId") or ""), "ord_type": r.get("ordType"),
+                "state": r.get("state"), "side": r.get("side"), "sl_trigger_px": _dec(r, "slTriggerPx"),
+                "sl_trigger_px_type": r.get("slTriggerPxType"), "tag": r.get("tag"),
+                "u_time": int(r.get("uTime") or 0)}
+
+    def protection_order(self, inst_id: str, algo_cl_ord_id: str) -> dict | None:
+        """以 algoClOrdId 查一張條件單；查不到回 None，其他錯誤照常拋出。"""
+        if not _CL_ORD_ID.match(str(algo_cl_ord_id)):
+            raise DemoError("algoClOrdId 只能是 1～32 個英數字")
+        try:
+            rows = self._request("GET", "/api/v5/trade/order-algo", {"algoClOrdId": algo_cl_ord_id})
+        except OkxApiError as exc:
+            if exc.code in ("51603", "51000"):
+                return None
+            raise
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise DemoError("查條件單回應筆數不對")
+        row = self._algo_row(rows[0])
+        if row["inst_id"] != _inst(inst_id):
+            raise DemoError("條件單的合約不對")
+        return row
+
+    def pending_algos(self) -> list[dict]:
+        """帳戶裡所有等待中的 SWAP 條件類委託（四種類型），用來找陌生的條件單。"""
+        result = []
+        for ord_type in self.ALGO_TYPES:
+            rows = self._request("GET", "/api/v5/trade/orders-algo-pending", {"ordType": ord_type, "instType": "SWAP"})
+            result.extend(self._algo_row(r) for r in rows)
+        return result
 
     BARS = {300_000: "5m", 900_000: "15m", 3_600_000: "1H", 14_400_000: "4H"}
 

@@ -812,7 +812,7 @@ class LocalSupervisor:
             return await self._io(self._journal.protection.state, self.bot_id)
 
     async def protection_step(self, *, now_ms):
-        """One explicit FakeExchange step; no autonomous service or live transport."""
+        """One explicit protection step (FakeExchange, or the OKX Demo adapter's conditional order); no autonomous service."""
         async with self._operation():
             self._execution()
             p = self._journal.protection
@@ -830,6 +830,13 @@ class LocalSupervisor:
                     await self._io(p.apply, self.bot_id, report)
             await self._execution_sync()
             return await self._io(p.state, self.bot_id)
+
+    async def protection_verify(self, *, now_ms):
+        """Query the active protection again (the exchange may have triggered or canceled it)."""
+        async with self._operation():
+            self._execution()
+            await self._io(self._journal.protection.verify, self.bot_id)
+        return await self.protection_step(now_ms=now_ms)
 
     async def set_loss_limits(self, *, soft_loss, hard_loss, actor, evidence_id):
         self._require_risk()

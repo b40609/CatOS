@@ -65,6 +65,16 @@ class FakeOkx:
         self.balance_failures = 0  # next N balance reads answer HTTP 503
         self.lose_post_response = False  # the next order is accepted but its response is lost
         self.hide_orders = 0       # order queries answer "does not exist" while this is set
+        self.algos = {}            # algoClOrdId -> conditional order (P6 disaster stop)
+        self.algo_posts = []       # (path, body) of every algo write
+        self.foreign_algos = []    # conditional orders someone else placed
+        self.reject_algo = None    # sCode to refuse the next algo create with
+
+    def trigger_stop(self):
+        """OKX fires the live disaster stop: the whole position is closed at market."""
+        algo = next(a for a in self.algos.values() if a["state"] == "live")
+        algo["state"] = "effective"
+        self.position = D("0")
 
     def bar_time(self, index):
         return BASE + (index - self.start_index) * TF
@@ -144,6 +154,43 @@ class FakeOkx:
             return ok([order])
         if path == "/api/v5/trade/fills":
             return ok(self.fills.get(q["ordId"], []))
+        if path == "/api/v5/trade/orders-algo-pending":
+            rows = [a for a in list(self.algos.values()) + self.foreign_algos
+                    if a["state"] == "live" and a["ordType"] == q["ordType"]]
+            return ok([dict(a) for a in rows])
+        if method == "GET" and path == "/api/v5/trade/order-algo":
+            algo = self.algos.get(q.get("algoClOrdId"))
+            if algo is None:
+                return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
+            return ok([dict(algo)])
+        if method == "POST" and path == "/api/v5/trade/order-algo":
+            p = json.loads(body)
+            self.algo_posts.append((path, p))
+            assert p["tag"] == TAG and p["closeFraction"] == "1" and p["reduceOnly"] is True and p["slOrdPx"] == "-1"
+            assert p["slTriggerPxType"] == "mark" and p["ordType"] == "conditional" and "requestId" not in p
+            if self.reject_algo:
+                code, self.reject_algo = self.reject_algo, None
+                return 200, json.dumps({"code": "1", "msg": "", "data": [{"sCode": code, "sMsg": "refused"}]}).encode()
+            algo_id = str(7000 + len(self.algo_posts))
+            self.algos[p["algoClOrdId"]] = {"instId": p["instId"], "algoId": algo_id, "algoClOrdId": p["algoClOrdId"],
+                                            "ordType": "conditional", "state": "live", "side": p["side"],
+                                            "slTriggerPx": p["slTriggerPx"], "slTriggerPxType": p["slTriggerPxType"],
+                                            "tag": TAG, "uTime": str(self.clock.ms)}
+            return ok([{"algoId": algo_id, "algoClOrdId": p["algoClOrdId"], "sCode": "0"}])
+        if method == "POST" and path == "/api/v5/trade/amend-algos":
+            p = json.loads(body)
+            self.algo_posts.append((path, p))
+            algo = self.algos[p["algoClOrdId"]]
+            assert algo["state"] == "live" and p["newSlOrdPx"] == "-1"
+            algo.update(slTriggerPx=p["newSlTriggerPx"], slTriggerPxType=p["newSlTriggerPxType"], uTime=str(self.clock.ms))
+            return ok([{"algoId": algo["algoId"], "reqId": p["reqId"], "sCode": "0"}])
+        if method == "POST" and path == "/api/v5/trade/cancel-algos":
+            p = json.loads(body)
+            self.algo_posts.append((path, p))
+            for item in p:
+                algo = next(a for a in self.algos.values() if a["algoId"] == item["algoId"])
+                algo["state"] = "canceled"
+            return ok([{"algoId": item["algoId"], "sCode": "0"} for item in p])
         raise AssertionError(target)
 
 
@@ -163,7 +210,7 @@ class DemoBotTests(unittest.TestCase):
                                    profile=PROFILE, confirm=lambda text, word: True)
         self.record = find_demo_approval(PROFILE)
 
-    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None, run="run"):
+    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None, run="run", disaster_stop=D("0")):
         """``run`` may be a nested path: another output root shares the same account files."""
         client = DemoClient(Credentials("k", "s", "p"), fake, clock_ms=clock, sleep=lambda s: None, monotonic=lambda: 0.0)
         lines = [] if events is None else events
@@ -174,7 +221,7 @@ class DemoBotTests(unittest.TestCase):
                 on_sleep(clock.ms)
 
         return DemoBot(client=client, record=self.record, output_dir=self.root / run, echo=lines.append,
-                       wall_ms=clock, sleep=sleep, limits=limits)
+                       wall_ms=clock, sleep=sleep, limits=limits, disaster_stop=disaster_stop)
 
     def run_bot(self, bot):
         return asyncio.run(bot.run())
@@ -667,6 +714,128 @@ class DemoBotTests(unittest.TestCase):
         # Only the closing leg of the reversal went out: Soft still blocks the opening leg.
         self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
         self.assertTrue(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
+
+
+class DisasterStopTests(unittest.TestCase):
+    """P6 on OKX Demo (2026-11-17, user: 10%, stop and tell me when it fires, a start option)."""
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+    run_bot_quietly = DemoBotTests.run_bot_quietly
+    kill_after = DemoBotTests.kill_after
+    TEN = D("0.10")
+
+    def algo_writes(self, fake):
+        return [(path.rsplit("/", 1)[1], body if isinstance(body, list) else
+                 {k: body.get(k) for k in ("side", "slTriggerPx", "newSlTriggerPx") if k in body})
+                for path, body in fake.algo_posts]
+
+    def test_the_stop_follows_entries_reversals_and_the_kill_flatten(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+        writes = self.algo_writes(fake)
+        # Long 1 at 105: sell stop at 94.5. Reversal: that stop is canceled before the short at 90
+        # opens, then a buy stop at 99. The Kill flatten cancels the last one.
+        self.assertEqual([w[0] for w in writes], ["order-algo", "cancel-algos", "order-algo", "cancel-algos"])
+        self.assertEqual(writes[0][1], {"side": "sell", "slTriggerPx": "94.5"})
+        self.assertEqual(writes[2][1], {"side": "buy", "slTriggerPx": "99.0"})
+        self.assertEqual([a["state"] for a in fake.algos.values()], ["canceled", "canceled"])
+        self.assertEqual(fake.position, 0)
+        manifest = json.loads((self.root / "run" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["disaster_stop"], "0.10")
+
+    def test_off_by_default_sends_no_conditional_order(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6)))
+        self.assertEqual(fake.algo_posts, [])
+        self.assertEqual(len(fake.posts), 4)
+
+    def test_a_fired_stop_ends_the_run_and_a_restart_starts_flat(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fired = []
+
+        def on_sleep(now):
+            if fake.algos and not fired and now > fake.bar_time(4) + 20_000:
+                fake.trigger_stop()  # the computer was fine, but OKX hit the stop first
+                fired.append(now)
+
+        lines = []
+        status = self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=on_sleep, disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("disaster_stop_triggered"), status)
+        self.assertEqual(len(fake.posts), 1)  # nothing sent after the stop fired
+        self.assertLess(clock.ms, fake.bar_time(5))  # noticed by a minute check, not at the next bar
+        self.assertIn("保底停損", demo_bot._hint(status["stop_reason"]))
+        # OKX is flat now: the next start is a new run, not a resume.
+        self.assertEqual(self.run_bot_quietly(FakeOkx(clock, start_index=3), clock, run="run2"), "ran")
+
+    def test_conditional_orders_from_someone_else_are_foreign(self):
+        foreign = {"instId": "BTC-USDT-SWAP", "algoId": "1", "algoClOrdId": "manual1", "ordType": "conditional",
+                   "state": "live", "side": "sell", "slTriggerPx": "90", "slTriggerPxType": "last", "tag": ""}
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.foreign_algos = [foreign]
+        self.assertTrue(self.run_bot_quietly(fake, clock).startswith("contract_not_flat_at_start"))
+        fake.foreign_algos = [dict(foreign, instId="ETH-USDT-SWAP", ordType="oco")]
+        self.assertEqual(self.run_bot_quietly(fake, clock, run="run2"), "foreign_positions_or_orders_in_account:ETH-USDT-SWAP")
+        self.assertEqual((fake.posts, fake.algo_posts), ([], []))
+
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def on_sleep(now):
+            if fake.position == 1 and not fake.foreign_algos and now > fake.bar_time(4) + 10_000:
+                fake.foreign_algos = [foreign]
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, run="run3", disaster_stop=self.TEN))
+        self.assertEqual(status["stop_reason"], "foreign_algo_orders_on_contract:manual1", status)
+        self.assertEqual(len(fake.posts), 1)
+
+    def test_a_refused_stop_is_retried_and_blocks_increases_meanwhile(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.reject_algo = "51277"
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        events = self.events()
+        self.assertIn("protection_request_failed", [e.get("alert") for e in events if e["kind"] == "protection_alert"])
+        # Retried at the next minute check; the run went on and the reversal still traded.
+        self.assertEqual([w[0] for w in self.algo_writes(fake)][:2], ["order-algo", "order-algo"])
+        self.assertEqual(len(fake.posts), 4)
+
+    def test_resume_keeps_the_stop_and_applies_the_new_ratio(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def stop_later(now):
+            if fake.algos and now > fake.bar_time(4) + 5_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=stop_later, disaster_stop=self.TEN))
+        self.assertEqual((status["stop_reason"], status["position"]), ("operator_stop_file", "1"), status)
+        self.assertEqual(self.algo_writes(fake), [("order-algo", {"side": "sell", "slTriggerPx": "94.5"})])
+        # Restarted with 5%: the same OKX stop is checked, then moved to 99.75, rounded to the 0.1
+        # tick toward triggering earlier (99.8); nothing is sent twice.
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 4), run="run2",
+                                            disaster_stop=D("0.05")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([w[0] for w in self.algo_writes(fake)], ["order-algo", "amend-algos", "cancel-algos"])
+        self.assertEqual(self.algo_writes(fake)[1][1], {"newSlTriggerPx": "99.8"})
+        self.assertEqual(len(fake.algos), 1)
+
+    def test_start_option_reads_percent(self):
+        self.assertEqual(demo_bot._percent("10%"), D("0.10"))
+        self.assertEqual(demo_bot._percent("0"), D("0"))
+        for bad in ("50%", "-1", "ten"):
+            with self.assertRaises(Exception):
+                demo_bot._percent(bad)
 
 
 class AdapterTests(unittest.TestCase):

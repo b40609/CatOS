@@ -159,7 +159,7 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 2. 啟動（前景執行，視窗要開著；從 `C:\dev\CatOS` 執行，才會用到你的正式核准與 Kill-Switch）：
 
 ```bash
-.venv/Scripts/python.exe -m catos.cli demo bot --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json
+.venv/Scripts/python.exe -m catos.cli demo bot --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json --disaster-stop 10%
 ```
 
 - 啟動前整個模擬盤帳戶要沒有掛單（包含其他合約）、其他合約沒有部位，否則不啟動。同一個 OKX 帳戶同時只能跑一個 Bot。
@@ -172,7 +172,9 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 - 部位對不上、帳戶出現別的部位或掛單、委託狀態不明、K 線斷掉都會停下並寫明原因，不重送、不接管。讀 OKX 短暫失敗會先退避重試幾次。
 - Ctrl+C 或在紀錄資料夾建立 `stop.request`：停止，**部位留著不平**；用同一個指令重開會接續。
 - 紀錄在 `outputs/okx-demo-bot/<run_id>/`：`events.jsonl`（每根 K 線、成交、風控）、`status.json`、`fills.json`、帳本 `state.sqlite3`；接續的 run 寫在同一個資料夾，`manifest.json` 的 `resumes` 記每次接續。
-- 還沒做：交易所端災難停損、介面上的啟動按鈕。
+- `--disaster-stop 10%`（保底停損，P6；不寫就是 0、不掛）：每次有部位，Bot 都在 OKX 掛一張條件單，價格從進場均價反向 10% 時（標記價格觸發），由 OKX 以市價把整個部位平掉。電腦當機、斷線時它照樣有效。加倉、反手、平倉時跟著改價或撤掉；OKX 確認掛上之前不加倉。OKX 觸發之後 Bot 停下並寫明原因，OKX 那時已經空倉，用同一個指令重開是新的 run。接續時用這次指令的比例。
+- 帳戶裡有不是 Bot 掛的條件單、止盈止損、計畫或追蹤委託，一律當成陌生委託：不啟動，或在跑的 Bot 停下。
+- 還沒做：介面上的啟動按鈕。
 
 ## 研究資料
 

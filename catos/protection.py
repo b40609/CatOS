@@ -106,8 +106,11 @@ class ProtectionJournal:
     def save(self, bot_id, state):
         from catos.journal import canonical
         self.db.execute('UPDATE protection SET state_json=? WHERE bot_id=?', (canonical(state), bot_id))
-        if self.blocked(bot_id):
-            self.db.execute('UPDATE risk_orders SET eligible=0 WHERE reduce_only=0 AND intent_key IN (SELECT intent_key FROM intents WHERE bot_id=?)', (bot_id,))
+        # Increases are gated where they happen, not by voiding intents here: the decision
+        # (Journal._risk_verdict) and the send (ExecutionJournal.prepare) both refuse while
+        # blocked() is true. Voiding pending work on every transient block also killed a
+        # reversal's opening leg in the moment between its close and the old stop's cancel
+        # (OKX Demo P6, 2026-11-17).
 
     def desired(self, bot_id, state):
         config = Config(**(state['config'] | dict(ratio=D(state['config']['ratio']))))
@@ -176,6 +179,19 @@ class ProtectionJournal:
             s['alert'] = 'protection_recheck_required'
         # ownership is advanced by the surrounding execution transaction.
         self.save(bot_id, s)
+
+    def verify(self, bot_id):
+        """Treat the active protection as unconfirmed so the next step queries it again.
+
+        Used when the exchange no longer lists it (triggered or canceled there). Nothing is
+        sent or released here; the query result decides.
+        """
+        with self.j._transaction():
+            s = self.state(bot_id)
+            if s['active'] and not s['pending'] and not s['uncertain']:
+                s['uncertain'], s['alert'] = True, 'protection_verify'
+                self.save(bot_id, s)
+            return s
 
     def prepare(self, bot_id, now_ms):
         from catos.journal import digest
