@@ -69,6 +69,7 @@ class FakeOkx:
         self.algo_posts = []       # (path, body) of every algo write
         self.foreign_algos = []    # conditional orders someone else placed
         self.reject_algo = None    # sCode to refuse the next algo create with
+        self.lose_algo_create = False  # the next algo create never reaches OKX (connection error)
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -168,6 +169,9 @@ class FakeOkx:
             self.algo_posts.append((path, p))
             assert p["tag"] == TAG and p["closeFraction"] == "1" and p["reduceOnly"] is True and p["slOrdPx"] == "-1"
             assert p["slTriggerPxType"] == "mark" and p["ordType"] == "conditional" and "requestId" not in p
+            if self.lose_algo_create:
+                self.lose_algo_create = False
+                raise ConnectionError("never reached OKX")
             if self.reject_algo:
                 code, self.reject_algo = self.reject_algo, None
                 return 200, json.dumps({"code": "1", "msg": "", "data": [{"sCode": code, "sMsg": "refused"}]}).encode()
@@ -829,6 +833,43 @@ class DisasterStopTests(unittest.TestCase):
         self.assertEqual([w[0] for w in self.algo_writes(fake)], ["order-algo", "amend-algos", "cancel-algos"])
         self.assertEqual(self.algo_writes(fake)[1][1], {"newSlTriggerPx": "99.8"})
         self.assertEqual(len(fake.algos), 1)
+
+    # ---- independent acceptance 2026-11-17 (p6-cleanup), D1/D3 ----
+    def test_an_unconfirmed_stop_never_blocks_the_kill_flatten(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.lose_algo_create = True  # the stop request is lost: OKX never saw it, queries say "not found"
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 4), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertEqual((fake.position, fake.algos), (0, {}))  # flattened; nothing was resent
+        alerts = [e.get("alert") for e in self.events() if e["kind"] == "protection_alert"]
+        self.assertIn("protection_unconfirmed", alerts)
+
+    def test_an_unconfirmed_stop_never_blocks_the_hard_flatten(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3, lose_after_fill=1)
+        fake.lose_algo_create = True
+        status = self.run_bot(self.make_bot(fake, clock, disaster_stop=self.TEN))
+        self.assertIn("hard_loss", status["stop_reason"])
+        self.assertEqual(fake.position, 0)
+        records = kill_switch.read_records(Path(os.environ[kill_switch.ENV_PATH]))
+        self.assertEqual((records[-1]["action"], records[-1]["actor"]), ("engage", "demo-bot"))
+
+    def test_a_stop_changed_on_okx_is_put_back(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        changed = []
+
+        def on_sleep(now):
+            if fake.algos and not changed and now > fake.bar_time(4) + 10_000:
+                next(iter(fake.algos.values()))["slTriggerPx"] = "80"  # someone moved it by hand
+                changed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, run="run", disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:") or status["state"] == "stopped", status)
+        writes = self.algo_writes(fake)
+        self.assertIn(("amend-algos", {"newSlTriggerPx": "94.5"}), writes)
 
     def test_start_option_reads_percent(self):
         self.assertEqual(demo_bot._percent("10%"), D("0.10"))

@@ -46,9 +46,11 @@ closes the whole position at market when the mark price moves that fraction agai
 average entry (catos/protection.py computes the price; the Supervisor sends it). It is
 created after an entry fill, moved when the average changes, canceled when the position
 closes (a reversal's old stop is canceled before the opening leg) and after a Kill/Hard
-flatten. Until OKX confirms it, increases stay blocked. A stop that OKX has fired ends the
-run (``disaster_stop_triggered``); OKX is then flat and the next start is a new run. Any
-other conditional, OCO, trigger or trailing order on the account is foreign. Default 0: off.
+flatten. Until OKX confirms it, increases stay blocked and later checks keep querying; it
+never blocks a reduction, a flatten or reconciliation. A stop that OKX has fired ends the
+run (``disaster_stop_triggered``); OKX is then flat and the next start is a new run. A stop
+OKX shows changed or missing is queried again and the ledger follows OKX. Any other
+conditional, OCO, trigger or trailing order on the account is foreign. Default 0: off.
 """
 
 from __future__ import annotations
@@ -266,6 +268,7 @@ class DemoBot:
         if type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5"):
             raise BotStopped("disaster_stop_out_of_range")
         self.disaster_stop = disaster_stop
+        self.protection_configured = False
         self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
         self.record = record
         self.profile = record["profile"]
@@ -338,15 +341,28 @@ class DemoBot:
         owned = await self._owned_position()
         if facts["pending"]:
             raise BotStopped(f"foreign_open_orders_on_contract:{facts['pending']}")
-        guard = await self._protection_settled()
-        listed = {row["algo_cl_ord_id"] for row in facts["algos"]}
-        if guard["active"] is not None and guard["active"]["payload"]["algoClOrdId"] not in listed:
-            # OKX no longer lists the disaster stop: triggered (the run stops) or canceled there.
-            await self.supervisor.protection_verify(now_ms=self.wall_ms())
-            guard = await self._protection_settled()
+        # The disaster stop never gates reconciliation or a flatten: an unconfirmed stop only keeps
+        # increases blocked (journal) while later steps query it (acceptance D1, 2026-11-17).
+        guard = await self.supervisor.protection_state()
+        active = guard["active"]
+        listed = {row["algo_cl_ord_id"]: row for row in facts["algos"]}
+        if active is not None and not (guard["pending"] or guard["uncertain"] or guard["triggered"]):
+            row = listed.get(active["payload"]["algoClOrdId"])
+            if row is None or (row["sl_trigger_px"], row["side"], row["sl_trigger_px_type"]) != (
+                    D(active["price"]), active["side"], active["trigger"]):
+                # OKX no longer lists our stop (fired or canceled there) or shows it changed: query
+                # it once more and let the ledger follow what OKX reports. Nothing is resent.
+                try:
+                    guard = await self.supervisor.protection_verify(now_ms=self.wall_ms())
+                except SupervisorUnavailable as exc:
+                    self.log.event("protection_wait", None, reason=str(exc))
+                    guard = await self.supervisor.protection_state()
+        # A fired stop ends the run; while flattening only when OKX no longer matches the ledger.
+        if guard["triggered"] and (not flattening or facts["position"] != owned):
+            raise BotStopped("disaster_stop_triggered")
         if facts["position"] != owned:
             raise BotStopped(f"position_mismatch:okx={facts['position']}:ledger={owned}")
-        known = set() if guard["active"] is None else {guard["active"]["payload"]["algoClOrdId"]}
+        known = {item["payload"]["algoClOrdId"] for item in (guard["active"], guard["pending"]) if item}
         foreign = sorted(row["algo_cl_ord_id"] or row["algo_id"] for row in facts["algos"]
                          if row["algo_cl_ord_id"] not in known)
         if foreign and not flattening:
@@ -357,46 +373,49 @@ class DemoBot:
             BOT_ID if position else None, ("okx-net-" + self.inst_id) if position else None))
         self.status["position"] = str(position)
 
-    async def _protection_settled(self):
-        """The ledger's disaster stop with any unconfirmed request settled by a query (never resent)."""
-        state = await self.supervisor.protection_state()
-        for attempt in range(3):
-            if state["triggered"]:
-                raise BotStopped("disaster_stop_triggered")
-            if not (state["pending"] or (state["uncertain"] and state["active"])):
-                return state
-            if attempt:
-                await self.sleep(1)
-            state = await self.supervisor.protection_step(now_ms=self.wall_ms())
-        if state["triggered"]:
-            raise BotStopped("disaster_stop_triggered")
-        if state["pending"] or (state["uncertain"] and state["active"]):
-            raise BotStopped("protection_unconfirmed")
-        return state
-
-    async def _configure_protection(self):
+    async def _configure_protection(self, *, strict=True):
+        """Install this start's ratio. At a fresh start a failure stops the run; on resume (strict
+        off) it is retried by later steps once an inherited stop is confirmed."""
         config = protection.Config(self.disaster_stop, "mark", "earlier", "cancel_confirm")
         try:
             await self.supervisor.configure_protection(config)
         except SupervisorUnavailable as exc:
-            raise BotStopped(f"protection_config_failed:{exc}") from None
+            if strict:
+                raise BotStopped(f"protection_config_failed:{exc}") from None
+            self.log.event("protection_wait", None, reason=f"configure:{exc}")
+            return
+        self.protection_configured = True
         if self.disaster_stop:
             self.log.event("protection_config", f"保底停損：價格從進場均價反向 {self.disaster_stop * 100:g}% 時，"
                            "由 OKX 以市價整倉平倉（標記價格觸發）", ratio=str(self.disaster_stop))
 
-    async def _protect(self, facts):
+    ALERTS = {
+        "protection_unconfirmed": "保底停損單還沒確認（OKX 沒回應或還查不到）：確認前不加倉，Bot 會繼續查",
+        "protection_request_failed": "OKX 拒絕了保底停損單：確認前不加倉，下次檢查會重掛",
+        "protection_mismatch": "保底停損和部位對不上：確認前不加倉，下次檢查會修正",
+    }
+
+    async def _protect(self, facts, *, flattening=False):
         """One disaster-stop step after a fresh observation: create, move or cancel the OKX stop.
 
         A step that cannot run now leaves increases blocked by the journal and is retried
         at the next check. Returns the facts to continue with (re-read after a change).
         """
         before = await self.supervisor.protection_state()
+        if not self.protection_configured and not (before["pending"] or before["uncertain"] or before["triggered"]):
+            await self._configure_protection(strict=False)
+            before = await self.supervisor.protection_state()
         try:
             state = await self.supervisor.protection_step(now_ms=self.wall_ms())
+            if not self.protection_configured and not (state["pending"] or state["uncertain"] or state["triggered"]):
+                # Resume: the inherited stop was just confirmed; now this start's ratio applies.
+                await self._configure_protection(strict=False)
+                if self.protection_configured:
+                    state = await self.supervisor.protection_step(now_ms=self.wall_ms())
         except SupervisorUnavailable as exc:
             self.log.event("protection_wait", None, reason=str(exc))
             return facts
-        if state["triggered"]:
+        if state["triggered"] and not flattening:
             raise BotStopped("disaster_stop_triggered")
         active, old = state["active"], before["active"]
         if active is not None and (old is None or active["price"] != old["price"]):
@@ -406,11 +425,11 @@ class DemoBot:
         elif active is None and old is not None:
             self.log.event("protection", "保底停損已撤銷")
         if state["alert"] and state["alert"] != before["alert"]:
-            self.log.event("protection_alert", None, alert=state["alert"])
+            self.log.event("protection_alert", self.ALERTS.get(state["alert"]), alert=state["alert"])
         if (active is None) != (old is None):
             # The ledger was marked for reconciliation: confirm against OKX before going on.
             facts = await self._call(self._account)
-            await self._reconcile(facts, "protection")
+            await self._reconcile(facts, "protection", flattening=flattening)
         return facts
 
     async def _observe(self, facts, now_ms):
@@ -533,8 +552,12 @@ class DemoBot:
         try:
             await self._flatten_rounds()
         except BotStopped as exc:
-            self.log.event("flatten_failed", f"清倉沒有完成（{exc.reason}）：部位可能還在 OKX 上，"
-                           "請到 OKX 網頁確認並手動平倉；Kill-Switch 維持觸發")
+            if exc.reason.startswith("disaster_stop_triggered"):
+                self.log.event("flatten_failed", "清倉途中 OKX 的保底停損先觸發了，OKX 已經平倉：請到 OKX 網頁確認部位是 0；"
+                               "Kill-Switch 維持觸發")
+            else:
+                self.log.event("flatten_failed", f"清倉沒有完成（{exc.reason}）：部位可能還在 OKX 上，"
+                               "請到 OKX 網頁確認並手動平倉；Kill-Switch 維持觸發")
             raise BotStopped(f"flatten_failed:{exc.reason}") from None
 
     async def _flatten_rounds(self):
@@ -562,7 +585,7 @@ class DemoBot:
             return
         try:
             await self._observe(facts, self.wall_ms())
-            await self._protect(facts)
+            await self._protect(facts, flattening=True)  # other contracts' positions do not matter here
         except BotStopped as exc:
             self.log.event("protection_left", f"保底停損單沒有確認撤掉（{exc.reason}）：部位已是 0，"
                            "請到 OKX 網頁的條件單確認並撤銷", reason=exc.reason)
@@ -897,8 +920,8 @@ class DemoBot:
                                           soft_reason=f"soft_loss（接續時從帳本補回）{_now_text()}")
                 self.guard.save(self.account_state)
                 self.log.event("soft_latched", "帳本的 Soft 鎖住沒有對應的 demo rearm：維持鎖住，帳戶紀錄已補回")
-        # This start's --disaster-stop applies (it may differ from the stopped run's); the OKX stop follows.
-        await self._configure_protection()
+        # This start's --disaster-stop applies (it may differ from the stopped run's): _protect installs
+        # it once the inherited stop is confirmed on OKX, and the stop follows.
         facts = await self._protect(facts)
         seq = self.supervisor.checkpoint.event_seq
         last_open = self.supervisor.checkpoint.last_open_time_ms
@@ -1014,7 +1037,6 @@ START_HINTS = {
     "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動。",
     "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
     "disaster_stop_triggered": "OKX 的保底停損已觸發（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
-    "protection_unconfirmed": "保底停損單的狀態查不清楚（OKX 沒回應或查不到），Bot 先停下、部位保留。到 OKX 網頁確認條件單與部位後，用同一個指令重開會接續。",
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
     "protection_config_failed": "保底停損設定沒有生效，Bot 先停下。把錯誤訊息截圖給我。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
