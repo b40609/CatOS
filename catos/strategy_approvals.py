@@ -481,7 +481,7 @@ def terminal_confirm(text, word):
 
 def cli_main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m catos.cli strategy",
-                                     description="研究策略上 local-sim Bot 的本機核准（只限使用者在終端機執行）")
+                                     description="研究策略上 Bot（local-sim 重播與 OKX 模擬盤）的本機核准（approve、revoke 只限使用者在終端機執行）")
     commands = parser.add_subparsers(dest="command", required=True)
     approve_cmd = commands.add_parser("approve", help="核准一份部署設定")
     approve_cmd.add_argument("--strategy", required=True)

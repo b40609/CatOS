@@ -339,6 +339,26 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(calls[-1][:3], ("POST", "/api/research/validations", 5))
 
 
+class McpResultFieldsTests(unittest.TestCase):
+    def test_get_result_can_return_only_the_requested_fields(self):  # trial-user friction 1
+        import asyncio
+        from catos.research_mcp import create_mcp_server
+
+        class Bridge:
+            def get_result(self, run_id):
+                return {"trial_log": {"runs": 2}, "result": {"fills": [1] * 1000}, "costs": {"net": "1"}}
+
+        server = create_mcp_server(Bridge())
+
+        def call(arguments):
+            reply = asyncio.run(server.call_tool("research_get_result", arguments))
+            return reply[1] if isinstance(reply, tuple) else reply
+
+        self.assertEqual(call({"run_id": "a" * 32, "fields": ["trial_log", "missing"]}),
+                         {"available_fields": ["costs", "result", "trial_log"], "trial_log": {"runs": 2}})
+        self.assertEqual(set(call({"run_id": "a" * 32})), {"trial_log", "result", "costs"})
+
+
 class FolderBotTests(Home):
     def profile(self, fast=2, slow=4, **changes):
         value = {"schema": "catos.strategy-deployment", "schema_version": 1, "strategy_id": SID, "version": "v1",

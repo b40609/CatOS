@@ -17,7 +17,7 @@ from catos.research_catalog import (
     DEFAULT_VALIDATION, ENGINE_FILES, MAX_BARS, MAX_VALIDATION_BAR_EVALUATIONS,
     MAX_VALIDATION_CANDIDATES, MAX_VALIDATION_CURVE_POINTS, MAX_VALIDATION_LOOKBACK_BARS,
     MAX_VALIDATION_RUNS, MAX_VALIDATION_WINDOWS, ROOT, check_search_grid, costs_for, costs_html,
-    decimal_string,
+    decimal_string, field_problem,
     drawdown_pcts, json_text, load_dataset_bars, provenance, registered_factory,
     require_search_names, resolve_dataset, sample_curve_indices, slim_margin, strategy_spec, validate_request,
 )
@@ -42,7 +42,7 @@ def _integer(value, name, low, high):
 
 def validate_validation_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_VALIDATION):
-        raise ValueError("validation: exact registered fields required")
+        raise ValueError(field_problem("validation", value, DEFAULT_VALIDATION))
     backtest, config, _, quantity = validate_request(value["backtest"])
     spec = strategy_spec(backtest["strategy_id"])
     space = value["search_space"]

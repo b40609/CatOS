@@ -387,9 +387,17 @@ def decimal_string(value, name, *, positive=False):
     return number
 
 
+def field_problem(kind, value, expected):
+    """'<kind>: exact registered fields required (missing [...], unexpected [...])'."""
+    if type(value) is not dict:
+        return f"{kind}: exact registered fields required (a JSON object with {sorted(expected)})"
+    return (f"{kind}: exact registered fields required (missing {sorted(set(expected) - set(value))}, "
+            f"unexpected {sorted(set(value) - set(expected))}; see research_catalog)")
+
+
 def validate_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_REQUEST):
-        raise ValueError("request: exact registered fields required")
+        raise ValueError(field_problem("request", value, DEFAULT_REQUEST))
     spec = strategy_spec(value["strategy_id"])
     # Every execution path revalidates the fixed local artifact manifest and
     # current allowlisted source hash before accepting a registered strategy.
@@ -454,7 +462,7 @@ def check_search_grid(spec, ranges, warmup):
 
 def validate_optimization_request(value):
     if type(value) is not dict or set(value) != set(DEFAULT_OPTIMIZATION):
-        raise ValueError("optimization: exact registered fields required")
+        raise ValueError(field_problem("optimization", value, DEFAULT_OPTIMIZATION))
     backtest_request, config, _, quantity = validate_request(value["backtest"])
     spec = strategy_spec(backtest_request["strategy_id"])
     space = value["search_space"]
@@ -501,7 +509,8 @@ def catalog():
             folder_errors.append({"strategy_id": spec.strategy_id, "error": str(error)})
     return {
         "strategies": strategies,
-        "strategy_folder": {"path": f"{strategy_folder.FOLDER}/", "guide": f"{strategy_folder.FOLDER}/README.md",
+        "strategy_folder": {"path": str(strategy_folder.folder_root().resolve()),
+                            "guide": f"{strategy_folder.FOLDER}/README.md",
                             "errors": folder_errors,
                             "notice": ("strategies/<id>/ 裡的 strategy.json＋strategy.py；每次讀檔重算 sha256，"
                                        "改了就是新版本。先用 research_check_strategy 檢查；研究不需核准，上 Bot 要使用者核准。")},
@@ -523,7 +532,8 @@ def catalog():
                    "timeout_seconds": TIMEOUT_SECONDS, "max_runs": MAX_RUNS,
                    "max_output_bytes": MAX_OUTPUT_BYTES},
         "model": ("Market at next open plus explicit slippage; funding from the dataset "
-                  "(synthetic: none); no order book, margin or liquidation model."),
+                  "(synthetic: none); no order book. Margin and liquidation per dataset "
+                  "(see each dataset's margin model)."),
     }
 
 

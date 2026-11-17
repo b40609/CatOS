@@ -18,8 +18,9 @@ from catos.research_catalog import (
 )
 
 TRIAL_LOG = "trials.jsonl"
-TRIAL_LOG_NOTICE = ("這個策略（所有版本）在這個研究資料夾累計送出的回測、優化與滾動驗證；"
-                    "configurations 是試過的參數組數，換參數或改程式都算試驗。優化結果的 DSR 另外用這個數字算一次。")
+TRIAL_LOG_NOTICE = ("這個策略（所有版本）在這個研究資料夾累計送出的回測、優化與滾動驗證。"
+                    "configurations 是評估過的參數組次數：同一組參數再送一次也再算一次（寧可多算），"
+                    "換參數或改程式都算試驗。優化結果的 dsr_with_history 用這個數字當 N 再算一次 DSR。")
 
 
 class ResearchError(Exception):

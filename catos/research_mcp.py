@@ -274,9 +274,15 @@ def create_mcp_server(bridge=None):
         return call(client.get_run, run_id)
 
     @server.tool(name="research_get_result",
-                 description="Read a completed research result. Decimal performance values remain JSON strings.")
-    def research_get_result(run_id: str) -> dict[str, Any]:
-        return call(client.get_result, run_id)
+                 description=("Read a completed research result. Decimal performance values remain JSON strings. "
+                              "Results can be about 1 MB (every fill, the equity curve, source snapshots): pass "
+                              "fields, e.g. [\"trial_log\", \"costs\", \"trade_stats\", \"overfitting\"], to get "
+                              "only those top-level keys plus available_fields."))
+    def research_get_result(run_id: str, fields: list[str] | None = None) -> dict[str, Any]:
+        result = call(client.get_result, run_id)
+        if fields is None:
+            return result
+        return {"available_fields": sorted(result), **{name: result[name] for name in fields if name in result}}
 
     @server.tool(name="research_get_report",
                  description="Read the persisted HTML report for a completed research run.")

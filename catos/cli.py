@@ -192,7 +192,14 @@ def main(argv: list[str] | None = None) -> int:
         from catos.okx_demo import cli_main
         return cli_main(args_in[1:])
     parser = argparse.ArgumentParser(
-        description="catOS Dual SMA Strategy Backtest CLI"
+        description="catOS Dual SMA Strategy Backtest CLI（沒有子指令時）",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=("子指令（各自加 --help 看用法）：\n"
+                "  strategy        研究策略上 Bot 的核准：identity、list 唯讀；approve、revoke 只限使用者本人\n"
+                "  replay          local-sim 歷史重播\n"
+                "  replay-compare  重播與研究回測的一致性比對\n"
+                "  kill            Kill-Switch；解除只限使用者本人\n"
+                "  demo            OKX 模擬盤（連線、Bot、Soft 解除只限使用者本人）"),
     )
     parser.add_argument("--csv", required=True, help="Path to candle CSV file")
     parser.add_argument("--symbol", required=True, help="Contract symbol matching caller-supplied specs")

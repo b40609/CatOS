@@ -394,7 +394,11 @@ def check(spec, strategy_class, parameters, quantity):
         try:
             value = function()
         except Exception as error:  # the strategy's own error, reported back to its author
-            stages.append({"name": name, "ok": False, "detail": f"{type(error).__name__}: {error}{where(error, spec)}"})
+            detail = f"{type(error).__name__}: {error}{where(error, spec)}"
+            if "not ready" in str(error):
+                detail += (f"。預熱是 lookback（{spec.lookback} = {lookback}）根，ready 必須剛好在第 {lookback} 根變 True；"
+                           f"要比較 N 根之前的收盤就需要 N+1 根，讓 {spec.lookback} 代表持有的根數（N+1）")
+            stages.append({"name": name, "ok": False, "detail": detail})
             raise
         stages.append({"name": name, "ok": True, "detail": None})
         return value
