@@ -332,8 +332,10 @@ class WorkerV2Tests(unittest.IsolatedAsyncioTestCase):
 
 class ReplayTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        from catos import account_lock
         self.temp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.dict(os.environ, {approvals.ENV_PATH: str(self.temp / "approvals.jsonl")}))
+        self.enterContext(patch.object(account_lock, "LOCK_DIRECTORY", self.temp / "locks"))  # not ~/.catos
         value = profile()
         artifact, _ = approvals.deployment_identity(value)
         self.record = approvals.approve(strategy_id=value["strategy_id"], version=value["version"],
@@ -350,6 +352,24 @@ class ReplayTests(unittest.IsolatedAsyncioTestCase):
             return connection.execute(query).fetchall()
         finally:
             connection.close()
+
+    async def test_an_over_budget_reversal_only_closes_and_the_replay_says_it_differs(self):
+        # 2026-11-17 (user "改"; acceptance D1): the budget fits the short at 100 but not the long at
+        # 130, so the reversal is one reduce-only close under the intent's own key.
+        series = bars(("100",) * 4 + ("90",) * 4 + ("130",) * 5)
+        limits = risk.Limits(D("0.002"), D("0.5"), D("0.05"), D("0.10"))
+        summary = await self.replay("over", series, risk_limits=limits)
+        self.assertEqual(summary["status"]["state"], "completed", summary["status"])
+        self.assertEqual(self.ledger("over", "SELECT reason FROM intents ORDER BY seq"),
+                         [("exposure_reserved",), ("reversal_close_only",)])
+        orders = self.ledger("over", "SELECT state,settled,payload_json FROM execution_orders ORDER BY rowid")
+        self.assertEqual([(state, settled, json.loads(p)["reduceOnly"]) for state, settled, p in orders],
+                         [("FILLED", 1, False), ("FILLED", 1, True)])
+        self.assertEqual(self.ledger("over", "SELECT position FROM ownership"), [("0",)])
+        for table in ("reservations", "outbox", "risk_orders"):
+            self.assertEqual(self.ledger("over", f"SELECT * FROM {table}"), [])
+        # The research backtest reversed; the replay did not, and the comparison says so.
+        self.assertFalse(replay_consistency.compare_run(self.temp / "over", series, CONTRACT)["passed"])
 
     async def test_reversals_go_out_as_two_legs_and_match_research_exactly(self):
         summary = await self.replay("a")

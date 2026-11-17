@@ -532,7 +532,8 @@ class DemoBot:
             if row["state"] != "FILLED":
                 self.log.event("order", f"委託未成交：{row['state']}", row={k: row[k] for k in ("cl_ord_id", "state")})
                 raise BotStopped(f"order_{row['state'].lower()}")
-            await self._record_fill(row, "反手平倉" if closing_leg else "開倉／調整")
+            await self._record_fill(row, "反手平倉" if closing_leg else
+                                    "反手只平倉" if receipt.reason == "reversal_close_only" else "開倉／調整")
             facts = await self._call(self._account)
             await self._reconcile(facts, f"fill-{row['cl_ord_id']}")
             state = await self._observe(facts, self.wall_ms())

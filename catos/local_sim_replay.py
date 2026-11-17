@@ -134,7 +134,10 @@ async def _reconcile(supervisor, position, evidence_id):
 async def _fill_intent(supervisor, exchange, config, receipt, view, bar, next_bar, now_ms, events, observe_again):
     """Dispatch one reserved intent at the next open; a reversal as close leg then opening leg."""
     execution = supervisor._journal.execution
-    target = receipt.target_position
+    # A reversal the increase gates refused is one reduce-only close to zero under the intent's
+    # own key (risk.evaluate "reversal_close_only", 2026-11-17); a reserved reversal is two legs.
+    close_only = receipt.reason == "reversal_close_only"
+    target = D("0") if close_only else receipt.target_position
     legs = []
     while True:
         with localcontext(research._CONTEXT):
@@ -162,7 +165,7 @@ async def _fill_intent(supervisor, exchange, config, receipt, view, bar, next_ba
         await _reconcile(supervisor, after.position, f"replay-{receipt.event_seq}-{len(legs)}")
         if after.position != trade.position_after:
             raise ReplayStopped("fill_position_mismatch")
-        legs.append(dict(leg="close" if closing else ("open" if legs else "single"),
+        legs.append(dict(leg="close" if closing else ("close_only" if close_only else ("open" if legs else "single")),
                          decision_seq=receipt.event_seq, decision_time_ms=now_ms,
                          fill_time_ms=next_bar.open_time_ms, quantity=str(trade.quantity),
                          price=str(trade.price), fee=str(trade.fee), position_after=str(after.position),
