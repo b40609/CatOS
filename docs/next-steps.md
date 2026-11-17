@@ -1,6 +1,6 @@
 # 下一步
 
-更新：2026-11-17。2026-11-17 前的完整沿革（研究線、工作包 A～F、v1 驗收、repo 重建、兩台機器分工）在 `docs/archive/next-steps-20261117.md`，本頁只寫現況。
+更新：2026-11-18。2026-11-17 前的完整沿革（研究線、工作包 A～F、v1 驗收、repo 重建、兩台機器分工）在 `docs/archive/next-steps-20261117.md`，本頁只寫現況。
 
 ## 現況
 
@@ -17,10 +17,11 @@
 ## 正式 Bot（2026-11-17 起）
 
 - 使用者本人核准：`approval_id=10d7846fe1adfef05a5e25825c7d884d`（15m、Donchian 192／48、1 張、本金 5000）。
-- 11:21 台北時間在 `C:\dev\CatOS` 啟動，run 是 `outputs/okx-demo-bot/63e5c1a15105485687e003007e478f69`。預熱 192 根完成，起始權益 4998.81 USDT，部位 0。
-- 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11:21 新建。當日基準在第一根正式 K 線（11:30）建立。
+- 現在的 run：`outputs/okx-demo-bot/9630e8f5c9cf4ff99a48527c35177a5d`，11-17 23:27 台北時間由使用者在 `C:\dev\CatOS`（a5ee0b0c）以 `--disaster-stop 10%` 啟動（manifest 的 `disaster_stop` 是 `0.1`）。預熱 192 根完成，起始權益 4998.81 USDT，部位 0。之前的 run：`63e5c1a1…`（11:21，舊版 e09da051）、`d3ad9901…`（17:04 到 23:27，217 根、0 成交，Ctrl+C 停下）。
+- 第一筆成交是 P6 條件單在模擬盤的第一次實測：看 `events.jsonl` 的 `protection`／`protection_alert` 事件，並在 OKX 網頁核對條件單（觸發價、方向、整倉）。
+- 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11-17 11:21 新建，之後的 run 沿用。
 - 看狀態：讀 run 資料夾的 `status.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
-- 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json`。整個模擬盤帳戶要先空倉；核准仍有效就不用重做。
+- 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json --disaster-stop 10%`。有部位時會接續同一個 run（限制見「已知缺口」）；核准仍有效就不用重做。
 
 ## M1 獨立驗收（2026-11-17）
 
@@ -60,9 +61,10 @@
 ## 已知缺口
 
 - 接續 run 的限制：帳戶紀錄只記最後一個 run，11-17 之前開的 run 沒有這筆紀錄，帶部位停下時仍要先平倉；接續的前置步驟（查舊委託、等舊委託期限）最壞約 2 分鐘不檢查 Kill-Switch，期間不送新單；Bot 停著時按 Kill 不會平倉；接續只比對張數，停機時手動平倉再開同樣張數分辨不出來；補進策略的 K 線上的反手或出場訊號不補做，部位要等下一個訊號才回到和策略一致；程序被直接殺掉後再接續，`fills.json` 會少算（帳本完整）；部位為 0 時若寫 Soft 到帳戶紀錄失敗，重開是新的 run，Soft 鎖住會遺失（同一天虧損仍超過 5% 時下一根會再鎖；重驗觀察 O1）；查不到結果的舊委託（OKX 回「不存在」）會讓接續停下，要手動處理。
+- 跨家第二意見還沒做：P6 與反手只平倉的驗收都是 Claude 子代理。11-17 23:28 起派 Gemini（Antigravity）唯讀審查三次，都撞到額度上限（`RESOURCE_EXHAUSTED 429`，約 11-21 11:20 台北時間重置），沒有結果。重置後再派。
 - 保底停損（P6）的限制：只在模擬盤用假 OKX 測過，條件單的回應格式是照 OKX 官方 SDK 的欄位名稱寫的，還沒在模擬盤實測；OKX 觸發後 Bot 只停下，不把那筆平倉補記進帳本（使用者 11-17 選「停下並提示」）；陌生委託只查 SWAP 的四種條件類委託（conditional／oco／trigger／move_order_stop），冰山與時間加權委託沒查。
 - 保底停損的其他限制：建立或撤單請求沒送到 OKX 時，帳本一直「不確定」，這個 run 之後都不加倉（出場與清倉不受影響），要等空倉重開，提示裡的「會繼續查」不會有結果；停損觸發但沒完全成交時 Bot 只停下說明、要使用者手動平倉（帳本已對不上，不判斷 Hard）；查詢故障期間觸發，停下原因會是 `position_mismatch`；條件單方向在 OKX 上被改時每次檢查都送改單（OKX 介面不能改方向，實際難遇到）；revision 用牆鐘，重啟時系統時鐘若倒退，run 會以錯誤結束（不多送東西）。
-- 測試衛生：`test_step2_deployment`、`test_strategy_folder`、`test_simulation_ui_w6/w8_fixture` 沒有隔離 local-sim 的鎖目錄，跑整套測試會在 `~/.catos/local-simulation-locks` 留下鎖檔（不影響功能；那個資料夾也有正式 Bot 的鎖，不要整個刪）。
+- 測試衛生：2026-11-18 起整套後端測試不再寫進真的 `~/.catos`（最後兩個漏網的是 `test_strategy_folder` 的重播、`test_kill_switch` 的控制面與重播；以暫存家目錄跑整套後檢查為空）。之前留在 `~/.catos/local-simulation-locks` 的約 850 個舊鎖檔不影響功能：正式路徑的帳戶 id 每個 run 都不同（`sim-control-<run_id>`、`r4-<run_id>`、`replay-<uuid>`、`okxdemo-<uuid>`），不會撞到舊綁定。要不要清由使用者決定；正式 Bot 的鎖也在同一個資料夾，不要整個刪。
 - 介面沒有 Bot 畫面，等前端定案再接。
 - 正式對帳的核心（`okx_readonly`、`okx_collection`、`account_report`、`reconciliation_gate`、`risk_period`）保留給實盤前的手續費與資金費分類，目前沒有接到執行中的路徑。
 - 驗收觀察，沒有處理：
@@ -102,7 +104,7 @@
    - 報告都在 `reports/agent-strategy-acceptance-20261117/`。
    - 使用者還沒核准任何資料夾策略：核准、重播或上模擬盤由使用者本人做，步驟在 `strategies/README.md`。
    - 驗證（commit 6c2d2b8c）：後端 `Ran 1016 tests`、`OK`；前端 typecheck 0 錯誤、22 項通過、build 成功；整合測試 13 項 PASS。
-   - 正式 Bot 仍是 11-17 上午啟動的舊版（e09da051），要使用者重開一次才會用到接續 run 與新的核准檢查。
+   - 正式 Bot 已由使用者在 11-17 23:27 用 a5ee0b0c 重開，接續 run、新的核准檢查與 P6 都在用。
 3. P6 交易所端保底停損：2026-11-17 使用者要求現在做，三題選建議（10%、觸發後停下並提示、啟動指令加 `--disaster-stop`）。程式與假 OKX 測試完成（`DisasterStopTests` 11 項）。獨立驗收第一次 FAIL（D1：停損沒確認時 Kill／Hard 不清倉），修正後窄範圍重驗 PASS（有觀察），重驗提出的兩則訊息問題（N1、N2）由開發者修好、只有自測；報告 `reports/p6-cleanup-acceptance-20261117/acceptance.md`、`recheck.md`。同一份驗收也驗了第 5 項的清理：通過。沒有在模擬盤實測。帳本的保護狀態機原本在保護「暫時不一致」的瞬間把待送的加倉意圖永久作廢，會讓反手的開倉腿消失；改成只在決策與送單時檢查（兩處原本就有），屬帳本改動，列入驗收。
    - 2026-11-17 使用者對驗收觀察回覆「改」：反手被加倉閘門擋下時照樣平掉原部位，只拒絕反向開倉（`reversal_close_only`，改在 `risk.py`、`journal.py`、`execution.py`）。獨立驗收：風控核心正確（新舊版約 216 萬組輸入比對，沒有任何組合會加倉或穿越零點），但 FAIL 在 local-sim 重播不認得新判定（D1）；修好後窄範圍重驗 PASS（有觀察），重驗提出的「最後一根只平倉時一致性誤報通過」（N1）由開發者修好、只有自測。報告在 `reports/reversal-close-only-acceptance-20261117/`。使用者 rearm 之後下一根才開反向倉，開倉價和研究回測不同（驗收觀察 O3）。
 4. Bot 的介面：等前端定案。
