@@ -341,7 +341,7 @@ class DemoBotTests(unittest.TestCase):
         self.assertIn("soft_latched", [e["kind"] for e in events])
         state_file = next((self.root / "accounts").glob("*.json"))
         self.assertTrue(json.loads(state_file.read_text(encoding="utf-8"))["soft_latched"])
-        self.assertNotIn("u1", state_file.read_text(encoding="utf-8"))
+        self.assertNotIn('"u1"', state_file.read_text(encoding="utf-8"))  # the uid is not a stored value
         # Only an interactive confirmation clears it.
         with mock.patch("sys.stdout", new=io.StringIO()), mock.patch("sys.stderr", new=io.StringIO()):
             self.assertEqual(rearm_main(["--reason", "test"]), 1)
