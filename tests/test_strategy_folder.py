@@ -402,6 +402,10 @@ class AcceptanceFixTests(FolderBotTests):
             "broken json": lambda: (directory / "strategy.json").write_text("{", encoding="utf-8"),
             "narrower range": lambda: self.write(parameters=[{"name": "fast", "min": 2, "max": 3, "default": 2},
                                                              {"name": "slow", "min": 3, "max": 500, "default": 50}]),
+            # Same version, renamed parameter (recheck O-B): a RegistryError, not a KeyError.
+            "renamed parameter": lambda: self.write(parameters=[{"name": "quick", "min": 2, "max": 200, "default": 20},
+                                                                {"name": "slow", "min": 3, "max": 500, "default": 50}],
+                                                    constraints=[["quick", "<", "slow"]]),
         }
         donchian_config = local_sim_replay.worker_config(donchian, research_catalog.SYNTHETIC_CONTRACT)
         folder_config = local_sim_replay.worker_config(folder, research_catalog.SYNTHETIC_CONTRACT)
@@ -457,6 +461,15 @@ class AcceptanceFixTests(FolderBotTests):
                                                 research_catalog.provenance(research_catalog.DATASET_ID, SID))
         self.assertTrue(report["ok"], report)
         self.assertFalse(report["bot_eligible"])
+
+    def test_a_slow_restart_check_reports_how_far_it_got(self):  # recheck O-A
+        self.write()
+        with patch.object(strategy_folder, "CHECK_RESTART_SECONDS", -1):
+            report = research_catalog.execute_check({"strategy_id": SID},
+                                                    research_catalog.provenance(research_catalog.DATASET_ID, SID))
+        self.assertTrue(report["ok"])
+        self.assertFalse(report["bot_eligible"] or report["exhaustive"])
+        self.assertIn("只比對了 0／", report["bot_reason"])
 
     def test_contract_details_from_the_acceptance(self):  # O5, O6, O7
         self.write(source=SOURCE.replace("        closes = list(self.closes)", "        print(1)\n        closes = list(self.closes)"))

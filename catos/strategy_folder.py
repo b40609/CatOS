@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import traceback
 from types import ModuleType
 
@@ -330,10 +331,11 @@ def build_class(spec, snapshot):
 
 CHECK_TIMEFRAME_MS = 900_000
 CHECK_START_MS = 1_704_067_200_000  # 2024-01-01T00:00Z
-# Strategy update calls the restart test may spend: every evaluation bar is a restart point
-# while (bars x (lookback + 1)) fits (always for a Bot's lookback <= 512); beyond it the
-# trade decisions come first, then evenly spaced bars.
-CHECK_UPDATE_BUDGET = 2_000_000
+# Wall-clock seconds the restart test may spend inside the research worker (whose whole
+# run has research_catalog.TIMEOUT_SECONDS = 30). Every evaluation bar is a restart point;
+# trade decisions and the bars around them go first, then the rest spread out, so a slow
+# strategy that runs out of time reports how far it got instead of a bare timeout.
+CHECK_RESTART_SECONDS = 15
 
 
 def synthetic_bars(count, seed=20261117):
@@ -370,7 +372,7 @@ def check(spec, strategy_class, parameters, quantity):
     Two Bot rules (ipc.parse_result, ipc.parse_history):
     - readiness: ``ready`` is False until exactly ``lookback`` bars were fed, then True;
     - restart consistency: a restarted Worker is rebuilt from the last ``lookback`` closed
-      bars only. At every evaluation bar (within CHECK_UPDATE_BUDGET), a fresh instance fed
+      bars only. At every evaluation bar (within CHECK_RESTART_SECONDS), a fresh instance fed
       only those bars must return the same target as the instance that saw everything.
     Otherwise the strategy can still be researched but cannot go on a Bot. Passing is
     necessary, not sufficient: a restarted instance that later drifts is not simulated.
@@ -433,18 +435,23 @@ def check(spec, strategy_class, parameters, quantity):
         targets.append(target)
         if target is not None and target != view.position:
             decisions.append(index)
-    room = CHECK_UPDATE_BUDGET // (lookback + 1)
-    report["restart_points"] = len(evaluation)
-    report["exhaustive"] = room >= len(evaluation)
-    if report["exhaustive"]:
-        indices = list(range(len(evaluation)))
-    else:
-        chosen = set(decisions[:room // 2])
-        step = max(1, len(evaluation) // max(1, room - len(chosen)))
-        indices = sorted(chosen | set(range(0, len(evaluation), step)))
+    total = len(evaluation)
+    report["restart_points"] = total
+    near = [index for decision in decisions for index in range(decision - 3, decision + 4) if 0 <= index < total]
+    stride = max(1, int(total ** 0.5))
+    spread = [index for offset in range(stride) for index in range(offset, total, stride)]
+    indices = list(dict.fromkeys([*decisions, *near, *spread]))  # every bar exactly once, priority order
     if report["bot_reason"] is not None:
         indices = []
+    deadline = time.monotonic() + CHECK_RESTART_SECONDS
+    checked = 0
     for index in indices:
+        if time.monotonic() > deadline:
+            report["bot_reason"] = (f"時間到（{CHECK_RESTART_SECONDS} 秒）只比對了 {checked}／{total} 個重啟時點："
+                                    "update 太慢（例如每根都重算整個視窗），改成增量計算或縮短 lookback。"
+                                    "研究可以繼續用，但核准要求每個時點都比對過")
+            break
+        checked += 1
         restarted = factory()
         start = lookback + index
         for bar in bars[start - lookback:start]:
@@ -462,7 +469,8 @@ def check(spec, strategy_class, parameters, quantity):
             break
     else:
         report["bot_eligible"] = report["bot_reason"] is None
-    report["decisions_checked"] = len(indices)
+    report["decisions_checked"] = checked
+    report["exhaustive"] = bool(indices) and checked == total
     stages.append({"name": "restart_consistency", "ok": report["bot_eligible"], "detail": report["bot_reason"]})
     if report["trades"] == 0:
         report["notice"] = "合成資料上沒有任何成交：重啟一致性只檢查到不下單的情況，參數可能太保守。"
