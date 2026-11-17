@@ -359,7 +359,7 @@ class DemoBot:
                     guard = await self.supervisor.protection_state()
         # A fired stop ends the run; while flattening only when OKX no longer matches the ledger.
         if guard["triggered"] and (not flattening or facts["position"] != owned):
-            raise BotStopped("disaster_stop_triggered")
+            raise BotStopped(_fired(facts["position"]))
         if facts["position"] != owned:
             raise BotStopped(f"position_mismatch:okx={facts['position']}:ledger={owned}")
         known = {item["payload"]["algoClOrdId"] for item in (guard["active"], guard["pending"]) if item}
@@ -416,7 +416,8 @@ class DemoBot:
             self.log.event("protection_wait", None, reason=str(exc))
             return facts
         if state["triggered"] and not flattening:
-            raise BotStopped("disaster_stop_triggered")
+            facts = await self._call(self._account)  # what the fired stop left on OKX
+            raise BotStopped(_fired(facts["position"]))
         active, old = state["active"], before["active"]
         if active is not None and (old is None or active["price"] != old["price"]):
             self.log.event("protection", f"保底停損已{'掛上' if old is None else '更新'}："
@@ -555,6 +556,9 @@ class DemoBot:
             if exc.reason.startswith("disaster_stop_triggered"):
                 self.log.event("flatten_failed", "清倉途中 OKX 的保底停損先觸發了，OKX 已經平倉：請到 OKX 網頁確認部位是 0；"
                                "Kill-Switch 維持觸發")
+            elif exc.reason.startswith("disaster_stop_incomplete"):
+                self.log.event("flatten_failed", "清倉途中 OKX 的保底停損觸發了，但沒有完全平倉：OKX 上還有部位，"
+                               "帳本已對不上，Bot 不能再下單。請到 OKX 網頁手動平倉；Kill-Switch 維持觸發")
             else:
                 self.log.event("flatten_failed", f"清倉沒有完成（{exc.reason}）：部位可能還在 OKX 上，"
                                "請到 OKX 網頁確認並手動平倉；Kill-Switch 維持觸發")
@@ -1036,7 +1040,8 @@ START_HINTS = {
     "resume_position_mismatch": "OKX 上的部位跟上一次 run 的帳本對不上（可能有人手動下過單），不會接手。先到 OKX 網頁處理部位再啟動。",
     "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動。",
     "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
-    "disaster_stop_triggered": "OKX 的保底停損已觸發（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
+    "disaster_stop_triggered": "OKX 的保底停損已觸發並平倉（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
+    "disaster_stop_incomplete": "OKX 的保底停損觸發了，但 OKX 上還有部位（停損單沒有完全成交）。帳本已經對不上，Bot 不能替你處理：請到 OKX 網頁手動平倉，再用同一個指令重開。",
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
     "protection_config_failed": "保底停損設定沒有生效，Bot 先停下。把錯誤訊息截圖給我。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
@@ -1053,6 +1058,11 @@ def _percent(text):
     if not value.is_finite() or not 0 <= value < 50:
         raise argparse.ArgumentTypeError("要在 0% 到 50% 之間（0 表示不掛保底停損）")
     return value / 100
+
+
+def _fired(okx_position):
+    """Stop reason after OKX fired the disaster stop: flat, or something left (failed/partial)."""
+    return "disaster_stop_triggered" if okx_position == 0 else f"disaster_stop_incomplete:okx={okx_position}"
 
 
 def _hint(reason):

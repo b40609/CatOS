@@ -871,6 +871,21 @@ class DisasterStopTests(unittest.TestCase):
         writes = self.algo_writes(fake)
         self.assertIn(("amend-algos", {"newSlTriggerPx": "94.5"}), writes)
 
+    def test_a_stop_that_fired_without_closing_says_a_position_is_left(self):  # recheck N1/N2
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fired = []
+
+        def on_sleep(now):
+            if fake.algos and not fired and now > fake.bar_time(4) + 20_000:
+                next(iter(fake.algos.values()))["state"] = "order_failed"  # fired, but its order failed
+                fired.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, disaster_stop=self.TEN))
+        self.assertEqual(status["stop_reason"], "disaster_stop_incomplete:okx=1", status)
+        self.assertIn("手動平倉", demo_bot._hint(status["stop_reason"]))
+        self.assertEqual(len(fake.posts), 1)
+
     def test_start_option_reads_percent(self):
         self.assertEqual(demo_bot._percent("10%"), D("0.10"))
         self.assertEqual(demo_bot._percent("0"), D("0"))
