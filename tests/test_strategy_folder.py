@@ -17,7 +17,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 
-from catos import (local_sim_replay, replay_consistency, research, research_catalog, research_optimization,
+from catos import (account_lock, local_sim_replay, replay_consistency, research, research_catalog, research_optimization,
                    research_overfit, strategy_approvals as approvals, strategy_folder, strategy_registry)
 from catos.research_mcp import CHECK_TIMEOUT_SECONDS, ResearchHttpBridge
 from catos.research_service import ResearchError, ResearchService
@@ -71,6 +71,8 @@ class Home(unittest.TestCase):
         self.temp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.dict(os.environ, {strategy_folder.HOME_ENV: str(self.temp),
                                                   approvals.ENV_PATH: str(self.temp / "approvals.jsonl")}))
+        # Replays take the local-sim account lock; keep it out of ~/.catos, where the real Bot's lock lives.
+        self.enterContext(patch.object(account_lock, "LOCK_DIRECTORY", self.temp / "locks"))
 
     def write(self, sid=SID, source=SOURCE, **manifest):
         directory = self.temp / "strategies" / sid

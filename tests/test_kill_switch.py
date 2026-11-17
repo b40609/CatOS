@@ -316,6 +316,7 @@ class ControlPlaneKillTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.dict(os.environ, {ks.ENV_PATH: str(self.temp / "kill.jsonl")}))
+        self.enterContext(patch.object(account_lock, "LOCK_DIRECTORY", self.temp / "locks"))  # not ~/.catos
         self.service = control.LocalSimControlService(self.temp / "simulation")
         self.service.open()
 
@@ -426,6 +427,7 @@ class ReplayKillTests(unittest.IsolatedAsyncioTestCase):
         self.temp = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.dict(os.environ, {approvals.ENV_PATH: str(self.temp / "approvals.jsonl"),
                                                   ks.ENV_PATH: str(self.temp / "kill.jsonl")}))
+        self.enterContext(patch.object(account_lock, "LOCK_DIRECTORY", self.temp / "locks"))  # not ~/.catos
         value = profile()
         artifact, _ = approvals.deployment_identity(value)
         self.record = approvals.approve(strategy_id=value["strategy_id"], version=value["version"],
