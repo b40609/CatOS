@@ -52,6 +52,7 @@ _GET_PATHS = frozenset((
     "/api/v5/trade/fills",
     "/api/v5/trade/order-algo",            # P6 disaster stop (2026-11-17): one conditional order
     "/api/v5/trade/orders-algo-pending",   # and the account's pending algo orders (foreign check)
+    "/api/v5/trade/orders-algo-history",   # finished ones, when order-algo no longer finds ours (2026-11-18)
 ))
 _POST_PATHS = frozenset(("/api/v5/trade/order", "/api/v5/trade/cancel-order",
                          "/api/v5/trade/order-algo", "/api/v5/trade/amend-algos", "/api/v5/trade/cancel-algos"))
@@ -520,6 +521,31 @@ class DemoClient:
             raise DemoError("查條件單回應筆數不對")
         row = self._algo_row(rows[0])
         if row["inst_id"] != _inst(inst_id):
+            raise DemoError("條件單的合約不對")
+        return row
+
+    ALGO_HISTORY_STATES = ("effective", "canceled", "order_failed")
+
+    def protection_history(self, inst_id: str, algo_cl_ord_id: str) -> dict | None:
+        """已結束的條件單：order-algo 查不到時補查（2026-11-18 使用者授權唯讀 orders-algo-history）。
+
+        這個端點不能用 algoClOrdId 查（要 ordType 加 state 或 algoId），所以依三種結束狀態各列一頁
+        （最近 100 筆）再比對；都沒有回 None。回應欄位只照 python-okx SDK 與文件寫，模擬盤未實測。
+        """
+        if not _CL_ORD_ID.match(str(algo_cl_ord_id)):
+            raise DemoError("algoClOrdId 只能是 1～32 個英數字")
+        inst = _inst(inst_id)
+        found = []
+        for state in self.ALGO_HISTORY_STATES:
+            rows = self._request("GET", "/api/v5/trade/orders-algo-history",
+                                 {"ordType": "conditional", "state": state, "instType": "SWAP", "instId": inst})
+            found.extend(r for r in rows if str(r.get("algoClOrdId") or "") == algo_cl_ord_id)
+        if not found:
+            return None
+        if len(found) != 1:
+            raise DemoError("歷史條件單筆數不對")
+        row = self._algo_row(found[0])
+        if row["inst_id"] != inst:
             raise DemoError("條件單的合約不對")
         return row
 

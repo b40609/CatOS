@@ -104,6 +104,7 @@
 - 2026-11-17 使用者要求清掉九月的舊程式並做交易所端保底停損（「清掉九月的舊程式交易所端保底停損」「對 兩件都要做」）。保底停損三題選建議：1 價格從進場均價反向 10% 由 OKX 以市價整倉平倉（標記價格觸發）；2 觸發後 Bot 停下並提示，不自動補記帳本；3 比例用啟動指令 `--disaster-stop` 設定，不寫進部署設定、不用重新核准，預設仍是 0%（INVARIANTS P6）。範圍是模擬盤上的 OKX 條件單（`order-algo`、`amend-algos`、`cancel-algos`、`order-algo` 查詢與 `orders-algo-pending`），屬 M1 已授權的下單、撤單；Live 仍未授權。代理決定、可推翻：九月模組只刪 Demo 連線、帳本綁定、E0 對帳流程與一次性交易授權，正式對帳核心（帳單收集、分類、R1 風控期間）保留給實盤前的手續費與資金費分類。
 - 2026-11-17 使用者對 P6 驗收觀察「反手被風控擋下時要不要至少平倉」回覆「改」：核准部署（Bot）的反手被加倉閘門擋下時（Soft／Hard 鎖存模式、風控健康、當日基準缺漏、曝險額度、保底停損未確認），仍以只減倉單平掉原部位，只拒絕反向開倉（`risk.evaluate` 的 `reversal_close_only`）；不是反手的加倉照舊整筆拒絕。這是「合法減倉始終允許」的延伸，不改 INVARIANTS 條文。
 - 2026-11-17 使用者對「讓 Agent 提交策略」方案（`docs/agent-strategy-submission-proposal.md`）3 題回覆「完全同意你的所有建議」：1 研究階段不用核准，`strategies/` 資料夾裡的策略 Agent 可直接回測、優化、滾動驗證，只有上 Bot 要使用者核准，並改寫 P1 對應的一句；2 策略資料夾加進 git 忽略，只追蹤範例策略與說明；3 刪掉從沒接上的上傳合約 `catos/python_strategy.py` 與 skip 的測試（同一組未接通的 `strategy_library.py`、`strategy_mcp.py` 與兩個證據腳本一併刪，git 有歷史）。不含新的資料採集、Demo／Live 範圍變更或代理代為核准。
+- 2026-11-18 使用者對 Gemini 第二意見審查的修法選「授權查歷史（建議）」：模擬盤 Bot 可以多呼叫一個唯讀端點 `GET /api/v5/trade/orders-algo-history`，只在 `order-algo` 查不到自己的保底停損時，用來補查已結束（effective／canceled／order_failed）的條件單；不能下單或撤單，同一個模擬盤主機。Live 仍未授權。
 
 ## INVARIANTS
 

@@ -529,10 +529,13 @@ class DemoBot:
                 raise BotStopped("dispatch_returned_nothing")
             closing_leg = row["order_key"] != intent_key
             row = await self._settle(row)
-            if row["state"] != "FILLED":
+            # Partly filled and the rest canceled (Gemini review, 2026-11-18): the filled part is a real
+            # position, so it is recorded, reconciled and protected like any fill before the run stops.
+            partial = row["state"] != "FILLED" and D(row["filled"]) != 0
+            if row["state"] != "FILLED" and not partial:
                 self.log.event("order", f"委託未成交：{row['state']}", row={k: row[k] for k in ("cl_ord_id", "state")})
                 raise BotStopped(f"order_{row['state'].lower()}")
-            await self._record_fill(row, "反手平倉" if closing_leg else
+            await self._record_fill(row, "部分成交" if partial else "反手平倉" if closing_leg else
                                     "反手只平倉" if receipt.reason == "reversal_close_only" else "開倉／調整")
             facts = await self._call(self._account)
             await self._reconcile(facts, f"fill-{row['cl_ord_id']}")
@@ -543,6 +546,11 @@ class DemoBot:
             # The disaster stop follows the new position. A reversal's old stop is canceled before
             # the opening leg, which the journal would otherwise refuse as an unprotected increase.
             facts = await self._protect(facts)
+            if partial:
+                self.log.event("order", f"委託只成交一部分就被撤（{row['state']}）：成交 {abs(D(row['filled']))} 張，"
+                               f"已記帳，保底停損照新部位處理；Bot 停下，重開會接續目前部位 {facts['position']}",
+                               row={k: row[k] for k in ("cl_ord_id", "state", "quantity", "filled")})
+                raise BotStopped(f"order_partially_filled:{row['state'].lower()}")
             if not closing_leg:
                 return facts
             closed_first = True
@@ -866,7 +874,7 @@ class DemoBot:
                 break
             for row in unresolved:
                 row = await self.supervisor.query_order(row["order_key"])
-                if row["settled"] and row["state"] == "FILLED":
+                if row["settled"] and D(row["filled"]) != 0:  # also partly filled, rest canceled
                     await self._record_fill(row, "接續時補查")
             await self.sleep(1)
         unresolved = await self.supervisor._io(journal.execution.unresolved)

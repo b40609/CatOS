@@ -70,6 +70,12 @@ class FakeOkx:
         self.foreign_algos = []    # conditional orders someone else placed
         self.reject_algo = None    # sCode to refuse the next algo create with
         self.lose_algo_create = False  # the next algo create never reaches OKX (connection error)
+        # Gemini review 2026-11-18 (all unverified OKX behavior, modeled as the worst case):
+        self.auto_cancel_on_flat = False   # OKX cancels the whole-position stop once the position is 0
+        self.finished_algos_vanish = False  # order-algo answers 51603 for finished stops (history has them)
+        self.reject_amend = None           # sCode every amend is refused with while set
+        self.cancel_race = False           # the stop ends just before our cancel arrives: 51402
+        self.partial_fill = None           # the next order fills only this size; the rest is canceled
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -135,12 +141,19 @@ class FakeOkx:
                 assert self.position != 0 and (self.position > 0) == (p["side"] == "sell") and size <= abs(self.position)
             price = self.mark()
             ord_id = str(4000 + len(self.orders))
+            state = "filled"
+            if self.partial_fill is not None:
+                size, state, self.partial_fill = D(self.partial_fill), "canceled", None
             fee = -(size * D("0.01") * price * D("0.0005"))
             self.position += size if p["side"] == "buy" else -size
             self.equity += fee
-            self.orders[p["clOrdId"]] = {"ordId": ord_id, "clOrdId": p["clOrdId"], "state": "filled", "sz": p["sz"],
-                                         "accFillSz": p["sz"], "uTime": str(self.clock.ms), "tag": TAG}
-            self.fills[ord_id] = [{"ordId": ord_id, "tradeId": "t" + ord_id, "fillSz": p["sz"],
+            if self.auto_cancel_on_flat and self.position == 0:
+                for algo in self.algos.values():
+                    if algo["state"] == "live":
+                        algo["state"] = "canceled"
+            self.orders[p["clOrdId"]] = {"ordId": ord_id, "clOrdId": p["clOrdId"], "state": state, "sz": p["sz"],
+                                         "accFillSz": str(size), "uTime": str(self.clock.ms), "tag": TAG}
+            self.fills[ord_id] = [{"ordId": ord_id, "tradeId": "t" + ord_id, "fillSz": str(size),
                                    "fillPx": str(price), "fee": str(fee)}]
             if self.lose_after_fill is not None and len(self.orders) == self.lose_after_fill:
                 self.equity -= self.loss  # an outside loss (600 = 12% of the day basis)
@@ -161,9 +174,12 @@ class FakeOkx:
             return ok([dict(a) for a in rows])
         if method == "GET" and path == "/api/v5/trade/order-algo":
             algo = self.algos.get(q.get("algoClOrdId"))
-            if algo is None:
+            if algo is None or (self.finished_algos_vanish and algo["state"] != "live"):
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             return ok([dict(algo)])
+        if method == "GET" and path == "/api/v5/trade/orders-algo-history":
+            assert q["ordType"] == "conditional" and q["instType"] == "SWAP" and "algoClOrdId" not in q
+            return ok([dict(a) for a in self.algos.values() if a["state"] == q["state"] and a["instId"] == q["instId"]])
         if method == "POST" and path == "/api/v5/trade/order-algo":
             p = json.loads(body)
             self.algo_posts.append((path, p))
@@ -186,6 +202,9 @@ class FakeOkx:
             self.algo_posts.append((path, p))
             algo = self.algos[p["algoClOrdId"]]
             assert algo["state"] == "live" and p["newSlOrdPx"] == "-1"
+            if self.reject_amend:
+                return 200, json.dumps({"code": "1", "msg": "", "data": [{"sCode": self.reject_amend,
+                                                                          "sMsg": "refused"}]}).encode()
             algo.update(slTriggerPx=p["newSlTriggerPx"], slTriggerPxType=p["newSlTriggerPxType"], uTime=str(self.clock.ms))
             return ok([{"algoId": algo["algoId"], "reqId": p["reqId"], "sCode": "0"}])
         if method == "POST" and path == "/api/v5/trade/cancel-algos":
@@ -194,6 +213,10 @@ class FakeOkx:
             for item in p:
                 algo = next(a for a in self.algos.values() if a["algoId"] == item["algoId"])
                 algo["state"] = "canceled"
+            if self.cancel_race:
+                self.cancel_race = False
+                return 200, json.dumps({"code": "1", "msg": "", "data": [{"algoId": p[0]["algoId"], "sCode": "51402",
+                                                                          "sMsg": "already canceled"}]}).encode()
             return ok([{"algoId": item["algoId"], "sCode": "0"} for item in p])
         raise AssertionError(target)
 
@@ -909,6 +932,107 @@ class DisasterStopTests(unittest.TestCase):
         for bad in ("50%", "-1", "ten"):
             with self.assertRaises(Exception):
                 demo_bot._percent(bad)
+
+
+class ReviewFixTests(unittest.TestCase):
+    """Gemini second-opinion review of P6 and the reversal close-only rule (2026-11-18).
+
+    The OKX behaviors here (auto-cancel at flat, 51603 for finished stops, refused amends,
+    51402 on a cancel race, partial market fills) are not measured on Demo yet; they are
+    modeled as the case that used to leave the run stuck or silent.
+    """
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+    run_bot_quietly = DemoBotTests.run_bot_quietly
+    kill_after = DemoBotTests.kill_after
+    algo_writes = DisasterStopTests.algo_writes
+    TEN = D("0.10")
+
+    def alerts(self):
+        return [e.get("alert") for e in self.events() if e["kind"] == "protection_alert"]
+
+    def test_a_stop_okx_canceled_at_flat_is_settled_from_the_algo_history(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.auto_cancel_on_flat = fake.finished_algos_vanish = True
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        # The reversal's close made OKX cancel the long's stop, and order-algo no longer finds it:
+        # the history says canceled, so the short still opens (it used to stay "unconfirmed" for good).
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+        self.assertEqual([w[0] for w in self.algo_writes(fake)], ["order-algo", "order-algo"])
+        self.assertEqual([a["state"] for a in fake.algos.values()], ["canceled", "canceled"])
+        self.assertNotIn("protection_unconfirmed", self.alerts())
+        self.assertNotIn("protection_left", [e["kind"] for e in self.events()])
+
+    def test_a_stop_fired_and_gone_from_order_algo_still_ends_the_run(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.finished_algos_vanish = True
+        fired = []
+
+        def on_sleep(now):
+            if fake.algos and not fired and now > fake.bar_time(4) + 20_000:
+                fake.trigger_stop()
+                fired.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("disaster_stop_triggered"), status)
+        self.assertEqual(len(fake.posts), 1)
+
+    def test_a_refused_amend_reports_the_refusal_once_and_keeps_the_old_stop(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def stop_later(now):
+            if fake.algos and now > fake.bar_time(4) + 5_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=stop_later, disaster_stop=self.TEN))
+        self.assertEqual(status["position"], "1", status)
+        fake.reject_amend = "51280"  # every move to the new 5% price is refused
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
+                                            disaster_stop=D("0.05")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        names = [w[0] for w in self.algo_writes(fake)]
+        self.assertGreaterEqual(names.count("amend-algos"), 2)  # retried at later checks
+        self.assertEqual(names[-1], "cancel-algos")             # the old stop is removed after the flatten
+        # Before: "unconfirmed" and "mismatch" alternated at every check.
+        self.assertEqual(self.alerts(), ["protection_request_failed"])
+        self.assertEqual(fake.position, 0)
+
+    def test_a_cancel_that_loses_the_race_is_settled_by_the_query(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.cancel_race = True  # the reversal's cancel gets 51402: OKX had just canceled it
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+        self.assertNotIn("protection_unconfirmed", self.alerts())
+
+    def test_a_partial_fill_is_recorded_and_protected_before_the_run_stops(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.partial_fill = "0.5"  # the long fills 0.5 of 1; OKX cancels the rest
+        lines = []
+        status = self.run_bot(self.make_bot(fake, clock, events=lines, disaster_stop=self.TEN))
+        self.assertEqual((status["stop_reason"], status["position"], status["fills"]),
+                         ("order_partially_filled:canceled", "0.5", 1), status)
+        fills = json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))
+        self.assertEqual([(f["state"], f["fills"][0]["quantity"]) for f in fills], [("CANCELED", "0.5")])
+        self.assertEqual(self.algo_writes(fake), [("order-algo", {"side": "sell", "slTriggerPx": "94.5"})])
+        self.assertEqual([a["state"] for a in fake.algos.values()], ["live"])
+        self.assertTrue(any("只成交一部分" in line for line in lines))
+        # The restart resumes the 0.5 with its stop.
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
+                                            disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
 
 
 class AdapterTests(unittest.TestCase):

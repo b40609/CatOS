@@ -119,27 +119,42 @@ class OkxDemoExchange:
                 if current is not None and current["state"] in ("live", "pause"):
                     await self._call(self._client.cancel_protection, self.inst_id, current["algo_id"])
         except OkxApiError as exc:
-            # 51xxx: OKX evaluated the new conditional order and refused it; 50xxx and transport
-            # failures leave it uncertain (the query decides later).
-            if operation == "algo_create" and str(exc.code).startswith("51"):
+            # 51xxx: OKX evaluated the request and refused it; 50xxx and transport failures leave it
+            # uncertain (the query decides later).
+            business = str(exc.code).startswith("51")
+            if operation == "algo_create" and business:
                 return ProtectionReport(request_id, self._revision(), "REJECTED", complete=True)
-            raise OSError(f"okx_demo_protection_uncertain:{exc.code}") from None
+            if operation == "algo_amend" and business:
+                # Refused amend (Gemini review, 2026-11-18): if our stop is still live, it is unchanged
+                # and the refusal is reported as such, instead of an "unconfirmed" that flips with
+                # "mismatch" every check. A stop that is gone or fired is reported as OKX shows it.
+                report = await self._protection_report(request_id, algo_cl, history=True)
+                if report.status == "LIVE":
+                    return ProtectionReport(request_id, self._revision(), "REJECTED", complete=True)
+                return report
+            if not (operation == "algo_cancel" and business):
+                raise OSError(f"okx_demo_protection_uncertain:{exc.code}") from None
+            # A refused cancel (already canceled, fired or gone, e.g. 51400-51402): the query decides,
+            # as for ordinary orders.
         except DemoError:
             raise OSError("okx_demo_protection_uncertain") from None
         wanted = D(payload["slTriggerPx"]) if operation in ("algo_create", "algo_amend") else None
+        # A stop that existed before (cancel, query) and is no longer in order-algo is looked up in the
+        # algo history; a just-created one may simply not be listed yet, so it is only re-queried.
+        history = operation in ("algo_cancel", "algo_query")
 
         def settled(report):
             if operation == "algo_query":
                 return True
             if report.status == "NOT_FOUND":
-                return False  # just sent: OKX may not list it yet
+                return history  # cancel: history already consulted; create/amend: OKX may lag
             if operation == "algo_cancel":
                 return report.status != "LIVE"
             return report.status != "LIVE" or (report.complete and report.price == wanted)
 
         report = None
         for _ in range(PROTECTION_POLL_TRIES):  # inside Supervisor's 5-second exchange timeout
-            report = await self._protection_report(request_id, algo_cl)
+            report = await self._protection_report(request_id, algo_cl, history=history)
             if settled(report):
                 return report
             await self._sleep(POLL_SECONDS)
@@ -150,9 +165,11 @@ class OkxDemoExchange:
         self._last_revision = max(getattr(self, "_last_revision", 0) + 1, time.time_ns() // 1000)
         return self._last_revision
 
-    async def _protection_report(self, request_id, algo_cl):
+    async def _protection_report(self, request_id, algo_cl, *, history=False):
         try:
             order = await self._call(self._client.protection_order, self.inst_id, algo_cl)
+            if order is None and history:
+                order = await self._call(self._client.protection_history, self.inst_id, algo_cl)
         except DemoError:
             raise OSError("okx_demo_protection_query_uncertain") from None
         if order is None:
