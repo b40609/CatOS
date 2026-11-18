@@ -259,7 +259,7 @@ def altered_stop(row: dict) -> bool:
     changed to a fixed size (acceptance O1; the exact shape of such an amend is unverified).
     """
     return (row.get("sl_ord_px", "") not in ("", "-1") or row.get("close_fraction", "") not in ("", "1")
-            or (row.get("state") == "live" and row.get("sz", "") not in ("", "0")))
+            or (row.get("state") in ("live", "pause") and row.get("sz", "") not in ("", "0")))
 
 
 class DemoClient:

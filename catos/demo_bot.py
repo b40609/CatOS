@@ -418,12 +418,14 @@ class DemoBot:
         try:
             state = await self.supervisor.protection_step(now_ms=self.wall_ms())
             if not self.protection_configured and not (state["pending"] or state["uncertain"] or state["triggered"]):
-                # Resume: the inherited stop was just confirmed; now this start's ratio applies.
+                # Resume: the inherited stop was just confirmed (which may mark the ledger for
+                # reconciliation); now this start's ratio applies.
+                facts = await self._reconcile_if_marked(facts, flattening)
                 await self._configure_protection()
                 state = await self.supervisor.protection_step(now_ms=self.wall_ms())
         except SupervisorUnavailable as exc:
             self.log.event("protection_wait", None, reason=str(exc))
-            return facts
+            return await self._reconcile_if_marked(facts, flattening)
         if state["triggered"] and not flattening:
             facts = await self._call(self._account)  # what the fired stop left on OKX
             raise BotStopped(_fired(facts["position"]))
@@ -436,10 +438,17 @@ class DemoBot:
             self.log.event("protection", "保底停損已撤銷")
         if state["alert"] and state["alert"] != before["alert"]:
             self.log.event("protection_alert", self.ALERTS.get(state["alert"]), alert=state["alert"])
-        if (active is None) != (old is None):
-            # The ledger was marked for reconciliation: confirm against OKX before going on.
-            facts = await self._call(self._account)
-            await self._reconcile(facts, "protection", flattening=flattening)
+        # A stop that appeared or went away marks the ledger for reconciliation; on resume two steps
+        # may do both (confirm the inherited one, then cancel it), so the mark is read, not inferred
+        # from the end states (Gemini second opinion O4, 2026-11-18).
+        return await self._reconcile_if_marked(facts, flattening)
+
+    async def _reconcile_if_marked(self, facts, flattening):
+        """Confirm against OKX before going on when a protection change marked the ledger."""
+        if self.supervisor.health != "RECONCILING":
+            return facts
+        facts = await self._call(self._account)
+        await self._reconcile(facts, "protection", flattening=flattening)
         return facts
 
     async def _observe(self, facts, now_ms):

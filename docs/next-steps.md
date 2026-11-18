@@ -74,7 +74,7 @@
   - 部分成交後被撤：以前會直接停下、不記成交、不掛停損。現在記帳、對帳、掛停損之後才停下（`order_partially_filled:canceled`），重開會接續。
   - 改條件單被 OKX 拒絕（51xxx）時，以前會被當成「沒回應」，提示來回跳；現在單子還在就記成「被拒」、下次檢查重試。撤條件單遇到 51xxx（例如剛好已撤）改成接著查結果。
   - 核對後不成立：`closeFraction` 和 `reduceOnly` 並存會被拒（OKX 文件寫 net 模式必須帶 `reduceOnly=true`）；對帳拿帳本比帳本（`demo_bot.py` 先比對 OKX 列出的條件單）；接續時同一次呼叫撤舊單又掛新單、跳過對帳（第二步會因為還沒對帳被拒，下一次檢查會補上）；停損觸發的瞬間加倉（這份部署的目標只有 -1、0、+1）。
-  - 當時成立但沒修的 6 個少見情況，11-18 使用者要求修（「做第 2 項、修那 6 個少見情況」），已修，測試在 `tests/test_demo_bot.py` 的 `RareCaseTests` 與 `tests/test_execution.py`。獨立驗收（Claude Opus，`reports/rare-cases-acceptance-20261118/acceptance.md`）FAIL 在 D1（見第 6 項），已修，待窄範圍重驗：
+  - 當時成立但沒修的 6 個少見情況，11-18 使用者要求修（「做第 2 項、修那 6 個少見情況」），已修，測試在 `tests/test_demo_bot.py` 的 `RareCaseTests` 與 `tests/test_execution.py`。獨立驗收（Claude Opus，`reports/rare-cases-acceptance-20261118/acceptance.md`）FAIL 在 D1（見第 6 項），修好後窄範圍重驗 PASS（有觀察，`recheck.md`）。Gemini 第二意見（`gemini-second-opinion.md`）也找到 D1，另外找到 O4（見下），已修，O4 修正待窄範圍重驗：
     1. 平倉單結果不明時停下、重開時 OKX 已空倉：以前開新 run，舊委託永遠沒結清。現在帳本有沒結清的委託就接續那個 run 先查清楚；不能接續（核准或設定改過、停太久、讀不到）就開新 run，並在新 run 寫 `previous_run_unsettled` 事件；啟動指令加 `--new-run` 可強制開新 run。
     2. 決策到送單之間風控改變（epoch 變了）：以前只減倉意圖一律作廢、Bot 停下。現在只要目前狀態仍核准這筆減倉、且不是 FLAT（FLAT 走清倉流程）就送出；加倉照舊作廢。測試時另外發現：Soft 剛好在反手決策後鎖住時，反手的平倉腿也被作廢、Bot 帶著部位停下；改成平倉腿照送、開倉腿照舊被擋（同 11-17「反手被擋時至少平倉」）。
     3. 條件單在 OKX 上被改成限價或部分張數：以前看不出來。現在看 `slOrdPx`／`closeFraction`，以及 live 狀態卻有 `sz`（驗收 O1；真實改單長什麼樣待驗證），被改過就記 `protection_altered`、視為未確認、禁止加倉，請使用者到 OKX 撤掉，Bot 下次檢查重掛。
@@ -82,6 +82,8 @@
     5. OKX 回空的觸發來源：以前是程式錯誤，現在當成 OKX 預設的 last（請求端文件如此，回應端待驗證），會被改回 mark。
     6. 接續時新比例裝不上：以前該次檢查仍用舊比例掛或改單。第一版改成「不掛不改、之後再裝」，驗收 D1 指出空倉時 OKX 會自動撤掉停損，帳本就不擋加倉，反手會開出沒有停損的部位；改成和全新啟動一樣直接停下（`protection_config_failed`），部位與 OKX 上已確認的條件單都留著。
     - 驗收其他觀察：被改過的條件單使用者不撤，帳本一直「不確定」，空倉重開會被 `contract_not_flat_at_start` 擋（O3）；反手決策後立刻變 FLAT 時 Bot 以 `dispatch_returned_nothing` 停下、不清倉，既有行為（O4）；`--new-run` 不讀舊帳本的 Soft 鎖住，只在當初寫帳戶紀錄失敗時有差（O5）；讀不到上一個 run 時改成寫 `previous_run_unreadable` 事件（O6，已改）。
+    - Gemini O4（修之前就有）：接續時上一次 run 留著沒確認的停損請求，而且停機期間漏了 2 根以上 K 線時，兩步保護處理（先確認舊的、再撤掉或改掛）會讓帳本停在「待對帳」，補 K 線時 Bot 以 `failed` 結束（沒有下單）。改成看帳本有沒有被標記待對帳，而不是只比對前後有沒有停損（`ResumeProtectionMarkTests`）。Gemini O1 的 `pause` 狀態也算進「有張數＝被改」。
+    - 重驗觀察 O7（待驗證）：`orders-algo-pending` 列表裡整倉停損的 `sz` 長什麼樣沒實測過。若它也回有值的 `sz`，每次對帳會多記一筆 `protection_altered` 並多查一次（之後 `order-algo` 會確認回來，不會一直禁止加倉）。下次跑 protection-check 時順便記下 pending 列表的原始資料。
 - 保底停損（P6）的限制：掛、改價、平倉後自動撤單、觸發（effective）已在模擬盤實測（上方「正式 Bot」的 P6 模擬盤實測）；觸發失敗沒有實測；OKX 觸發後 Bot 只停下，不把那筆平倉補記進帳本（使用者 11-17 選「停下並提示」）；陌生委託只查 SWAP 的四種條件類委託（conditional／oco／trigger／move_order_stop），冰山與時間加權委託沒查。
 - 保底停損的其他限制：建立或撤單請求沒送到 OKX 時，帳本一直「不確定」，這個 run 之後都不加倉（出場與清倉不受影響），要等空倉重開，提示裡的「會繼續查」不會有結果；停損觸發但沒完全成交時 Bot 只停下說明、要使用者手動平倉（帳本已對不上，不判斷 Hard）；查詢故障期間觸發，停下原因會是 `position_mismatch`；條件單方向在 OKX 上被改時每次檢查都送改單（OKX 介面不能改方向，實際難遇到）；revision 用牆鐘，重啟時系統時鐘若倒退，run 會以錯誤結束（不多送東西）。
 - 測試衛生：2026-11-18 起整套後端測試不再寫進真的 `~/.catos`（最後兩個漏網的是 `test_strategy_folder` 的重播、`test_kill_switch` 的控制面與重播；以暫存家目錄跑整套後檢查為空）。之前留在 `~/.catos/local-simulation-locks` 的約 850 個舊鎖檔不影響功能：正式路徑的帳戶 id 每個 run 都不同（`sim-control-<run_id>`、`r4-<run_id>`、`replay-<uuid>`、`okxdemo-<uuid>`），不會撞到舊綁定。要不要清由使用者決定；正式 Bot 的鎖也在同一個資料夾，不要整個刪。

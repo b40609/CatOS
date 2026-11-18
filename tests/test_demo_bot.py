@@ -1291,6 +1291,75 @@ class RareCaseTests(unittest.TestCase):
         self.assertEqual((fake.position, [a["state"] for a in fake.algos.values()]), (1, ["live"]))
 
 
+class ResumeProtectionMarkTests(unittest.TestCase):
+    """Gemini second opinion O4 (2026-11-18): a resume whose protection steps both confirm and end a
+    stop left the ledger marked for reconciliation, and the next caught-up bar failed the run."""
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+    kill_after = DemoBotTests.kill_after
+
+    def test_a_pending_create_confirmed_then_canceled_on_resume(self):  # X1
+        import sqlite3
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        real_send, dropped = fake.send, []
+
+        def send(method, target, headers, body):
+            answer = real_send(method, target, headers, body)
+            if method == "POST" and target.startswith("/api/v5/trade/order-algo") and not dropped:
+                dropped.append(target)
+                raise TimeoutError("accepted, response lost")
+            return answer
+
+        fake.send = send
+        fake.algo_lag = 10**9  # OKX does not list it yet: the create stays pending
+
+        def stop_while_pending(now):
+            if fake.position == 1 and now > fake.bar_time(4) + 15_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=stop_while_pending, disaster_stop=D("0.10")))
+        self.assertEqual(status["position"], "1", status)
+        with sqlite3.connect(self.root / "run" / "state.sqlite3") as db:
+            state = json.loads(db.execute("SELECT state_json FROM protection WHERE bot_id='demo-bot'").fetchone()[0])
+        self.assertTrue(state["pending"] or state["uncertain"], state)
+        fake.algo_lag = 0
+        clock.ms = fake.bar_time(6) + 5_000  # bars 4 and 5 closed while stopped: one is caught up
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2",
+                                            disaster_stop=D("0")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        self.assertEqual([a["state"] for a in fake.algos.values()], ["canceled"])
+
+    def test_a_pending_cancel_confirmed_then_a_new_ratio_on_resume(self):  # X2
+        import sqlite3
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def stop_later(now):
+            if fake.algos and now > fake.bar_time(4) + 15_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=stop_later, disaster_stop=D("0.10")))
+        self.assertEqual(status["position"], "1", status)
+        algo = next(iter(fake.algos.values()))
+        algo["state"] = "canceled"  # the stopped run's cancel reached OKX; its answer did not
+        with sqlite3.connect(self.root / "run" / "state.sqlite3") as db:
+            row = json.loads(db.execute("SELECT state_json FROM protection WHERE bot_id='demo-bot'").fetchone()[0])
+            row["pending"] = {"operation": "algo_cancel", "payload": row["active"]["payload"]}
+            row["uncertain"] = True
+            db.execute("UPDATE protection SET state_json=? WHERE bot_id='demo-bot'",
+                       (json.dumps(row, sort_keys=True, separators=(",", ":")),))
+        clock.ms = fake.bar_time(6) + 5_000
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), run="run2",
+                                            disaster_stop=D("0.05")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+
+
 class AdapterTests(unittest.TestCase):
     def test_reports_translate_fills_and_fee_sign(self):
         clock = Clock(BASE + 1_000 + 4 * TF)
