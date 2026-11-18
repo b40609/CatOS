@@ -35,7 +35,8 @@ D = Decimal
 WATCH_SECONDS = 10
 HISTORY_STATES = ("effective", "canceled", "order_failed")
 ALGO_FIELDS = ("instId", "algoId", "algoClOrdId", "ordType", "state", "side", "slTriggerPx", "slTriggerPxType",
-               "slOrdPx", "closeFraction", "reduceOnly", "sz", "tag", "cTime", "uTime")
+               "slOrdPx", "closeFraction", "reduceOnly", "sz", "tag", "cTime", "uTime", "ordId", "ordIdList",
+               "actualSz", "actualPx", "actualSide", "triggerTime", "failCode")
 
 
 class CheckStopped(DemoError):
@@ -100,7 +101,11 @@ def _position(client, inst):
 
 
 async def run_check(client: DemoClient, inst: str, *, sleep=asyncio.sleep, stamp: str | None = None,
-                    ratio: Decimal = D("0.1"), watch_seconds: int = WATCH_SECONDS) -> dict:
+                    ratio: Decimal = D("0.1"), watch_seconds: int = WATCH_SECONDS,
+                    trigger_wait_seconds: int = 0) -> dict:
+    """``trigger_wait_seconds`` > 0: trigger mode. The stop is placed close (``ratio``, e.g. 0.001) and
+    left to fire; the run waits up to that long, then records what OKX did. Not fired in time:
+    the stop is canceled and the position closed as usual."""
     report: dict = dict(inst_id=inst, steps=[], findings={})
     issues = account_issues(client.account_config())
     if issues:
@@ -142,6 +147,18 @@ async def run_check(client: DemoClient, inst: str, *, sleep=asyncio.sleep, stamp
         if created.status != "LIVE" or created.price != stop1:
             raise DemoError(f"掛停損後查到的不是預期的 {stop1}：{_report_dict(created)}")
         report["steps"].append(f"保底停損已掛：賣出整倉，標記價格 {stop1} 觸發")
+        if trigger_wait_seconds:
+            fired = await _wait_trigger(client, exchange, inst, algo_cl, base, stamp, trigger_wait_seconds,
+                                        sleep, report)
+            if fired:
+                opened = _position(client, inst) != 0
+                report["findings"]["position_after_trigger"] = str(_position(client, inst))
+                left = [a for a in client.pending_algos() if a["inst_id"] == inst]
+                if opened or left:
+                    raise DemoError(f"觸發後還有部位或條件單（條件單 {len(left)} 張）")
+                report["steps"].append("觸發後 OKX 已平倉：空倉、沒有條件單")
+                return report
+            report["steps"].append(f"等了 {trigger_wait_seconds} 秒沒有觸發，改走撤單與平倉")
 
         stop2 = protection.stop_price(average, size, tick, protection.Config(ratio=ratio + D("0.02")))
         amended = await exchange.protection("algo_amend", priced(f"catospc2{stamp}", stop2))
@@ -199,6 +216,30 @@ async def run_check(client: DemoClient, inst: str, *, sleep=asyncio.sleep, stamp
         raise CheckStopped(f"{type(exc).__name__}: {exc}", report) from None
 
 
+async def _wait_trigger(client, exchange, inst, algo_cl, base, stamp, wait_seconds, sleep, report):
+    """Poll every 5 seconds until the stop leaves ``live``; record what OKX shows afterwards."""
+    looks = 0
+    for looks in range(1, wait_seconds // 5 + 2):
+        found = _probe_algo(client, inst, algo_cl)
+        states = [r.get("state") for r in found["rows"]]
+        if found["code"] != "0" or states != ["live"]:
+            break
+        await sleep(5)
+    else:
+        report["trigger_wait"] = dict(looks=looks, fired=False)
+        return False
+    report["trigger_wait"] = dict(looks=looks, fired=True, order_algo=found)
+    await sleep(2)  # let OKX finish the triggered market order
+    report["triggered_order_algo"] = _probe_algo(client, inst, algo_cl)
+    report["triggered_history"] = _probe_history(client, inst, algo_cl)
+    queried = await exchange.protection("algo_query", dict(base, requestId=f"catospc6{stamp}"))
+    report["triggered_adapter_query"] = _report_dict(queried)
+    report["findings"].update(trigger_state=states, adapter_after_trigger=queried.status,
+                              triggered_history_has_it=[s for s, v in report["triggered_history"].items() if v["mine"]])
+    report["steps"].append(f"停損已觸發（order-algo 狀態 {states or found['code']}），轉接層判定 {queried.status}")
+    return True
+
+
 def _cleanup(client, exchange, contract, inst, size, stamp, algo_cl, opened, report):
     try:
         held = _position(client, inst)
@@ -220,6 +261,12 @@ def render(report: dict) -> str:
     lines = [f"OKX 模擬盤保底停損實測：{report['inst_id']}", ""]
     lines += [f"  - {s}" for s in report["steps"]]
     f = report.get("findings", {})
+    if "adapter_after_trigger" in f:
+        lines += ["", "  觸發實測：",
+                  f"    觸發後 order-algo 狀態：{f['trigger_state']}",
+                  f"    orders-algo-history 查得到：{', '.join(f['triggered_history_has_it']) or '查不到'}",
+                  f"    Bot 的轉接層判定：{f['adapter_after_trigger']}",
+                  f"    觸發後部位：{f.get('position_after_trigger', '—')}"]
     if f:
         lines += ["", "  OKX 實際行為："]
         if "auto_cancel_on_flat" in f:
@@ -238,6 +285,9 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="catos.cli demo protection-check",
                                      description="在模擬盤開最小張數，實測保底停損的掛、改、平倉後狀態，再全部收掉")
     parser.add_argument("--inst", default=DEFAULT_INST, choices=[DEFAULT_INST])
+    parser.add_argument("--trigger", action="store_true",
+                        help="觸發實測：停損放在均價下方 0.1%%，等它觸發（最多 --wait-minutes 分鐘）")
+    parser.add_argument("--wait-minutes", type=int, default=30)
     parser.add_argument("--out", type=Path, default=Path("reports") / "okx-demo-protection-check")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
@@ -251,7 +301,8 @@ def main(argv: list[str]) -> int:
     try:
         client, note = connect()
         print(f"金鑰：{credentials_path()}，{note}\n")
-        report = asyncio.run(run_check(client, args.inst, stamp=stamp))
+        options = dict(ratio=D("0.001"), trigger_wait_seconds=args.wait_minutes * 60) if args.trigger else {}
+        report = asyncio.run(run_check(client, args.inst, stamp=stamp, **options))
         code = 0
     except CheckStopped as exc:
         report, code = exc.report, 1

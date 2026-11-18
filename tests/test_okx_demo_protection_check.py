@@ -81,6 +81,39 @@ class ProtectionCheckTests(unittest.TestCase):
         self.assertTrue(any("平倉單" in step for step in caught.exception.report["steps"]))
 
 
+class TriggerModeTests(ProtectionCheckTests.__base__):
+    setUp = ProtectionCheckTests.setUp
+
+    def run_trigger(self, fire_after):
+        looks = []
+
+        async def sleep(seconds):
+            looks.append(seconds)
+            if len(looks) == fire_after:
+                self.fake.trigger_stop()
+
+        return asyncio.run(run_check(self.client, "BTC-USDT-SWAP", sleep=sleep, stamp="1", ratio=D("0.01"),  # fake price ~100, tick 0.1
+                                     trigger_wait_seconds=60))
+
+    def test_fired_stop_is_reported_as_triggered(self):
+        self.fake.finished_algos_vanish = True
+        report = self.run_trigger(fire_after=2)
+        self.assertTrue(report["trigger_wait"]["fired"])
+        self.assertEqual(report["findings"]["adapter_after_trigger"], "TRIGGERED")
+        self.assertEqual(report["findings"]["triggered_history_has_it"], ["effective"])
+        self.assertEqual(report["findings"]["position_after_trigger"], "0")
+        self.assertEqual(self.fake.position, 0)
+        self.assertEqual([p["reduceOnly"] for p in self.fake.posts], [False])  # OKX closed it, not us
+        self.assertIn("Bot 的轉接層判定：TRIGGERED", render(report))
+
+    def test_not_fired_in_time_cancels_and_closes(self):
+        report = self.run_trigger(fire_after=10_000)
+        self.assertFalse(report["trigger_wait"]["fired"])
+        self.assertEqual(report["findings"]["adapter_final_status"], "CANCELED")
+        self.assertEqual(self.fake.position, 0)
+        self.assertEqual([p["reduceOnly"] for p in self.fake.posts], [False, True])
+
+
 class BotRunningTests(unittest.TestCase):
     def test_recent_running_status_blocks(self):
         root = Path(tempfile.mkdtemp())
