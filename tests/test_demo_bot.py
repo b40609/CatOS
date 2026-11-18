@@ -1081,7 +1081,7 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual((fake.position, status["fills"]), (0, 3), status)
         fills = json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))
         self.assertEqual([(f["leg"], f["state"]) for f in fills],
-                         [("開倉／調整", "FILLED"), ("清倉（部分成交）", "CANCELED"), ("清倉", "FILLED")])
+                         [("開倉／加倉", "FILLED"), ("清倉（部分成交）", "CANCELED"), ("清倉", "FILLED")])
 
     def test_a_stop_gone_everywhere_is_reported_once_by_the_minute_check(self):  # Gemini recheck #3
         clock = Clock(BASE + 1_000)
