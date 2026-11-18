@@ -1,0 +1,56 @@
+test_r1a_listing_lag_assumption_remains (test_recheck_scratch.AdapterRecheck.test_r1a_listing_lag_assumption_remains) ... ok
+test_r1b_forward_step_after_send (test_recheck_scratch.AdapterRecheck.test_r1b_forward_step_after_send) ... ok
+test_r1c_forward_step_before_send (test_recheck_scratch.AdapterRecheck.test_r1c_forward_step_before_send) ... ok
+test_r1d_order_listed_between_first_query_and_proof (test_recheck_scratch.AdapterRecheck.test_r1d_order_listed_between_first_query_and_proof)
+Q1 says not found; the order shows up before the second look: never REJECTED. ... ok
+test_r1e_time_read_fails_no_proof (test_recheck_scratch.AdapterRecheck.test_r1e_time_read_fails_no_proof) ... ok
+test_r1f_restart_cannot_prove (test_recheck_scratch.AdapterRecheck.test_r1f_restart_cannot_prove) ... ok
+test_r3_deadline_only_for_flatten_reduce_only (test_recheck_scratch.AdapterRecheck.test_r3_deadline_only_for_flatten_reduce_only) ... ok
+test_r_o5_deadline_dropped_when_okx_answers (test_recheck_scratch.AdapterRecheck.test_r_o5_deadline_dropped_when_okx_answers) ... ok
+test_d1_backward_step_kill_flatten (test_recheck_scratch.BotRecheck.test_d1_backward_step_kill_flatten)
+Round-1 test_2e: reversal reduce-only at bar 5, then within 5 minutes the local clock steps ... ok
+test_r2a_resend_timing_in_okx_time (test_recheck_scratch.BotRecheck.test_r2a_resend_timing_in_okx_time) ... ok
+test_r2b_listing_lag_misjudged_in_flatten (test_recheck_scratch.BotRecheck.test_r2b_listing_lag_misjudged_in_flatten) ... ok
+test_r2c_reversal_close_lost_then_restart_books_it (test_recheck_scratch.BotRecheck.test_r2c_reversal_close_lost_then_restart_books_it) ... ok
+test_r2d_slow_time_read_o1_unchanged (test_recheck_scratch.BotRecheck.test_r2d_slow_time_read_o1_unchanged) ... ok
+test_mutations (test_recheck_scratch.MutationRecheck.test_mutations) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 68.621s
+
+OK
+
+[r1a] OKX took it, never listed: at deadline+10000 NOT_FOUND, at deadline+10001 REJECTED
+
+[r1b] deadline-sent=5000 okx_now-deadline=-4000 status=NOT_FOUND
+
+[r1c] expTime-sent=5000 (want 5000); 15.001 s of OKX time later status=REJECTED
+
+[r1d] listed between Q1 and Q2: first report=NOT_FOUND next report=FILLED filled=1
+
+[r1e] public/time failing, 1 h later: NOT_FOUND
+
+[r1f] new adapter (restart), 1 h later: NOT_FOUND
+
+[r3] (flattening, reduceOnly, expTime sent, status 1 h later): [(False, True, False, 'NOT_FOUND'), (True, False, False, 'NOT_FOUND'), (False, False, False, 'NOT_FOUND'), (True, True, True, 'REJECTED')]
+
+[o5] answered order: status=FILLED deadlines={} expTime=['1794801606000']
+
+[d1] stop=manual_kill:kill-switch- okx_position=0 states=['FILLED', 'FILLED', 'FILLED', 'FILLED'] expTime per order=[False, False, False, True]
+
+[r2a] stop=manual_kill:kill-switch- owned=0 reservations=0 states=[('FILLED', 1, '1'), ('REJECTED', 1, '0'), ('FILLED', 1, '1')]
+      lost: OKX t=1794801871000 expTime=1794801876000 (+5000); resend at expTime+11000 ms
+
+[r2b] stop=flatten_failed:position_mismatch:okx=0:ledger=1 posts=2 states=['FILLED', 'REJECTED']
+
+[r2c] first stop=order_not_settled:UNKNOWN:8865ce1c59c517 expTimes=[None, None]
+      restart stop=manual_kill:kill-switch- run2_created=False owned=0 legs=['開倉／調整', '接續時補查']
+
+[r2d] stop=flatten_failed:order_not_settled:UNKNOWN:943224713 posts=1 okx_position=1
+
+[mut] PROOF_MARGIN_MS=-1e12 (no waiting): ran=7 failed=2 ['test_a_late_listing_inside_the_margin_is_not_taken_for_a_lost_order', 'test_the_proof_waits_for_okx_time_not_the_local_clock']
+[mut] _never_taken = any deadline: ran=7 failed=2 ['test_a_late_listing_inside_the_margin_is_not_taken_for_a_lost_order', 'test_the_proof_waits_for_okx_time_not_the_local_clock']
+[mut] proof by local clock (round-1 D2): ran=7 failed=2 ['test_the_deadline_follows_okx_server_time', 'test_the_proof_waits_for_okx_time_not_the_local_clock']
+[mut] no second query after the time read: ran=7 failed=0 []
+[mut] every reduce-only gets a deadline (round-1 D3): ran=7 failed=1 ['test_a_strategy_close_gets_no_deadline']
+[mut] deadline kept after an ordId (O5 reverted): ran=7 failed=0 []

@@ -1511,6 +1511,31 @@ class FlattenResendTests(unittest.TestCase):
         self.assertTrue(status["stop_reason"].startswith("order_not_settled:UNKNOWN"), status)
         self.assertEqual(fake.exp_times, [None, None])
         self.assertEqual(fake.position, 1)
+    def test_an_order_listed_before_the_second_look_is_not_lost(self):  # recheck OR1
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        sent = []
+
+        def arm():
+            fake.lose_post_response = True
+            fake.hide_until = 10**18
+
+        real = fake.send
+
+        def send(method, target, headers, body):
+            if method == "POST" and target == "/api/v5/trade/order" and fake.lose_post_response:
+                sent.append(clock.ms)
+            # OKX lists it only once its clock is past the deadline: the proof's own re-query finds it.
+            if target == "/api/v5/public/time" and sent and clock.ms > sent[0] + 15_000:
+                fake.hide_until = 0
+            return real(method, target, headers, body)
+
+        fake.send = send
+        status = self.kill_with(fake, clock, arm)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+
 
 class AdapterTests(unittest.TestCase):
     def test_reports_translate_fills_and_fee_sign(self):
