@@ -17,7 +17,7 @@
 ## 正式 Bot（2026-11-17 起）
 
 - 使用者本人核准：`approval_id=10d7846fe1adfef05a5e25825c7d884d`（15m、Donchian 192／48、1 張、本金 5000）。
-- 現在的 run：`outputs/okx-demo-bot/9630e8f5c9cf4ff99a48527c35177a5d`，11-17 23:27 台北時間由使用者在 `C:\dev\CatOS`（a5ee0b0c）以 `--disaster-stop 10%` 啟動（manifest 的 `disaster_stop` 是 `0.1`）。預熱 192 根完成，起始權益 4998.81 USDT，部位 0。之前的 run：`63e5c1a1…`（11:21，舊版 e09da051）、`d3ad9901…`（17:04 到 23:27，217 根、0 成交，Ctrl+C 停下）。
+- 現在的 run：`outputs/okx-demo-bot/1e5a3848060f444daf568fd54d5524e1`，11-18 13:24 台北時間由使用者在 `C:\dev\CatOS`（ae5cac2c，含審查修正 5ca49b93、7a3d142c）以 `--disaster-stop 10%` 啟動；空倉開新 run，預熱 192 根完成，部位 0。之前的 run：`63e5c1a1…`（11-17 11:21，舊版 e09da051）、`d3ad9901…`（11-17 17:04 到 23:27，217 根、0 成交）、`9630e8f5…`（11-17 23:27 到 11-18 13:24，a5ee0b0c，約 244 根、0 成交，Ctrl+C 停下）。
 - 第一筆成交是 P6 條件單在模擬盤的第一次實測：看 `events.jsonl` 的 `protection`／`protection_alert` 事件，並在 OKX 網頁核對條件單（觸發價、方向、整倉）。
 - 唯讀核對工具：`.venv/Scripts/python.exe tools/demo_bot_watch.py`（只讀 run 資料夾，依成交重算均價與停損價，對照 Bot 寫的 `protection` 事件）。2026-11-18 起 T3 排程「模擬盤 Bot 保底停損核對」每小時跑一次，狀態檔在 `outputs/demo-bot-watch/state.json`；第一筆成交核對完就可以停掉排程。
 - 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11-17 11:21 新建，之後的 run 沿用。
@@ -62,7 +62,7 @@
 ## 已知缺口
 
 - 接續 run 的限制：帳戶紀錄只記最後一個 run，11-17 之前開的 run 沒有這筆紀錄，帶部位停下時仍要先平倉；接續的前置步驟（查舊委託、等舊委託期限）最壞約 2 分鐘不檢查 Kill-Switch，期間不送新單；Bot 停著時按 Kill 不會平倉；接續只比對張數，停機時手動平倉再開同樣張數分辨不出來；補進策略的 K 線上的反手或出場訊號不補做，部位要等下一個訊號才回到和策略一致；程序被直接殺掉後再接續，`fills.json` 會少算（帳本完整）；部位為 0 時若寫 Soft 到帳戶紀錄失敗，重開是新的 run，Soft 鎖住會遺失（同一天虧損仍超過 5% 時下一根會再鎖；重驗觀察 O1）；查不到結果的舊委託（OKX 回「不存在」）會讓接續停下，要手動處理。
-- 跨家第二意見（2026-11-18，Gemini 4 Hydrogen xhigh，P6 與反手只平倉各一份唯讀審查）：主控逐條核對後，有 3 條成立並已修（`tests/test_demo_bot.py` 的 `ReviewFixTests`）。獨立驗收（Claude Opus，`reports/gemini-review-fixes-acceptance-20261118/acceptance.md`）PASS，找到 D1（撤單後查一次查不到就停止輪詢）與觀察 O1、O2；Gemini 同時做的第二意見也找到 D1、O1，另外還有「對帳時第一次出現的告警沒寫事件」。這四項都已修，窄範圍重驗 PASS、沒有新發現（`recheck.md`）。正式 Bot 要重開才會用到這些修正：
+- 跨家第二意見（2026-11-18，Gemini 4 Hydrogen xhigh，P6 與反手只平倉各一份唯讀審查）：主控逐條核對後，有 3 條成立並已修（`tests/test_demo_bot.py` 的 `ReviewFixTests`）。獨立驗收（Claude Opus，`reports/gemini-review-fixes-acceptance-20261118/acceptance.md`）PASS，找到 D1（撤單後查一次查不到就停止輪詢）與觀察 O1、O2；Gemini 同時做的第二意見也找到 D1、O1，另外還有「對帳時第一次出現的告警沒寫事件」。這四項都已修，窄範圍重驗 PASS、沒有新發現（`recheck.md`）。正式 Bot 已於 11-18 13:24 重開、用上這些修正：
   - 已結束的保底停損用 `order-algo` 查不到（51603）時，帳本會一直「待確認」、之後不能開倉。現在撤單與查詢時改查 `orders-algo-history`（使用者 11-18 授權）。只查每種狀態最近 100 筆；OKX 實際會不會回 51603、平倉時會不會自動撤掉條件單，都還沒實測（待驗證）。
   - 部分成交後被撤：以前會直接停下、不記成交、不掛停損。現在記帳、對帳、掛停損之後才停下（`order_partially_filled:canceled`），重開會接續。
   - 改條件單被 OKX 拒絕（51xxx）時，以前會被當成「沒回應」，提示來回跳；現在單子還在就記成「被拒」、下次檢查重試。撤條件單遇到 51xxx（例如剛好已撤）改成接著查結果。
