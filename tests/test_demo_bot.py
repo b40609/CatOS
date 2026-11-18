@@ -398,6 +398,8 @@ class DemoBotTests(unittest.TestCase):
         closed_at = next(e for e in bars if e["reason"] == "reversal_close_only")["bar"]["open_time_ms"]
         self.assertEqual(closed_at, fake.bar_time(5))
         self.assertEqual(fake.position, 0)
+        why = next(e["why"] for e in self.events() if e["kind"] == "order" and "why" in e)
+        self.assertEqual((why["mode"], why["protection_blocked"]), ("NO_INCREASE", False))
 
     # ---- independent acceptance 2026-11-17: D1–D4 and observations ----
     def test_flatten_survives_a_failed_read(self):

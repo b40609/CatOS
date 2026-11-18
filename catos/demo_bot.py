@@ -1080,10 +1080,32 @@ class DemoBot:
                        risk_reasons=sorted(state.reasons))
         if receipt.disposition == "RESERVED_SIMULATION":
             if receipt.reason == "reversal_close_only":
-                self.log.event("order", "反手的開新倉被風控擋下：只平掉原部位")
+                self.log.event("order", "反手的開新倉被風控擋下：只平掉原部位", why=await self._close_only_why(now_ms))
             await self._execute(receipt, facts, now_ms)
         elif receipt.disposition not in ("NO_INTENT", "NO_CHANGE", "REJECTED", "EXPIRED"):
             raise BotStopped(f"unexpected_disposition:{receipt.disposition}")
+
+    async def _close_only_why(self, now_ms):
+        """Which increase gate refused a reversal's opening leg (risk.evaluate keeps only the verdict)."""
+        def read():
+            j = self.supervisor._journal
+            p = j.protection.state(BOT_ID)
+            try:
+                desired = j.protection.desired(BOT_ID, p)
+            except Exception as exc:  # noqa: BLE001 - a diagnostic, never a reason to stop
+                desired = f"error:{type(exc).__name__}"
+            owner = j.connection.execute("SELECT position FROM ownership WHERE bot_id=?", (BOT_ID,)).fetchone()
+            return dict(protection_blocked=j.protection.blocked(BOT_ID), active=p["active"] and {
+                k: p["active"].get(k) for k in ("price", "side", "trigger")}, desired=desired,
+                quantity=p["quantity"], average=p["average"], owner=owner and owner[0],
+                pending=bool(p["pending"]), uncertain=p["uncertain"], alert=p["alert"])
+        state = self.supervisor.risk_state
+        try:
+            why = await self.supervisor._io(read)
+        except Exception as exc:  # noqa: BLE001
+            why = dict(read_error=type(exc).__name__)
+        return dict(why, mode=state.mode, health=state.health, supervisor_health=self.supervisor.health,
+                    basis_day=state.basis and state.basis.day, today=risk.taipei_day(now_ms))
 
     def _write_status(self):
         atomic_json(self.output_dir / "status.json", dict(self.status, updated_at=_now_text()))
