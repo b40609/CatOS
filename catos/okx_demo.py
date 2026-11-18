@@ -766,6 +766,9 @@ def cli_main(argv: list[str]) -> int:
     if argv and argv[0] == "rearm":
         from catos.demo_bot import rearm_main
         return rearm_main(argv[1:])
+    if argv and argv[0] == "protection-check":
+        from catos.okx_demo_protection_check import main as check_main
+        return check_main(argv[1:])
     parser = argparse.ArgumentParser(prog="catos.cli demo", description="OKX 模擬盤（只連 Demo）")
     sub = parser.add_subparsers(dest="cmd", required=True)
     p_status = sub.add_parser("status", help="讀模擬盤的餘額、部位、掛單")
