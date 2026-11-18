@@ -27,7 +27,7 @@ import time
 from types import SimpleNamespace
 
 from catos.fake_exchange import TAG, build_payload
-from catos.okx_demo import DemoClient, DemoError, OkxApiError, account_issues
+from catos.okx_demo import DemoClient, DemoError, OkxApiError, account_issues, altered_stop
 from catos.okx_demo_exchange import OkxDemoExchange
 from catos import protection
 
@@ -74,6 +74,19 @@ def _probe(client, path, params):
 def _probe_algo(client, inst, algo_cl):
     found = _probe(client, "/api/v5/trade/order-algo", {"algoClOrdId": algo_cl})
     found["rows"] = [r for r in found["rows"] if r.get("algoClOrdId") == algo_cl]
+    return found
+
+
+def _probe_pending(client, inst, algo_cl):
+    """The live stop as orders-algo-pending lists it (the list _reconcile reads; O7, 2026-11-18), and
+    whether altered_stop reads that row as changed by hand."""
+    found = _probe(client, "/api/v5/trade/orders-algo-pending",
+                   {"ordType": "conditional", "instType": "SWAP", "instId": inst})
+    found["rows"] = [r for r in found["rows"] if r.get("algoClOrdId") == algo_cl]
+    try:
+        found["altered"] = [altered_stop(DemoClient._algo_row(r)) for r in found["rows"]]
+    except Exception as exc:  # noqa: BLE001 - a record, never a reason to stop mid-check
+        found["altered"] = [f"unreadable:{type(exc).__name__}"]
     return found
 
 
@@ -143,7 +156,10 @@ async def run_check(client: DemoClient, inst: str, *, sleep=asyncio.sleep, stamp
         stop1 = protection.stop_price(average, size, tick, protection.Config(ratio=ratio))
         created = await exchange.protection("algo_create", priced(algo_cl, stop1))
         report["create"] = dict(expected=str(stop1), adapter=_report_dict(created),
-                                raw=_probe_algo(client, inst, algo_cl))
+                                raw=_probe_algo(client, inst, algo_cl),
+                                pending=_probe_pending(client, inst, algo_cl))
+        report["findings"]["pending_sz"] = [r.get("sz") for r in report["create"]["pending"]["rows"]]
+        report["findings"]["pending_read_as_altered"] = report["create"]["pending"]["altered"]
         if created.status != "LIVE" or created.price != stop1:
             raise DemoError(f"掛停損後查到的不是預期的 {stop1}：{_report_dict(created)}")
         report["steps"].append(f"保底停損已掛：賣出整倉，標記價格 {stop1} 觸發")
@@ -163,7 +179,8 @@ async def run_check(client: DemoClient, inst: str, *, sleep=asyncio.sleep, stamp
         stop2 = protection.stop_price(average, size, tick, protection.Config(ratio=ratio + D("0.02")))
         amended = await exchange.protection("algo_amend", priced(f"catospc2{stamp}", stop2))
         report["amend"] = dict(expected=str(stop2), adapter=_report_dict(amended),
-                               raw=_probe_algo(client, inst, algo_cl))
+                               raw=_probe_algo(client, inst, algo_cl),
+                               pending=_probe_pending(client, inst, algo_cl))
         if amended.status != "LIVE" or amended.price != stop2:
             raise DemoError(f"改價後查到的不是預期的 {stop2}：{_report_dict(amended)}")
         report["steps"].append(f"保底停損已改到 {stop2}")
@@ -267,6 +284,10 @@ def render(report: dict) -> str:
                   f"    orders-algo-history 查得到：{', '.join(f['triggered_history_has_it']) or '查不到'}",
                   f"    Bot 的轉接層判定：{f['adapter_after_trigger']}",
                   f"    觸發後部位：{f.get('position_after_trigger', '—')}"]
+    if "pending_sz" in f:
+        lines += ["", "  等待中條件單列表（orders-algo-pending）：",
+                  f"    sz 欄位：{f['pending_sz'] or '列表裡沒有這張'}",
+                  f"    Bot 判定被改過：{f['pending_read_as_altered'] or '—'}"]
     if "auto_cancel_on_flat" in f or "finished_order_algo_code" in f:
         lines += ["", "  OKX 實際行為："]
         if "auto_cancel_on_flat" in f:

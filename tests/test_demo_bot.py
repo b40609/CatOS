@@ -1165,6 +1165,7 @@ class RareCaseTests(unittest.TestCase):
         self.assertTrue((self.root / "run2").exists())
         self.assertEqual((self.root / "run" / "manifest.json").read_text(encoding="utf-8"), before)
         self.assertIn("--new-run", demo_bot._hint("resume_unresolved_orders"))
+        self.assertIn("Kill-Switch", demo_bot._hint("risk_flat:hard_loss"))
 
     def test_an_unsettled_run_that_cannot_continue_is_noted_in_the_new_run(self):
         clock = Clock(BASE + 1_000)
@@ -1217,6 +1218,7 @@ class RareCaseTests(unittest.TestCase):
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.both(on_sleep, self.kill_after(fake, 7)), disaster_stop=self.TEN))
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
         self.assertIn("protection_altered", [e["kind"] for e in self.events()])
+        self.assertNotIn("protection_unconfirmed", self.alerts())  # the altered event says why, not "no answer"
         # Bar 5 wants a short: the long is closed, the short is not opened while the stop is not whole.
         self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
         self.assertEqual(fake.position, 0)

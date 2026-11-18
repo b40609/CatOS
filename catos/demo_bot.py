@@ -365,7 +365,7 @@ class DemoBot:
                 except SupervisorUnavailable as exc:
                     self.log.event("protection_wait", None, reason=str(exc))
                     guard = await self.supervisor.protection_state()
-                if guard["alert"] and guard["alert"] != before:  # _protect would no longer see it change
+                if guard["alert"] and guard["alert"] != before and not altered:  # _protect would no longer see it change
                     self.log.event("protection_alert", self.ALERTS.get(guard["alert"]), alert=guard["alert"])
         # A fired stop ends the run; while flattening only when OKX no longer matches the ledger.
         if guard["triggered"] and (not flattening or facts["position"] != owned):
@@ -1136,6 +1136,8 @@ START_HINTS = {
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
     "order_partially_filled": "委託只成交一部分，剩下的被 OKX 撤掉。成交的部分已記帳，Bot 先停下讓你看一下；到 OKX 網頁確認部位與條件單後，用同一個指令重開會接續目前部位。",
     "protection_config_failed": "保底停損比例裝不上，Bot 先停下；部位與 OKX 上已確認的條件單都留著。用同一個指令重開會再試；還是不行就把錯誤訊息截圖給我。",
+    "risk_flat": "Hard 日損或 Kill-Switch 鎖住，Bot 已經把部位平掉並停下（模擬盤）。Kill-Switch 紀錄（Hard 也會寫進去）只有你能解除；"
+                 "解除後用同一個指令重開。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
 }
 
@@ -1169,7 +1171,8 @@ def cli_main(argv):
                         help="保底停損：價格從進場均價反向這麼多時，由 OKX 以市價整倉平倉（電腦當機、斷線時的最後保險）。"
                              "預設 0（不掛）")
     parser.add_argument("--new-run", action="store_true",
-                        help="OKX 空倉時一定開新的 run，不接續上一次有委託沒結清的 run（舊帳本保留、不結清）")
+                        help="OKX 空倉時一定開新的 run，不接續上一次有委託沒結清的 run（舊帳本保留、不結清）。"
+                             "新 run 只沿用帳戶紀錄裡的 Soft 鎖住，不讀舊帳本")
     args = parser.parse_args(argv)
     try:
         profile = strategy_approvals.load_profile(args.profile)

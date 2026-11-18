@@ -47,6 +47,10 @@ class ProtectionCheckTests(unittest.TestCase):
         self.assertEqual(self.fake.position, 0)
         self.assertEqual([p["reduceOnly"] for p in self.fake.posts], [False, True])
         self.assertIn("平倉後自動結束條件單：否", render(report))
+        # O7: the live stop as the pending list shows it, and that the Bot does not read it as altered.
+        self.assertEqual(len(report["create"]["pending"]["rows"]), 1)
+        self.assertEqual(report["findings"]["pending_read_as_altered"], [False])
+        self.assertIn("等待中條件單列表", render(report))
 
     def test_okx_cancels_on_flat_and_hides_finished_stop(self):
         self.fake.auto_cancel_on_flat = self.fake.finished_algos_vanish = True
