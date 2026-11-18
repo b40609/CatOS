@@ -30,6 +30,13 @@
 - 看狀態：讀 run 資料夾的 `status.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
 - 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json --disaster-stop 10%`。有部位時會接續同一個 run（限制見「已知缺口」）；核准仍有效就不用重做。
 
+## 模擬盤測試 Bot（2026-11-18）
+
+- 使用者 11-18 要求不要等 192 根突破，改用測試設定 `catos/deployment_profiles/donchian-breakout-5m-4-2-test.json`（5m、Donchian 4／2、1 張；使用者核准 `fb96d4c18d067e102efcc88a57c3aed7`），`--disaster-stop 10%`。測試期間正式 Bot 停著。
+- 實測通過的完整流程：開倉 → Bot 掛保底停損 → 出場 → OKX 自動撤停損、帳本清空（run `7a08ab81`）；反手：平空 → 開多 → 新停損 56440.26（賣出、mark），舊停損已撤，OKX 部位 1、均價 62711.4 與帳本一致（run `5ff76d05`，11-19 01:00 台北）。
+- 測出並修好的問題：Futures 模式保證金率讀錯讓反手只平倉（見已知缺口「保證金率」）；出場成交的腿名稱標錯（`51ec30b3`）；反手只平倉時加記被哪道閘門擋（`3520f4b4`）。
+- 換回正式設定：等測試 Bot 空倉，停掉它，再用正式設定重開（不同設定不能接續有部位的 run）。測試設定的核准要不要撤銷由使用者決定（代理不能撤）。
+
 ## M1 獨立驗收（2026-11-17）
 
 - 第一輪 FAIL：`reports/okx-demo-m1-acceptance-20261117/acceptance.md`。下單出口、UNKNOWN 不重送、成交入帳、憑證、Decimal 都通過。不通過的是四個缺陷：
