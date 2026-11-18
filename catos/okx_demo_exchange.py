@@ -8,7 +8,13 @@ Uncertainty rules (INVARIANTS: UNKNOWN is never blindly resent or released):
 - A transport failure, timeout or an OKX error that is not an order-level rejection
   raises OSError, which the Supervisor records as UNKNOWN; the runner then queries.
 - Only an order-level rejection (sCode 51xxx etc. on the order row) is REJECTED.
-- "Not found" on a query is NOT_FOUND, which the journal treats as no evidence.
+- "Not found" on a query is NOT_FOUND, which the journal treats as no evidence. The one
+  exception is an order sent with an OKX ``expTime`` (request deadline): OKX does not process a
+  request once its server time is past that deadline, so "not found" well after it (server time
+  estimated from public/time) proves the order was never taken and it is reported REJECTED.
+  Reduce-only orders only. Assumes OKX lists an accepted order at once (protection-check: the
+  first query after the send finds it).
+  A flatten can then send a new reduce-only order instead of stopping (M1 acceptance R3, 2026-11-18).
 - A report is ``complete`` only when the order is terminal and the listed trades sum
   to the filled size; until then the order stays unsettled and is queried again.
 Fees: OKX reports a charge as negative; the ledger stores a cost as positive, so the
@@ -35,10 +41,16 @@ _ALGO_STATES = {"live": "LIVE", "pause": "LIVE", "effective": "TRIGGERED", "part
                 "order_failed": "TRIGGERED", "partially_failed": "TRIGGERED", "canceled": "CANCELED"}
 # Codes for which OKX did not take the request at all; anything else is uncertain.
 _REQUEST_REJECTED = frozenset(("51000", "51001", "51008", "51010", "51020", "51121", "51124",
-                               "51169", "51202", "51203", "51004", "51006", "51007"))
+                               "51169", "51202", "51203", "51004", "51006", "51007",
+                               # expTime already past: not processed (Demo probe 2026-11-18, reports/flatten-resend-20261118)
+                               "50036"))
 POLL_SECONDS = 0.3
 POLL_TRIES = 8  # inside Supervisor's 5-second exchange timeout
 PROTECTION_POLL_TRIES = 4  # a protection step also spends a request on the create/amend/cancel itself
+SUBMIT_DEADLINE_MS = 5_000    # expTime: OKX server time at send + this
+PROOF_MARGIN_MS = 10_000      # "not found" counts as never taken only this long after the deadline
+CLOCK_MAX_AGE_MS = 300_000    # re-read OKX server time when the offset is older than this
+CLOCK_MAX_RTT_MS = 2_000      # an offset read with a slower round trip is not trusted
 
 
 class OkxDemoExchange:
@@ -50,6 +62,33 @@ class OkxDemoExchange:
         self._client = client
         self._sleep = sleep
         self.calls = []
+        self._offset = None       # (OKX server time - local time, local time it was read), ms
+        self._deadlines = {}      # clOrdId -> expTime sent with it (OKX server time, ms)
+
+    def _now(self):
+        return self._client._clock_ms()
+
+    async def _server_offset(self):
+        """OKX server time minus local time, re-read every few minutes; None when it cannot be
+        read precisely (the order then goes without a deadline, as before)."""
+        if self._offset is not None and self._now() - self._offset[1] < CLOCK_MAX_AGE_MS:
+            return self._offset[0]
+        try:
+            before = self._now()
+            server = await self._call(self._client.server_time_ms)
+            after = self._now()
+        except DemoError:
+            return None
+        if after - before > CLOCK_MAX_RTT_MS:
+            return None
+        self._offset = (server - (before + after) // 2, after)
+        return self._offset[0]
+
+    def _never_taken(self, cl_ord_id, asked_ms):
+        """``asked_ms``: local time the "not found" query was sent."""
+        deadline = self._deadlines.get(cl_ord_id)
+        return (deadline is not None and self._offset is not None
+                and asked_ms + self._offset[0] > deadline + PROOF_MARGIN_MS)
 
     async def _call(self, method, *args):
         return await asyncio.to_thread(method, *args)
@@ -61,8 +100,14 @@ class OkxDemoExchange:
             raise ipc.ProtocolError("payload instrument is not this Bot's contract")
         self.calls.append(("submit", dict(payload)))
         cl_ord_id = payload["clOrdId"]
+        # Only a reduce-only order gets a provable deadline: a second one can never add exposure
+        # (OKX caps it at the position), so a wrong proof costs at most a position-mismatch stop.
+        offset = await self._server_offset() if payload.get("reduceOnly") is True else None
+        deadline = None if offset is None else self._now() + offset + SUBMIT_DEADLINE_MS
+        if deadline is not None:
+            self._deadlines[cl_ord_id] = deadline  # before sending: a lost answer can still be proven
         try:
-            await self._call(self._client.submit_supervisor_payload, payload)
+            await self._call(self._client.submit_supervisor_payload, payload, deadline)
         except OkxApiError as exc:
             if exc.code in _REQUEST_REJECTED:
                 return Report(cl_ord_id, "rejected" + cl_ord_id, 1, "REJECTED", Decimal("0"), (), True)
@@ -180,7 +225,7 @@ class OkxDemoExchange:
             raise OSError("okx_demo_protection_query_uncertain") from None
         if order is None:
             return ProtectionReport(request_id, self._revision(), "NOT_FOUND")
-        if order["tag"] not in (TAG, None, "") or order["ord_type"] != "conditional":
+        if order["tag"] != TAG or order["ord_type"] != "conditional":
             raise ipc.ProtocolError("conditional order on the exchange is not this Supervisor's")
         status = _ALGO_STATES.get(order["state"])
         if status is None:
@@ -200,13 +245,17 @@ class OkxDemoExchange:
 
     async def _report(self, cl_ord_id):
         try:
+            asked = self._now()
             order = await self._call(self._client.order_by_client_id, self.inst_id, cl_ord_id)
             if order is None:
+                if self._never_taken(cl_ord_id, asked):
+                    return Report(cl_ord_id, "rejected" + cl_ord_id, 1, "REJECTED", Decimal("0"), (), True)
                 return Report(cl_ord_id, None, 1, "NOT_FOUND")
             status = _STATES.get(order["state"])
             if status is None:
                 raise OSError(f"okx_demo_unknown_state:{order['state']}")
-            if order["tag"] not in (TAG, None, ""):
+            # OKX reports the tag on our orders (Demo probe 2026-11-18): an empty one is not ours either.
+            if order["tag"] != TAG:
                 raise ipc.ProtocolError("order on the exchange carries a different tag")
             fills = ()
             if order["acc_fill_sz"] > 0:

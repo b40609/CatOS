@@ -80,6 +80,10 @@ class FakeOkx:
         self.algo_lag, self.last_hidden = 0, False  # history look) do not show the stop yet
         self.amend_source_lag = 0          # after an amend, the next N order-algo looks still show the old source
         self.pending_source = None
+        self.drop_posts = 0                # the next N orders never reach OKX (connection error / 503)
+        self.server_skew = 0               # OKX server time minus local time, ms
+        self.time_failures = 0             # next N public/time reads fail
+        self.exp_times = []                # expTime header of every order POST (None when absent)
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -102,6 +106,11 @@ class FakeOkx:
         path, _, query = target.partition("?")
         q = {k: v[0] for k, v in parse_qs(query).items()}
         ok = lambda data: (200, json.dumps({"code": "0", "data": data}).encode())
+        if path == "/api/v5/public/time":
+            if self.time_failures:
+                self.time_failures -= 1
+                return 503, b"<html>503</html>"
+            return ok([{"ts": str(self.clock.ms + self.server_skew)}])
         if path == "/api/v5/account/config":
             return ok([{"acctLv": "2", "posMode": "net_mode", "perm": "read_only,trade", "label": "t", "uid": self.uid}])
         if path == "/api/v5/public/instruments":
@@ -136,6 +145,12 @@ class FakeOkx:
             return ok(rows[:int(q["limit"])])
         if method == "POST" and path == "/api/v5/trade/order":
             p = json.loads(body)
+            self.exp_times.append(headers.get("expTime"))
+            if self.drop_posts:
+                self.drop_posts -= 1
+                raise ConnectionError("never reached OKX")
+            if headers.get("expTime") and self.clock.ms + self.server_skew > int(headers["expTime"]):
+                return 200, json.dumps({"code": "1", "msg": "", "data": [{"sCode": "50036", "sMsg": "expTime earlier than the current system time"}]}).encode()
             self.posts.append(p)
             assert p["tag"] == TAG and p["tdMode"] == "cross" and p["posSide"] == "net"
             if self.reject:
@@ -1133,6 +1148,7 @@ class RareCaseTests(unittest.TestCase):
             if fake.position == 1 and not armed and now > fake.bar_time(4) + 10_000:
                 fake.lose_post_response = True
                 fake.hide_orders = 1
+                fake.time_failures = 10**9  # no server time, no deadline: the order stays unknown
                 armed.append(now)
 
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
@@ -1360,6 +1376,91 @@ class ResumeProtectionMarkTests(unittest.TestCase):
                                             disaster_stop=D("0.05")))
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
         self.assertEqual(fake.position, 0)
+
+
+class FlattenResendTests(unittest.TestCase):
+    """M1 acceptance R3 (2026-11-18): a flatten order that never reached OKX is proven so through
+    its expTime deadline, and the flatten sends a new reduce-only order instead of stopping."""
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+
+    def kill_with(self, fake, clock, arm):
+        engaged = []
+
+        def on_sleep(now):
+            if fake.position == 1 and not engaged and now > fake.bar_time(4) + 10_000:
+                arm()
+                kill_switch.engage(reason="end", actor="cli")
+                engaged.append(now)
+
+        return self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+
+    def test_a_flatten_order_that_never_arrived_is_sent_again(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def arm():
+            fake.drop_posts = 1
+
+        status = self.kill_with(fake, clock, arm)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertEqual(len(fake.exp_times), 3)  # buy, the lost sell, the second sell
+        self.assertIsNone(fake.exp_times[0])  # an opening order carries no deadline
+        self.assertTrue(all(fake.exp_times[1:]))
+        self.assertIn("flatten_done", [e["kind"] for e in self.events()])
+
+    def test_without_server_time_the_lost_flatten_order_still_stops(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def arm():
+            fake.drop_posts = 1
+            fake.time_failures = 10**9
+
+        status = self.kill_with(fake, clock, arm)
+        self.assertTrue(status["stop_reason"].startswith("flatten_failed:order_not_settled:UNKNOWN"), status)
+        self.assertEqual(fake.position, 1)
+        self.assertEqual(fake.exp_times[1:], [None])  # nothing resent
+
+    def test_the_deadline_follows_okx_server_time(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.server_skew = -20_000  # OKX 20 s behind: a local-time deadline would still be fine,
+        sent = []                   # one 20 s ahead would expire every order
+
+        def arm():
+            fake.server_skew = 20_000
+            fake.drop_posts = 1
+
+        real = fake.send
+
+        def send(method, target, headers, body):
+            if headers.get("expTime"):
+                sent.append(int(headers["expTime"]) - (clock.ms + fake.server_skew))
+            return real(method, target, headers, body)
+
+        fake.send = send
+        status = self.kill_with(fake, clock, arm)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        self.assertTrue(sent and all(0 < left <= 5_000 for left in sent), sent)
+
+    def test_an_expired_deadline_is_a_plain_rejection(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3, position="1")
+        client = DemoClient(Credentials("k", "s", "p"), fake, clock_ms=clock, sleep=lambda s: None,
+                            monotonic=lambda: 0.0)
+        exchange = OkxDemoExchange(client, "acct", "BTC-USDT-SWAP")
+        exchange._offset = (-60_000, clock.ms)  # a wrong offset: the deadline is already past at OKX
+        payload = {"instId": "BTC-USDT-SWAP", "tdMode": "cross", "posSide": "net", "ordType": "market",
+                   "side": "sell", "sz": "1", "reduceOnly": True, "clOrdId": "c1", "tag": TAG}
+        report = asyncio.run(exchange.submit(payload))
+        self.assertEqual((report.status, report.complete, fake.posts, fake.position), ("REJECTED", True, [], D("1")))
 
 
 class AdapterTests(unittest.TestCase):

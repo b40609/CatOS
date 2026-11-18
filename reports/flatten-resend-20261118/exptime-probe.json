@@ -1,0 +1,8 @@
+{"run_at": "2026-11-18T09:31Z", "script": "exptime_probe.py", "result": {
+ "skew_ms": 3017,
+ "expired": {"code": "50036", "msg": "The expTime can't be earlier than the current system time. Please adjust the expTime and try again."},
+ "expired_query": null, "pos_after_expired": "0",
+ "valid_first_query_s": 0.35,
+ "valid_order": {"state": "filled", "sz": "0.01", "acc_fill_sz": "0.01", "tag": "41cb53c54d6dABDE"},
+ "close_order": {"state": "filled", "sz": "0.01", "acc_fill_sz": "0.01", "tag": "41cb53c54d6dABDE"},
+ "final_pos": "0"}}

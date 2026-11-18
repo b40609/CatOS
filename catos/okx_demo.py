@@ -280,7 +280,8 @@ class DemoClient:
     def __repr__(self):
         return "DemoClient(<demo>)"
 
-    def _request(self, method: str, path: str, params: dict | None = None, payload: dict | None = None) -> list:
+    def _request(self, method: str, path: str, params: dict | None = None, payload: dict | None = None,
+                 exp_time_ms: int | None = None) -> list:
         allowed = _GET_PATHS if method == "GET" else _POST_PATHS if method == "POST" else frozenset()
         if path not in allowed:
             raise DemoError(f"端點不在白名單：{method} {path}")
@@ -288,6 +289,10 @@ class DemoClient:
         body = json.dumps(payload, separators=(",", ":")) if payload is not None else ""
         headers = {"Accept": "application/json", "Content-Type": "application/json",
                    "x-simulated-trading": "1"}
+        if exp_time_ms is not None:
+            # OKX does not process the request once its server time is past expTime (docs-v5 "expTime",
+            # REST request header, checked 2026-11-18); not part of the signature.
+            headers["expTime"] = str(int(exp_time_ms))
         if not path.startswith(_PUBLIC_PREFIXES):
             stamp = _timestamp(self._clock_ms())
             headers.update({"OK-ACCESS-KEY": self._credentials.api_key,
@@ -424,15 +429,16 @@ class DemoClient:
     # ---- Bot 用：Supervisor 的委託格式、以 clOrdId 查單 ----
     SUPERVISOR_FIELDS = frozenset(("instId", "tdMode", "posSide", "ordType", "side", "sz", "reduceOnly", "clOrdId", "tag"))
 
-    def submit_supervisor_payload(self, payload: dict) -> str:
-        """送出 Supervisor 建好的委託（fake_exchange.build_payload 的欄位），原樣轉送、不增減欄位。"""
+    def submit_supervisor_payload(self, payload: dict, exp_time_ms: int | None = None) -> str:
+        """送出 Supervisor 建好的委託（fake_exchange.build_payload 的欄位），原樣轉送、不增減欄位。
+        exp_time_ms：OKX 伺服器時間超過它就不處理這筆請求（header expTime）。"""
         if (type(payload) is not dict or set(payload) != self.SUPERVISOR_FIELDS or payload["tag"] != TAG
                 or payload["tdMode"] != "cross" or payload["posSide"] != "net" or payload["ordType"] != "market"
                 or payload["side"] not in ("buy", "sell") or type(payload["reduceOnly"]) is not bool
                 or not _CL_ORD_ID.match(str(payload["clOrdId"]))):
             raise DemoError("委託欄位不符 Supervisor 格式，拒送")
         _inst(payload["instId"])
-        rows = self._request("POST", "/api/v5/trade/order", payload=dict(payload))
+        rows = self._request("POST", "/api/v5/trade/order", payload=dict(payload), exp_time_ms=exp_time_ms)
         if len(rows) != 1 or rows[0].get("sCode") not in ("0", 0) or not rows[0].get("ordId"):
             row = rows[0] if rows else {}
             raise OkxApiError(str(row.get("sCode", "?")), str(row.get("sMsg", "下單回應不完整")))
