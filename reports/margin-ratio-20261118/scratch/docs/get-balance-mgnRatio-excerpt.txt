@@ -1,0 +1,11 @@
+來源：https://www.okx.com/docs-v5/en/ （2026-11-18 下載），Trading Account > Get balance > Response Parameters
+
+adjEq | String | Adjusted equity in USD : totalEq minus haircut discounts applied to non-stablecoin collateral assets. This is the operative value used in the margin ratio calculation ( mgnRatio = adjEq / mmr ). The net fiat value of the assets in the account that can provide margins for spot, expiry futures, perpetual futures and options under the cross-margin mode. In multi-ccy or PM mode, the asset and margin requirement will all be converted to USD value to process the order check or liquidation. Due to the volatility of each currency market, our platform calculates the actual USD value of each currency based on discount rates to balance market risks. Applicable to Spot mode / Multi-currency margin and Portfolio margin
+
+mmr | String | Maintenance Margin Requirement (MMR) in USD : the minimum equity required to avoid forced liquidation. The sum of maintenance margins of all open positions and pending orders under cross-margin mode. When adjEq ≤ mmr (equivalently, mgnRatio ≤ 1.0), the system begins forced liquidation of positions. Subscribe to the position-risk-warning WebSocket channel for proactive alerts. Applicable to Spot mode / Multi-currency margin / Portfolio margin
+
+mgnRatio | String | Account-level margin ratio = adjEq / mmr . Values at or below 1.0 indicate the account is at or past the liquidation boundary. Monitor this field or subscribe to the position-risk-warning WebSocket channel for proactive alerts. Applicable to Spot mode / Multi-currency margin / Portfolio margin
+
+> mgnRatio | String | Cross maintenance margin ratio of currency The index for measuring the risk of a certain asset in the account. Applicable to Futures mode and when there is cross position
+
+> mmr | String | Cross maintenance margin requirement at the currency level Applicable to Futures mode and when there is cross position

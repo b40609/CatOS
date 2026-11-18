@@ -1,0 +1,19 @@
+S1 Futures：頂層空、USDT details 50               mgn_ratio=50     margin_ok(持倉)=True
+S2 兩處都空                                      mgn_ratio=None   margin_ok(持倉)=False
+S3 兩處都沒有欄位                                   mgn_ratio=None   margin_ok(持倉)=False
+S4 頂層空、details 0                             mgn_ratio=0      margin_ok(持倉)=False
+S5 頂層空、details 負值 -1                         mgn_ratio=-1     margin_ok(持倉)=False
+S6 頂層空、details 2.99（低於門檻）                    mgn_ratio=2.99   margin_ok(持倉)=False
+S7 頂層空、details 3（剛好門檻）                       mgn_ratio=3      margin_ok(持倉)=True
+S8 頂層空、details 非數字 abc                       DemoError: OKX 回應的 mgnRatio 不是數字
+S9 頂層空、details NaN                           DemoError: OKX 回應的 mgnRatio 不是有限數字
+S10 頂層空、details Infinity                     DemoError: OKX 回應的 mgnRatio 不是有限數字
+S11 只有 BTC details 有值、USDT 空                 mgn_ratio=None   margin_ok(持倉)=False
+S12 BTC 在前且有值、USDT 2                         mgn_ratio=2      margin_ok(持倉)=False
+S13 多幣種：頂層 2、details 50（並存）                  mgn_ratio=2      margin_ok(持倉)=False
+S14 頂層 0、details 50                          mgn_ratio=0      margin_ok(持倉)=False
+S15 頂層 abc、details 50                        DemoError: OKX 回應的 mgnRatio 不是數字
+S16 頂層 50、details abc（不會讀到）                  mgn_ratio=50     margin_ok(持倉)=True
+S17 頂層空白字串 ' '、details 50                    DemoError: OKX 回應的 mgnRatio 不是數字
+S18 頂層 null（JSON null）、details 50            mgn_ratio=50     margin_ok(持倉)=True
+S19 details 數字型別 50（非字串）                     mgn_ratio=50     margin_ok(持倉)=True

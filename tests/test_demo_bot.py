@@ -89,6 +89,7 @@ class FakeOkx:
         # Where OKX puts the margin ratio: "futures" (acctLv 2, the real Demo account: details[].mgnRatio
         # only), "account" (top-level mgnRatio), or None (nowhere).
         self.margin_ratio_at = "futures"
+        self.margin_ratio = "50"           # its value while a position is open
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -127,7 +128,7 @@ class FakeOkx:
             if self.balance_failures:
                 self.balance_failures -= 1
                 return 503, b'{"code":"50001","msg":"Service temporarily unavailable","data":[]}'
-            ratio = "50" if self.position else ""
+            ratio = self.margin_ratio if self.position else ""
             top = ratio if self.margin_ratio_at == "account" else ""
             cur = ratio if self.margin_ratio_at == "futures" else ""
             return ok([{"totalEq": str(self.equity), "mgnRatio": top,
@@ -1580,6 +1581,29 @@ class MarginRatioTests(unittest.TestCase):
         self.assertEqual(reasons, ["exposure_reserved", "reversal_close_only"])
         why = next(e["why"] for e in self.events() if e["kind"] == "order" and "why" in e)
         self.assertEqual(why["health"], "DEGRADED")
+
+    def snapshot(self, account_ratio, details):
+        class Sender:
+            def send(self, method, target, headers, body):
+                return 200, json.dumps({"code": "0", "data": [{"mgnRatio": account_ratio, "details": details}]}).encode()
+        client = DemoClient(Credentials("k", "s", "p"), Sender(), clock_ms=lambda: 0, sleep=lambda s: None,
+                            monotonic=lambda: 0.0)
+        return client.account_snapshot()["mgn_ratio"]
+
+    def test_which_ratio_is_read(self):  # acceptance O2
+        usdt = {"ccy": "USDT", "eq": "5000", "mgnRatio": "50"}
+        btc = {"ccy": "BTC", "eq": "1", "mgnRatio": "900"}
+        self.assertEqual(self.snapshot("2", [usdt]), D("2"))           # the account level wins when given
+        self.assertEqual(self.snapshot("", [btc, usdt]), D("50"))      # only the USDT entry, wherever it is
+        self.assertIsNone(self.snapshot("", [btc, dict(usdt, mgnRatio="")]))
+
+    def test_a_ratio_just_under_three_keeps_increases_closed(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.margin_ratio = "2.99"
+        self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), disaster_stop=D("0.10")))
+        reasons = [e["reason"] for e in self.events() if e["kind"] == "bar" and e.get("target") is not None]
+        self.assertEqual(reasons, ["exposure_reserved", "reversal_close_only"])
 
 
 class AdapterTests(unittest.TestCase):

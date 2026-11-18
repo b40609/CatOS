@@ -1,0 +1,172 @@
+C:\dev\CatOS\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+............................................................................................................................................Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_triggered_requires_fill_reconciliation
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_request_failed
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_unconfirmed
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_mismatch
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_triggered_requires_fill_reconciliation
+.Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_unconfirmed
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+..Bot demo-bot: protection_recheck_required
+Bot demo-bot: restart_protection_reconciliation
+Bot demo-bot: protection_change_pending
+Bot demo-bot: protection_recheck_required
+..Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.........Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+...Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_unconfirmed
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_mismatch
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_mismatch
+Bot demo-bot: protection_recheck_required
+...Bot demo-bot: protection_recheck_required
+Bot demo-bot: restart_protection_reconciliation
+..Bot demo-bot: protection_recheck_required
+Bot demo-bot: restart_protection_reconciliation
+Bot demo-bot: protection_mismatch
+Bot demo-bot: protection_change_pending
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_unconfirmed
+Bot demo-bot: restart_protection_reconciliation
+C:\Users\user\AppData\Local\Python\pythoncore-3.14-64\Lib\json\decoder.py:345: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001CB7FA2A6B0>
+  obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+Bot demo-bot: protection_change_pending
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: restart_protection_reconciliation
+Bot demo-bot: protection_change_pending
+Bot demo-bot: protection_recheck_required
+..Bot demo-bot: protection_recheck_required
+Bot demo-bot: restart_protection_reconciliation
+Bot demo-bot: protection_change_pending
+Bot demo-bot: protection_request_failed
+Bot demo-bot: protection_recheck_required
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_triggered_requires_fill_reconciliation
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_unconfirmed
+.Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+Bot demo-bot: protection_recheck_required
+.......................................C:\dev\CatOS\tests\test_fetch_okx_dataset.py:55: ResourceWarning: unclosed database in <sqlite3.Connection object at 0x000001CB7FA28C70>
+  self.candles = [[str(ms), "60000.0", "60010.0", "59990.0", "60005.0", "1", "1", "1",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..................................................................................Executing <Task finished name='Task-711' coro=<ControlTests.test_event_and_run_limits_do_not_delete_old_records() done, defined at C:\dev\CatOS\tests\test_local_sim_control.py:285> result=None created at C:\Users\user\AppData\Local\Python\pythoncore-3.14-64\Lib\asyncio\runners.py:110> took 0.347 seconds
+........................................................................................................[I 2026-11-18 23:48:23,765] A new study created in memory with name: catos-memory
+[I 2026-11-18 23:48:23,771] A new study created in memory with name: catos-memory
+[I 2026-11-18 23:48:23,776] A new study created in memory with name: catos-memory
+.................................Bot bot: protection_change_pending
+.Bot bot: protection_change_pending
+Bot bot: protection_unconfirmed
+.Bot bot: protection_change_pending
+..Bot bot: protection_change_pending
+Bot bot: protection_change_pending
+Bot bot: protection_unconfirmed
+.Bot bot: protection_change_pending
+Bot bot: protection_unconfirmed
+.Bot bot: protection_change_pending
+.Bot bot: protection_change_pending
+Bot bot: restart_protection_reconciliation
+.Bot bot: protection_change_pending
+Bot bot: protection_recheck_required
+Bot bot: protection_recheck_required
+.Bot bot: protection_change_pending
+Bot bot: protection_recheck_required
+.Bot bot: protection_change_pending
+Bot bot: protection_recheck_required
+.Bot bot: protection_change_pending
+Bot bot: restart_protection_reconciliation
+..Bot bot: protection_change_pending
+Bot bot: protection_triggered_requires_fill_reconciliation
+.Bot bot: protection_change_pending
+Bot bot: protection_change_pending
+Bot bot: protection_unconfirmed
+.Bot bot: protection_change_pending
+Bot bot: protection_change_pending
+........................................................錯誤: config missing required keys: ['warmup_bars']
+錯誤: config contains unexpected keys: ['unexpected']
+錯誤: contract missing required keys: ['tick_size']
+錯誤: contract contains unexpected keys: ['extra']
+錯誤: field 'fee_rate' must be a string representing a Decimal, got float
+錯誤: field 'initial_balance' must be a string representing a Decimal, got int
+錯誤: field 'contract.tick_size' must be a string representing a Decimal, got float
+錯誤: field 'timeframe_ms' must be an integer, not bool, float, or string
+錯誤: field 'timeframe_ms' must be an integer, not bool, float, or string
+錯誤: field 'timeframe_ms' must be an integer, not bool, float, or string
+錯誤: field 'warmup_bars' must be an integer, not bool, float, or string
+錯誤: field 'warmup_bars' must be a non-negative integer
+錯誤: field 'initial_balance' contains invalid decimal text: 'not_a_number'
+錯誤: contract label must identify a USDT SWAP
+錯誤: field 'funding_events' must be an array
+錯誤: funding_events[0] missing required keys: ['mark_price']
+錯誤: funding_events[0] contains unexpected keys: ['extra']
+錯誤: funding_events[0].rate must be a string representing a Decimal, got float
+.錯誤: JSON contains duplicate key: 'timeframe_ms'
+.錯誤: simulated write error during disk flush
+.錯誤: JSON contains forbidden constant: 'NaN'
+.錯誤: [Errno 2] No such file or directory: 'C:\\Users\\user\\AppData\\Local\\Temp\\tmpk7req0md\\nonexistent.csv'
+錯誤: config file not found: C:\Users\user\AppData\Local\Temp\tmpk7req0md\nonexistent.json
+錯誤: row 2, column 'closed': expected '1', got '0'
+..錯誤: output file already exists: C:\Users\user\AppData\Local\Temp\tmpnl34jrt_\report.html
+錯誤: output path must have .html extension, got '.txt'
+錯誤: output path must have .html extension, got '.csv'
+.................................[I 2026-11-18 23:48:30,247] A new study created in memory with name: catos-memory
+..........................................................................[I 2026-11-18 23:48:36,466] A new study created in memory with name: catos-memory
+......[I 2026-11-18 23:48:37,669] A new study created in memory with name: catos-memory
+......................................................................................................................................................................................................................................................................................
+----------------------------------------------------------------------
+Ran 907 tests in 240.273s
+
+OK
+報告已成功輸出至: C:\Users\user\AppData\Local\Temp\tmpqhnv5b09\report.html
+聲明：本報告為純記憶體研究結果，合成或歷史資料來源由使用者自行負責；非 Demo／Live 交易執行器。
+報告已成功輸出至: C:\Users\user\AppData\Local\Temp\tmpw_uqsf9_\bom_report.html
+聲明：本報告為純記憶體研究結果，合成或歷史資料來源由使用者自行負責；非 Demo／Live 交易執行器。
+報告已成功輸出至: C:\Users\user\AppData\Local\Temp\tmpnl34jrt_\nested\deep\report.html
+聲明：本報告為純記憶體研究結果，合成或歷史資料來源由使用者自行負責；非 Demo／Live 交易執行器。
+報告已成功輸出至: C:\Users\user\AppData\Local\Temp\tmpqw462e3a\warmup3_report.html
+聲明：本報告為純記憶體研究結果，合成或歷史資料來源由使用者自行負責；非 Demo／Live 交易執行器。
+Port 57504 already in use. No process stopped and no alternate port selected.
+Retained fixture unit evidence: C:\dev\CatOS\outputs\workspace-w6-fixture-test-28749b58805e438797873075a1a37141
+Retained fixture unit evidence: C:\dev\CatOS\outputs\workspace-w8-fixture-test-0eb24e5ed8524900a8381e555e0ffbd2
