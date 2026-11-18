@@ -607,8 +607,13 @@ class DemoClient:
         usdt = next((d for d in account.get("details", []) if d.get("ccy") == "USDT"), None)
         if usdt is None or _dec(usdt, "eq") is None:
             raise DemoError("餘額回應沒有 USDT 權益")
-        return {"usdt_eq": _dec(usdt, "eq"), "mgn_ratio": _dec(account, "mgnRatio"),
-                "u_time": int(account.get("uTime") or 0)}
+        # The account-level mgnRatio is only given in Spot / Multi-currency / Portfolio margin modes; in
+        # Futures mode (acctLv 2, this Bot's account) the cross ratio is details[].mgnRatio of the
+        # currency (OKX docs-v5 "Get balance", checked 2026-11-18). Missing in both: None (not safe).
+        ratio = _dec(account, "mgnRatio")
+        if ratio is None:
+            ratio = _dec(usdt, "mgnRatio")
+        return {"usdt_eq": _dec(usdt, "eq"), "mgn_ratio": ratio, "u_time": int(account.get("uTime") or 0)}
 
 
 # ---- 帳戶檢查（第一張單前的簡單核對）----

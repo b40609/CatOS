@@ -86,6 +86,9 @@ class FakeOkx:
         self.exp_times = []                # expTime header of every order POST (None when absent)
         self.time_lag = 0                  # public/time answers this much behind OKX's real clock
         self.hide_until = 0                # order queries answer "does not exist" until this local time
+        # Where OKX puts the margin ratio: "futures" (acctLv 2, the real Demo account: details[].mgnRatio
+        # only), "account" (top-level mgnRatio), or None (nowhere).
+        self.margin_ratio_at = "futures"
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -124,8 +127,12 @@ class FakeOkx:
             if self.balance_failures:
                 self.balance_failures -= 1
                 return 503, b'{"code":"50001","msg":"Service temporarily unavailable","data":[]}'
-            return ok([{"totalEq": str(self.equity), "mgnRatio": "50" if self.position else "",
-                        "details": [{"ccy": "USDT", "eq": str(self.equity), "availEq": str(self.equity)}]}])
+            ratio = "50" if self.position else ""
+            top = ratio if self.margin_ratio_at == "account" else ""
+            cur = ratio if self.margin_ratio_at == "futures" else ""
+            return ok([{"totalEq": str(self.equity), "mgnRatio": top,
+                        "details": [{"ccy": "USDT", "eq": str(self.equity), "availEq": str(self.equity),
+                                     "mgnRatio": cur}]}])
         if path == "/api/v5/account/positions":
             rows = [{"instId": inst, "pos": pos, "mgnMode": "cross", "avgPx": "10"} for inst, pos in self.others]
             return ok(rows + ([{"instId": "BTC-USDT-SWAP", "pos": str(self.position), "mgnMode": "cross", "avgPx": "100"}]
@@ -1537,6 +1544,42 @@ class FlattenResendTests(unittest.TestCase):
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
         self.assertEqual(fake.position, 0)
         self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+
+
+class MarginRatioTests(unittest.TestCase):
+    """Test Bot on Demo, 2026-11-18 12:20: a reversal only closed. In Futures mode (acctLv 2) OKX gives the
+    margin ratio only in details[].mgnRatio; reading the account level alone made every held position
+    look unsafe (health DEGRADED), so the opening leg was refused."""
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+    kill_after = DemoBotTests.kill_after
+
+    def reversal(self, where):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.margin_ratio_at = where
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7), disaster_stop=D("0.10")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        return [e["reason"] for e in self.events() if e["kind"] == "bar" and e.get("target") is not None], fake
+
+    def test_futures_mode_ratio_lets_the_reversal_open(self):
+        reasons, fake = self.reversal("futures")
+        self.assertEqual(reasons, ["exposure_reserved", "reversal_reserved"])
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts][:3],
+                         [("buy", False), ("sell", True), ("sell", False)])
+
+    def test_account_level_ratio_still_works(self):
+        reasons, _ = self.reversal("account")
+        self.assertEqual(reasons, ["exposure_reserved", "reversal_reserved"])
+
+    def test_no_ratio_with_a_position_keeps_increases_closed(self):
+        reasons, fake = self.reversal(None)
+        self.assertEqual(reasons, ["exposure_reserved", "reversal_close_only"])
+        why = next(e["why"] for e in self.events() if e["kind"] == "order" and "why" in e)
+        self.assertEqual(why["health"], "DEGRADED")
 
 
 class AdapterTests(unittest.TestCase):
