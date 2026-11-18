@@ -76,6 +76,8 @@ class FakeOkx:
         self.reject_amend = None           # sCode every amend is refused with while set
         self.cancel_race = False           # the stop ends just before our cancel arrives: 51402
         self.partial_fill = None           # the next order fills only this size; the rest is canceled
+        self.lag_after_cancel = 0          # after our cancel, the next N order-algo looks (and that round's
+        self.algo_lag, self.last_hidden = 0, False  # history look) do not show the stop yet
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -174,11 +176,17 @@ class FakeOkx:
             return ok([dict(a) for a in rows])
         if method == "GET" and path == "/api/v5/trade/order-algo":
             algo = self.algos.get(q.get("algoClOrdId"))
+            self.last_hidden = self.algo_lag > 0
+            if self.last_hidden:
+                self.algo_lag -= 1
+                return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             if algo is None or (self.finished_algos_vanish and algo["state"] != "live"):
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             return ok([dict(algo)])
         if method == "GET" and path == "/api/v5/trade/orders-algo-history":
             assert q["ordType"] == "conditional" and q["instType"] == "SWAP" and "algoClOrdId" not in q
+            if self.last_hidden:
+                return ok([])
             return ok([dict(a) for a in self.algos.values() if a["state"] == q["state"] and a["instId"] == q["instId"]])
         if method == "POST" and path == "/api/v5/trade/order-algo":
             p = json.loads(body)
@@ -213,6 +221,7 @@ class FakeOkx:
             for item in p:
                 algo = next(a for a in self.algos.values() if a["algoId"] == item["algoId"])
                 algo["state"] = "canceled"
+            self.algo_lag = self.lag_after_cancel
             if self.cancel_race:
                 self.cancel_race = False
                 return 200, json.dumps({"code": "1", "msg": "", "data": [{"algoId": p[0]["algoId"], "sCode": "51402",
@@ -1015,6 +1024,51 @@ class ReviewFixTests(unittest.TestCase):
                          [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
         self.assertNotIn("protection_unconfirmed", self.alerts())
 
+    def test_a_cancel_okx_lists_late_is_queried_again_before_the_history(self):  # acceptance D1
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.lag_after_cancel = 1  # right after the cancel neither order-algo nor the history shows it
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts],
+                         [("buy", False), ("sell", True), ("sell", False), ("buy", True)])
+        self.assertNotIn("protection_unconfirmed", self.alerts())
+
+    def test_a_partly_filled_flatten_order_is_recorded_and_the_rest_closed(self):  # acceptance O1
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        engaged = []
+
+        def on_sleep(now):
+            if fake.position == 1 and not engaged and now > fake.bar_time(4) + 10_000:
+                fake.partial_fill = "0.5"  # the Kill flatten's first order fills half
+                kill_switch.engage(reason="end", actor="cli")
+                engaged.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual((fake.position, status["fills"]), (0, 3), status)
+        fills = json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))
+        self.assertEqual([(f["leg"], f["state"]) for f in fills],
+                         [("開倉／調整", "FILLED"), ("清倉（部分成交）", "CANCELED"), ("清倉", "FILLED")])
+
+    def test_a_stop_gone_everywhere_is_reported_once_by_the_minute_check(self):  # Gemini recheck #3
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        gone = []
+
+        def on_sleep(now):
+            if fake.algos and not gone and now > fake.bar_time(4) + 20_000:
+                fake.algos.clear()  # neither order-algo, the pending list nor the history knows it
+                gone.append(now)
+            if gone and now > fake.bar_time(4) + 200_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep, disaster_stop=self.TEN))
+        self.assertEqual(status["stop_reason"], "operator_stop_file", status)
+        self.assertEqual(self.alerts(), ["protection_unconfirmed"])  # logged once, not silently
+        self.assertEqual(len(fake.posts), 1)  # nothing resent while it stays uncertain
+
     def test_a_partial_fill_is_recorded_and_protected_before_the_run_stops(self):
         clock = Clock(BASE + 1_000)
         fake = FakeOkx(clock, start_index=3)
@@ -1027,7 +1081,8 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual([(f["state"], f["fills"][0]["quantity"]) for f in fills], [("CANCELED", "0.5")])
         self.assertEqual(self.algo_writes(fake), [("order-algo", {"side": "sell", "slTriggerPx": "94.5"})])
         self.assertEqual([a["state"] for a in fake.algos.values()], ["live"])
-        self.assertTrue(any("只成交一部分" in line for line in lines))
+        self.assertTrue(any("只成交一部分" in line and "保底停損在 94.5" in line for line in lines), lines)
+        self.assertIn("接續", demo_bot._hint(status["stop_reason"]))
         # The restart resumes the 0.5 with its stop.
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
                                             disaster_stop=self.TEN))

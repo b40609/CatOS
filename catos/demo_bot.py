@@ -352,11 +352,14 @@ class DemoBot:
                     D(active["price"]), active["side"], active["trigger"]):
                 # OKX no longer lists our stop (fired or canceled there) or shows it changed: query
                 # it once more and let the ledger follow what OKX reports. Nothing is resent.
+                before = guard["alert"]
                 try:
                     guard = await self.supervisor.protection_verify(now_ms=self.wall_ms())
                 except SupervisorUnavailable as exc:
                     self.log.event("protection_wait", None, reason=str(exc))
                     guard = await self.supervisor.protection_state()
+                if guard["alert"] and guard["alert"] != before:  # _protect would no longer see it change
+                    self.log.event("protection_alert", self.ALERTS.get(guard["alert"]), alert=guard["alert"])
         # A fired stop ends the run; while flattening only when OKX no longer matches the ledger.
         if guard["triggered"] and (not flattening or facts["position"] != owned):
             raise BotStopped(_fired(facts["position"]))
@@ -547,8 +550,14 @@ class DemoBot:
             # the opening leg, which the journal would otherwise refuse as an unprotected increase.
             facts = await self._protect(facts)
             if partial:
+                guard = await self.supervisor.protection_state()
+                confirmed = guard["active"] is not None and not (guard["pending"] or guard["uncertain"])
+                stop = ("" if facts["position"] == 0 else
+                        f"保底停損在 {guard['active']['price']}；" if confirmed else
+                        "沒有設保底停損；" if not self.disaster_stop else
+                        "保底停損還沒確認，請到 OKX 網頁看條件單；")
                 self.log.event("order", f"委託只成交一部分就被撤（{row['state']}）：成交 {abs(D(row['filled']))} 張，"
-                               f"已記帳，保底停損照新部位處理；Bot 停下，重開會接續目前部位 {facts['position']}",
+                               f"已記帳；目前部位 {facts['position']}，{stop}Bot 停下，用同一個指令重開會接續",
                                row={k: row[k] for k in ("cl_ord_id", "state", "quantity", "filled")})
                 raise BotStopped(f"order_partially_filled:{row['state'].lower()}")
             if not closing_leg:
@@ -587,8 +596,8 @@ class DemoBot:
             row = await self.supervisor.flatten_step(now_ms=now_ms, expires_at_ms=now_ms + 60_000)
             if row is not None:
                 row = await self._settle(row)
-                if row["state"] == "FILLED":
-                    await self._record_fill(row, "清倉")
+                if D(row["filled"]) != 0:  # also partly filled; the next round closes the rest (acceptance O1)
+                    await self._record_fill(row, "清倉" if row["state"] == "FILLED" else "清倉（部分成交）")
         facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
         raise BotStopped(f"flatten_incomplete:okx_position={facts['position']}")
 
@@ -1054,6 +1063,7 @@ START_HINTS = {
     "disaster_stop_triggered": "OKX 的保底停損已觸發並平倉（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
     "disaster_stop_incomplete": "OKX 的保底停損觸發了，但 OKX 上還有部位（停損單沒有完全成交）。帳本已經對不上，Bot 不能替你處理：請到 OKX 網頁手動平倉，再用同一個指令重開。",
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
+    "order_partially_filled": "委託只成交一部分，剩下的被 OKX 撤掉。成交的部分已記帳，Bot 先停下讓你看一下；到 OKX 網頁確認部位與條件單後，用同一個指令重開會接續目前部位。",
     "protection_config_failed": "保底停損設定沒有生效，Bot 先停下。把錯誤訊息截圖給我。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
 }

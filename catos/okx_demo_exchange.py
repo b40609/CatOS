@@ -139,23 +139,26 @@ class OkxDemoExchange:
         except DemoError:
             raise OSError("okx_demo_protection_uncertain") from None
         wanted = D(payload["slTriggerPx"]) if operation in ("algo_create", "algo_amend") else None
-        # A stop that existed before (cancel, query) and is no longer in order-algo is looked up in the
-        # algo history; a just-created one may simply not be listed yet, so it is only re-queried.
-        history = operation in ("algo_cancel", "algo_query")
+        # A stop that existed before and is no longer in order-algo is looked up in the algo history;
+        # a just-created or amended one may simply not be listed yet, so it is only re-queried.
+        # A cancel first re-queries order-algo once (OKX may lag right after the cancel), then also the
+        # history (acceptance D1, 2026-11-18); a query is a single look that includes the history.
+        def with_history(attempt):
+            return operation == "algo_query" or (operation == "algo_cancel" and attempt >= 1)
 
-        def settled(report):
+        def settled(report, attempt):
             if operation == "algo_query":
                 return True
             if report.status == "NOT_FOUND":
-                return history  # cancel: history already consulted; create/amend: OKX may lag
+                return with_history(attempt)  # create/amend: just sent, OKX may not list it yet
             if operation == "algo_cancel":
                 return report.status != "LIVE"
             return report.status != "LIVE" or (report.complete and report.price == wanted)
 
         report = None
-        for _ in range(PROTECTION_POLL_TRIES):  # inside Supervisor's 5-second exchange timeout
-            report = await self._protection_report(request_id, algo_cl, history=history)
-            if settled(report):
+        for attempt in range(PROTECTION_POLL_TRIES):  # inside Supervisor's 5-second exchange timeout
+            report = await self._protection_report(request_id, algo_cl, history=with_history(attempt))
+            if settled(report, attempt):
                 return report
             await self._sleep(POLL_SECONDS)
         return report
