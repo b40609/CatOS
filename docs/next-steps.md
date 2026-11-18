@@ -17,7 +17,7 @@
 ## 正式 Bot（2026-11-17 起）
 
 - 使用者本人核准：`approval_id=10d7846fe1adfef05a5e25825c7d884d`（15m、Donchian 192／48、1 張、本金 5000）。
-- 現在的 run：`outputs/okx-demo-bot/1e5a3848060f444daf568fd54d5524e1`，11-18 13:24 台北時間由使用者在 `C:\dev\CatOS`（ae5cac2c，含審查修正 5ca49b93、7a3d142c）以 `--disaster-stop 10%` 啟動；空倉開新 run，預熱 192 根完成，部位 0。之前的 run：`63e5c1a1…`（11-17 11:21，舊版 e09da051）、`d3ad9901…`（11-17 17:04 到 23:27，217 根、0 成交）、`9630e8f5…`（11-17 23:27 到 11-18 13:24，a5ee0b0c，約 244 根、0 成交，Ctrl+C 停下）。
+- 現在的 run：`outputs/okx-demo-bot/e96edaecdf7f488d820c0acd4e12833c`，11-18 13:36 台北時間由使用者以 `--disaster-stop 10%` 重開（程式含審查修正 5ca49b93、7a3d142c），空倉、預熱完成。之前的 run：`1e5a3848…`（11-18 13:24 到 13:33，為了 P6 實測以 stop.request 停下）、`63e5c1a1…`（11-17 11:21，舊版 e09da051）、`d3ad9901…`（11-17 17:04 到 23:27，217 根、0 成交）、`9630e8f5…`（11-17 23:27 到 11-18 13:24，a5ee0b0c，約 244 根、0 成交，Ctrl+C 停下）。
 - 第一筆成交是 P6 條件單在模擬盤的第一次實測：看 `events.jsonl` 的 `protection`／`protection_alert` 事件，並在 OKX 網頁核對條件單（觸發價、方向、整倉）。
 - P6 模擬盤實測（2026-11-18 13:33，`python -m catos.cli demo protection-check`，紀錄 `reports/okx-demo-protection-check/1794979993705.json`）：等 Donchian 成交太慢，改成一次性實測。Bot 以 stop.request 停下（空倉），用 Bot 同一個轉接層開最小張數 0.01 張，均價 64820。結果：
   - 掛單：`order-algo` 回的欄位和程式照 SDK 寫的一致（`state`、`side`、`slTriggerPx`、`slTriggerPxType=mark`、`slOrdPx=-1`、`closeFraction=1`、`reduceOnly="true"`、`sz` 空字串、`tag` 保留），轉接層判定 LIVE、價格 58338 相符。
