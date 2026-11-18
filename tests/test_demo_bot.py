@@ -1223,7 +1223,8 @@ class RareCaseTests(unittest.TestCase):
 
     def test_the_fill_size_okx_adds_after_firing_is_not_an_alteration(self):
         from catos.okx_demo import altered_stop
-        self.assertFalse(altered_stop({"sl_ord_px": "-1", "close_fraction": "1", "sz": "1"}))
+        self.assertFalse(altered_stop({"state": "effective", "sl_ord_px": "-1", "close_fraction": "1", "sz": "1"}))
+        self.assertTrue(altered_stop({"state": "live", "sl_ord_px": "-1", "close_fraction": "", "sz": "0.5"}))  # O1
         self.assertFalse(altered_stop({"sl_ord_px": "", "close_fraction": "", "sz": ""}))
         self.assertTrue(altered_stop({"sl_ord_px": "94", "close_fraction": "1", "sz": ""}))
         self.assertTrue(altered_stop({"sl_ord_px": "-1", "close_fraction": "0.5", "sz": ""}))
@@ -1262,11 +1263,13 @@ class RareCaseTests(unittest.TestCase):
         self.assertIn(("amend-algos", {"newSlTriggerPx": "94.5"}), self.algo_writes(fake))
         self.assertEqual([a["slTriggerPxType"] for a in fake.algos.values()], ["mark"])
 
-    # 6. On resume, a new ratio that cannot be installed never lets the old ratio place or move a stop.
-    def test_resume_never_uses_the_old_ratio_while_the_new_one_is_not_installed(self):
+    # 6. On resume, a new ratio that cannot be installed stops the run: the old ratio never places or
+    # moves a stop, and no position is opened without one (acceptance D1: OKX ends the stop at flat).
+    def test_resume_stops_when_the_new_ratio_cannot_be_installed(self):
         from catos.supervisor import LocalSupervisor, SupervisorUnavailable
         clock = Clock(BASE + 1_000)
         fake = FakeOkx(clock, start_index=3)
+        fake.auto_cancel_on_flat = True  # as measured on Demo, 2026-11-18
 
         def stop_later(now):
             if fake.algos and now > fake.bar_time(4) + 5_000:
@@ -1282,12 +1285,10 @@ class RareCaseTests(unittest.TestCase):
         with mock.patch.object(LocalSupervisor, "configure_protection", refuse):
             status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
                                                 disaster_stop=D("0.05")))
-        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
-        names = [w[0] for w in self.algo_writes(fake)[before:]]
-        self.assertNotIn("order-algo", names)
-        self.assertNotIn("amend-algos", names)
-        self.assertIn("protection_wait", [e["kind"] for e in self.events()])
-        self.assertEqual(fake.position, 0)
+        self.assertTrue(status["stop_reason"].startswith("protection_config_failed:"), status)
+        self.assertEqual(fake.algo_posts[before:], [])  # nothing placed, moved or canceled
+        self.assertEqual(len(fake.posts), 1)            # the reversal at bar 5 never ran
+        self.assertEqual((fake.position, [a["state"] for a in fake.algos.values()]), (1, ["live"]))
 
 
 class AdapterTests(unittest.TestCase):

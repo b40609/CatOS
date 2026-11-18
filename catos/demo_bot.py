@@ -383,17 +383,16 @@ class DemoBot:
             BOT_ID if position else None, ("okx-net-" + self.inst_id) if position else None))
         self.status["position"] = str(position)
 
-    async def _configure_protection(self, *, strict=True):
-        """Install this start's ratio. At a fresh start a failure stops the run; on resume (strict
-        off) it is retried by later steps once an inherited stop is confirmed."""
+    async def _configure_protection(self):
+        """Install this start's ratio; a failure stops the run (position and any confirmed OKX stop
+        are kept). On resume it is only attempted once no inherited stop is pending, uncertain or
+        triggered, so a refusal then is not transient. Going on without it would let a flat ledger
+        (OKX ends the stop at flat) open a position with no stop at all (acceptance D1, 2026-11-18)."""
         config = protection.Config(self.disaster_stop, "mark", "earlier", "cancel_confirm")
         try:
             await self.supervisor.configure_protection(config)
         except SupervisorUnavailable as exc:
-            if strict:
-                raise BotStopped(f"protection_config_failed:{exc}") from None
-            self.log.event("protection_wait", None, reason=f"configure:{exc}")
-            return
+            raise BotStopped(f"protection_config_failed:{exc}") from None
         self.protection_configured = True
         if self.disaster_stop:
             self.log.event("protection_config", f"保底停損：價格從進場均價反向 {self.disaster_stop * 100:g}% 時，"
@@ -413,20 +412,15 @@ class DemoBot:
         """
         before = await self.supervisor.protection_state()
         if not self.protection_configured and not (before["pending"] or before["uncertain"] or before["triggered"]):
-            await self._configure_protection(strict=False)
-            if not self.protection_configured:
-                # Resume: this start's ratio could not be installed yet. Nothing is placed or moved with
-                # the stopped run's ratio (2026-11-18 review gap); a changed position is not covered, so the
-                # journal keeps increases blocked until a later check installs the ratio.
-                return facts
+            # Resume: nothing is placed or moved with the stopped run's ratio (2026-11-18 review gap).
+            await self._configure_protection()
             before = await self.supervisor.protection_state()
         try:
             state = await self.supervisor.protection_step(now_ms=self.wall_ms())
             if not self.protection_configured and not (state["pending"] or state["uncertain"] or state["triggered"]):
                 # Resume: the inherited stop was just confirmed; now this start's ratio applies.
-                await self._configure_protection(strict=False)
-                if self.protection_configured:
-                    state = await self.supervisor.protection_step(now_ms=self.wall_ms())
+                await self._configure_protection()
+                state = await self.supervisor.protection_step(now_ms=self.wall_ms())
         except SupervisorUnavailable as exc:
             self.log.event("protection_wait", None, reason=str(exc))
             return facts
@@ -769,7 +763,11 @@ class DemoBot:
             finally:
                 connection.close()
         except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
-            return None  # nothing readable to settle; a position would have been refused above
+            # Nothing readable to settle (a position would have been refused above); said, not silent
+            # (acceptance O6, 2026-11-18).
+            self.start_notes.append((f"讀不到上一次 run 的帳本，不知道有沒有沒結清的委託，開新的 run；舊資料夾 {directory}",
+                                     dict(reason="previous_run_unreadable", previous_run=str(directory))))
+            return None
         if not unresolved:
             return None
 
@@ -1128,7 +1126,7 @@ START_HINTS = {
     "disaster_stop_incomplete": "OKX 的保底停損觸發了，但 OKX 上還有部位（停損單沒有完全成交）。帳本已經對不上，Bot 不能替你處理：請到 OKX 網頁手動平倉，再用同一個指令重開。",
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
     "order_partially_filled": "委託只成交一部分，剩下的被 OKX 撤掉。成交的部分已記帳，Bot 先停下讓你看一下；到 OKX 網頁確認部位與條件單後，用同一個指令重開會接續目前部位。",
-    "protection_config_failed": "保底停損設定沒有生效，Bot 先停下。把錯誤訊息截圖給我。",
+    "protection_config_failed": "保底停損比例裝不上，Bot 先停下；部位與 OKX 上已確認的條件單都留著。用同一個指令重開會再試；還是不行就把錯誤訊息截圖給我。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
 }
 

@@ -254,10 +254,12 @@ def altered_stop(row: dict) -> bool:
     """True when a conditional order no longer closes the whole position at market.
 
     Only a field that is present and different counts (an empty field is not evidence), so a
-    response without these fields never looks altered. ``sz`` is not used: OKX fills it in once
-    the stop fires (Demo trigger check, 2026-11-18), and closeFraction 1 already means "whole".
+    response without these fields never looks altered. ``sz`` is empty on a live whole-position
+    stop and OKX fills it in once the stop fires (Demo, 2026-11-18): a live stop with a size was
+    changed to a fixed size (acceptance O1; the exact shape of such an amend is unverified).
     """
-    return row.get("sl_ord_px", "") not in ("", "-1") or row.get("close_fraction", "") not in ("", "1")
+    return (row.get("sl_ord_px", "") not in ("", "-1") or row.get("close_fraction", "") not in ("", "1")
+            or (row.get("state") == "live" and row.get("sz", "") not in ("", "0")))
 
 
 class DemoClient:

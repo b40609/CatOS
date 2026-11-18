@@ -372,7 +372,7 @@ class ExecutionTests(unittest.TestCase):
     def test_a_reduction_held_across_a_restart_still_goes_out(self):  # 2026-11-18 review gap
         # The restart bumps the epoch. An increase from the old epoch is voided (test above); a
         # reduction the current risk state still approves is sent, since a legal reduction is always
-        # allowed (P3b). Before, the resumed Demo Bot stopped on it.
+        # allowed (P3b). Shows the mechanism; any epoch change between decision and dispatch counts.
         self.submit()
         self.j.execution.apply(self.key, report(self.key, status="FILLED", fills=(Fill("entry", D("2"), D("100")),), complete=True))
         self.reconcile(position=D("2"), attributed_bot_id="bot")
