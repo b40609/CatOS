@@ -74,7 +74,7 @@
   - 部分成交後被撤：以前會直接停下、不記成交、不掛停損。現在記帳、對帳、掛停損之後才停下（`order_partially_filled:canceled`），重開會接續。
   - 改條件單被 OKX 拒絕（51xxx）時，以前會被當成「沒回應」，提示來回跳；現在單子還在就記成「被拒」、下次檢查重試。撤條件單遇到 51xxx（例如剛好已撤）改成接著查結果。
   - 核對後不成立：`closeFraction` 和 `reduceOnly` 並存會被拒（OKX 文件寫 net 模式必須帶 `reduceOnly=true`）；對帳拿帳本比帳本（`demo_bot.py` 先比對 OKX 列出的條件單）；接續時同一次呼叫撤舊單又掛新單、跳過對帳（第二步會因為還沒對帳被拒，下一次檢查會補上）；停損觸發的瞬間加倉（這份部署的目標只有 -1、0、+1）。
-  - 當時成立但沒修的 6 個少見情況，11-18 使用者要求修（「做第 2 項、修那 6 個少見情況」），已修，測試在 `tests/test_demo_bot.py` 的 `RareCaseTests` 與 `tests/test_execution.py`。獨立驗收（Claude Opus，`reports/rare-cases-acceptance-20261118/acceptance.md`）FAIL 在 D1（見第 6 項），修好後窄範圍重驗 PASS（有觀察，`recheck.md`）。Gemini 第二意見（`gemini-second-opinion.md`）也找到 D1，另外找到 O4（見下），已修，O4 修正待窄範圍重驗：
+  - 當時成立但沒修的 6 個少見情況，11-18 使用者要求修（「做第 2 項、修那 6 個少見情況」），已修，測試在 `tests/test_demo_bot.py` 的 `RareCaseTests` 與 `tests/test_execution.py`。獨立驗收（Claude Opus，`reports/rare-cases-acceptance-20261118/acceptance.md`）FAIL 在 D1（見第 6 項），修好後窄範圍重驗 PASS（有觀察，`recheck.md`）。Gemini 第二意見（`gemini-second-opinion.md`）也找到 D1，另外找到 O4（見下），已修，窄範圍重驗 PASS（`recheck-o4.md`，21 個情境修前修後逐項相同）：
     1. 平倉單結果不明時停下、重開時 OKX 已空倉：以前開新 run，舊委託永遠沒結清。現在帳本有沒結清的委託就接續那個 run 先查清楚；不能接續（核准或設定改過、停太久、讀不到）就開新 run，並在新 run 寫 `previous_run_unsettled` 事件；啟動指令加 `--new-run` 可強制開新 run。
     2. 決策到送單之間風控改變（epoch 變了）：以前只減倉意圖一律作廢、Bot 停下。現在只要目前狀態仍核准這筆減倉、且不是 FLAT（FLAT 走清倉流程）就送出；加倉照舊作廢。測試時另外發現：Soft 剛好在反手決策後鎖住時，反手的平倉腿也被作廢、Bot 帶著部位停下；改成平倉腿照送、開倉腿照舊被擋（同 11-17「反手被擋時至少平倉」）。
     3. 條件單在 OKX 上被改成限價或部分張數：以前看不出來。現在看 `slOrdPx`／`closeFraction`，以及 live 狀態卻有 `sz`（驗收 O1；真實改單長什麼樣待驗證），被改過就記 `protection_altered`、視為未確認、禁止加倉，請使用者到 OKX 撤掉，Bot 下次檢查重掛。
