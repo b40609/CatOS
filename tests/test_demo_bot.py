@@ -84,6 +84,8 @@ class FakeOkx:
         self.server_skew = 0               # OKX server time minus local time, ms
         self.time_failures = 0             # next N public/time reads fail
         self.exp_times = []                # expTime header of every order POST (None when absent)
+        self.time_lag = 0                  # public/time answers this much behind OKX's real clock
+        self.hide_until = 0                # order queries answer "does not exist" until this local time
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -110,7 +112,7 @@ class FakeOkx:
             if self.time_failures:
                 self.time_failures -= 1
                 return 503, b"<html>503</html>"
-            return ok([{"ts": str(self.clock.ms + self.server_skew)}])
+            return ok([{"ts": str(self.clock.ms + self.server_skew - self.time_lag)}])
         if path == "/api/v5/account/config":
             return ok([{"acctLv": "2", "posMode": "net_mode", "perm": "read_only,trade", "label": "t", "uid": self.uid}])
         if path == "/api/v5/public/instruments":
@@ -182,7 +184,7 @@ class FakeOkx:
             return ok([{"ordId": ord_id, "clOrdId": p["clOrdId"], "sCode": "0"}])
         if method == "GET" and path == "/api/v5/trade/order":
             order = self.orders.get(q.get("clOrdId"))
-            if order is None or self.hide_orders:
+            if order is None or self.hide_orders or self.clock.ms < self.hide_until:
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             return ok([order])
         if path == "/api/v5/trade/fills":
@@ -1148,7 +1150,6 @@ class RareCaseTests(unittest.TestCase):
             if fake.position == 1 and not armed and now > fake.bar_time(4) + 10_000:
                 fake.lose_post_response = True
                 fake.hide_orders = 1
-                fake.time_failures = 10**9  # no server time, no deadline: the order stays unknown
                 armed.append(now)
 
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
@@ -1420,7 +1421,7 @@ class FlattenResendTests(unittest.TestCase):
 
         def arm():
             fake.drop_posts = 1
-            fake.time_failures = 10**9
+            fake.time_failures = 10**9  # no proof possible: the hidden flatten order stays unknown
 
         status = self.kill_with(fake, clock, arm)
         self.assertTrue(status["stop_reason"].startswith("flatten_failed:order_not_settled:UNKNOWN"), status)
@@ -1453,15 +1454,63 @@ class FlattenResendTests(unittest.TestCase):
     def test_an_expired_deadline_is_a_plain_rejection(self):
         clock = Clock(BASE + 1_000)
         fake = FakeOkx(clock, start_index=3, position="1")
+        fake.time_lag = 60_000  # the time read is stale: the deadline is already past at OKX
         client = DemoClient(Credentials("k", "s", "p"), fake, clock_ms=clock, sleep=lambda s: None,
                             monotonic=lambda: 0.0)
         exchange = OkxDemoExchange(client, "acct", "BTC-USDT-SWAP")
-        exchange._offset = (-60_000, clock.ms)  # a wrong offset: the deadline is already past at OKX
+        exchange.flattening = True
         payload = {"instId": "BTC-USDT-SWAP", "tdMode": "cross", "posSide": "net", "ordType": "market",
                    "side": "sell", "sz": "1", "reduceOnly": True, "clOrdId": "c1", "tag": TAG}
         report = asyncio.run(exchange.submit(payload))
         self.assertEqual((report.status, report.complete, fake.posts, fake.position), ("REJECTED", True, [], D("1")))
 
+    def test_a_late_listing_inside_the_margin_is_not_taken_for_a_lost_order(self):  # acceptance O2
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def arm():
+            fake.lose_post_response = True
+            fake.hide_until = clock.ms + 14_000  # listed 14 s later: after the deadline, inside the margin
+
+        status = self.kill_with(fake, clock, arm)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+
+    def test_the_proof_waits_for_okx_time_not_the_local_clock(self):  # acceptance D2
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def arm():
+            fake.drop_posts = 1
+
+        real = fake.send
+
+        def send(method, target, headers, body):
+            if method == "POST" and target == "/api/v5/trade/order" and fake.drop_posts:
+                fake.server_skew -= 60_000  # the local clock jumps 60 s ahead right after the send
+            return real(method, target, headers, body)
+
+        fake.send = send
+        status = self.kill_with(fake, clock, arm)
+        # OKX's clock never passes the deadline within the settle window: nothing is proven or resent.
+        self.assertTrue(status["stop_reason"].startswith("flatten_failed:order_not_settled:UNKNOWN"), status)
+        self.assertEqual(len(fake.exp_times), 2)
+
+    def test_a_strategy_close_gets_no_deadline(self):  # acceptance D3
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        armed = []
+
+        def on_sleep(now):
+            if fake.position == 1 and not armed and now > fake.bar_time(4) + 10_000:
+                fake.drop_posts = 1  # bar 5's reversal close never reaches OKX
+                armed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertTrue(status["stop_reason"].startswith("order_not_settled:UNKNOWN"), status)
+        self.assertEqual(fake.exp_times, [None, None])
+        self.assertEqual(fake.position, 1)
 
 class AdapterTests(unittest.TestCase):
     def test_reports_translate_fills_and_fee_sign(self):

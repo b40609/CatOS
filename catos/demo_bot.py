@@ -583,6 +583,7 @@ class DemoBot:
     async def _flatten(self, reason):
         """FLAT latched (Kill-Switch or Hard): reduce-only market orders until OKX shows zero."""
         self.log.event("flatten", f"清倉開始（{reason}）")
+        self.exchange.flattening = True  # its lost orders may be proven never taken and sent again
         try:
             await self._flatten_rounds()
         except BotStopped as exc:
@@ -873,7 +874,7 @@ class DemoBot:
         self.account_state = dict(self.account_state, run=dict(dir=str(self.output_dir.resolve()),
                                                                account_id=account_id))
         self.guard.save(self.account_state)
-        exchange = OkxDemoExchange(self.client, account_id, self.inst_id)
+        exchange = self.exchange = OkxDemoExchange(self.client, account_id, self.inst_id)
         self.supervisor = LocalSupervisor(self.output_dir / "state.sqlite3", account_id=account_id, bot_id=BOT_ID,
                                           config=self.worker, fixture_budget=facts["equity"], risk_limits=self.limits,
                                           exchange=exchange, day_clock=self, require_new_database=True)
@@ -893,7 +894,7 @@ class DemoBot:
         atomic_json(self.output_dir / "manifest.json", manifest)
         self.fills = list(resumed["fills"])
         self.status.update(fills=len(self.fills), resumed=True)
-        exchange = OkxDemoExchange(self.client, manifest["account_id"], self.inst_id)
+        exchange = self.exchange = OkxDemoExchange(self.client, manifest["account_id"], self.inst_id)
         self.supervisor = LocalSupervisor(self.output_dir / manifest["database"], account_id=manifest["account_id"],
                                           bot_id=BOT_ID, config=self.worker, fixture_budget=resumed["budget"],
                                           risk_limits=self.limits, exchange=exchange, day_clock=self,

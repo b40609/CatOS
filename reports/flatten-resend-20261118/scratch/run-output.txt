@@ -1,0 +1,70 @@
+test_2a_resend_ledger_state_and_timing (test_acceptance_scratch.BotLevelTests.test_2a_resend_ledger_state_and_timing) ... ok
+test_2b_misjudged_flatten_order_stops_on_position_mismatch (test_acceptance_scratch.BotLevelTests.test_2b_misjudged_flatten_order_stops_on_position_mismatch)
+OKX took the flatten order but never lists it (lag > 15 s): it is called never taken. ... ok
+test_2c_misjudged_reversal_close_then_restart_starts_a_new_run (test_acceptance_scratch.BotLevelTests.test_2c_misjudged_reversal_close_then_restart_starts_a_new_run)
+RareCaseTests.lose_the_reversal_close without its time_failures override: the ... ok
+test_2d_slow_time_read_eats_the_supervisor_timeout (test_acceptance_scratch.BotLevelTests.test_2d_slow_time_read_eats_the_supervisor_timeout)
+public/time answers after 5.5 s (real): the Supervisor's 5 s wait ends before the POST. ... ok
+test_2e_backward_clock_step_within_the_offset_cache_fails_the_kill_flatten (test_acceptance_scratch.BotLevelTests.test_2e_backward_clock_step_within_the_offset_cache_fails_the_kill_flatten)
+The reversal close at bar 5 caches the offset. Within 5 minutes the local clock is stepped ... ok
+test_5a_proof_without_any_waiting (test_acceptance_scratch.MutationTests.test_5a_proof_without_any_waiting) ... ok
+test_5b_proof_ignoring_server_offset (test_acceptance_scratch.MutationTests.test_5b_proof_ignoring_server_offset) ... ok
+test_5c_deadline_in_local_time (test_acceptance_scratch.MutationTests.test_5c_deadline_in_local_time) ... ok
+test_3a_opening_order_has_no_deadline_and_never_becomes_rejected (test_acceptance_scratch.OpeningOrderTests.test_3a_opening_order_has_no_deadline_and_never_becomes_rejected) ... ok
+test_3b_reduce_only_must_be_exactly_true (test_acceptance_scratch.OpeningOrderTests.test_3b_reduce_only_must_be_exactly_true) ... ok
+test_1a_without_clock_jump_not_found_stays_not_found_for_15s (test_acceptance_scratch.ProofUnitTests.test_1a_without_clock_jump_not_found_stays_not_found_for_15s) ... ok
+test_1b_forward_clock_step_after_send_proves_before_the_deadline (test_acceptance_scratch.ProofUnitTests.test_1b_forward_clock_step_after_send_proves_before_the_deadline) ... ok
+test_1c_forward_clock_step_inside_offset_cache_before_send (test_acceptance_scratch.ProofUnitTests.test_1c_forward_clock_step_inside_offset_cache_before_send) ... ok
+test_1d_slow_time_read_means_no_deadline (test_acceptance_scratch.ProofUnitTests.test_1d_slow_time_read_means_no_deadline) ... ok
+test_1e_offset_cache_five_minutes (test_acceptance_scratch.ProofUnitTests.test_1e_offset_cache_five_minutes) ... ok
+test_1f_backward_clock_step_keeps_a_stale_offset (test_acceptance_scratch.ProofUnitTests.test_1f_backward_clock_step_keeps_a_stale_offset) ... ok
+test_1g_restart_cannot_prove (test_acceptance_scratch.ProofUnitTests.test_1g_restart_cannot_prove) ... ok
+test_1h_query_time_is_taken_before_the_request (test_acceptance_scratch.ProofUnitTests.test_1h_query_time_is_taken_before_the_request)
+asked = local time before the query is sent; a slow query does not help the proof. ... ok
+test_4a_empty_or_missing_tag_on_an_order_is_refused (test_acceptance_scratch.TagTests.test_4a_empty_or_missing_tag_on_an_order_is_refused) ... ok
+test_4b_conditional_order_without_tag_is_refused (test_acceptance_scratch.TagTests.test_4b_conditional_order_without_tag_is_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 24.753s
+
+OK
+
+[2a] stop=manual_kill:kill-switch-dc4daf okx_position=0 ledger_owned=0
+      {'cl_ord_id': 'f28c1f12de454059a7dbc69b560d96c8', 'quantity': '1', 'filled': '1', 'state': 'FILLED', 'settled': 1, 'exchange_id': '4000'}
+      {'cl_ord_id': 'b4d085b156e4a9cc56b28fc747b51fc0', 'quantity': '-1', 'filled': '0', 'state': 'REJECTED', 'settled': 1, 'exchange_id': 'rejectedb4d085b156e4a9cc56b28fc747b51fc0'}
+      {'cl_ord_id': 'f905108f0afa4d43b451225b164ba606', 'quantity': '-1', 'filled': '1', 'state': 'FILLED', 'settled': 1, 'exchange_id': '4001'}
+     reservations=0 risk_orders=0
+     lost sent at OKX t=1794801911000, expTime=1794801916000; resend at OKX t=1794801927000 (= expTime + 11000 ms)
+
+[2b] stop=flatten_failed:position_mismatch:okx=0:ledger=1 okx_position=0 ledger_owned=1 posts=[('buy', False), ('sell', True)] states=['FILLED', 'REJECTED']
+
+[2c] first run stop=order_rejected okx_position=0 ledger_owned=1 states=['FILLED', 'REJECTED']
+     restart stop=manual_kill:kill-switch-440f9881aae8bf64 new_run_dir=True
+     old ledger after restart: owned=1 states=['FILLED', 'REJECTED']
+
+[2d] stop=flatten_failed:order_not_settled:UNKNOWN:5e72b359fdc4e4b77ba3a30937dee9db okx_position=1 posts=[('buy', False)] states=['FILLED', 'UNKNOWN']
+
+[2e] stop=flatten_failed:flatten_incomplete:okx_position=-1 okx_position=-1 states=['FILLED', 'FILLED', 'FILLED', 'REJECTED', 'REJECTED', 'REJECTED', 'REJECTED', 'REJECTED'] expTimes_sent=6
+
+[5a] PROOF_MARGIN_MS=-1e12 (proof right away): FlattenResendTests ran=4 failed=0
+[5b] _never_taken = 'any deadline' : FlattenResendTests ran=4 failed=0
+[5c] deadline in local time (offset 0): FlattenResendTests ran=4 failed=3
+
+[3a] opening order: expTime=[None], extra time reads=0, deadlines={}, status 1 h later=NOT_FOUND
+
+[1a] listing lag 15 s: status=REJECTED complete=True okx_position=0
+
+[1b] okx_server_now - deadline = -4000 ms, status=REJECTED, okx_position=0
+
+[1c] expTime sent = OKX now + 25000 ms (intended 5000)
+[1c] at query: okx_now - deadline = -9999 ms, status=REJECTED
+
+[1d] RTT 2.5 s: expTime header=[None], deadlines={}, status=NOT_FOUND
+
+[1e] public/time reads for 3 reduce-only orders over 300 001 ms: 2
+
+[1f] after a -1 h step: time reads=1, second order result posts=1
+
+[1g] restarted adapter, 1 h later: status=NOT_FOUND
+
+[1h] query sent at t0+14 s, answered at t0+19 s: status=NOT_FOUND
