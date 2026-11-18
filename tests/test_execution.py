@@ -369,6 +369,28 @@ class ExecutionTests(unittest.TestCase):
         self.assertEqual(self.j.execution.order(self.key)["state"], "ABORTED")
         self.assertEqual(self.j.total_reserved(), 0)
 
+    def test_a_reduction_held_across_a_restart_still_goes_out(self):  # 2026-11-18 review gap
+        # The restart bumps the epoch. An increase from the old epoch is voided (test above); a
+        # reduction the current risk state still approves is sent, since a legal reduction is always
+        # allowed (P3b). Before, the resumed Demo Bot stopped on it.
+        self.submit()
+        self.j.execution.apply(self.key, report(self.key, status="FILLED", fills=(Fill("entry", D("2"), D("100")),), complete=True))
+        self.reconcile(position=D("2"), attributed_bot_id="bot")
+        self.observe(position=D("2"))
+        reduction = position_intent(self.j, 3, D("2"), D("0"))
+        self.assertEqual(reduction.reason, "legal_reduction")
+        epoch = self.j.risk_state().epoch
+        self.j.close()
+        self.j = Journal(self.path, "fake-account", D("100"), LIMITS, True)
+        self.reconcile(position=D("2"), attributed_bot_id="bot")
+        self.observe(position=D("2"))
+        self.assertGreater(self.j.risk_state().epoch, epoch)
+        self.assertNotEqual(self.j.risk_state().mode, "FLAT")
+        request = self.j.execution.prepare("bot", reduction.intent_key, 4 * STEP)
+        self.assertIsNotNone(request)
+        self.assertEqual((request["payload"]["reduceOnly"], request["payload"]["side"], request["payload"]["sz"]),
+                         (True, "sell", "2"))
+
     def test_atomic_submission_failure_never_creates_partial_mapping(self):
         with patch.object(self.j, "_commit", side_effect=sqlite3.OperationalError("synthetic failure")):
             with self.assertRaises(sqlite3.OperationalError):

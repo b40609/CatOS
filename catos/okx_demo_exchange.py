@@ -23,7 +23,7 @@ import time
 
 from catos import ipc
 from catos.fake_exchange import TAG, Fill, Report
-from catos.okx_demo import DemoClient, DemoError, OkxApiError
+from catos.okx_demo import DemoClient, DemoError, OkxApiError, altered_stop
 from catos.protection import Report as ProtectionReport
 
 D = Decimal
@@ -153,7 +153,10 @@ class OkxDemoExchange:
                 return with_history(attempt)  # create/amend: just sent, OKX may not list it yet
             if operation == "algo_cancel":
                 return report.status != "LIVE"
-            return report.status != "LIVE" or (report.complete and report.price == wanted)
+            # The whole request must show: an amend of the trigger source alone keeps the price
+            # (2026-11-18 review gap), so the source is compared too.
+            return report.status != "LIVE" or (report.complete and report.price == wanted
+                                               and report.trigger == payload["slTriggerPxType"])
 
         report = None
         for attempt in range(PROTECTION_POLL_TRIES):  # inside Supervisor's 5-second exchange timeout
@@ -183,8 +186,16 @@ class OkxDemoExchange:
         if status is None:
             raise OSError(f"okx_demo_unknown_algo_state:{order['state']}")
         if status == "LIVE":
+            # 2026-11-18 review gaps: an empty trigger source is OKX's default, the last price (documented
+            # for requests; unverified for responses), so it reads as "not mark" and is amended, instead of
+            # failing the run. A stop changed outside CatOS to a limit price or a partial size is LIVE but
+            # incomplete: the ledger keeps it unconfirmed (no increases) until it is canceled and re-placed.
+            trigger = order["sl_trigger_px_type"] or "last"
+            if (order["sl_trigger_px"] is None or order["sl_trigger_px"] <= 0 or order["side"] not in ("buy", "sell")
+                    or trigger not in ("mark", "last", "index")):
+                raise OSError("okx_demo_protection_unreadable")
             return ProtectionReport(request_id, self._revision(), "LIVE", order["sl_trigger_px"], order["side"],
-                                    order["sl_trigger_px_type"], order["state"] == "live", order["algo_id"])
+                                    trigger, order["state"] == "live" and not altered_stop(order), order["algo_id"])
         return ProtectionReport(request_id, self._revision(), status, complete=True, algo_id=order["algo_id"])
 
     async def _report(self, cl_ord_id):

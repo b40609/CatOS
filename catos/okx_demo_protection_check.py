@@ -267,7 +267,7 @@ def render(report: dict) -> str:
                   f"    orders-algo-history 查得到：{', '.join(f['triggered_history_has_it']) or '查不到'}",
                   f"    Bot 的轉接層判定：{f['adapter_after_trigger']}",
                   f"    觸發後部位：{f.get('position_after_trigger', '—')}"]
-    if f:
+    if "auto_cancel_on_flat" in f or "finished_order_algo_code" in f:
         lines += ["", "  OKX 實際行為："]
         if "auto_cancel_on_flat" in f:
             lines.append(f"    平倉後自動結束條件單：{'是' if f['auto_cancel_on_flat'] else '否'}")

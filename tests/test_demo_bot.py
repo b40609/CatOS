@@ -78,6 +78,8 @@ class FakeOkx:
         self.partial_fill = None           # the next order fills only this size; the rest is canceled
         self.lag_after_cancel = 0          # after our cancel, the next N order-algo looks (and that round's
         self.algo_lag, self.last_hidden = 0, False  # history look) do not show the stop yet
+        self.amend_source_lag = 0          # after an amend, the next N order-algo looks still show the old source
+        self.pending_source = None
 
     def trigger_stop(self):
         """OKX fires the live disaster stop: the whole position is closed at market."""
@@ -182,6 +184,11 @@ class FakeOkx:
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
             if algo is None or (self.finished_algos_vanish and algo["state"] != "live"):
                 return 200, json.dumps({"code": "51603", "msg": "Order does not exist", "data": []}).encode()
+            if self.pending_source is not None:
+                if self.amend_source_lag:
+                    self.amend_source_lag -= 1
+                else:
+                    algo["slTriggerPxType"], self.pending_source = self.pending_source, None
             return ok([dict(algo)])
         if method == "GET" and path == "/api/v5/trade/orders-algo-history":
             assert q["ordType"] == "conditional" and q["instType"] == "SWAP" and "algoClOrdId" not in q
@@ -213,7 +220,11 @@ class FakeOkx:
             if self.reject_amend:
                 return 200, json.dumps({"code": "1", "msg": "", "data": [{"sCode": self.reject_amend,
                                                                           "sMsg": "refused"}]}).encode()
-            algo.update(slTriggerPx=p["newSlTriggerPx"], slTriggerPxType=p["newSlTriggerPxType"], uTime=str(self.clock.ms))
+            algo.update(slTriggerPx=p["newSlTriggerPx"], uTime=str(self.clock.ms))
+            if self.amend_source_lag:
+                self.pending_source = p["newSlTriggerPxType"]
+            else:
+                algo["slTriggerPxType"] = p["newSlTriggerPxType"]
             return ok([{"algoId": algo["algoId"], "reqId": p["reqId"], "sCode": "0"}])
         if method == "POST" and path == "/api/v5/trade/cancel-algos":
             p = json.loads(body)
@@ -246,7 +257,8 @@ class DemoBotTests(unittest.TestCase):
                                    profile=PROFILE, confirm=lambda text, word: True)
         self.record = find_demo_approval(PROFILE)
 
-    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None, run="run", disaster_stop=D("0")):
+    def make_bot(self, fake, clock, events=None, on_sleep=None, limits=None, run="run", disaster_stop=D("0"),
+                 new_run=False):
         """``run`` may be a nested path: another output root shares the same account files."""
         client = DemoClient(Credentials("k", "s", "p"), fake, clock_ms=clock, sleep=lambda s: None, monotonic=lambda: 0.0)
         lines = [] if events is None else events
@@ -257,7 +269,7 @@ class DemoBotTests(unittest.TestCase):
                 on_sleep(clock.ms)
 
         return DemoBot(client=client, record=self.record, output_dir=self.root / run, echo=lines.append,
-                       wall_ms=clock, sleep=sleep, limits=limits, disaster_stop=disaster_stop)
+                       wall_ms=clock, sleep=sleep, limits=limits, disaster_stop=disaster_stop, new_run=new_run)
 
     def run_bot(self, bot):
         return asyncio.run(bot.run())
@@ -1087,6 +1099,194 @@ class ReviewFixTests(unittest.TestCase):
         status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
                                             disaster_stop=self.TEN))
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual(fake.position, 0)
+
+
+class RareCaseTests(unittest.TestCase):
+    """Six rare cases the 2026-11-18 review left open, fixed the same day (user: "修那 6 個少見情況")."""
+
+    setUp = DemoBotTests.setUp
+    make_bot = DemoBotTests.make_bot
+    run_bot = DemoBotTests.run_bot
+    events = DemoBotTests.events
+    run_bot_quietly = DemoBotTests.run_bot_quietly
+    kill_after = DemoBotTests.kill_after
+    algo_writes = DisasterStopTests.algo_writes
+    TEN = D("0.10")
+
+    def alerts(self, run="run"):
+        return [e.get("alert") for e in self.events(run) if e["kind"] == "protection_alert"]
+
+    @staticmethod
+    def both(first, second):
+        def on_sleep(now):
+            first(now)
+            second(now)
+        return on_sleep
+
+    def lose_the_reversal_close(self, fake, clock):
+        """Long from bar 3; bar 5's reversal close is accepted by OKX but its answer is lost: OKX is
+        flat, the ledger keeps one unsettled close, and the run stops."""
+        armed = []
+
+        def on_sleep(now):
+            if fake.position == 1 and not armed and now > fake.bar_time(4) + 10_000:
+                fake.lose_post_response = True
+                fake.hide_orders = 1
+                armed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=on_sleep))
+        self.assertTrue(status["stop_reason"].startswith("order_not_settled:UNKNOWN"), status)
+        self.assertEqual((fake.position, len(fake.posts)), (0, 2))
+        fake.hide_orders = 0  # OKX answers again
+        return status
+
+    # 1. Flat on OKX, but the stopped run left an order of unknown outcome.
+    def test_a_flat_restart_settles_the_stopped_runs_unknown_order(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.lose_the_reversal_close(fake, clock)
+        lines = []
+        status = self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 6), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertFalse((self.root / "run2").exists())  # the stopped run is continued, not a new one
+        self.assertTrue(any("有委託沒結清" in line for line in lines), lines)
+        legs = [f["leg"] for f in json.loads((self.root / "run" / "fills.json").read_text(encoding="utf-8"))]
+        self.assertEqual(legs[-1], "接續時補查")
+        self.assertEqual(len(fake.posts), 2)  # nothing resent
+
+    def test_new_run_leaves_the_unsettled_run_as_it_is(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.lose_the_reversal_close(fake, clock)
+        before = (self.root / "run" / "manifest.json").read_text(encoding="utf-8")
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), run="run2", new_run=True))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertTrue((self.root / "run2").exists())
+        self.assertEqual((self.root / "run" / "manifest.json").read_text(encoding="utf-8"), before)
+        self.assertIn("--new-run", demo_bot._hint("resume_unresolved_orders"))
+
+    def test_an_unsettled_run_that_cannot_continue_is_noted_in_the_new_run(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.lose_the_reversal_close(fake, clock)
+        strategy_approvals.revoke(approval_id=self.record["record_id"], confirm=lambda text, word: True)
+        sha = strategy_approvals.deployment_identity(PROFILE)[0]["sha256"]
+        strategy_approvals.approve(strategy_id=PROFILE["strategy_id"], version=PROFILE["version"], sha256=sha,
+                                   profile=PROFILE, confirm=lambda text, word: True)
+        self.record = find_demo_approval(PROFILE)
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), run="run2"))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        notes = [e for e in self.events("run2") if e["kind"] == "previous_run_unsettled"]
+        self.assertEqual([(n["reason"], n["unsettled"]) for n in notes], [("resume_approval_changed", 1)])
+
+    # 2. A risk change between decision and dispatch (new epoch) no longer voids a legal reduction.
+    def test_a_soft_latch_before_the_reversal_still_closes_the_long(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        real = DemoBot._execute
+        calls = []
+
+        async def soft_first(bot, receipt, facts, now_ms):
+            calls.append(receipt.intent_key)
+            if len(calls) == 2:  # the reversal from bar 5: Soft latches right before its dispatch
+                # As _observe would: the Supervisor's risk state latches, dispatch persists it first.
+                bot.supervisor.risk_state = risk.halt(bot.supervisor.risk_state, {"soft_loss"})
+            return await real(bot, receipt, facts, now_ms)
+
+        lines = []
+        with mock.patch.object(DemoBot, "_execute", soft_first):
+            status = self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 7)))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        # The close leg goes out under the new epoch; the opening leg is refused by Soft.
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertEqual(fake.position, 0)
+        self.assertTrue(any("開倉腿被風控擋下" in line for line in lines), lines)
+
+    # 3. A stop changed outside CatOS to a limit price or a partial size.
+    def test_a_stop_changed_to_a_limit_price_blocks_increases(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        changed = []
+
+        def on_sleep(now):
+            if fake.algos and not changed and now > fake.bar_time(4) + 10_000:
+                next(iter(fake.algos.values())).update(slOrdPx="94", closeFraction="")  # a limit price by hand
+                changed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.both(on_sleep, self.kill_after(fake, 7)), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertIn("protection_altered", [e["kind"] for e in self.events()])
+        # Bar 5 wants a short: the long is closed, the short is not opened while the stop is not whole.
+        self.assertEqual([(p["side"], p["reduceOnly"]) for p in fake.posts], [("buy", False), ("sell", True)])
+        self.assertEqual(fake.position, 0)
+
+    def test_the_fill_size_okx_adds_after_firing_is_not_an_alteration(self):
+        from catos.okx_demo import altered_stop
+        self.assertFalse(altered_stop({"sl_ord_px": "-1", "close_fraction": "1", "sz": "1"}))
+        self.assertFalse(altered_stop({"sl_ord_px": "", "close_fraction": "", "sz": ""}))
+        self.assertTrue(altered_stop({"sl_ord_px": "94", "close_fraction": "1", "sz": ""}))
+        self.assertTrue(altered_stop({"sl_ord_px": "-1", "close_fraction": "0.5", "sz": ""}))
+
+    # 4. An amend that only changes the trigger source is confirmed by the source, not the price.
+    def test_an_amend_of_the_source_alone_waits_until_okx_shows_it(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        changed = []
+
+        def on_sleep(now):
+            if fake.algos and not changed and now > fake.bar_time(4) + 10_000:
+                next(iter(fake.algos.values()))["slTriggerPxType"] = "last"  # same price, other source
+                fake.amend_source_lag = 1  # our amend back to mark shows one query late
+                changed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.both(on_sleep, self.kill_after(fake, 5)), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        amends = [w for w in self.algo_writes(fake) if w[0] == "amend-algos"]
+        self.assertEqual(amends, [("amend-algos", {"newSlTriggerPx": "94.5"})])  # once, then confirmed
+        self.assertNotIn("protection_unconfirmed", self.alerts())
+
+    # 5. An empty trigger source from OKX reads as its default (last) and is amended to mark.
+    def test_an_empty_trigger_source_is_amended_not_a_crash(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        changed = []
+
+        def on_sleep(now):
+            if fake.algos and not changed and now > fake.bar_time(4) + 10_000:
+                next(iter(fake.algos.values()))["slTriggerPxType"] = ""
+                changed.append(now)
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.both(on_sleep, self.kill_after(fake, 5)), disaster_stop=self.TEN))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertIn(("amend-algos", {"newSlTriggerPx": "94.5"}), self.algo_writes(fake))
+        self.assertEqual([a["slTriggerPxType"] for a in fake.algos.values()], ["mark"])
+
+    # 6. On resume, a new ratio that cannot be installed never lets the old ratio place or move a stop.
+    def test_resume_never_uses_the_old_ratio_while_the_new_one_is_not_installed(self):
+        from catos.supervisor import LocalSupervisor, SupervisorUnavailable
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+
+        def stop_later(now):
+            if fake.algos and now > fake.bar_time(4) + 5_000:
+                (self.root / "run" / "stop.request").write_text("", encoding="utf-8")
+
+        status = self.run_bot(self.make_bot(fake, clock, on_sleep=stop_later, disaster_stop=self.TEN))
+        self.assertEqual(status["position"], "1", status)
+        before = len(fake.algo_posts)
+
+        async def refuse(supervisor, config):
+            raise SupervisorUnavailable("synthetic")
+
+        with mock.patch.object(LocalSupervisor, "configure_protection", refuse):
+            status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 5), run="run2",
+                                                disaster_stop=D("0.05")))
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        names = [w[0] for w in self.algo_writes(fake)[before:]]
+        self.assertNotIn("order-algo", names)
+        self.assertNotIn("amend-algos", names)
+        self.assertIn("protection_wait", [e["kind"] for e in self.events()])
         self.assertEqual(fake.position, 0)
 
 

@@ -111,7 +111,12 @@ class ExecutionJournal:
             verdict = risk.evaluate(state, self.j.risk_limits, self.j._checkpoint(bot).config.contract,
                 target, position, now_ms, held_buy=buys, held_sell=sells,
                 held_reduction=reduction, reconciled=self._known(owner, position))
-            allowed = (s is not None and row["eligible"] and row["epoch"] == state.epoch
+            # A risk change between decision and dispatch (new epoch) voids increases; a reduction that the
+            # current state still approves goes out, since a legal reduction is always allowed (P3b). FLAT
+            # belongs to the flatten path. (2026-11-18 review gap: a resumed reduce-only intent was voided.)
+            epoch_ok = row["epoch"] == state.epoch or (bool(row["reduce_only"]) and verdict.reduce_only
+                                                      and state.mode != "FLAT")
+            allowed = (s is not None and row["eligible"] and epoch_ok
                        and (verdict.reduce_only or not self.j.protection.blocked(bot_id))
                        and now_ms < deadline and verdict.accepted and verdict.quantity == qty
                        and verdict.reduce_only == bool(row["reduce_only"])
@@ -177,7 +182,13 @@ class ExecutionJournal:
             verdict = risk.evaluate(state, self.j.risk_limits, self.j._checkpoint(bot).config.contract,
                                     D("0"), position, now_ms, held_reduction=reduction,
                                     reconciled=self._known(owner, position))
-            allowed = (state.snapshot is not None and row["eligible"] and row["epoch"] == state.epoch
+            # The close leg is a reduction re-evaluated now (P3b; 2026-11-17 "反手被擋時至少平倉"): a risk
+            # change since the decision (new epoch; Soft or a degraded health also marks the reserved
+            # opening leg ineligible) does not void it. FLAT belongs to the flatten path. The opening leg
+            # is still re-checked on its own (prepare), so an ineligible one is refused there.
+            # (2026-11-18 review gap: Soft between decision and dispatch stopped the Bot with the position held.)
+            allowed = (state.snapshot is not None
+                       and ((row["eligible"] and row["epoch"] == state.epoch) or state.mode != "FLAT")
                        and position * D(row["target"]) < 0 and now_ms < deadline
                        and verdict.accepted and verdict.reduce_only and verdict.quantity == -position
                        and not self.unresolved())

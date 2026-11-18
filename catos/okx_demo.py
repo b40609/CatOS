@@ -250,6 +250,16 @@ def _inst(inst_id: str) -> str:
     return inst_id
 
 
+def altered_stop(row: dict) -> bool:
+    """True when a conditional order no longer closes the whole position at market.
+
+    Only a field that is present and different counts (an empty field is not evidence), so a
+    response without these fields never looks altered. ``sz`` is not used: OKX fills it in once
+    the stop fires (Demo trigger check, 2026-11-18), and closeFraction 1 already means "whole".
+    """
+    return row.get("sl_ord_px", "") not in ("", "-1") or row.get("close_fraction", "") not in ("", "1")
+
+
 class DemoClient:
     def __init__(self, credentials: Credentials, sender: Sender | None = None, *,
                  clock_ms: Callable[[], int] | None = None, sleep: Callable[[float], None] | None = None,
@@ -503,7 +513,11 @@ class DemoClient:
                 "algo_cl_ord_id": str(r.get("algoClOrdId") or ""), "ord_type": r.get("ordType"),
                 "state": r.get("state"), "side": r.get("side"), "sl_trigger_px": _dec(r, "slTriggerPx"),
                 "sl_trigger_px_type": r.get("slTriggerPxType"), "tag": r.get("tag"),
-                "u_time": int(r.get("uTime") or 0)}
+                "u_time": int(r.get("uTime") or 0),
+                # Whole-position market stop: slOrdPx -1, closeFraction 1, sz empty (Demo, 2026-11-18).
+                "sl_ord_px": str(r.get("slOrdPx") or ""), "close_fraction": str(r.get("closeFraction") or ""),
+                "sz": str(r.get("sz") or "")}
+
 
     def protection_order(self, inst_id: str, algo_cl_ord_id: str) -> dict | None:
         """以 algoClOrdId 查一張條件單；查不到回 None，其他錯誤照常拋出。"""

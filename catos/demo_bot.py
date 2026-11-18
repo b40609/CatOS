@@ -73,7 +73,7 @@ from catos.kill_switch import KillSwitchError, terminal_confirm
 from catos.journal import Reconciliation
 from catos.local_sim_r4 import atomic_json, durable_view
 from catos.local_sim_replay import fill_config, worker_config
-from catos.okx_demo import DemoClient, DemoError, account_issues, connect, credentials_path
+from catos.okx_demo import DemoClient, DemoError, account_issues, altered_stop, connect, credentials_path
 from catos.okx_demo_exchange import OkxDemoExchange
 from catos.research_catalog import ROOT
 from catos.supervisor import LocalSupervisor, SupervisorUnavailable
@@ -262,7 +262,7 @@ class AccountGuard:
 class DemoBot:
     def __init__(self, *, client: DemoClient, record: dict, output_dir: Path, limits: risk.Limits | None = None,
                  stop: asyncio.Event | None = None, echo=print, wall_ms=_wall_ms, sleep=asyncio.sleep,
-                 kill_path=None, accounts_dir=None, disaster_stop=D("0")):
+                 kill_path=None, accounts_dir=None, disaster_stop=D("0"), new_run=False):
         self.client = client
         # P6 (2026-11-17): exchange-side disaster stop as a fraction of the average entry price; 0 = off.
         if type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5"):
@@ -290,6 +290,8 @@ class DemoBot:
         self.hard_engaged = False
         self.log = None
         self.resumed = None  # the stopped run being continued, if any
+        self.new_run = new_run  # flat on OKX: never continue the last run, even with unsettled orders
+        self.start_notes = []
         self.status = dict(state="starting", bars=0, fills=0, last_bar_open_ms=None, stop_reason=None,
                            position=None, started_at=_now_text())
         self.fills = []
@@ -348,7 +350,12 @@ class DemoBot:
         listed = {row["algo_cl_ord_id"]: row for row in facts["algos"]}
         if active is not None and not (guard["pending"] or guard["uncertain"] or guard["triggered"]):
             row = listed.get(active["payload"]["algoClOrdId"])
-            if row is None or (row["sl_trigger_px"], row["side"], row["sl_trigger_px_type"]) != (
+            altered = row is not None and altered_stop(row)
+            if altered:  # changed outside CatOS to a limit price or a partial size (2026-11-18 review gap)
+                self.log.event("protection_altered", "保底停損在 OKX 上被改成限價或部分張數：確認前不加倉。"
+                               "請到 OKX 網頁撤掉這張條件單，Bot 下次檢查會重掛", algo_id=row["algo_id"],
+                               sl_ord_px=row["sl_ord_px"], close_fraction=row["close_fraction"], sz=row["sz"])
+            if altered or row is None or (row["sl_trigger_px"], row["side"], row["sl_trigger_px_type"] or "last") != (
                     D(active["price"]), active["side"], active["trigger"]):
                 # OKX no longer lists our stop (fired or canceled there) or shows it changed: query
                 # it once more and let the ledger follow what OKX reports. Nothing is resent.
@@ -407,6 +414,11 @@ class DemoBot:
         before = await self.supervisor.protection_state()
         if not self.protection_configured and not (before["pending"] or before["uncertain"] or before["triggered"]):
             await self._configure_protection(strict=False)
+            if not self.protection_configured:
+                # Resume: this start's ratio could not be installed yet. Nothing is placed or moved with
+                # the stopped run's ratio (2026-11-18 review gap); a changed position is not covered, so the
+                # journal keeps increases blocked until a later check installs the ratio.
+                return facts
             before = await self.supervisor.protection_state()
         try:
             state = await self.supervisor.protection_step(now_ms=self.wall_ms())
@@ -691,6 +703,13 @@ class DemoBot:
             if facts["position"] != 0:
                 self.resumed = self._resumable_run(facts)  # refuses unless the last run's ledger owns it
                 self.output_dir = self.resumed["dir"]
+            elif not self.new_run:
+                # Flat on OKX, but the last run may have stopped with an order of unknown outcome (e.g. a
+                # close whose answer was lost): continue that run so the order is queried and its ledger
+                # settled, instead of leaving it open forever (2026-11-18 review gap).
+                self.resumed = self._unsettled_flat_run(facts)
+                if self.resumed is not None:
+                    self.output_dir = self.resumed["dir"]
             if facts["others"]:
                 raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
             if self.resumed is None:
@@ -699,7 +718,8 @@ class DemoBot:
             guard.release()
             raise
         self.guard = guard
-        self.echo(f"紀錄資料夾：{self.output_dir}" + ("（接續上一次的 run）" if self.resumed else ""))
+        self.echo(f"紀錄資料夾：{self.output_dir}" + ("" if not self.resumed else "（接續上一次的 run）" if facts["position"]
+                                                    else "（接續上一次的 run：有委託沒結清，先查清楚）"))
         try:
             self._open_run(facts, contract)
         except BaseException:
@@ -709,6 +729,8 @@ class DemoBot:
                 self.log.close()
                 self.log = None
             raise
+        for message, fields in self.start_notes:
+            self.log.event("previous_run_unsettled", message, **fields)
         try:
             await self.supervisor.start()
             # A resumed ledger that already latched Hard engaged the Kill-Switch back then.
@@ -728,6 +750,47 @@ class DemoBot:
         finally:
             await self._close()
         return self.status
+
+    def _unsettled_flat_run(self, facts):
+        """The last run, if its ledger has unsettled orders and it can be continued; otherwise None.
+
+        A run that cannot be continued (changed approval or settings, unreadable, stopped too long
+        ago) is left as it is and a new run starts; the reason is logged in the new run.
+        """
+        pointer = self.account_state.get("run")
+        if pointer is None:
+            return None
+        directory = Path(pointer["dir"])
+        try:
+            manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+            connection = sqlite3.connect((directory / manifest["database"]).resolve().as_uri() + "?mode=ro", uri=True)
+            try:
+                unresolved = connection.execute("SELECT COUNT(*) FROM execution_orders WHERE settled=0").fetchone()[0]
+            finally:
+                connection.close()
+        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
+            return None  # nothing readable to settle; a position would have been refused above
+        if not unresolved:
+            return None
+
+        def note(why, reason):
+            self.start_notes.append((f"上一次 run 有 {unresolved} 筆委託沒結清，但{why}，開新的 run；舊帳本保留在 {directory}",
+                                     dict(reason=reason, unsettled=unresolved, previous_run=str(directory))))
+
+        try:
+            resumed = self._resumable_run(facts)
+            status = json.loads((directory / "status.json").read_text(encoding="utf-8"))
+            last_open = int(status["last_bar_open_ms"])
+        except BotStopped as exc:
+            note(f"不能接續（{exc.reason}）", exc.reason)
+            return None
+        except (OSError, ValueError, KeyError, TypeError):
+            note("讀不到它停在哪根 K 線", "resume_last_bar_unreadable")
+            return None
+        if (self.wall_ms() - last_open) // self.tf >= RESUME_CANDLES - 1:
+            note("停下太久補不回 K 線", "resume_gap_too_long")
+            return None
+        return resumed
 
     def _resumable_run(self, facts):
         """The account's last run, if its ledger owns exactly the OKX position; otherwise refuse.
@@ -1058,7 +1121,8 @@ START_HINTS = {
     "resume_approval_changed": "上一次 run 用的核准跟現在有效的核准不同（重新核准或撤銷過），不能接續。先到 OKX 網頁平倉再啟動。",
     "resume_config_changed": "上一次 run 的策略設定或風控門檻跟現在不同，不能接續。先到 OKX 網頁平倉再啟動。",
     "resume_position_mismatch": "OKX 上的部位跟上一次 run 的帳本對不上（可能有人手動下過單），不會接手。先到 OKX 網頁處理部位再啟動。",
-    "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動。",
+    "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動；"
+                                "OKX 已經空倉時，啟動指令加 --new-run 開新的 run（舊 run 的帳本保留、不結清）。",
     "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
     "disaster_stop_triggered": "OKX 的保底停損已觸發並平倉（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
     "disaster_stop_incomplete": "OKX 的保底停損觸發了，但 OKX 上還有部位（停損單沒有完全成交）。帳本已經對不上，Bot 不能替你處理：請到 OKX 網頁手動平倉，再用同一個指令重開。",
@@ -1097,6 +1161,8 @@ def cli_main(argv):
     parser.add_argument("--disaster-stop", type=_percent, default=Decimal("0"), metavar="10%",
                         help="保底停損：價格從進場均價反向這麼多時，由 OKX 以市價整倉平倉（電腦當機、斷線時的最後保險）。"
                              "預設 0（不掛）")
+    parser.add_argument("--new-run", action="store_true",
+                        help="OKX 空倉時一定開新的 run，不接續上一次有委託沒結清的 run（舊帳本保留、不結清）")
     args = parser.parse_args(argv)
     try:
         profile = strategy_approvals.load_profile(args.profile)
@@ -1114,7 +1180,8 @@ def cli_main(argv):
     directory = Path(args.output_root) / uuid.uuid4().hex  # a resumed run keeps its own folder instead
     print("停止：按 Ctrl+C（部位保留，重開會接續），或在紀錄資料夾建立 stop.request；緊急停止用 Kill-Switch（會平倉）。\n")
     try:
-        bot = DemoBot(client=client, record=record, output_dir=directory, disaster_stop=args.disaster_stop)
+        bot = DemoBot(client=client, record=record, output_dir=directory, disaster_stop=args.disaster_stop,
+                      new_run=args.new_run)
         status = asyncio.run(bot.run())
     except KeyboardInterrupt:
         print("\n已收到 Ctrl+C；部位留在模擬盤上，沒有平倉。用同一個指令重開會接續這個 run。")
