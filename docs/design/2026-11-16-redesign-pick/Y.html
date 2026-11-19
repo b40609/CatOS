@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="night" data-density="cozy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CatOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#141415;--deep:#0f0f10;--card:#19191b;--raise:#232325;--raise2:#2d2d30;
+  --fg:#ededed;--fg2:#a1a1a6;--fg3:#85858b;
+  --line:rgba(237,237,237,.08);--line2:rgba(237,237,237,.16);
+  --acc:#f2a52b;--acc-ink:#f2a52b;--acc-soft:rgba(242,165,43,.12);--acc-soft2:rgba(242,165,43,.2);
+  --up:#4cc38a;--down:#e5484d;--down-soft:rgba(229,72,77,.12);--down-line:rgba(229,72,77,.4);
+  --s2:#7fa8dc;--s3:#b9b3a7;
+  --btn:#ededed;--on-btn:#141415;--hi:inset 0 1px 0 rgba(255,255,255,.06);
+  --float:0 16px 48px rgba(0,0,0,.5);
+  --sans:"Geist","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:"Geist Mono","JetBrains Mono",Consolas,ui-monospace,monospace;
+  --pad:20px;--row:44px;--gap:16px;--ease:cubic-bezier(.22,1,.36,1)
+}
+[data-theme=day]{
+  --bg:#fafafa;--deep:#f4f4f5;--card:#fff;--raise:#f4f4f5;--raise2:#e9e9eb;
+  --fg:#171717;--fg2:#525252;--fg3:#737373;
+  --line:rgba(23,23,23,.09);--line2:rgba(23,23,23,.18);
+  --acc-ink:#8a5200;--acc-soft:rgba(242,165,43,.16);--acc-soft2:rgba(242,165,43,.28);
+  --up:#15803d;--down:#d02525;--down-soft:rgba(220,38,38,.07);--down-line:rgba(220,38,38,.35);
+  --s2:#3f73b8;--s3:#8c877d;
+  --btn:#171717;--on-btn:#fff;--hi:0 1px 2px rgba(0,0,0,.05);
+  --float:0 8px 24px rgba(0,0,0,.1)
+}
+[data-density=compact]{--pad:12px;--row:36px;--gap:12px}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 14px/22px var(--sans);-webkit-font-smoothing:antialiased;min-width:1180px}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,p,ol,ul{margin:0;padding:0}
+svg{display:block}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.t2{color:var(--fg2)}.t3{color:var(--fg3)}.up{color:var(--up)}.down{color:var(--down)}.acc{color:var(--acc-ink)}
+.s{font-size:13px;line-height:20px}.xs{font-size:12px;line-height:16px}
+.r{text-align:right}.nw{white-space:nowrap}
+.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--fg3);display:inline-block;flex:none}
+.dot.u{background:var(--up)}.dot.d{background:var(--down)}.dot.a{background:var(--acc)}
+
+/* 外框 */
+.side{position:fixed;left:0;top:0;bottom:0;width:248px;background:var(--deep);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px 12px;z-index:30;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;font-size:17px;line-height:1;font-weight:600}
+.brand svg{width:22px;height:22px;color:var(--acc)}
+.nl{font-size:12px;line-height:16px;color:var(--fg3);padding:24px 8px 8px}
+.nv{display:flex;align-items:center;gap:8px;width:100%;height:36px;padding:0 8px;margin-bottom:2px;border:0;border-radius:8px;background:none;color:var(--fg2);text-align:left;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.nv .i{color:var(--fg3)}
+.nv:hover{background:var(--raise);color:var(--fg)}
+.nv.on{background:var(--raise);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line),var(--hi)}
+.nv.on .i{color:var(--acc-ink)}
+.nv .q{margin-left:auto;font:400 12px/16px var(--mono);color:var(--fg3)}
+.own{margin-top:auto;display:flex;gap:12px;align-items:center;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--card);text-align:left;width:100%;transition:border-color .15s var(--ease)}
+.own:hover{border-color:var(--line2)}
+.av{width:32px;height:32px;border-radius:50%;background:var(--raise2);display:grid;place-items:center;font-weight:500;flex:none}
+.main{margin-left:248px;min-height:900px}
+.top{position:sticky;top:0;z-index:20;height:56px;display:flex;align-items:center;gap:12px;padding:0 32px;background:var(--bg);border-bottom:1px solid var(--line)}
+.ttl{display:flex;align-items:baseline;gap:12px;min-width:0;margin-right:auto}
+.ttl b{font-size:16px;font-weight:500;white-space:nowrap}.ttl span{color:var(--fg3);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 8px;border:0;background:none;border-radius:8px;color:var(--fg2);font-size:13px;white-space:nowrap}
+button.st:hover{background:var(--raise);color:var(--fg)}
+.kill{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;border:1px solid var(--down-line);border-radius:8px;background:var(--down-soft);color:var(--down);font-weight:500;white-space:nowrap;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.kill:hover{background:var(--down);color:#fff}
+.page{max-width:1600px;padding:24px 32px 64px;display:grid;gap:var(--gap)}
+.banner{margin:16px 32px 0;border:1px solid var(--down-line);background:var(--down-soft);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.g{display:grid;gap:var(--gap);min-width:0}
+.col2{display:grid;gap:var(--gap);align-items:start}
+
+/* 元件 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:var(--pad);min-width:0}
+.ct{display:flex;align-items:center;gap:8px;margin-bottom:16px;min-height:24px}
+.ct h2{font-size:14px;line-height:20px;font-weight:500;white-space:nowrap}
+.ct .sp{margin-left:auto;display:flex;gap:8px;align-items:center;min-width:0}
+.tag{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:6px;background:var(--raise);color:var(--fg2);font-size:12px;line-height:20px;white-space:nowrap}
+.by{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;border:0;border-radius:6px;background:var(--acc-soft);color:var(--acc-ink);font-size:12px;line-height:20px;white-space:nowrap;vertical-align:middle;transition:background-color .15s var(--ease)}
+.by:hover{background:var(--acc-soft2)}
+.by svg{width:10px;height:8px;fill:currentColor}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:32px;padding:0 12px;border:1px solid var(--line2);border-radius:8px;background:var(--raise);color:var(--fg);font-size:13px;font-weight:500;white-space:nowrap;transition:background-color .15s var(--ease),border-color .15s var(--ease),transform .12s var(--ease)}
+.btn:hover:not(:disabled){background:var(--raise2)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.pri{background:var(--btn);border-color:var(--btn);color:var(--on-btn)}
+.btn.pri:hover:not(:disabled){background:var(--btn);opacity:.88}
+.btn.danger{background:var(--down);border-color:var(--down);color:#fff}
+.btn.danger:hover:not(:disabled){background:var(--down);opacity:.9}
+.btn.red{color:var(--down);border-color:var(--down-line);background:var(--down-soft)}
+.btn.quiet{border-color:transparent;background:none;color:var(--fg2)}
+.btn.quiet:hover:not(:disabled){background:var(--raise);color:var(--fg)}
+.btn.ib{width:28px;height:28px;padding:0}
+.btn.lg{height:40px;padding:0 16px;font-size:14px}
+.sw{position:relative;width:36px;height:20px;border:0;border-radius:10px;background:var(--raise2);flex:none;transition:background-color .15s var(--ease)}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--fg3);transition:transform .15s var(--ease),background-color .15s var(--ease)}
+.sw.on{background:var(--fg)}.sw.on::after{transform:translateX(16px);background:var(--bg)}
+.sw:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:inline-flex;padding:2px;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--deep)}
+.seg button{height:28px;padding:0 12px;border:0;border-radius:6px;background:none;color:var(--fg2);font-size:13px;white-space:nowrap;transition:background-color .15s var(--ease),color .15s var(--ease)}
+.seg button:hover{color:var(--fg)}
+.seg button.on{background:var(--raise);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line),var(--hi)}
+.seg button:disabled{cursor:not-allowed;opacity:.6}
+table{width:100%;border-collapse:collapse}
+th{font-weight:400;font-size:12px;line-height:16px;color:var(--fg3);text-align:left;padding:0 12px 8px 0;white-space:nowrap}
+td{height:var(--row);padding:8px 12px 8px 0;border-top:1px solid var(--line);font-size:13px;line-height:20px;vertical-align:middle}
+th:last-child,td:last-child{padding-right:0}
+th.r,td.r{text-align:right}
+td.m,td .m{font-size:12px}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--raise)}
+.rw{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:var(--row);padding:8px 0;border-top:1px solid var(--line)}
+.rw:first-child{border-top:0;padding-top:0}
+.rw:last-child{padding-bottom:0}
+.hl{font-size:32px;line-height:40px;font-weight:500}
+.k{font-size:12px;line-height:16px;color:var(--fg3)}
+.v{font-size:28px;line-height:32px;font-weight:500;font-variant-numeric:tabular-nums;margin:4px 0;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.stats>div{padding:16px 20px;border-left:1px solid var(--line);min-width:0}.stats>div:first-child{border-left:0}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:32px;align-items:end;padding:8px 0}
+.facts{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:12px;font-size:13px;line-height:20px;color:var(--fg2);align-items:center}
+.facts b{color:var(--fg);font-weight:500}
+.say{background:var(--raise);border-radius:10px;padding:12px 16px}
+.empty{border:1px dashed var(--line2);border-radius:8px;padding:16px 12px;font-size:12px;line-height:16px;color:var(--fg3);text-align:center}
+.ax{font:400 11px var(--mono);fill:var(--fg3)}
+
+/* 總覽 */
+.todo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.todo:first-of-type{border-top:0;padding-top:0}.todo:last-child{padding-bottom:0}
+.todo.first{background:var(--raise);border:0;border-radius:10px;padding:12px 16px;margin-bottom:4px}
+.todo.first+.todo{border-top:0}
+.lgd{display:grid;grid-template-columns:8px minmax(0,1fr) auto 40px;gap:12px;align-items:center;min-height:36px;font-size:13px;line-height:20px}
+.ev{display:grid;grid-template-columns:72px 44px minmax(0,1fr);gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:13px;line-height:20px}
+.ev:first-child{border-top:0;padding-top:0}.ev:last-child{padding-bottom:0}
+.pl{display:grid;grid-template-columns:56px 20px minmax(0,1fr);gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:13px;line-height:20px}
+.pl:first-child{border-top:0;padding-top:0}.pl:last-child{padding-bottom:0}
+
+/* 策略 */
+.kan{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start}
+.kcol{background:var(--deep);border:1px solid var(--line);border-radius:16px;padding:8px}
+.kh{display:flex;align-items:baseline;gap:8px;padding:8px 8px 0;font-weight:500}
+.kh span{font:400 12px/16px var(--mono);color:var(--fg3)}
+.ks{font-size:12px;line-height:16px;color:var(--fg3);padding:4px 8px 12px;min-height:52px}
+.kc{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s var(--ease),background-color .15s var(--ease)}
+.kc:last-child{margin-bottom:0}
+.kc:hover{border-color:var(--line2)}
+.kc.on{border-color:var(--fg3);background:var(--raise);box-shadow:var(--hi)}
+.gb{display:flex;gap:2px;margin:12px 0 8px}
+.gb i{flex:1;height:4px;border-radius:2px;background:var(--raise2)}
+.kc.on .gb i{background:var(--line2)}
+.gb i.p,.kc.on .gb i.p{background:var(--fg3)}.gb i.f,.kc.on .gb i.f{background:var(--down)}.gb i.r,.kc.on .gb i.r{background:var(--fg)}.gb i.a,.kc.on .gb i.a{background:var(--acc)}
+.gate{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
+.gate:first-of-type{border-top:0}
+.gm{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);color:var(--fg3);margin-top:2px}
+.gm .i{width:12px;height:12px;stroke-width:2}
+.gm.p{border-color:transparent;background:var(--raise2);color:var(--fg)}
+.gm.f{border-color:transparent;background:var(--down-soft);color:var(--down)}
+.gm.r{border-color:var(--fg2);color:var(--fg)}
+.gm.a{border-color:transparent;background:var(--acc-soft);color:var(--acc-ink)}
+
+/* 研究 */
+.verdict{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;background:var(--raise);border-radius:12px;padding:20px 24px}
+.verdict h3{font-size:20px;line-height:28px;font-weight:500}
+.gs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--line);border-radius:12px}
+.gs>div{padding:12px 16px;border-left:1px solid var(--line);min-width:0}.gs>div:first-child{border-left:0}
+.qa{display:grid;grid-template-columns:20px 160px minmax(0,1fr) auto;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.qa:first-of-type{border-top:0}
+.qa .fig{font-size:20px;line-height:28px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cost{display:grid;grid-template-columns:64px minmax(0,1fr) 80px;gap:12px;align-items:center;min-height:32px;font-size:13px}
+.cost .b{height:4px;border-radius:2px;background:var(--raise2);position:relative}
+.cost .b i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--fg2)}
+.heat{display:grid;grid-template-columns:40px repeat(12,minmax(0,1fr));gap:4px;font:400 11px/16px var(--mono)}
+.heat .hm,.heat .hy{color:var(--fg3);text-align:center;align-self:center}
+.heat .hc{text-align:center;padding:4px 0;border-radius:4px;color:var(--fg)}
+
+/* 執行 */
+.bl{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:border-color .15s var(--ease),background-color .15s var(--ease)}
+.bl:hover{border-color:var(--line2)}
+.bl.on{background:var(--raise);border-color:var(--fg3);box-shadow:var(--hi)}
+
+/* 風控 */
+.way{border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center}
+.way+.way{margin-top:8px}
+
+/* 我的 CatOS */
+.idc{position:relative;height:208px;border-radius:16px;padding:24px;background:linear-gradient(145deg,#2c2c2f,#1c1c1e);border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 12px 32px rgba(0,0,0,.28);color:#ededed;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.idc .cat{position:absolute;right:-24px;bottom:-40px;width:184px;height:184px;color:rgba(255,255,255,.04)}
+.idc .chip{width:40px;height:28px;border-radius:6px;background:linear-gradient(135deg,#f6c15e,#c98414);box-shadow:inset 0 1px 0 rgba(255,255,255,.35);position:relative}
+.idc .chip::after{content:"";position:absolute;inset:6px 12px;border-left:1px solid rgba(60,36,0,.4);border-right:1px solid rgba(60,36,0,.4)}
+.idc .k{color:#a1a1a6}
+.scale{position:relative;height:8px;border-radius:4px;background:var(--raise2);margin:28px 0 8px}
+.scale i{position:absolute;top:-6px;width:4px;height:20px;border-radius:2px;background:var(--acc);margin-left:-2px}
+.scale b{position:absolute;top:-28px;transform:translateX(-50%);font-size:12px;line-height:16px;font-weight:500;color:var(--acc-ink);white-space:nowrap}
+.sl{display:flex;justify-content:space-between;font-size:12px;line-height:16px;color:var(--fg3)}
+.day{display:flex;height:36px;border-radius:8px;overflow:hidden;gap:2px}
+.day span{display:grid;place-items:center;font-size:12px;line-height:16px;color:var(--fg2);background:var(--raise);white-space:nowrap;overflow:hidden}
+.day span.q{background:var(--deep);color:var(--fg3);box-shadow:inset 0 0 0 1px var(--line)}
+.day span.d{background:var(--acc);color:#1a1206;font-weight:500}
+.day span.w{background:var(--raise2)}
+.hist{display:flex;align-items:flex-end;gap:2px;height:44px}
+.hist i{flex:1;background:var(--fg3);border-radius:2px 2px 0 0;min-height:2px;opacity:.6}
+.hist i.pk{background:var(--acc);opacity:1}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip2{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:8px;background:var(--raise);font-size:13px;white-space:nowrap}
+.chip2.off{background:none;box-shadow:inset 0 0 0 1px var(--line);color:var(--fg3);text-decoration:line-through}
+.mem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:16px 0;border-top:1px solid var(--line);align-items:start}
+.mem:first-of-type{border-top:0;padding-top:0}.mem:last-child{padding-bottom:0}
+.mem h3{font-size:15px;line-height:22px;font-weight:500}
+.quote{border-left:2px solid var(--line2);padding-left:12px;margin:8px 0;color:var(--fg2);font-size:13px;line-height:20px}
+.ask{border:1px solid var(--line);background:var(--raise);border-radius:12px;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center}
+.ask+.ask{margin-top:8px}
+.rule{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:16px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.rule:first-of-type{border-top:0;padding-top:0}.rule:last-child{padding-bottom:0}
+.inp{width:100%;height:40px;padding:0 12px;border:1px solid var(--line2);border-radius:8px;background:var(--deep);color:var(--fg)}
+.inp::placeholder{color:var(--fg3)}
+textarea.inp{height:88px;padding:8px 12px;line-height:22px;resize:vertical}
+.wire{display:grid;gap:8px;padding:12px;border-radius:10px;background:var(--deep);border:1px solid var(--line)}
+.wire>div{display:grid;gap:4px;align-content:start}
+.wire span{display:block;border-radius:6px;background:var(--raise);padding:6px 8px;font-size:12px;line-height:16px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wire span.rk{background:var(--acc-soft);color:var(--acc-ink)}
+.ord{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;gap:12px;align-items:center;min-height:var(--row);padding:6px 0;border-top:1px solid var(--line)}
+.ord:first-of-type{border-top:0}
+.ord.off .nm{color:var(--fg3)}
+.nt{display:grid;grid-template-columns:minmax(0,1fr) 64px 64px 64px;gap:8px;align-items:center;min-height:var(--row);padding:4px 0;border-top:1px solid var(--line)}
+.nt.h{border-top:0;min-height:24px;font-size:12px;color:var(--fg3)}
+.nt>*:not(:first-child){justify-self:center}
+.brief{background:var(--deep);border:1px solid var(--line);border-radius:12px;padding:16px}
+.brief li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:6px 0;font-size:13px;line-height:20px;list-style:none}
+.brief li span:first-child{font:400 12px/20px var(--mono);color:var(--fg3)}
+
+/* 對話框 */
+.ov{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(0,0,0,.6);animation:fade .2s var(--ease)}
+.dlg{width:520px;max-width:92%;max-height:92%;overflow:auto;background:var(--card);border:1px solid var(--line2);border-radius:16px;padding:24px;box-shadow:var(--float);animation:rise .22s var(--ease)}
+.dlg h3{font-size:18px;line-height:28px;font-weight:500;margin-bottom:8px}
+.dlg p{margin-bottom:12px;color:var(--fg2)}
+.dlg label{display:block;font-size:13px;color:var(--fg2);margin-top:16px}
+.dlg label .inp{margin-top:8px}
+.acts{display:flex;justify-content:flex-end;gap:8px;margin-top:24px}
+.opt{display:grid;grid-template-columns:20px minmax(0,1fr);gap:12px;width:100%;text-align:left;border:1px solid var(--line2);border-radius:10px;background:var(--deep);padding:16px;margin-top:8px;transition:border-color .15s var(--ease),background-color .15s var(--ease)}
+.opt:hover{border-color:var(--fg3)}
+.opt .rd{width:16px;height:16px;border-radius:50%;border:1px solid var(--fg3);margin-top:4px;display:grid;place-items:center}
+.opt.on{border-color:var(--fg);background:var(--raise)}
+.opt.on .rd{border-color:var(--fg)}.opt.on .rd::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--fg)}
+.opt b{font-weight:500;font-size:15px}
+.chk{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;padding:6px 0;font-size:13px;line-height:20px;align-items:start}
+.chk .i{margin-top:2px}
+.tip{position:fixed;z-index:60;display:none;pointer-events:none;background:var(--raise);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;font:400 12px/20px var(--mono);color:var(--fg);box-shadow:var(--float)}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}
+.toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:70;background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;line-height:20px;box-shadow:var(--float);animation:rise .22s var(--ease)}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+.toast{animation-name:riseC}
+@keyframes riseC{from{opacity:0;transform:translate(-50%,8px)}}
+#view{animation:rise .32s var(--ease)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:1360px){.hero{grid-template-columns:minmax(0,1fr) 460px;gap:24px}.hl{font-size:28px;line-height:36px}.stats>div{padding:16px}.v{font-size:24px}}
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l3.5 4h7L19 4v10a7 7 0 01-14 0z" fill="currentColor"/><circle cx="9.5" cy="13" r="1.3" fill="var(--deep)"/><circle cx="14.5" cy="13" r="1.3" fill="var(--deep)"/></svg>CatOS</div>
+  <nav id="nav"></nav>
+  <button class="own" data-go="me" id="own"></button>
+</aside>
+<div class="main">
+  <header class="top">
+    <div class="ttl" id="ttl"></div>
+    <span id="stat" style="display:flex;align-items:center;gap:4px"></span>
+    <span id="killslot"></span>
+  </header>
+  <div id="banner"></div>
+  <main class="page" id="view"></main>
+</div>
+<script>
+/* ============ 工具 ============ */
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const f=(n,d=2)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sg=(n,d=2)=>(n>0?'+':n<0?'−':'')+f(Math.abs(n),d);
+const cl=n=>n>0?'up':n<0?'down':'';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rng=s=>()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
+const ddOf=d=>{let m=-1e18;return d.map(v=>{m=Math.max(m,v);return (v-m)/m*100})};
+/* 隨機路徑，並用線性修正讓它通過指定的點，這樣圖和數字對得起來 */
+function path(seed,n,vol,anchors){const r=rng(seed),d=[0];for(let i=1;i<n;i++)d.push(d[i-1]+(r()-0.5)*vol);
+  const c=anchors.slice().sort((a,b)=>a[0]-b[0]).map(([i,v])=>[i,v-d[i]]);
+  return d.map((v,i)=>{let k=0;while(k<c.length-2&&i>c[k+1][0])k++;const a=c[k],b=c[Math.min(k+1,c.length-1)],t=b[0]===a[0]?0:Math.max(0,Math.min(1,(i-a[0])/(b[0]-a[0])));return v+a[1]+(b[1]-a[1])*t})}
+function candles(seed,n,vol,anchors){const c=path(seed,n+1,vol,anchors.map(([i,v])=>[i+1,v])),r=rng(seed+7),o=[];
+  for(let i=0;i<n;i++){const a=c[i],b=c[i+1];o.push([a,Math.max(a,b)+r()*vol*.4,Math.min(a,b)-r()*vol*.4,b])}return o}
+const NOW=new Date(2026,10,16,6,47);
+const md=d=>(d.getMonth()+1)+'/'+String(d.getDate()).padStart(2,'0');
+const ago=h=>new Date(NOW.getTime()-h*3600e3);
+
+/* ============ 圖示（lucide 線條，16px，1.5） ============ */
+const IC={
+home:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+cols:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>',
+flask:'<path d="M10 2v7.5a2 2 0 0 1-.2.9L4.7 20.6a1 1 0 0 0 .9 1.4h12.8a1 1 0 0 0 .9-1.4L14.2 10.4a2 2 0 0 1-.2-.9V2M8.5 2h7M7 16h10"/>',
+pulse:'<path d="M22 12h-2.5a2 2 0 0 0-1.9 1.5l-2.4 8.3a.25.25 0 0 1-.5 0L9.2 2.2a.25.25 0 0 0-.5 0L6.4 10.5A2 2 0 0 1 4.5 12H2"/>',
+shield:'<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>',
+user:'<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+book:'<path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+rules:'<path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/>',
+sliders:'<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
+moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+check:'<path d="M20 6 9 17l-5-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',
+pencil:'<path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8L2 21.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5zM15 5l4 4"/>',
+trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>',
+plus:'<path d="M5 12h14M12 5v14"/>',up:'<path d="m5 12 7-7 7 7M12 19V5"/>',down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+chev:'<path d="m9 18 6-6-6-6"/>',
+warn:'<path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3M12 9v4M12 17h.01"/>',
+power:'<path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/>',
+lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+minus:'<path d="M5 12h14"/>'};
+const ic=(n,c='')=>`<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+const CAT='<path d="M5 4l3.5 4h7L19 4v10a7 7 0 01-14 0z" fill="currentColor"/>';
+
+/* ============ 假資料（沿用草稿的 DB，修正互相對不上的地方） ============ */
+const DB={
+  acct:{eq:10214.37,start:10000,today:42.11,unreal:63.20,avail:9880.12,margin:334.25,lev:0.31,levMax:0.50,soft:5,hard:10,days:23,day0:10172.26,yday:36.52},
+  stages:[['idea','想法','一句話或一段說明，你或 Agent 都能提'],['research','研究中','回測、調參數、驗證，Agent 代勞'],['validated','已驗證','前四關都過，等你決定要不要上模擬盤'],['demo','模擬盤','在 OKX 模擬盤真的下單，跑滿 30 天'],['live','實盤','用真錢，六關全過才能來']],
+  gates:[['扣掉成本還賺','手續費、滑價、資金費都算進去後，淨損益是正的'],['沒看過的資料也賺','用前一段選參數，在後一段沒看過的資料上測'],['不是靠運氣','試了很多組參數後，這個結果還站得住'],['Bot 和回測做同樣的事','同一段歷史，Bot 重播的每一筆成交都和回測相同'],['模擬盤跑滿 30 天','在 OKX 模擬盤連續執行，沒有中斷'],['模擬盤偏差小於 1%','模擬盤的損益和同期回測的差距']],
+  gw:{p:'通過',f:'沒過',r:'進行中',w:'還沒開始',a:'要注意'},
+  strats:[
+    {id:'don4h',name:'Donchian 通道突破',desc:'突破近期高點做多，跌破低點做空',sym:'BTC',tf:'4H',yrs:4.87,stage:'demo',by:'你',g:'pppprp',ret:11.4,sh:0.82,dd:-9.8,n:103,dsr:0.71,pbo:0.20,seed:11,note:'模擬盤第 23 天，還要 7 天'},
+    {id:'tsmom',name:'時間序列動能',desc:'過去一段時間在漲就持有，在跌就空手',sym:'BTC',tf:'1D',yrs:4.87,stage:'demo',by:'你',g:'pppprp',ret:18.2,sh:1.04,dd:-16.5,n:61,dsr:0.78,pbo:0.17,seed:23,note:'模擬盤第 15 天，半倉'},
+    {id:'rsi',name:'均值回歸 RSI',desc:'跌過頭買進，漲過頭賣出',sym:'ETH',tf:'1H',yrs:3,stage:'demo',by:'Agent',g:'ppppra',ret:9.1,sh:0.66,dd:-7.2,n:388,dsr:0.58,pbo:0.31,seed:37,note:'偏差 −0.61%，過了你的提醒線'},
+    {id:'ens',name:'Donchian 多週期集成',desc:'三個週期的 Donchian 一起投票',sym:'BTC',tf:'1D',yrs:4.87,stage:'validated',by:'你',g:'ppppww',ret:13.9,sh:0.95,dd:-11.3,n:74,dsr:0.74,pbo:0.22,seed:41,note:'前四關都過了，等你部署'},
+    {id:'fund',name:'資金費擁擠過濾',desc:'資金費過高時不追多',sym:'BTC',tf:'4H',yrs:4.87,stage:'research',by:'Agent',g:'prwwww',ret:7.3,sh:0.51,dd:-12.0,n:96,dsr:null,pbo:null,seed:53,note:'Agent 正在跑參數優化，62%'},
+    {id:'dcm',name:'DCM 突破後回踩',desc:'突破後等回踩再進場',sym:'BTC',tf:'15m',yrs:1,stage:'research',by:'你',g:'fwwwww',ret:-4.6,sh:-0.38,dd:-14.9,n:1204,dsr:null,pbo:null,seed:67,note:'扣掉成本後是虧的'},
+    {id:'vol',name:'波動率突破',desc:'波動突然放大時順勢進場',sym:'SOL',tf:'4H',stage:'idea',by:'Agent',g:'wwwwww',seed:71,note:'Agent 昨天提出，等你看'},
+    {id:'wk',name:'週末效應',desc:'只在週末持有',sym:'BTC',tf:'1D',stage:'idea',by:'你',g:'wwwwww',seed:83,note:'還只是一句話'}
+  ],
+  bots:[
+    {id:'don4h',inst:'BTC-USDT-SWAP',pos:'多 2 張',side:1,qty:2,avg:103412.0,mark:105477.0,un:41.30,today:28.40,total:139.60,days:23,drift:-0.12,lev:0.21,notional:2109.54,ref:2109.54,cnt:9,nextAt:'08:00',next:'1 小時 13 分',seed:101},
+    {id:'tsmom',inst:'BTC-USDT-SWAP',pos:'多 1 張',side:1,qty:1,avg:103287.0,mark:105477.0,un:21.90,today:13.71,total:87.17,days:15,drift:0.05,lev:0.10,notional:1054.77,ref:1054.77,cnt:3,nextAt:'08:00',next:'1 小時 13 分',seed:113},
+    {id:'rsi',inst:'ETH-USDT-SWAP',pos:'空手',side:0,qty:0,avg:null,mark:3412.6,un:0,today:0,total:-12.40,days:14,drift:-0.61,lev:0,notional:0,ref:1023.78,cnt:6,nextAt:'07:00',next:'13 分',seed:127,wait:'空手。RSI 低於 28 就買進 3 張'}
+  ],
+  todo:[
+    {k:'deploy',lab:'等你決定',t:'Donchian 多週期集成 可以上模擬盤了',s:'前四關都通過。部署後開始跑第五關的 30 天',a:'看了再決定',id:'ens'},
+    {k:'warn',lab:'要注意',t:'均值回歸 RSI 和回測差了 −0.61%',s:'過了你的提醒線 0.5%，還沒到系統門檻 1%。主要來自 3 筆成交的滑價',a:'看比對',id:'rsi'},
+    {k:'idea',lab:'新想法',t:'Agent 提出：波動率突破（SOL）',s:'昨天 22:14 提出，已依你的規矩改成只做多',a:'看一下',id:'vol'}
+  ],
+  events:[
+    ['04:00:02','風控','核對完成：CatOS 的帳和 OKX 的部位、餘額一致'],
+    ['04:00:01','成交','Donchian 通道突破 買進 1 張 BTC，成交價 105,412.4，手續費 0.53'],
+    ['04:00:00','行情','BTC 4 小時線收在 105,409.0，高於加碼線 105,380.0'],
+    ['03:12:44','Agent','送出參數優化：資金費擁擠過濾（48 組）'],
+    ['02:00:01','行情','ETH 1 小時線收在 3,408.2，RSI 41，在買賣線中間，不動作'],
+    ['00:00:03','風控','今天的起算權益 10,172.26，虧損限額 5% 和 10%'],
+    ['昨 22:14','Agent','提出新想法：波動率突破（SOL，4 小時線）'],
+    ['昨 21:00:01','成交','均值回歸 RSI 賣出 3 張 ETH，成交價 3,421.8，手續費 0.51']
+  ],
+  fills:[
+    ['11/16 04:00','don4h','買進','BTC',1,105412.4,3.4,0.53,''],
+    ['11/15 21:00','rsi','賣出','ETH',3,3421.8,-1.9,0.51,'+6.99'],
+    ['11/15 20:00','rsi','買進','ETH',3,3398.5,2.6,0.51,''],
+    ['11/12 08:00','don4h','買進','BTC',1,101411.6,2.8,0.51,''],
+    ['11/09 08:00','tsmom','買進','BTC',1,103287.0,4.1,0.52,''],
+    ['11/07 16:00','don4h','賣出','BTC',2,100950.2,-5.2,1.01,'+48.20'],
+    ['11/04 13:00','rsi','賣出','ETH',3,3310.4,-3.3,0.50,'−9.60'],
+    ['11/01 04:00','don4h','買進','BTC',2,98540.0,3.0,0.99,'']
+  ],
+  cost:[['價格損益',1912.4],['手續費',-412.6],['滑價',-188.3],['資金費',-171.5],['淨損益',1140.0]],
+  wf:{don4h:[2.1,-0.8,3.4,1.2,-1.5,4.0,0.9],tsmom:[3.2,1.1,-2.4,5.0,2.2,-0.9,4.1,1.6],rsi:[1.4,-1.1,0.8,-0.6,2.0,0.5,-0.9],ens:[1.8,-0.6,2.9,1.5,-1.2,3.3,1.1]},
+  latches:[['11/03 14:22','CatOS 的帳和 OKX 對不上（差 1 張），自動停止加倉','11/03 15:05 你手動解除。原因：OKX 回報延遲，重新核對後一致'],['10/27 02:05','你按了緊急停止（保留部位只停止）','10/27 02:40 你手動解除。原因：測試']]
+};
+DB.S=id=>DB.strats.find(s=>s.id===id);
+DB.acct.soft$=DB.acct.day0*(1-DB.acct.soft/100);DB.acct.hard$=DB.acct.day0*(1-DB.acct.hard/100);
+DB.eq=path(7,120,18,[[0,10000],[64,10156],[74,9969],[118,DB.acct.day0],[119,DB.acct.eq]]);
+const EQDD=(()=>{const d=ddOf(DB.eq),v=Math.min(...d),i=d.indexOf(v);return {v,date:md(ago((119-i)*552/119))}})();
+const BT={};
+DB.bt=s=>{if(BT[s.id])return BT[s.id];const n=Math.round(s.yrs*52)+1,end=100*Math.pow(1+s.ret/100,s.yrs);let lo=.2,hi=40,d;
+  for(let k=0;k<30;k++){const v=(lo+hi)/2;d=path(s.seed,n,v,[[0,100],[n-1,end]]);if(Math.min(...ddOf(d))<s.dd)hi=v;else lo=v}
+  const bhEnd=s.sym==='ETH'?170:s.yrs<2?108:229,bh=s.yrs>4?path(3,n,7,[[0,100],[Math.round(n*.18),36],[Math.round(n*.45),92],[n-1,bhEnd]]):s.sym==='ETH'?path(5,n,6,[[0,100],[Math.round(n*.3),190],[Math.round(n*.5),74],[n-1,bhEnd]]):path(9,n,3.4,[[0,100],[Math.round(n*.45),74],[n-1,bhEnd]]);
+  const M=Math.round(s.yrs*12),mo=[];for(let j=0;j<M;j++){const a=d[Math.round(j*(n-1)/M)],b=d[Math.round((j+1)*(n-1)/M)];const dt=new Date(2026,10-(M-1-j),1);mo.push({y:dt.getFullYear(),m:dt.getMonth(),v:(b/a-1)*100})}
+  const ys={};mo.forEach(x=>{ys[x.y]=(ys[x.y]||1)*(1+x.v/100)});
+  return BT[s.id]={eq:d,bh,tot:(end/100-1)*100,bhTot:bhEnd-100,bhDD:Math.min(...ddOf(bh)),mo,ys:Object.entries(ys).map(([y,v])=>[y,(v-1)*100]),from:s.yrs>4?'2022/02':s.yrs>2?'2023/12':'2025/12'}};
+DB.costOf=s=>s.id==='dcm'?[['價格損益',212.0],['手續費',-438.0],['滑價',-164.0],['資金費',-70.0],['淨損益',-460.0]]:DB.cost.map(([n,v])=>[n,Math.round(v*s.ret/11.4*10)/10]);
+DB.botEq=b=>{const n=b.days*6+1;return path(b.seed,n,9,[[0,0],[n-1,b.total]])};
+DB.botGap=b=>Math.round(b.drift/100*b.ref*100)/100;
+DB.botBt=b=>{const l=DB.botEq(b),n=l.length,g=DB.botGap(b);return l.map((v,i)=>v-g*i/(n-1)+Math.sin(i/3)*1.4*Math.sin(Math.PI*i/(n-1)))};
+const KC={
+  don4h:{step:4,vol:520,a:[[0,99800],[19,98540],[58,100950.2],[86,101411.6],[109,105409]],marks:[[19,1,'買 2'],[58,-1,'賣 2'],[86,1,'買 1'],[109,1,'買 1']]},
+  tsmom:{step:24,vol:1500,a:[[0,88200],[19,96800],[102,103287],[109,105409]],marks:[[102,1,'買 1']]},
+  rsi:{step:1,vol:13,a:[[0,3381],[99,3398.5],[100,3421.8],[109,3412.6]],marks:[[99,1,'買 3'],[100,-1,'賣 3']]}
+};
+const KCACHE={};const kOf=id=>KCACHE[id]||(KCACHE[id]=candles(DB.bots.find(b=>b.id===id).seed,110,KC[id].vol,KC[id].a));
+/* Bot 現在在等什麼：數字從圖上的資料算出來 */
+function waitOf(b){if(b.wait)return b.wait;const k=kOf(b.id);
+  if(b.id==='don4h'){const lv=Math.min(...k.slice(98).map(a=>a[2]));return {t:`持有多單 2 張。下一根收盤低於 ${f(lv,1)} 就平倉`,lv,lt:'平倉線'}}
+  if(b.id==='tsmom'){const lv=k[19][3];return {t:`持有多單 1 張。價格跌回 90 天前的 ${f(lv,1)} 以下就平倉`,lv,lt:'90 天前的價格'}}
+  return {t:b.wait}}
+const waitT=b=>{const w=waitOf(b);return typeof w==='string'?w:w.t};
+
+/* ============ 個人化資料（自編） ============ */
+const ST={kill:null,km:null,stop:{},sel:'ens',rs:'don4h',bot:'don4h',memf:'all',draft:null};
+const P={
+  name:'Kai',theme:'night',density:'cozy',terms:'plain',riskFirst:true,dd:15,drift:0.5,per:1,
+  mods:[{id:'exposure',n:'曝險額度',col:'s',on:true},{id:'loss',n:'今天離停損線多遠',col:'s',on:true},{id:'todo',n:'需要你決定',col:'m',on:true},{id:'bots',n:'Bot 現在在做什麼',col:'m',on:true},{id:'equity',n:'權益走勢',col:'m',on:true},{id:'pipeline',n:'想法走到哪',col:'s',on:true},{id:'events',n:'最近發生的事',col:'m',on:true},{id:'fills',n:'逐筆成交',col:'m',on:false}],
+  metrics:['dd','luck','net','bh'],
+  quiet:true,
+  ntf:[{n:'碰到風控線、緊急停止',s:'勿擾時段也會送',c:[1,1,1],lock:1},{n:'Bot 和回測差超過 0.5%',c:[1,1,1]},{n:'策略可以部署了',c:[1,0,1]},{n:'Agent 提出新想法',c:[1,0,1]},{n:'Bot 成交',c:[1,0,1]},{n:'研究跑完',c:[1,0,0]},{n:'每日核對結果',s:'對不上才會另外通知',c:[0,0,1]}],
+  mem:[
+    {id:'m1',src:'said',t:'你最怕的是大回撤，不是少賺',ev:'10/26 你說：「先告訴我最慘會虧多少」',use:[['research','研究報告先講回撤'],['overview','總覽先看風險']],last:'今天 04:00'},
+    {id:'m2',src:'said',t:'主力只做 BTC、ETH，其他幣只做多、不做空',ev:'10/28 你定的規矩',use:[['strategies','Agent 提想法前先過濾']],last:'昨天 22:14'},
+    {id:'m3',src:'seen',t:'你習慣晚上 21:00 到 23:00 做決定',ev:'過去 23 天你做了 18 個決定，15 個在這個時段',use:[['overview','要你決定的事排到 21:00']],last:'昨天 21:00'},
+    {id:'m4',src:'said',t:'23:00 到 07:00 不要吵你，碰到風控線除外',ev:'10/30 你說：「晚上不要吵我」',use:[['me-layout','勿擾時段']],last:'今天 04:00'},
+    {id:'m5',src:'seen',t:'你看研究報告先看最大回撤，幾乎不看勝率',ev:'12 份報告裡，11 次先展開回撤，勝率只點過 1 次',use:[['research','報告的順序']],last:'昨天 15:02'},
+    {id:'m6',src:'seen',t:'你不喜歡術語',ev:'你問過 4 次「這是什麼意思」：Sharpe、DSR、PBO、bps',use:[['research','全站用白話']],last:'今天 06:47'},
+    {id:'m7',src:'said',t:'15 分鐘以下的週期不做',ev:'11/13 DCM 回測沒過後，你說：「太短的不做了，成本吃光」',use:[['strategies','DCM 已標記']],last:'11/13'},
+    {id:'m8',src:'said',t:'一次只給一個建議，不要丟一堆選項',ev:'11/02 你說：「直接告訴我你的建議」',use:[['overview','待辦只標一件先做的']],last:'今天 06:47'},
+    {id:'m9',src:'seen',t:'部署新策略時，你都從 1 張開始',ev:'3 次部署都選最小張數起跳',use:[['strategies','部署時預設 1 張']],last:'11/02'},
+    {id:'m10',src:'seen',t:'模擬盤和回測差超過 0.5%，你就會進來看',ev:'偏差過 0.5% 的 4 天裡，你每天都開了比對頁',use:[['exec','提醒線設在 0.5%']],last:'昨天 21:02'}
+  ],
+  ask:[
+    {id:'a1',t:'你週末不太看 CatOS',ev:'過去 3 個週末你只打開過 1 次',sug:'週末只送緊急通知，其他併到週一的晨報'},
+    {id:'a2',t:'權益回落時你會一直進來看',ev:`${EQDD.date} 權益從高點回落 ${f(-EQDD.v)}% 那天，你打開了 9 次，平常 3 次`,sug:'回落超過 1.5% 就主動通知你，附上原因'}
+  ],
+  gone:[{t:'你喜歡先看 K 線圖',when:'11/10',why:'你說其實不看'}],
+  rules:[
+    {id:'r1',hard:1,on:1,t:'每筆交易最多虧本金的 1%',d:'約 102 USDT。下單前先算，超過就縮小張數',hit:'還沒擋過任何一筆'},
+    {id:'r2',hard:1,on:1,t:'BTC、ETH 以外的幣不做空',d:'小幣只做多',hit:'昨天 22:14 把「波動率突破（SOL）」改成只做多'},
+    {id:'r3',hard:1,on:1,t:'不做 15 分鐘以下的週期',d:'成本太重',hit:'11/13 標記了「DCM 突破後回踩」'},
+    {id:'r4',hard:1,on:1,t:'回測最深跌幅超過 15%，不能全額部署',d:'最多半倉，而且要你另外同意',hit:'11/01 時間序列動能（−16.5%）改成半倉'},
+    {id:'r5',hard:1,on:1,lock:1,t:'沒有你本人按確認，不上實盤、不改風控門檻',d:'這條關不掉',hit:'從沒被碰過'},
+    {id:'s1',hard:0,on:1,t:'23:00 到 07:00 不要吵我，碰到風控線除外',hit:'今天夜裡留了 2 件事到晨報'},
+    {id:'s2',hard:0,on:1,t:'先講結論，再講原因，不要術語',hit:'每一頁都照做'},
+    {id:'s3',hard:0,on:1,t:'一次只給我一個建議',hit:'今天的待辦只標了一件'},
+    {id:'s4',hard:0,on:1,t:'新想法每週最多 2 個',hit:'這週已提 1 個'},
+    {id:'s5',hard:0,on:1,t:'要我決定的事，排在晚上 21:00 之後一起給我',hit:'昨天 21:00 給了 2 件'}
+  ],
+  auto:[['跑回測和驗證',0,''],['提出新想法',0,'每週最多 2 個'],['調整研究中策略的參數',0,''],['把策略部署到模擬盤',1,''],['出狀況時停掉一個 Bot',0,'停了馬上通知你'],['重新啟動停掉的 Bot',1,''],['上實盤',2,'',1],['改風控門檻或你的規矩',2,'',1]]
+};
+const EX=[
+  ['連虧 3 筆就先停下來問我',{kind:'界線',mean:'任何一個 Bot 連續 3 筆虧損，就停止它的新進場並通知你，等你決定',eff:'影響 3 個執行中的 Bot。過去 23 天會觸發 0 次'}],
+  ['重大數據公布前後 1 小時不要開新倉',{kind:'界線',mean:'美國物價、利率決議、就業數據公布的前後 1 小時不開新倉，已有部位不動',eff:'過去 23 天會擋下 1 筆進場'}],
+  ['每週日晚上給我一份週報',{kind:'做事方式',mean:'每週日 21:00 送一份週報：本週損益、每個想法的進度、下週要你決定的事',eff:'落在你做決定的時段，不會和勿擾衝突'}]
+];
+const T=(plain,pro)=>P.terms==='plain'?plain:pro;
+/* 簽名細節：「依你」標記。點下去看這裡為什麼長這樣、去哪裡改 */
+const BY={
+  order:['先看風險','你說過最怕的是大回撤，所以總覽把曝險和停損線排在損益前面。','me-layout','改版面'],
+  quiet:['晚上不吵你','你說「晚上不要吵我」。23:00 到 07:00 只有碰到風控線才會通知，其他留到 07:00 的晨報。','me-layout','改提醒'],
+  one:['一次一個建議','你說「直接告訴我你的建議」。好幾件事等你時，Agent 只標一件建議先做的。','me-rules','改規矩'],
+  dd15:['回撤上限 15%','你定的規矩：回測最深跌幅超過 15% 的策略不能全額部署。研究報告也用這條線下結論。','me-rules','改規矩'],
+  mord:['你在意的順序','研究報告照你習慣看的順序排：先看最慘虧多少，再看是不是運氣，最後才看報酬。','me-layout','改順序'],
+  plain:['白話','你問過 4 次「這是什麼意思」，所以全站用白話，術語收起來。','me-layout','改用語'],
+  drift:['差 0.5% 就提醒','系統門檻是 1%，但你通常 0.5% 就會進來看，所以提醒線設在 0.5%。','me-memory','看依據'],
+  small:['小幣只做多','你定的規矩：BTC、ETH 以外的幣不做空。','me-rules','改規矩'],
+  tf15:['不做 15 分鐘以下','11/13 你說「太短的不做了，成本吃光」。','me-rules','改規矩'],
+  per1:['每筆最多虧 1%','你定的規矩。下單前系統會先算，超過就縮小張數。','me-rules','改規矩'],
+  start1:['從 1 張開始','你 3 次部署都選最小張數起跳，所以這裡預設 1 張。','me-memory','看依據'],
+  late:['21:00 後一起給你','你習慣晚上 21:00 到 23:00 做決定，要你決定的事會排到那時候。','me-rules','改規矩'],
+  week2:['每週最多 2 個新想法','你定的做事方式。這週 Agent 已提 1 個。','me-rules','改規矩'],
+  lines:['你的線比系統緊','系統只管帳戶層級的 6 條線。你另外定了自己的界線，下單前一樣會檢查，Agent 和 Bot 都繞不過去。','me-rules','改規矩'],
+  hide:['你關掉的區塊','你在「版面與提醒」關掉了這些區塊，隨時可以打開。','me-layout','改版面']
+};
+const by=(k,l)=>`<button class="by" data-act="why" data-k="${k}"><svg viewBox="0 0 10 8" aria-hidden="true"><path d="M0 8V0l3 3.5h4L10 0v8z"/></svg>依你 · ${l||BY[k][0]}</button>`;
+const BC={don4h:'var(--acc)',tsmom:'var(--s2)',rsi:'var(--s3)',ens:'var(--fg3)'};
+
+/* 會跟著緊急停止改變的狀態 */
+function acct(){const a={...DB.acct};if(ST.kill&&ST.kill.mode==='flat'){a.unreal=0;a.lev=0;a.margin=0;a.avail=a.eq}return a}
+function bots(){return DB.bots.map(b=>{const stop=!!(ST.kill||ST.stop[b.id]),flat=(ST.kill&&ST.kill.mode==='flat')||ST.stop[b.id]==='flat';return {...b,stopped:stop,...(flat?{pos:'空手',side:0,qty:0,un:0,lev:0,notional:0}:{})}})}
+const gateDays=s=>(DB.bots.find(b=>b.id===s.id)||{}).days||0;
+function gateNote(s,i){const c=s.g[i],b=DB.bots.find(x=>x.id===s.id),w=DB.wf[s.id];
+  if(c==='w')return '還沒開始';
+  if(i===0)return c==='p'?`年化 ${sg(s.ret,1)}%`:c==='f'?`年化 ${sg(s.ret,1)}%`:'進行中';
+  if(i===1)return c==='r'?'參數優化 62%':w?`${w.length} 段裡 ${w.filter(v=>v>0).length} 段賺`:'通過';
+  if(i===2)return `失靈機率 ${f(s.pbo*100,0)}%`;
+  if(i===3)return '重播成交逐筆相同';
+  if(i===4)return `${b?b.days:0}／30 天`;
+  return b&&!b.fresh?`目前 ${sg(b.drift)}%`:'等第一筆成交'}
+const gm=c=>`<span class="gm ${c}">${c==='p'?ic('check'):c==='f'?ic('x'):c==='r'?ic('clock'):c==='a'?ic('warn'):''}</span>`;
+const gbar=s=>`<div class="gb" title="${s.g.split('').map((c,i)=>DB.gates[i][0]+'：'+DB.gw[c]).join('\n')}">${s.g.split('').map(c=>`<i class="${c}"></i>`).join('')}</div>`;
+const gcount=s=>s.g.split('').filter(c=>c==='p').length;
+function ruleCheck(s){const o=[];
+  o.push(['BTC','ETH'].includes(s.sym)?['p','幣種',`${s.sym}，是你的主力幣`]:['a','幣種',`${s.sym} 是小幣，只能做多。Agent 已改成只做多`]);
+  o.push(s.tf==='15m'?['f','週期','15 分鐘，你說過不做 15 分鐘以下']:['p','週期',`${s.tf}，在你做的範圍內`]);
+  o.push(s.dd==null?['w','回撤','還沒有回測']:Math.abs(s.dd)>P.dd?['a','回撤',`${f(s.dd,1)}%，超過你的 ${P.dd}%，最多半倉`]:['p','回撤',`${f(s.dd,1)}%，在你的 ${P.dd}% 以內`]);
+  return o}
+
+/* ============ 圖表 ============ */
+/* 刻度落在整數上：10,000、10,100，不是 9,994、10,068 */
+function ticks(mn,mx,n){const raw=(mx-mn)/n||1,p=Math.pow(10,Math.floor(Math.log10(raw))),m=raw/p,st=(m<1.5?1:m<3.5?2:m<7.5?5:10)*p,o=[];for(let v=Math.ceil(mn/st-1e-9)*st;v<=mx+st*1e-9;v+=st)o.push(Math.round(v/st)*st);return o}
+let _gid=0;const HOV={},CH={};
+const C={
+  line({w,h,series,pad=[8,8,24,52],yfmt=v=>f(v,0),xl=[],grid=4,base=null,max=null}){
+    const [T0,R,B,L]=pad,all=series.flatMap(s=>s.d).concat(base!=null?[base]:[]);let mn=Math.min(...all),mx=max!=null?max:Math.max(...all);const p=(mx-mn||1)*.08;mn-=p;if(max==null)mx+=p;
+    const n=Math.max(...series.map(s=>s.d.length)),x=i=>L+i/(n-1)*(w-L-R),y=v=>T0+(mx-v)/(mx-mn)*(h-T0-B),id='h'+(++_gid);
+    let o=`<svg width="${w}" height="${h}" data-hid="${id}">`;
+    ticks(mn,mx,grid).forEach(v=>{o+=`<line x1="${L}" x2="${w-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" class="ax">${yfmt(v)}</text>`});
+    xl.forEach(([i,t])=>o+=`<text x="${x(i)}" y="${h-6}" text-anchor="${i<=0?'start':i>=n-1?'end':'middle'}" class="ax">${t}</text>`);
+    if(base!=null)o+=`<line x1="${L}" x2="${w-R}" y1="${y(base)}" y2="${y(base)}" stroke="var(--fg3)" stroke-dasharray="2 4"/>`;
+    series.forEach(s=>{const pt=s.d.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join('');
+      if(s.fill){const yb=s.fb!=null?y(s.fb):h-B;o+=`<path d="${pt}L${x(s.d.length-1)} ${yb}L${L} ${yb}Z" fill="${s.c}" opacity="${s.fill}"/>`}
+      o+=`<path d="${pt}" fill="none" stroke="${s.c}" stroke-width="${s.w||1.5}" ${s.dash?`stroke-dasharray="${s.dash}"`:''} stroke-linejoin="round" stroke-linecap="round"/>`;
+      if(s.dot)o+=`<circle cx="${x(s.d.length-1)}" cy="${y(s.d[s.d.length-1])}" r="4" fill="${s.dot}" stroke="var(--card)" stroke-width="2"/>`});
+    o+=`<line class="hx" y1="${T0}" y2="${h-B}" stroke="var(--fg3)" visibility="hidden"/>`;HOV[id]={L,R,w,n,series,yfmt};
+    return o+'</svg>'},
+  bars({w,h,d,labels=[],pad=[20,0,24,0]}){const [T0,R,B,L]=pad,mx=Math.max(0,...d),mn=Math.min(0,...d),y=v=>T0+(mx-v)/(mx-mn||1)*(h-T0-B-16),bw=(w-L-R)/d.length;
+    let o=`<svg width="${w}" height="${h}"><line x1="${L}" x2="${w-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line2)"/>`;
+    d.forEach((v,i)=>{const y0=y(0),y1=y(v),cx=L+i*bw+bw/2;o+=`<rect x="${cx-Math.min(16,bw*.3)}" y="${Math.min(y0,y1)}" width="${Math.min(32,bw*.6)}" height="${Math.max(2,Math.abs(y1-y0))}" rx="2" fill="var(--${v>=0?'fg2':'down'})"/><text x="${cx}" y="${v>=0?y1-6:y1+14}" text-anchor="middle" class="ax" style="fill:var(--${v>=0?'fg2':'down'})">${sg(v,1)}</text>`;
+      if(labels[i])o+=`<text x="${cx}" y="${h-6}" text-anchor="middle" class="ax">${labels[i]}</text>`});return o+'</svg>'},
+  candles({w,h,k,marks=[],lines=[],xl=[],pad=[12,80,24,0]}){const [T0,R,B,L]=pad;let mn=Math.min(...k.map(a=>a[2]),...lines.map(l=>l.v)),mx=Math.max(...k.map(a=>a[1]),...lines.map(l=>l.v));const p=(mx-mn)*.08;mn-=p;mx+=p;
+    const cw=(w-L-R)/k.length,x=i=>L+cw*(i+.5),y=v=>T0+(mx-v)/(mx-mn)*(h-T0-B);let o=`<svg width="${w}" height="${h}">`;
+    const LN=lines.map(l=>({...l,y:y(l.v)})).sort((a,b)=>a.y-b.y);LN.forEach((l,i)=>{l.ty=i&&l.y-LN[i-1].ty<24?LN[i-1].ty+24:l.y;l.below=!!i&&l.y-LN[i-1].y<28});
+    ticks(mn,mx,4).forEach(v=>{o+=`<line x1="${L}" x2="${w-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>`;if(!LN.some(l=>Math.abs(l.ty-y(v))<18))o+=`<text x="${w-R+10}" y="${y(v)+4}" class="ax">${f(v,0)}</text>`});
+    xl.forEach(([i,t])=>o+=`<text x="${x(i)}" y="${h-6}" text-anchor="${i<=0?'start':i>=k.length-1?'end':'middle'}" class="ax">${t}</text>`);
+    k.forEach((a,i)=>{const c=`var(--${a[3]>=a[0]?'up':'down'})`,t=y(Math.max(a[0],a[3])),bh=Math.max(1,Math.abs(y(a[0])-y(a[3])));o+=`<line x1="${x(i)}" x2="${x(i)}" y1="${y(a[1])}" y2="${y(a[2])}" stroke="${c}"/><rect x="${x(i)-cw*.3}" y="${t}" width="${cw*.6}" height="${bh}" fill="${c}"><title>開 ${f(a[0],1)}　高 ${f(a[1],1)}　低 ${f(a[2],1)}　收 ${f(a[3],1)}</title></rect>`});
+    LN.forEach(l=>{const x0=l.from!=null?x(l.from):L;o+=`<line x1="${x0}" x2="${w-R}" y1="${l.y}" y2="${l.y}" stroke="${l.c}" stroke-dasharray="4 4"/><rect x="${w-R+4}" y="${l.ty-10}" width="${R-4}" height="20" rx="4" fill="var(--raise2)"/><text x="${w-R+10}" y="${l.ty+4}" class="ax" style="fill:var(--fg)">${f(l.v,1)}</text><text x="${x0+4}" y="${l.below?l.y+14:l.y-6}" class="ax" style="fill:${l.c}">${l.t}</text>`});
+    marks.forEach(([i,side,t])=>{const X=x(i),buy=side>0,Y=buy?y(k[i][2])+8:y(k[i][1])-8;o+=`<path d="M${X} ${Y}l-5 ${buy?8:-8}h10z" fill="var(--acc)" stroke="var(--card)" stroke-width="1.5"/><text x="${X}" y="${buy?Y+22:Y-14}" text-anchor="middle" class="ax" style="fill:var(--fg)">${t}</text>`});
+    return o+'</svg>'}
+};
+const TIP=document.createElement('div');TIP.className='tip';
+function bindHover(){$$('svg[data-hid]').forEach(svg=>{if(svg._b)return;svg._b=1;const h=HOV[svg.dataset.hid];if(!h)return;const hx=$('.hx',svg);
+  svg.addEventListener('mousemove',e=>{const r=svg.getBoundingClientRect(),i=Math.max(0,Math.min(h.n-1,Math.round((e.clientX-r.left-h.L)/(h.w-h.L-h.R)*(h.n-1)))),X=h.L+i/(h.n-1)*(h.w-h.L-h.R);
+    hx.setAttribute('x1',X);hx.setAttribute('x2',X);hx.setAttribute('visibility','visible');
+    TIP.innerHTML=h.series.filter(s=>s.d[i]!=null).map(s=>`<div><i style="background:${s.c}"></i>${s.name||''} <b>${h.yfmt(s.d[i])}</b></div>`).join('');TIP.style.display='block';
+    TIP.style.left=Math.min(innerWidth-TIP.offsetWidth-8,e.clientX+16)+'px';TIP.style.top=(e.clientY+16)+'px'});
+  svg.addEventListener('mouseleave',()=>{hx.setAttribute('visibility','hidden');TIP.style.display='none'})})}
+function drawAll(){$$('[data-c]').forEach(el=>{const fn=CH[el.dataset.c];if(fn)el.innerHTML=fn(el.clientWidth,el.clientHeight,el)});bindHover()}
+
+/* ============ 總覽 ============ */
+function mExposure(wide){const A=acct(),B=bots(),bud=A.eq*A.levMax,items=B.filter(b=>b.notional>0).map(b=>({n:DB.S(b.id).name,v:b.notional,c:BC[b.id],s:b.pos}));
+  const used=items.reduce((a,b)=>a+b.v,0),pend=!ST.kill&&DB.S('ens').stage==='validated'?1054.77:0,r=78,L=2*Math.PI*r;let acc=0;
+  const arc=(v,c,extra='')=>{const len=L*v/bud,l=Math.max(0,len-3),s=`<circle cx="100" cy="100" r="${r}" fill="none" stroke="${c}" stroke-width="20" stroke-dasharray="${l} ${L-l}" stroke-dashoffset="${-acc}" transform="rotate(-90 100 100)" ${extra}/>`;acc+=len;return s};
+  const svg=`<svg viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="曝險額度已用 ${f(used/bud*100,0)}%"><circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--raise2)" stroke-width="20"/>${items.map(it=>arc(it.v,it.c)).join('')}${pend?arc(pend,'var(--fg3)','opacity=".45"'):''}
+    <text x="100" y="100" text-anchor="middle" style="font:500 36px var(--sans);fill:var(--fg);font-variant-numeric:tabular-nums">${f(used/bud*100,0)}%</text><text x="100" y="122" text-anchor="middle" style="font:400 12px var(--sans);fill:var(--fg3)">額度已用</text></svg>`;
+  return `<div class="card"><div class="ct"><h2>曝險額度</h2><div class="sp"><span class="xs t3 m">${f(used/A.eq,2)} / ${f(A.levMax,2)} 倍</span></div></div>
+    <div style="${wide?'display:grid;grid-template-columns:200px minmax(0,1fr);gap:32px;align-items:center':''}"><div style="display:grid;place-items:center;padding:${wide?'0':'4px 0 20px'}">${svg}</div><div>
+    ${items.map(it=>`<div class="lgd"><span class="dot" style="background:${it.c}"></span><span>${it.n} <span class="t3">${it.s}</span></span><span class="m xs">${f(it.v)}</span><span class="m xs r t2">${f(it.v/bud*100,0)}%</span></div>`).join('')}
+    <div class="lgd"><span class="dot" style="background:var(--raise2)"></span><span class="t2">還沒用</span><span class="m xs">${f(bud-used)}</span><span class="m xs r t2">${f((bud-used)/bud*100,0)}%</span></div>
+    ${pend?`<div class="lgd" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span class="dot" style="background:var(--fg3);opacity:.45"></span><span class="t2">如果部署 Donchian 多週期集成</span><span class="m xs t2">${f(pend)}</span><span class="m xs r t2">+${f(pend/bud*100,0)}%</span></div>`:''}</div></div>
+    <div class="xs t3" style="margin-top:${wide?16:12}px">額度 =權益 ${f(A.eq)} × 單一幣種上限 ${f(A.levMax,2)} 倍 = ${f(bud)} USDT</div></div>`}
+function mLoss(){const A=acct(),room=A.eq-A.soft$;
+  CH.loss=(w,h)=>{const lo=A.hard$-90,hi=Math.max(A.eq,A.day0)+60,x=v=>(v-lo)/(hi-lo)*w,y=28;
+    return `<svg width="${w}" height="${h}"><rect x="0" y="${y}" width="${w}" height="8" rx="4" fill="var(--raise2)"/><rect x="0" y="${y}" width="${x(A.hard$)}" height="8" rx="4" fill="var(--down)" opacity=".55"/>
+      <rect x="${x(Math.min(A.day0,A.eq))}" y="${y}" width="${Math.max(2,Math.abs(x(A.eq)-x(A.day0)))}" height="8" fill="var(--${A.eq>=A.day0?'up':'down'})"/>
+      ${[[A.hard$,'−10%','平倉並鎖住','start'],[A.soft$,'−5%','停止加倉','middle'],[A.day0,'今天起點','','end']].map(([v,a,b,an])=>`<line x1="${x(v)}" x2="${x(v)}" y1="${y-6}" y2="${y+14}" stroke="var(--fg2)"/><text x="${x(v)+(an==='start'?-1:an==='end'?1:0)}" y="${y+30}" text-anchor="${an}" class="ax" style="fill:var(--fg2)">${a}</text><text x="${x(v)+(an==='start'?-1:an==='end'?1:0)}" y="${y+46}" text-anchor="${an}" class="ax">${b||f(v)}</text>`).join('')}
+      <circle cx="${x(A.eq)}" cy="${y+4}" r="6" fill="var(--acc)" stroke="var(--card)" stroke-width="2"/><text x="${Math.min(w,x(A.eq)+8)}" y="${y-12}" text-anchor="end" class="ax" style="fill:var(--acc-ink)">現在 ${f(A.eq)}</text></svg>`};
+  return `<div class="card"><div class="ct"><h2>今天離停損線多遠</h2></div><div class="k">還能再虧這麼多，才會停止加倉</div><div class="v">${f(room)} <span class="s t3" style="font-weight:400">USDT</span></div>
+    <div data-c="loss" style="height:84px;margin-top:12px"></div><div class="xs t3" style="margin-top:8px">兩條線都從今天 00:00 的權益 ${f(A.day0)} 算起。碰到就鎖住，要你手動解除</div></div>`}
+function mTodo(){const l=DB.todo;return `<div class="card"><div class="ct"><h2>需要你決定</h2><span class="m xs t3">${l.length}</span><div class="sp">${l.length>1?by('one'):''}</div></div>
+  ${l.map((t,i)=>`<div class="todo ${i===0&&l.length>1?'first':''}"><div><div class="xs ${i===0&&l.length>1?'acc':'t3'}">${i===0&&l.length>1?'Agent 建議先做這件':t.lab}</div><div style="font-weight:500">${t.t}</div><div class="s t2">${t.s}</div></div>
+    <button class="btn ${i===0?'pri':''}" ${t.k==='deploy'?`data-act="deploy-open" data-id="${t.id}"`:t.k==='warn'?`data-act="bot" data-id="${t.id}"`:`data-act="sel" data-id="${t.id}"`}>${t.a}</button></div>`).join('')||'<div class="t2">沒有要你決定的事，今天不用做任何事</div>'}
+  ${l.length?`<div class="xs t3" style="margin-top:12px;display:flex;gap:8px;align-items:center">不急。今晚 21:00 會再提醒你一次 ${by('late')}</div>`:''}</div>`}
+function mBots(){const B=bots();return `<div class="card"><div class="ct"><h2>Bot 現在在做什麼</h2><span class="m xs t3">${B.length}</span><div class="sp"><button class="btn quiet" data-go="exec">看執行 ${ic('chev')}</button></div></div>
+  <table><thead><tr><th>Bot</th><th>現在</th><th class="r">今天</th><th class="r">累計</th><th class="r">和回測差</th></tr></thead><tbody>
+  ${B.map(b=>{const s=DB.S(b.id);return `<tr class="row" data-act="bot" data-id="${b.id}"><td class="nw"><div style="display:flex;gap:8px;align-items:center"><span class="dot" style="background:${BC[b.id]}"></span><span style="font-weight:500">${s.name}</span></div><div class="xs t3" style="padding-left:16px">${s.sym} · ${s.tf} · 第 ${b.days} 天</div></td>
+    <td class="t2">${b.stopped?'<span class="down">已停止</span>，'+(b.side?'部位保留中':'沒有部位'):waitT(b)}</td><td class="r m ${cl(b.today)}">${sg(b.today)}</td><td class="r m ${cl(b.total)}">${sg(b.total)}</td><td class="r m nw ${Math.abs(b.drift)>P.drift?'acc':'t2'}">${b.fresh?'—':sg(b.drift)+'%'}</td></tr>`}).join('')}</tbody></table></div>`}
+function mEquity(){const A=acct();CH.eq=(w,h)=>C.line({w,h,series:[{d:DB.eq,c:'var(--fg)',fill:.05,name:'權益',dot:'var(--acc)'}],base:10000,yfmt:v=>f(v,0),xl:[[0,'10/24 開始'],[60,'11/04'],[119,'現在']]});
+  return `<div class="card"><div class="ct"><h2>權益走勢</h2><div class="sp xs t3">模擬盤 ${A.days} 天 · 最深回落 ${f(EQDD.v)}%（${EQDD.date}）· 虛線是起始本金</div></div><div data-c="eq" style="height:280px"></div></div>`}
+function mPipeline(){return `<div class="card"><div class="ct"><h2>想法走到哪</h2><div class="sp"><button class="btn quiet" data-go="strategies">看策略 ${ic('chev')}</button></div></div>
+  ${DB.stages.map(([k,n])=>{const l=DB.strats.filter(s=>s.stage===k);return `<div class="pl"><span class="${l.length?'':'t3'}">${n}</span><span class="m ${l.length?'':'t3'}">${l.length}</span><span class="s t2">${l.map(s=>s.name).join('、')||'還沒有。最快的還要 7 天'}</span></div>`}).join('')}</div>`}
+function mEvents(){return `<div class="card"><div class="ct"><h2>最近發生的事</h2></div>${DB.events.slice(0,6).map(e=>`<div class="ev"><span class="m xs t3">${e[0]}</span><span class="xs t3">${e[1]}</span><span>${e[2]}</span></div>`).join('')}</div>`}
+function mFills(){return `<div class="card"><div class="ct"><h2>逐筆成交</h2></div><table><thead><tr><th>時間</th><th>策略</th><th>動作</th><th class="r">成交價</th><th class="r">這筆損益</th></tr></thead><tbody>${DB.fills.slice(0,5).map(x=>`<tr><td class="m t3">${x[0]}</td><td>${DB.S(x[1]).name}</td><td>${x[2]} ${x[4]} 張 ${x[3]}</td><td class="r m">${f(x[5],1)}</td><td class="r m ${x[8][0]==='+'?'up':x[8]?'down':'t3'}">${x[8]||'持有中'}</td></tr>`).join('')}</tbody></table></div>`}
+const MOD={exposure:mExposure,loss:mLoss,todo:mTodo,bots:mBots,equity:mEquity,pipeline:mPipeline,events:mEvents,fills:mFills};
+function vOverview(){const A=acct(),B=bots(),k=ST.kill,run=B.filter(b=>!b.stopped).length;
+  const colS=P.mods.filter(m=>m.on&&m.col==='s').map(m=>MOD[m.id]()).join(''),colM=P.mods.filter(m=>m.on&&m.col==='m').map(m=>MOD[m.id]()).join(''),off=P.mods.filter(m=>!m.on);
+  return `<div class="hero"><div><div class="s t3">你上次離開是昨晚 23:10，到現在 7 小時 37 分</div>
+    <h1 class="hl">${k?'<span class="down">已緊急停止</span>，鎖定中':`現在安全，今天${A.today>=0?'賺':'賠'} <span class="${cl(A.today)} num">${sg(A.today)}</span> USDT`}</h1>
+    <div class="facts"><span><b>1</b> 筆成交</span><span><b>0</b> 次碰到風控線</span><span>Agent 在跑 <b>1</b> 個研究</span><span><b>2</b> 件事留到晨報</span>${by('quiet')}</div></div>
+    <div class="stats"><div><div class="k">權益</div><div class="v">${f(A.eq)}</div><div class="xs t2"><span class="up">${sg((A.eq-A.start)/A.start*100)}%</span> 比起始本金</div></div>
+      <div><div class="k">今天</div><div class="v ${cl(A.today)}">${sg(A.today)}</div><div class="xs t2"><span class="${cl(A.today)}">${sg(A.today/A.day0*100)}%</span> 比 00:00</div></div>
+      <div><div class="k">還沒實現</div><div class="v ${cl(A.unreal)}">${sg(A.unreal)}</div><div class="xs t2">${B.filter(b=>b.side).length} 個部位 · ${run} 個 Bot</div></div></div></div>
+  <div class="col2" style="grid-template-columns:${P.riskFirst?'380px minmax(0,1fr)':'minmax(0,1fr) 380px'}"><div class="g" style="order:${P.riskFirst?0:1}">${colS}</div><div class="g">${colM}</div></div>
+  <div class="xs t3" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">這一頁照你的習慣排 ${P.riskFirst?by('order'):''}${off.length?`<span>·　已關掉：${off.map(m=>m.n).join('、')}</span>${by('hide','調整')}`:''}</div>`}
+
+/* ============ 策略 ============ */
+function vStrategies(){const s=DB.S(ST.sel)||DB.strats[0],st=DB.stages.findIndex(x=>x[0]===s.stage),b=DB.bots.find(x=>x.id===s.id),fail=s.g.includes('f');
+  const card=x=>{const tg=[];if(x.id==='vol')tg.push(by('small'));if(x.id==='dcm')tg.push(by('tf15'));if(x.id==='tsmom')tg.push(by('dd15','半倉'));
+    return `<div class="kc ${x.id===s.id?'on':''}" role="button" tabindex="0" data-act="sel" data-id="${x.id}"><div style="font-weight:500">${x.name}</div><div class="xs t3">${x.sym} · ${x.tf} · ${x.by==='Agent'?'Agent 提的':'你提的'}</div>
+      ${x.stage==='idea'?`<div class="s t2" style="margin-top:8px">${x.desc}</div>`:`${gbar(x)}<div class="xs t2" style="display:flex;flex-wrap:wrap;gap:0 12px"><span class="nw">過了 ${gcount(x)}／6 關</span>${x.ret!=null?`<span class="nw">年化 <span class="m ${cl(x.ret)}">${sg(x.ret,1)}%</span></span>`:''}</div>`}
+      <div class="xs ${x.g.includes('f')?'down':x.g.includes('a')?'acc':'t3'}" style="margin-top:8px">${x.note}</div>${tg.length?`<div style="margin-top:8px">${tg.join(' ')}</div>`:''}</div>`};
+  const nx={idea:['交給 Agent 研究，它會先跑扣掉成本的回測，過了第一關再來問你',`<button class="btn pri lg" data-act="to-research" data-id="${s.id}">交給 Agent 研究</button><button class="btn lg" data-act="drop-open" data-id="${s.id}">不做了</button>`],
+    research:fail?['第一關沒過，問題在訊號本身。Agent 建議收掉這個想法',`<button class="btn pri lg" data-act="drop-open" data-id="${s.id}">收掉這個想法</button><button class="btn lg" data-act="rs" data-id="${s.id}">看研究報告</button>`]:['Agent 正在跑參數優化（62%）。你不用做任何事，今晚 21:00 後給你結果',`<button class="btn lg" data-act="rs" data-id="${s.id}">看研究報告</button>`],
+    validated:['前四關都過了。部署到模擬盤後，開始跑第五關的 30 天',`<button class="btn pri lg" data-act="deploy-open" data-id="${s.id}">部署到模擬盤</button><button class="btn lg" data-act="rs" data-id="${s.id}">先看研究報告</button>`],
+    demo:[b&&b.fresh?'剛部署。等第一根 K 線收盤後開始計算天數':`還要在模擬盤跑 ${30-gateDays(s)} 天。跑滿後由你決定要不要上實盤`,`<button class="btn pri lg" data-act="bot" data-id="${s.id}">看執行狀況</button><button class="btn lg" data-act="rs" data-id="${s.id}">看研究報告</button>`]}[s.stage];
+  return `<div style="display:flex;align-items:center;gap:16px"><div class="s t2" style="margin-right:auto">每個想法從左走到右。要上實盤，得過六關。最亮的那一格是現在走到的地方</div><span class="xs t3">這週 Agent 提了 1 個新想法</span>${by('week2')}<button class="btn" data-act="idea-open">${ic('plus')}新想法</button></div>
+  <div class="kan">${DB.stages.map(([k,n,sub])=>{const l=DB.strats.filter(x=>x.stage===k);return `<div class="kcol"><div class="kh">${n}<span>${l.length}</span></div><div class="ks">${sub}</div>${l.map(card).join('')||`<div class="empty">還沒有策略走到這裡<br>最快的是 Donchian 通道突破，還要 7 天</div>`}</div>`}).join('')}</div>
+  <div class="card" id="detail"><div class="col2" style="grid-template-columns:minmax(0,1fr) 344px;gap:32px">
+    <div><div class="xs t3">${s.sym}-USDT 永續 · ${s.tf} · ${s.by==='Agent'?'Agent 提的':'你提的'} · 現在在「${DB.stages[st][1]}」</div><h2 style="font-size:20px;line-height:28px;font-weight:500;margin:4px 0">${s.name}</h2><div class="t2" style="margin-bottom:12px">${s.desc}</div>
+      ${DB.gates.map((g,i)=>`<div class="gate">${gm(s.g[i])}<div><div style="font-weight:500">第 ${i+1} 關　${g[0]}</div><div class="s t3">${g[1]}</div></div><div class="s r nw ${s.g[i]==='f'?'down':s.g[i]==='a'?'acc':s.g[i]==='r'?'':s.g[i]==='w'?'t3':'t2'}">${gateNote(s,i)}</div></div>`).join('')}</div>
+    <div class="g" style="gap:16px"><div class="say"><div class="k">下一步</div><div style="margin:4px 0 16px">${nx[0]}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${nx[1]}</div></div>
+      <div><div class="k" style="margin-bottom:4px">和你的規矩對一下</div>${ruleCheck(s).map(([c,n,t])=>`<div class="chk">${c==='p'?ic('check','t2'):c==='f'?ic('x','down'):c==='a'?ic('warn','acc'):ic('minus','t3')}<span><span class="t3">${n}　</span>${t}</span></div>`).join('')}</div></div>
+  </div></div>`}
+
+/* ============ 研究 ============ */
+function verdict(s){const b=DB.bots.find(x=>x.id===s.id);
+  if(s.g.includes('f'))return {k:'f',h:'不值得繼續',d:`扣掉手續費和滑價後，這一年是虧的（年化 ${sg(s.ret,1)}%）。問題在訊號本身，15 分鐘的週期又讓成本特別重`,a:`<button class="btn lg" data-act="drop-open" data-id="${s.id}">收掉這個想法</button>`};
+  if(s.stage==='research')return {k:'r',h:'還在研究，先不用決定',d:'第一關過了，Agent 正在跑參數優化（62%）。今晚 21:00 後給你結果',a:''};
+  if(s.stage==='validated')return {k:'p',h:'值得上模擬盤',d:`前四關都過了。最深跌 ${f(-s.dd,1)}%，在你能接受的 ${P.dd}% 以內。下一步是部署到模擬盤跑 30 天，還不到放真錢的時候`,a:`<button class="btn pri lg" data-act="deploy-open" data-id="${s.id}">部署到模擬盤</button>`};
+  const ex=Math.abs(s.dd)>P.dd?`最深跌過 ${f(-s.dd,1)}%，超過你的上限 ${P.dd}%，所以現在只用一半張數。`:b&&Math.abs(b.drift)>P.drift?`模擬盤和回測差了 ${sg(b.drift)}%，過了你的提醒線。`:`最深跌 ${f(-s.dd,1)}%，在你能接受的 ${P.dd}% 以內。`;
+  return {k:Math.abs(s.dd)>P.dd||(b&&Math.abs(b.drift)>P.drift)?'a':'r',h:'繼續跑模擬盤，還不能放真錢',d:`${ex}統計上還不能完全排除運氣，要靠模擬盤 30 天補證據，現在是第 ${b?b.days:0} 天`,a:`<button class="btn lg" data-act="bot" data-id="${s.id}">看執行狀況</button>`}}
+const rsTabs=s=>`<div class="seg" style="justify-self:start">${DB.strats.filter(x=>x.stage!=='idea').map(x=>`<button data-act="rs" data-id="${x.id}" class="${x.id===s.id?'on':''}">${esc(x.name)}</button>`).join('')}</div>`;
+/* 剛交給 Agent、還沒有回測結果的想法：不畫圖表、不顯示數字 */
+const rsEmpty=s=>rsTabs(s)+`
+  <div class="card" style="padding:32px"><div class="xs t3">研究報告 · ${s.sym}-USDT 永續 · ${s.tf} · ${s.by==='Agent'?'Agent 提的':'你提的'}</div>
+    <h1 style="font-size:28px;line-height:36px;font-weight:500;margin:4px 0">${esc(s.name.endsWith('…')?s.desc:s.name)}</h1>${s.name.endsWith('…')||s.name===s.desc?'':`<div class="t2">${esc(s.desc)}</div>`}
+    <div class="verdict" style="margin:24px 0 16px"><div style="display:grid;grid-template-columns:20px minmax(0,1fr);gap:12px">${gm('r')}<div><h3>還沒有結果，先不用決定</h3><div class="t2" style="margin-top:4px;max-width:720px">Agent 剛開始研究，會先跑扣掉成本的回測。第一關過了才會繼續，沒過就直接告訴你</div></div></div><div>${by('late')}</div></div>
+    <div class="k" style="margin-bottom:4px">動工前先和你的規矩對過</div>${ruleCheck(s).map(([c,n,t])=>`<div class="chk">${c==='p'?ic('check','t2'):c==='f'?ic('x','down'):c==='a'?ic('warn','acc'):ic('minus','t3')}<span><span class="t3">${n}　</span>${t}</span></div>`).join('')}</div>`;
+function vResearch(){const s=DB.S(ST.rs)||DB.S('don4h');if(s.ret==null)return rsEmpty(s);const R=DB.bt(s),v=verdict(s),cost=DB.costOf(s),mx=Math.max(...cost.map(c=>Math.abs(c[1]))),wf=DB.wf[s.id],n=R.eq.length,eat=-(cost[1][1]+cost[2][1]+cost[3][1])/Math.abs(cost[0][1])*100;
+  const yl=[];for(let y=parseInt(R.from);y<=2026;y++){const i=Math.round((new Date(y,0,1)-new Date(parseInt(R.from),+R.from.slice(5)-1,1))/(NOW-new Date(parseInt(R.from),+R.from.slice(5)-1,1))*(n-1));if(i>=0&&i<n-8)yl.push([Math.max(0,i),y])}yl.push([n-1,'現在']);
+  CH.rEq=(w,h)=>C.line({w,h,series:[{d:R.bh,c:'var(--fg3)',w:1.2,dash:'4 4',name:'買了放著'},{d:R.eq,c:'var(--acc)',w:2,name:s.name,dot:'var(--acc)'}],base:100,yfmt:v=>f(v,0),xl:[],pad:[12,8,8,52]});
+  CH.rDd=(w,h)=>C.line({w,h,series:[{d:ddOf(R.bh),c:'var(--fg3)',w:1,fill:.1,fb:0,name:'買了放著的跌幅'},{d:ddOf(R.eq),c:'var(--down)',w:1.2,fill:.25,fb:0,name:'策略的跌幅'}],grid:2,max:0,yfmt:v=>f(v,0)+'%',xl:yl,pad:[4,8,24,52]});
+  if(wf)CH.rWf=(w,h)=>C.bars({w,h,d:wf,labels:wf.map((_,i)=>i+1)});
+  const Q={
+    dd:['最慘會虧多少',Math.abs(s.dd)>P.dd?`超過你能接受的 ${P.dd}%。買了放著同期最深跌 ${f(-R.bhDD,0)}%`:`在你能接受的 ${P.dd}% 以內。買了放著同期最深跌 ${f(-R.bhDD,0)}%`,f(s.dd,1)+'%',Math.abs(s.dd)>P.dd?'a':'p'],
+    luck:['是不是靠運氣',s.pbo==null?'還沒檢查，要先過第二關':`換一段資料就失靈的機率 ${f(s.pbo*100,0)}%，低於 50% 算過。${T('統計把握','DSR')} ${f(s.dsr*100,0)}%，要到 95% 才算確定`,s.pbo==null?'—':f(s.pbo*100,0)+'%',s.pbo==null?'w':s.pbo<.5?'p':'f'],
+    net:['扣掉成本還賺嗎',s.ret>0?`每賺 100 元，成本拿走 ${f(eat,0)} 元。${s.n} 筆成交`:`價格上有賺，但成本是它的 ${f(eat/100,1)} 倍`,sg(s.ret,1)+'%',s.ret>0?'p':'f'],
+    bh:['比買了放著好嗎',R.tot>=R.bhTot||R.tot<0?`${f(s.yrs,0)} 年總報酬 ${sg(R.tot,0)}%，買了放著 ${sg(R.bhTot,0)}%`:`${f(s.yrs,0)} 年總報酬 ${sg(R.tot,0)}%，輸給買了放著的 ${sg(R.bhTot,0)}%，但最深只跌 ${f(-s.dd,0)}%，買了放著跌過 ${f(-R.bhDD,0)}%`,sg(R.tot,0)+'%',R.tot<0?'f':'p']};
+  const years=[...new Set(R.mo.map(x=>x.y))];
+  return `${rsTabs(s)}
+  <div class="card" style="padding:32px"><div class="xs t3">研究報告 · ${s.sym}-USDT 永續 · ${s.tf} · ${R.from} 到 2026/11 · 最近一次由${s.by==='Agent'?' Agent ':'你'}執行</div>
+    <h1 style="font-size:28px;line-height:36px;font-weight:500;margin:4px 0">${s.name}</h1><div class="t2">${s.desc}</div>
+    <div class="verdict" style="margin:24px 0 16px"><div style="display:grid;grid-template-columns:20px minmax(0,1fr);gap:12px">${gm(v.k)}<div><h3>${v.h}</h3><div class="t2" style="margin-top:4px;max-width:720px">${v.d}</div></div></div><div>${v.a}</div></div>
+    <div class="gs">${DB.gates.map((g,i)=>`<div><div class="xs t3">第 ${i+1} 關</div><div class="s" style="font-weight:500;margin:4px 0;min-height:40px">${g[0]}</div><div class="xs ${s.g[i]==='f'?'down':s.g[i]==='a'?'acc':s.g[i]==='r'?'':s.g[i]==='w'?'t3':'t2'}" style="display:flex;gap:4px;align-items:center">${s.g[i]==='p'?ic('check'):''}${DB.gw[s.g[i]]}</div></div>`).join('')}</div>
+    <div class="ct" style="margin:32px 0 4px"><h2>照你的順序看</h2>${by('mord')}${P.terms==='plain'?by('plain'):''}</div>
+    ${P.metrics.map((k,i)=>`<div class="qa"><span class="m xs t3">${i+1}</span><span style="font-weight:500">${Q[k][0]}</span><span class="t2 s">${Q[k][1]}</span><span class="fig ${Q[k][3]==='f'?'down':Q[k][3]==='a'?'acc':''}">${Q[k][2]}</span></div>`).join('')}
+    <div class="s t3" style="display:flex;gap:24px;margin:32px 0 8px;align-items:center;flex-wrap:wrap"><span style="display:flex;gap:8px;align-items:center"><i style="width:16px;height:2px;background:var(--acc);display:block"></i>這個策略，已扣全部成本</span><span style="display:flex;gap:8px;align-items:center"><i style="width:16px;border-top:1px dashed var(--fg3);display:block"></i>什麼都不做，買了放著</span><span>起點 = 100，下半部是從高點跌了多少</span></div>
+    <div data-c="rEq" style="height:280px"></div><div data-c="rDd" style="height:112px"></div></div>
+  <div class="col2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,.8fr)">
+    <div class="card"><div class="ct"><h2>賺的錢被什麼吃掉</h2></div>${cost.map(([nm,val],i)=>`<div class="cost" style="${i===4?'border-top:1px solid var(--line);margin-top:8px;padding-top:8px':''}"><span class="${i===4?'':'t2'}">${nm}</span><div class="b"><i style="width:${Math.abs(val)/mx*100}%;${i===4?'background:var(--acc)':val<0?'background:var(--down)':''}"></i></div><span class="m xs r ${i===4?cl(val):''}">${sg(val,1)}</span></div>`).join('')}<div class="xs t3" style="margin-top:12px">平均每年，本金 10,000 USDT</div></div>
+    <div class="card"><div class="ct"><h2>換一段沒看過的資料</h2></div>${wf?`<div data-c="rWf" style="height:148px"></div><div class="xs t3" style="margin-top:12px">切成 ${wf.length} 段，${wf.filter(x=>x>0).length} 段賺、${wf.filter(x=>x<=0).length} 段虧。橫軸是第幾段，數字是那一段的報酬 %</div>`:`<div class="empty" style="padding:48px 12px">${s.g[0]==='f'?'第一關沒過，不用再跑這一關':'還沒跑到這一關'}</div>`}</div>
+    <div class="card"><div class="ct"><h2>其他數字</h2></div><div class="rw"><span class="t2">每年表現</span><span class="m xs r">${R.ys.map(([y,val])=>`<span class="${cl(val)}" title="${y} 年">${sg(val,0)}</span>`).join(' ')}</span></div><div class="rw"><span class="t2">成交筆數</span><span class="m xs">${s.n}</span></div><div class="rw"><span class="t2">賺錢的比例</span><span class="m xs">${30+s.seed%17}.4%</span></div><div class="rw"><span class="t2">${T('每承擔一分波動賺多少','Sharpe')}</span><span class="m xs">${f(s.sh)}</span></div><div class="rw"><span class="t2">試過的參數組數</span><span class="m xs">${s.stage==='research'?48:21}</span></div></div></div>
+  <div class="card"><div class="ct"><h2>每個月的報酬 %</h2><div class="sp xs t3">顏色越深，賺或賠越多。數字和上面的曲線是同一份資料</div></div>
+    <div class="heat"><span></span>${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<span class="hm">${m} 月</span>`).join('')}${years.map(y=>`<span class="hy">${y}</span>`+[0,1,2,3,4,5,6,7,8,9,10,11].map(m=>{const c=R.mo.find(x=>x.y===y&&x.m===m);return c?`<span class="hc" style="background:color-mix(in srgb,var(--${c.v>=0?'up':'down'}) ${Math.min(70,6+Math.abs(c.v)*9)}%,transparent)">${(c.v<0?'−':'')+f(Math.abs(c.v),1)}</span>`:'<span></span>'}).join('')).join('')}</div></div>`}
+
+/* ============ 執行 ============ */
+function vExec(){const B=bots(),b=B.find(x=>x.id===ST.bot)||B[0],s=DB.S(b.id),fl=DB.fills.filter(x=>x[1]===b.id),gap=DB.botGap(b),over=Math.abs(b.drift)>P.drift;
+  let body;
+  if(b.fresh){body=`<div class="card"><div class="empty" style="padding:64px 12px">剛部署，還沒有部位和成交<br>等 ${b.nextAt} 這根 K 線收盤後做第一次決定</div></div>`}
+  else{const kc=KC[b.id],k=kOf(b.id),w=waitOf(b),lines=[];if(b.side&&w.lv)lines.push({v:w.lv,t:w.lt,c:'var(--down)',from:86});if(b.side)lines.push({v:b.avg,t:'你的均價',c:'var(--fg2)',from:b.id==='tsmom'?96:80});
+    const at=i=>md(ago((109-i)*kc.step)),xl=[[0,at(0)],[36,at(36)],[73,at(73)],[109,'最後一根收盤']];
+    CH.kc=(wd,h)=>C.candles({w:wd,h,k,marks:kc.marks,lines,xl});
+    const live=DB.botEq(b),bt=DB.botBt(b);CH.cmp=(wd,h)=>C.line({w:wd,h,series:[{d:bt,c:'var(--fg3)',w:1.2,dash:'4 4',name:'回測'},{d:live,c:BC[b.id]==='var(--s3)'?'var(--fg)':BC[b.id],name:'模擬盤',dot:'var(--acc)'}],base:0,yfmt:v=>sg(v,0),xl:[[0,'部署'],[live.length-1,'現在']],pad:[8,8,24,44]});
+    body=`<div class="card"><div class="say" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;margin-bottom:16px"><div><div class="k">現在</div><div style="font-size:16px;line-height:24px">${b.stopped?`已停止，不會再做任何決定。${b.side?'部位還留著，沒有 Bot 在看':'沒有部位'}`:waitT(b)}</div></div><div class="r"><div class="k">下一次決定</div><div class="m">${b.stopped?'—':b.nextAt+'　還有 '+b.next}</div></div></div>
+        <div data-c="kc" style="height:340px"></div><div class="xs t3" style="margin-top:8px">三角形是這個 Bot 的成交。每根 K 線是 ${s.tf==='4H'?'4 小時':s.tf==='1D'?'1 天':'1 小時'}，只在收盤後做決定</div></div>
+      <div class="card"><div class="ct"><h2>和回測一樣嗎</h2><div class="sp">${by('drift')}</div></div>
+        <div class="col2" style="grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:32px;align-items:center"><div>
+          <div style="font-size:20px;line-height:28px;font-weight:500">${over?'<span class="acc">做的事一樣，賺的錢有落差</span>':'一樣'}</div>
+          <div class="t2" style="margin:4px 0 16px">最近 ${fl.length} 筆成交都和回測在同一根 K 線、同一個方向。${over?'差距主要來自 3 筆成交的滑價比回測大':'差距來自滑價和手續費'}</div>
+          <div class="rw"><span class="t2">模擬盤累計</span><span class="m ${cl(b.total)}">${sg(b.total)}</span></div><div class="rw"><span class="t2">同期回測</span><span class="m ${cl(b.total-gap)}">${sg(b.total-gap)}</span></div>
+          <div class="rw"><span class="t2">差多少</span><span class="m ${over?'acc':''}">${sg(gap)}　${sg(b.drift)}%</span></div><div class="rw"><span class="t2">你的提醒線 · 系統門檻</span><span class="m">${f(P.drift,1)}% · 1.0%</span></div></div>
+          <div><div data-c="cmp" style="height:200px"></div></div></div></div>
+      <div class="card"><div class="ct"><h2>成交紀錄</h2><div class="sp xs t3">最近 ${fl.length} 筆，共 ${b.cnt} 筆</div></div><table><thead><tr><th>時間</th><th>動作</th><th class="r">張數</th><th class="r">回測的價格</th><th class="r">實際成交價</th><th class="r">差</th><th class="r">手續費</th><th class="r">這筆損益</th></tr></thead><tbody>
+        ${fl.map(x=>`<tr><td class="m t3">${x[0]}</td><td>${x[2]}</td><td class="r m">${x[4]}</td><td class="r m t2">${f(x[5]-x[6],1)}</td><td class="r m">${f(x[5],1)}</td><td class="r m t2">${sg(x[6],1)}</td><td class="r m t2">${f(x[7])}</td><td class="r m ${x[8][0]==='+'?'up':x[8]?'down':'t3'}">${x[8]||'持有中'}</td></tr>`).join('')}</tbody></table></div>`}
+  return `<div class="col2" style="grid-template-columns:280px minmax(0,1fr)">
+    <div class="g" style="gap:8px">${B.map(x=>{const q=DB.S(x.id);return `<div class="bl ${x.id===b.id?'on':''}" role="button" tabindex="0" data-act="bot" data-id="${x.id}"><div style="display:flex;gap:8px;align-items:center;font-weight:500"><span class="dot" style="background:${BC[x.id]}"></span>${q.name}</div><div class="xs t3" style="padding-left:16px">${q.sym} · ${q.tf} · ${x.stopped?'已停止':x.pos}</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-left:16px"><span class="xs t3">累計</span><span class="m ${cl(x.total)}">${sg(x.total)}</span></div><div style="display:flex;justify-content:space-between;align-items:baseline;padding-left:16px"><span class="xs t3">和回測差</span><span class="m xs ${Math.abs(x.drift)>P.drift?'acc':'t2'}">${x.fresh?'—':sg(x.drift)+'%'}</span></div></div>`}).join('')}
+      <button class="btn quiet" data-go="strategies" style="justify-content:flex-start">${ic('plus')}部署另一個策略</button></div>
+    <div class="g"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h1 style="font-size:20px;line-height:28px;font-weight:500">${s.name}</h1><span class="s" style="display:flex;gap:8px;align-items:center"><span class="dot ${b.stopped?'d':'u'}"></span>${b.stopped?'已停止':'執行中'}</span><span class="s t3 nw">${b.inst.replace('-SWAP',' 永續')} · ${s.tf} · 模擬盤第 ${b.days} 天</span>
+      <span style="margin-left:auto;display:flex;gap:8px"><button class="btn" data-act="rs" data-id="${s.id}">研究報告</button>${b.stopped?`<button class="btn" data-act="start-bot" data-id="${b.id}" ${ST.kill?'disabled':''}>重新啟動</button>`:`<button class="btn red" data-act="stop-open" data-id="${b.id}">停止這個 Bot</button>`}</span></div>${body}</div></div>`}
+
+/* ============ 風控 ============ */
+function vRisk(){const A=acct(),k=ST.kill,B=bots(),pos=B.filter(b=>b.side).reduce((a,b)=>a+b.qty,0);
+  const hard=P.rules.filter(r=>r.hard);
+  return `<div class="hero" style="grid-template-columns:minmax(0,1fr)"><div><div class="s t3">帳戶層級，所有 Bot 共用</div><h1 class="hl">${k?'<span class="down">鎖定中</span>，要你手動解除才能再下單':'正常，離每一條線都還遠'}</h1>
+    <div class="facts"><span>系統的線 <b>6</b> 條</span><span>你另外定的界線 <b>${hard.filter(r=>r.on).length}</b> 條</span><span>碰到就鎖住，只有你能解除</span>${by('lines')}</div></div></div>
+  <div class="col2" style="grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)">
+    <div class="g">${mLoss()}${mExposure(true)}
+      <div class="card"><div class="ct"><h2>出事會怎樣</h2></div><table><thead><tr><th>情況</th><th>現在</th><th>系統會做什麼</th><th>怎麼恢復</th></tr></thead><tbody>
+        <tr><td>今天虧到 5%</td><td class="m nw">${sg(A.today/A.day0*100)}%</td><td class="t2">停止加倉，只能減倉</td><td class="t2">你手動解除</td></tr>
+        <tr><td>今天虧到 10%</td><td class="m nw">${sg(A.today/A.day0*100)}%</td><td class="t2">全部平倉並鎖住</td><td class="t2">你手動解除，隔天不會自己解開</td></tr>
+        <tr><td>單一幣種曝險超過 0.50 倍</td><td class="m nw">${f(A.lev,2)} 倍</td><td class="t2">擋下會超過的新單</td><td class="t2">部位變小後自動恢復</td></tr>
+        <tr><td>CatOS 的帳和 OKX 對不上</td><td class="nw">一致</td><td class="t2">停止加倉並通知你</td><td class="t2">對上後你手動解除</td></tr>
+        <tr><td>出現不認得的部位</td><td class="nw">沒有</td><td class="t2">停止加倉，不會自動處理</td><td class="t2">你處理後手動解除</td></tr>
+        <tr><td>下單後沒收到回報</td><td class="nw">沒有</td><td class="t2">不重送，先查清楚</td><td class="t2">查到結果後自動繼續</td></tr></tbody></table>
+        <div class="xs t3" style="margin-top:12px">上次核對 04:00:02，部位、餘額、掛單都一致</div></div></div>
+    <div class="g"><div class="card"><div class="ct"><h2>怎麼停</h2><div class="sp s" style="display:flex;gap:8px;align-items:center"><span class="dot ${k?'d':'u'}"></span>${k?'鎖定中':'待命'}</div></div>
+        <div class="way"><div><div style="font-weight:500">平倉並停止</div><div class="s t2">撤掉委託，用市價平掉 ${pos} 張部位，然後鎖住</div></div><button class="btn danger" data-act="kill-open" data-m="flat" ${k?'disabled':''}>${ic('power')}停</button></div>
+        <div class="way"><div><div style="font-weight:500">保留部位只停止</div><div class="s t2">撤掉委託，所有 Bot 不再做決定，部位留著，然後鎖住</div></div><button class="btn red" data-act="kill-open" data-m="keep" ${k?'disabled':''}>${ic('power')}停</button></div>
+        <div class="way"><div><div style="font-weight:500">只停一個 Bot</div><div class="s t2">其他 Bot 照常跑，不會鎖住</div></div><button class="btn" data-go="exec">去執行頁</button></div>
+        ${k?`<button class="btn pri lg" style="width:100%;margin-top:16px" data-act="unlock-open">${ic('lock')}解除鎖定</button>`:'<div class="xs t3" style="margin-top:12px">右上角的緊急停止在每一頁都按得到。按下去會先問你要哪一種</div>'}</div>
+      <div class="card"><div class="ct"><h2>你定的界線</h2><div class="sp"><button class="btn quiet" data-go="me-rules">去改 ${ic('chev')}</button></div></div>${hard.map(r=>`<div class="rw"><div><div class="${r.on?'':'t3'}">${r.t}</div><div class="xs t3">上次：${r.hit}</div></div><span class="xs ${r.on?'t2':'t3'} nw">${r.lock?'關不掉':r.on?'生效中':'已關掉'}</span></div>`).join('')}</div>
+      <div class="card"><div class="ct"><h2>以前鎖過的紀錄</h2></div>${DB.latches.map(l=>`<div class="rw" style="display:block"><div><span class="m xs t3">${l[0]}</span>　${l[1]}</div><div class="s t3">${l[2]}</div></div>`).join('')}</div></div></div>`}
+
+/* ============ 我的 CatOS：我的檔案 ============ */
+function vMe(){const A=acct();const opens=[0,0,0,0,0,0,2,14,6,1,0,0,3,2,0,0,0,1,2,4,5,19,17,3],mx=Math.max(...opens);
+  const seg=[[7,'勿擾','q'],[2,'可通知',''],[9,'上班中，只送緊急','w'],[3,'可通知',''],[2,'做決定','d'],[1,'','q']];
+  return `<div class="col2" style="grid-template-columns:360px minmax(0,1fr)">
+    <div class="g"><div class="idc"><svg class="cat" viewBox="0 0 24 24" aria-hidden="true">${CAT}</svg>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start"><div class="chip"></div><div class="xs" style="color:#a1a1a6">CatOS 擁有者</div></div>
+        <div><div style="font-size:28px;line-height:36px;font-weight:500">${esc(P.name)}</div><div class="s" style="color:#a1a1a6">穩健偏保守 · 4 小時線與日線 · BTC、ETH</div></div>
+        <div style="display:flex;justify-content:space-between" class="xs"><span class="m" style="color:#a1a1a6">OKX 模擬盤 尾號 4821</span><span class="m" style="color:#a1a1a6">自 2026/10/24</span></div></div>
+      <div class="card"><div class="ct"><h2>帳戶狀況</h2><div class="sp s" style="display:flex;gap:8px;align-items:center"><span class="dot u"></span>已連線</div></div>
+        <div class="rw"><span class="t2">權益</span><span class="m">${f(A.eq)}</span></div><div class="rw"><span class="t2">可用</span><span class="m">${f(A.avail)}</span></div><div class="rw"><span class="t2">模擬盤</span><span>第 ${A.days} 天，3 個 Bot</span></div><div class="rw"><span class="t2">實盤</span><span class="t3">還沒開。最快的策略還要 7 天</span></div></div>
+      <div class="card"><div class="ct"><h2>慣用的市場與週期</h2></div>
+        <div class="k" style="margin-bottom:8px">市場</div><div class="chips"><span class="chip2">BTC<span class="xs t3">6 個 · 可多可空</span></span><span class="chip2">ETH<span class="xs t3">1 個 · 可多可空</span></span><span class="chip2">SOL<span class="xs t3">1 個 · 只做多</span></span><span class="chip2 off">其他小幣做空</span></div>
+        <div class="k" style="margin:16px 0 8px">週期</div><div class="chips"><span class="chip2">日線<span class="xs t3">3 個</span></span><span class="chip2">4 小時<span class="xs t3">3 個</span></span><span class="chip2">1 小時<span class="xs t3">1 個</span></span><span class="chip2 off">15 分鐘以下</span></div>
+        <div class="xs t3" style="margin-top:12px">數字是你現有的 8 個想法。只做 OKX 的 USDT 永續合約，只用已收盤的 K 線做決定</div></div>
+      <div class="card"><div class="ct"><h2>Agent 對你的了解</h2></div><div class="rw"><span class="t2">記得的事</span><button class="btn quiet" data-go="me-memory">${P.mem.length} 件${P.ask.length?`，${P.ask.length} 件等你確認`:''} ${ic('chev')}</button></div><div class="rw"><span class="t2">你定的規矩</span><button class="btn quiet" data-go="me-rules">${P.rules.filter(r=>r.on).length} 條生效 ${ic('chev')}</button></div><div class="rw"><span class="t2">版面與提醒</span><button class="btn quiet" data-go="me-layout">${P.mods.filter(m=>m.on).length} 個區塊 ${ic('chev')}</button></div></div></div>
+    <div class="g">
+      <div class="card"><div class="ct"><h2>風險偏好</h2><div class="sp xs t3">從你定的數字算出來，改數字就會跟著動</div></div>
+        <div class="scale"><i style="left:34%"></i><b style="left:34%">穩健偏保守</b></div><div class="sl"><span>很保守</span><span>保守</span><span>穩健</span><span>積極</span><span>很積極</span></div>
+        <table style="margin-top:20px"><thead><tr><th>你的界線</th><th class="r">你定的</th><th class="r">過去 23 天實際</th><th class="r">用了多少</th></tr></thead><tbody>
+          <tr><td>每筆最多虧</td><td class="r m">${f(P.per,1)}%</td><td class="r m">0.09%</td><td class="r m t2">9%</td></tr>
+          <tr><td>能接受的最深回落</td><td class="r m">${P.dd}%</td><td class="r m">${f(-EQDD.v)}%</td><td class="r m t2">${f(-EQDD.v/P.dd*100,0)}%</td></tr>
+          <tr><td>單一幣種曝險</td><td class="r m">0.50 倍</td><td class="r m">0.31 倍</td><td class="r m t2">62%</td></tr>
+          <tr><td>一天最多虧（停止加倉 · 全平）</td><td class="r m">5% · 10%</td><td class="r m">0.84%</td><td class="r m t2">17%</td></tr></tbody></table>
+        <div class="say s" style="margin-top:16px"><span class="t3">Agent 的觀察　</span>你定的線很緊，實際用量更低。模擬盤跑滿 30 天前，不建議放寬任何一條</div></div>
+      <div class="card"><div class="ct"><h2>交易作息</h2><div class="sp xs t3">上排是你過去 23 天實際打開 CatOS 的時間</div></div>
+        <div class="hist">${opens.map((v,i)=>`<i class="${i===21||i===22?'pk':''}" style="height:${Math.max(2,v/mx*44)}px" title="${i}:00　${v} 次"></i>`).join('')}</div>
+        <div class="day" style="margin-top:4px">${seg.map(([h,t,c])=>`<span class="${c}" style="flex:${h} 1 0">${t}</span>`).join('')}</div>
+        <div style="position:relative;height:20px;margin-top:4px" class="m xs t3">${[[0,'00'],[7,'07'],[9,'09'],[18,'18'],[21,'21'],[23,'23']].map(([h,t])=>`<span style="position:absolute;left:${h/24*100}%">${t}</span>`).join('')}</div>
+        <div class="xs t3" style="margin-top:8px">現在 06:47，勿擾中。07:00 送晨報，要你決定的事 21:00 一起給你</div></div>
+      <div class="card"><div class="ct"><h2>你最近的決定</h2><div class="sp xs t3">報告出來到你決定，平均 1.4 天</div></div>
+        ${[['11/13','不做','DCM 突破後回踩','「太短的不做了，成本吃光」'],['11/02','部署','均值回歸 RSI','1 張起跳'],['11/01','部署','時間序列動能','回撤超過 15%，你同意用半倉'],['10/27','緊急停止','保留部位只停止','測試，35 分鐘後解除'],['10/24','部署','Donchian 通道突破','第一個上模擬盤的策略']].map(d=>`<div class="ev" style="grid-template-columns:48px 72px minmax(0,1fr)"><span class="m xs t3">${d[0]}</span><span class="xs t3">${d[1]}</span><span>${d[2]}<span class="t3">　${d[3]}</span></span></div>`).join('')}</div>
+    </div></div>`}
+
+/* ============ 我的 CatOS：Agent 記得的事 ============ */
+const PN={overview:'總覽',strategies:'策略',research:'研究',exec:'執行',risk:'風控','me-layout':'版面與提醒','me-rules':'我的規矩','me-memory':'Agent 記得的事',me:'我的檔案'};
+function vMemory(){const l=P.mem.filter(m=>ST.memf==='all'||m.src===ST.memf),ns=P.mem.filter(m=>m.src==='said').length;
+  return `<div class="hero" style="grid-template-columns:minmax(0,1fr) auto"><div><div class="s t3">Agent 每次做決定前都會讀這一頁。每一條都看得到依據，隨時能改、能刪</div><h1 class="hl">Agent 記得 ${P.mem.length} 件關於你的事${P.ask.length?`，${P.ask.length} 件等你確認`:''}</h1></div>
+    <div class="seg">${[['all','全部 '+P.mem.length],['said','你說過的 '+ns],['seen','它觀察到的 '+(P.mem.length-ns)]].map(([k,t])=>`<button data-act="memf" data-v="${k}" class="${ST.memf===k?'on':''}">${t}</button>`).join('')}</div></div>
+  ${P.ask.length?`<div class="card"><div class="ct"><h2>等你確認</h2><div class="sp xs t3">Agent 猜的，你沒說對之前不會照做</div></div>${P.ask.map(a=>`<div class="ask"><div><div style="font-weight:500">${a.t}</div><div class="s t2">依據：${a.ev}</div><div class="s" style="margin-top:4px">想這樣做：${a.sug}</div></div><div style="display:flex;gap:8px"><button class="btn pri" data-act="ask-ok" data-id="${a.id}">對，照做</button><button class="btn" data-act="ask-no" data-id="${a.id}">不對</button></div></div>`).join('')}</div>`:''}
+  <div class="card">${l.map(m=>`<div class="mem"><div><div class="xs t3" style="display:flex;gap:8px;align-items:center"><span class="tag">${m.src==='said'?'你說過的':'它觀察到的'}</span>上次用到：${m.last}</div><h3 style="margin-top:8px">${esc(m.t)}</h3><div class="quote">${esc(m.ev)}</div>
+      <div class="xs t3" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">用在${m.use.map(([p,t])=>`<button class="by" data-go="${p}">${PN[p]} · ${t}</button>`).join('')}</div></div>
+      <div style="display:flex;gap:4px"><button class="btn quiet ib" data-act="mem-edit" data-id="${m.id}" title="改這一條" aria-label="改這一條">${ic('pencil')}</button><button class="btn quiet ib" data-act="mem-del" data-id="${m.id}" title="刪掉這一條" aria-label="刪掉這一條">${ic('trash')}</button></div></div>`).join('')||'<div class="t2">這一類還沒有記錄</div>'}</div>
+  <div class="card"><div class="ct"><h2>已經忘掉的</h2><div class="sp xs t3">刪掉後，Agent 下次做決定就不會再參考</div></div>${P.gone.map(g=>`<div class="rw"><span class="t2" style="text-decoration:line-through">${esc(g.t)}</span><span class="xs t3 nw">${g.when} 刪掉　${g.why}</span></div>`).join('')}</div>`}
+
+/* ============ 我的 CatOS：我的規矩 ============ */
+function vRules(){const row=r=>`<div class="rule"><button class="sw ${r.on?'on':''}" data-act="rule-toggle" data-id="${r.id}" ${r.lock?'disabled':''} role="switch" aria-checked="${!!r.on}" aria-label="${esc(r.t)}"></button><div><div class="${r.on?'':'t3'}" style="font-weight:500">${esc(r.t)}</div><div class="xs t3">${r.d?esc(r.d)+'　·　':''}上次：${esc(r.hit)}</div></div>
+    ${r.lock?`<span class="xs t3" style="display:flex;gap:4px;align-items:center">${ic('lock')}關不掉</span>`:`<button class="btn quiet ib" data-act="rule-del" data-id="${r.id}" title="刪掉這一條" aria-label="刪掉這一條">${ic('trash')}</button>`}</div>`;
+  const d=ST.draft;
+  return `<div class="hero" style="grid-template-columns:minmax(0,1fr)"><div><div class="s t3">界線由系統擋下，Agent 繞不過去。做事方式是 Agent 會照做的習慣</div><h1 class="hl">${P.rules.filter(r=>r.on&&r.hard).length} 條界線、${P.rules.filter(r=>r.on&&!r.hard).length} 個做事方式生效中</h1></div></div>
+  <div class="card"><div class="ct"><h2>用一句話告訴 Agent</h2></div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><input class="inp" id="ri" placeholder="例如：連虧 3 筆就先停下來問我" value="${d?esc(d.raw):''}"><button class="btn pri lg" data-act="rule-parse">讓 Agent 讀一遍</button></div>
+    <div class="chips" style="margin-top:12px"><span class="xs t3" style="align-self:center">試試看</span>${EX.map((e,i)=>`<button class="btn" data-act="rule-ex" data-i="${i}">${e[0]}</button>`).join('')}</div>
+    ${d?`<div class="say" style="margin-top:16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center"><div><div class="xs t3">Agent 的理解　<span class="tag">${d.kind}</span></div><div style="margin:4px 0">${esc(d.mean)}</div><div class="s t2">${esc(d.eff)}</div></div><div style="display:flex;gap:8px"><button class="btn pri" data-act="rule-add">沒錯，加進去</button><button class="btn" data-act="rule-cancel">不是這個意思</button></div></div>`:''}</div>
+  <div class="col2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div class="card"><div class="ct"><h2>界線</h2><div class="sp xs t3">系統強制，下單前檢查</div></div>${P.rules.filter(r=>r.hard).map(row).join('')}</div>
+    <div class="card"><div class="ct"><h2>做事方式</h2><div class="sp xs t3">Agent 會照做</div></div>${P.rules.filter(r=>!r.hard).map(row).join('')}</div></div>
+  <div class="card"><div class="ct"><h2>Agent 可以自己做什麼</h2><div class="sp xs t3">鎖住的兩項屬於安全底線，只有你本人能做</div></div>
+    ${P.auto.map((a,i)=>`<div class="rw"><div><span>${a[0]}</span>${a[2]?`<span class="xs t3">　${a[2]}</span>`:''}</div><div class="seg">${['自己做','先問我','只有我能做'].map((t,j)=>`<button data-act="auto" data-i="${i}" data-j="${j}" class="${a[1]===j?'on':''}" ${a[3]?'disabled':''}>${t}</button>`).join('')}</div></div>`).join('')}</div>`}
+
+/* ============ 我的 CatOS：版面與提醒 ============ */
+function vLayout(){const MQ={dd:'最慘會虧多少',luck:'是不是靠運氣',net:'扣掉成本還賺嗎',bh:'比買了放著好嗎'};
+  const sg3=(act,cur,opts)=>`<div class="seg">${opts.map(([k,t])=>`<button data-act="${act}" data-v="${k}" class="${String(cur)===String(k)?'on':''}">${t}</button>`).join('')}</div>`;
+  const wcol=c=>`<div>${P.mods.filter(m=>m.on&&m.col===c).map(m=>`<span class="${c==='s'?'rk':''}">${m.n}</span>`).join('')}</div>`;
+  const A=acct();
+  return `<div class="col2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div class="g">
+      <div class="card"><div class="ct"><h2>外觀與用語</h2><div class="sp xs t3">改了馬上生效</div></div>
+        <div class="rw"><div>外觀<div class="xs t3">夜間是深色，日間是淺色</div></div>${sg3('set-theme',P.theme,[['night','夜間'],['day','日間']])}</div>
+        <div class="rw"><div>密度<div class="xs t3">緊密可以一頁看到更多</div></div>${sg3('set-density',P.density,[['cozy','寬鬆'],['compact','緊密']])}</div>
+        <div class="rw"><div>用語<div class="xs t3">白話會把 Sharpe、DSR 換成一句話</div></div>${sg3('set-terms',P.terms,[['plain','白話'],['pro','術語']])}</div></div>
+      <div class="card"><div class="ct"><h2>總覽要看什麼</h2><div class="sp xs t3">關掉的不會出現，順序就是由上到下</div></div>
+        <div class="rw"><div>先看什麼<div class="xs t3">決定哪一欄排在左邊</div></div>${sg3('set-first',P.riskFirst?1:0,[[1,'風險在前'],[0,'損益在前']])}</div>
+        ${P.mods.map((m,i)=>`<div class="ord ${m.on?'':'off'}"><span class="m xs t3">${i+1}</span><span class="nm">${m.n}<span class="xs t3">　${m.col==='s'?'風險欄':'損益欄'}</span></span><span style="display:flex;gap:4px"><button class="btn quiet ib" data-act="mod-up" data-id="${m.id}" ${i===0?'disabled':''} aria-label="往上移">${ic('up')}</button><button class="btn quiet ib" data-act="mod-down" data-id="${m.id}" ${i===P.mods.length-1?'disabled':''} aria-label="往下移">${ic('down')}</button></span><button class="sw ${m.on?'on':''}" data-act="mod-toggle" data-id="${m.id}" role="switch" aria-checked="${m.on}" aria-label="顯示${m.n}"></button></div>`).join('')}
+        <div class="k" style="margin:16px 0 8px">總覽會長這樣</div><div class="wire" style="grid-template-columns:${P.riskFirst?'1fr 1.8fr':'1.8fr 1fr'}">${P.riskFirst?wcol('s')+wcol('m'):wcol('m')+wcol('s')}</div></div>
+      <div class="card"><div class="ct"><h2>研究報告先看什麼</h2><div class="sp xs t3">第一項會決定結論先講哪件事</div></div>
+        ${P.metrics.map((k,i)=>`<div class="ord" style="grid-template-columns:20px minmax(0,1fr) auto"><span class="m xs t3">${i+1}</span><span>${MQ[k]}</span><span style="display:flex;gap:4px"><button class="btn quiet ib" data-act="met-up" data-v="${k}" ${i===0?'disabled':''} aria-label="往上移">${ic('up')}</button><button class="btn quiet ib" data-act="met-down" data-v="${k}" ${i===P.metrics.length-1?'disabled':''} aria-label="往下移">${ic('down')}</button></span></div>`).join('')}</div></div>
+    <div class="g">
+      <div class="card"><div class="ct"><h2>提醒</h2><div class="sp xs t3">每件事送到哪裡</div></div>
+        <div class="nt h"><span></span><span>畫面</span><span>手機</span><span>晨報</span></div>
+        ${P.ntf.map((n,i)=>`<div class="nt"><div>${n.n}${n.s?`<div class="xs t3">${n.s}</div>`:''}</div>${n.c.map((v,j)=>`<button class="sw ${v?'on':''}" data-act="ntf" data-i="${i}" data-j="${j}" ${n.lock?'disabled':''} role="switch" aria-checked="${!!v}" aria-label="${n.n}"></button>`).join('')}</div>`).join('')}</div>
+      <div class="card"><div class="ct"><h2>勿擾時段</h2><div class="sp"><button class="sw ${P.quiet?'on':''}" data-act="quiet-toggle" role="switch" aria-checked="${P.quiet}" aria-label="勿擾時段"></button></div></div>
+        <div class="rw"><span class="t2">每天</span><span class="m">23:00 到 07:00</span></div><div class="rw"><span class="t2">這段時間</span><span>只有碰到風控線才通知</span></div><div class="rw"><span class="t2">其他的事</span><span>留到 07:00 的晨報</span></div><div class="rw"><span class="t2">要你決定的事</span><span>21:00 一起給你</span></div>
+        <div class="xs t3" style="margin-top:12px">${P.quiet?'現在 06:47，勿擾中。夜裡留了 2 件事':'已關掉。任何時間都會照上面的設定通知你'}</div></div>
+      <div class="card"><div class="ct"><h2>今天 07:00 的晨報會長這樣</h2></div><div class="brief"><ol>
+        ${[P.riskFirst?['安全',`離停止加倉的線還有 ${f(A.eq-A.soft$)} USDT，曝險用了 62%`]:['損益',`昨天 ${sg(A.yday)}，今天到現在 ${sg(A.today)}`],P.riskFirst?['損益',`昨天 ${sg(A.yday)}，今天到現在 ${sg(A.today)}`]:['安全',`離停止加倉的線還有 ${f(A.eq-A.soft$)} USDT，曝險用了 62%`],['夜裡','04:00 Donchian 通道突破加碼 1 張。Agent 送出 1 個研究'],['等你','Donchian 多週期集成 可以上模擬盤了。不急，21:00 再提醒你']].map((x,i)=>`<li><span>${i+1}</span><span><span class="t3">${x[0]}　</span>${x[1]}</span></li>`).join('')}</ol></div>
+        <div class="xs t3" style="margin-top:12px">順序跟著「先看什麼」走，內容只放你打開晨報的那幾項</div></div></div></div>`}
+
+/* ============ 外框與互動 ============ */
+const NAV=[['交易',[['overview','總覽','home','現在安全嗎？賺還是賠？',vOverview],['strategies','策略','cols','我的想法各走到哪？',vStrategies],['research','研究','flask','這個想法值得上線嗎？',vResearch],['exec','執行','pulse','Bot 現在在做什麼？和回測一樣嗎？',vExec],['risk','風控','shield','出事會怎樣？怎麼停？',vRisk]]],
+  ['我的 CatOS',[['me','我的檔案','user','CatOS 眼中的我是誰？',vMe],['me-memory','Agent 記得的事','book','它記得我什麼？憑什麼？',vMemory],['me-rules','我的規矩','rules','Agent 能做什麼、不能做什麼？',vRules],['me-layout','版面與提醒','sliders','我要看什麼、什麼時候被打擾？',vLayout]]]];
+const PAGES={};NAV.forEach(g=>g[1].forEach(p=>PAGES[p[0]]={n:p[1],q:p[3],v:p[4]}));
+let PAGE;
+function render(){const R=document.documentElement;R.dataset.theme=P.theme;R.dataset.density=P.density;const k=ST.kill;
+  $('#nav').innerHTML=NAV.map(([g,it])=>`<div class="nl">${g}</div>`+it.map(([id,n,i])=>`<button class="nv ${id===PAGE?'on':''}" data-go="${id}" ${id===PAGE?'aria-current="page"':''}>${ic(i)}<span>${n}</span>${id==='overview'&&DB.todo.length?`<span class="q">${DB.todo.length}</span>`:id==='me-memory'&&P.ask.length?`<span class="q">${P.ask.length}</span>`:''}</button>`).join('')).join('');
+  $('#own').innerHTML=`<span class="av">${esc(P.name[0])}</span><span style="min-width:0"><span style="display:block;font-weight:500">${esc(P.name)}</span><span class="xs t3" style="display:block">穩健偏保守 · ${P.quiet?'勿擾到 07:00':'可通知'}</span></span>`;
+  $('#ttl').innerHTML=`<b>${PAGES[PAGE].n}</b><span>${PAGES[PAGE].q}</span>`;
+  $('#stat').innerHTML=`<span class="st"><span class="dot ${k?'d':'u'}"></span>${k?'已鎖定':'OKX 模擬盤已連線'}</span><span class="st m">11/16 週一 06:47</span>${P.quiet?`<button class="st" data-act="why" data-k="quiet">${ic('moon')}勿擾到 07:00</button>`:''}<button class="st" data-act="theme-toggle" title="切換夜間或日間" aria-label="切換夜間或日間">${ic(P.theme==='night'?'sun':'moon')}</button>`;
+  $('#killslot').innerHTML=k?`<button class="btn lg" data-act="unlock-open">${ic('lock')}解除鎖定</button>`:`<button class="kill" data-act="kill-open">${ic('power')}緊急停止</button>`;
+  $('#banner').innerHTML=k?`<div class="banner"><div><span class="down" style="font-weight:500">已緊急停止，鎖定中</span>　<span class="m xs t3">${k.t}　${k.mode==='flat'?'平倉並停止':'保留部位只停止'}</span><div class="s t2">${k.mode==='flat'?'撤單 0 張，平倉 3 張，花了 1.4 秒。':'撤單 0 張，保留 BTC 多 3 張。現在沒有 Bot 在看著這些部位。'}不能下任何新單。原因：${esc(k.r)}</div></div><button class="btn" data-act="unlock-open">解除鎖定</button></div>`:'';
+  $('#view').innerHTML=PAGES[PAGE].v();document.title='CatOS · '+PAGES[PAGE].n;drawAll()}
+function go(p,keep){if(!PAGES[p])return;const ch=p!==PAGE;PAGE=p;try{if(location.hash.slice(1)!==p)location.hash=p}catch(e){}if(ch){const v=$('#view');v.style.animation='none';void v.offsetWidth;v.style.animation=''}render();if(ch&&!keep)scrollTo(0,0)}
+function toast(m){$$('.toast').forEach(n=>n.remove());const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2800)}
+function dlg(html,w){closeDlg();const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" ${w?`style="width:${w}px"`:''}>${html}</div>`;o.addEventListener('mousedown',e=>{if(e.target===o)closeDlg()});document.body.appendChild(o);const i=$('input,textarea',o)||$('.acts .btn',o);if(i)i.focus()}
+function closeDlg(){$$('.ov').forEach(n=>n.remove())}
+const move=(arr,i,d)=>{const j=i+d;if(j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]]};
+const ACT={
+  close:closeDlg,
+  why:el=>{const b=BY[el.dataset.k];dlg(`<div class="xs acc" style="margin-bottom:4px">這裡為什麼長這樣</div><h3>${b[0]}</h3><p>${b[1]}</p><div class="acts"><button class="btn" data-act="close">知道了</button><button class="btn pri" data-go="${b[2]}">${b[3]}</button></div>`,440)},
+  'theme-toggle':()=>{P.theme=P.theme==='night'?'day':'night';render()},
+  'set-theme':el=>{P.theme=el.dataset.v;render()},'set-density':el=>{P.density=el.dataset.v;render()},'set-terms':el=>{P.terms=el.dataset.v;render()},'set-first':el=>{P.riskFirst=el.dataset.v==='1';render()},
+  'mod-toggle':el=>{const m=P.mods.find(x=>x.id===el.dataset.id);m.on=!m.on;render()},
+  'mod-up':el=>{move(P.mods,P.mods.findIndex(x=>x.id===el.dataset.id),-1);render()},'mod-down':el=>{move(P.mods,P.mods.findIndex(x=>x.id===el.dataset.id),1);render()},
+  'met-up':el=>{move(P.metrics,P.metrics.indexOf(el.dataset.v),-1);render()},'met-down':el=>{move(P.metrics,P.metrics.indexOf(el.dataset.v),1);render()},
+  ntf:el=>{const n=P.ntf[+el.dataset.i];n.c[+el.dataset.j]=n.c[+el.dataset.j]?0:1;render()},
+  'quiet-toggle':()=>{P.quiet=!P.quiet;render()},
+  memf:el=>{ST.memf=el.dataset.v;render()},
+  'mem-del':el=>{const m=P.mem.find(x=>x.id===el.dataset.id);dlg(`<h3>要 Agent 忘掉這一條？</h3><p>「${esc(m.t)}」</p><p>忘掉後，${m.use.map(u=>PN[u[0]]+'的「'+u[1]+'」').join('、')}會回到預設。</p><label>為什麼不對（可以不填，Agent 會記得別再這樣猜）<input class="inp" id="mw"></label><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="mem-del-do" data-id="${m.id}">忘掉</button></div>`)},
+  'mem-del-do':el=>{const i=P.mem.findIndex(x=>x.id===el.dataset.id),m=P.mem[i];P.gone.unshift({t:m.t,when:'剛剛',why:$('#mw').value.trim()||'沒有說原因'});P.mem.splice(i,1);closeDlg();render();toast('Agent 已經忘掉這一條')},
+  'mem-edit':el=>{const m=P.mem.find(x=>x.id===el.dataset.id);dlg(`<h3>改這一條</h3><p>用你自己的話寫。改完後算是「你說過的」，Agent 不會再自己改它。</p><textarea class="inp" id="mt">${esc(m.t)}</textarea><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn pri" data-act="mem-edit-do" data-id="${m.id}">存起來</button></div>`)},
+  'mem-edit-do':el=>{const m=P.mem.find(x=>x.id===el.dataset.id),v=$('#mt').value.trim();if(!v)return;m.t=v;m.src='said';m.ev='剛剛你親手改的';m.last='剛剛';closeDlg();render();toast('已更新，之後照這一條做')},
+  'ask-ok':el=>{const i=P.ask.findIndex(x=>x.id===el.dataset.id),a=P.ask[i];P.mem.unshift({id:'n'+Date.now(),src:'said',t:a.t,ev:'剛剛你確認了 Agent 的觀察。'+a.sug,use:[['me-layout','提醒']],last:'剛剛'});P.ask.splice(i,1);render();toast('記住了，會照這樣做')},
+  'ask-no':el=>{const i=P.ask.findIndex(x=>x.id===el.dataset.id),a=P.ask[i];P.gone.unshift({t:a.t,when:'剛剛',why:'你說不對'});P.ask.splice(i,1);render();toast('好，不會這樣做，也不會再這樣猜')},
+  'rule-toggle':el=>{const r=P.rules.find(x=>x.id===el.dataset.id);if(r.lock)return;if(r.on&&r.hard){dlg(`<h3>關掉這條界線？</h3><p>「${esc(r.t)}」</p><p>關掉後系統不會再擋。這是你的安全線，確定要關嗎？</p><div class="acts"><button class="btn" data-act="close">不關了</button><button class="btn danger" data-act="rule-off" data-id="${r.id}">關掉</button></div>`);return}r.on=r.on?0:1;render()},
+  'rule-off':el=>{P.rules.find(x=>x.id===el.dataset.id).on=0;closeDlg();render();toast('已關掉這條界線')},
+  'rule-del':el=>{const r=P.rules.find(x=>x.id===el.dataset.id);dlg(`<h3>刪掉這一條？</h3><p>「${esc(r.t)}」</p><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="rule-del-do" data-id="${r.id}">刪掉</button></div>`)},
+  'rule-del-do':el=>{P.rules=P.rules.filter(x=>x.id!==el.dataset.id);closeDlg();render();toast('已刪掉')},
+  'rule-ex':el=>{const e=EX[+el.dataset.i];ST.draft={raw:e[0],...e[1]};render()},
+  'rule-parse':()=>{const v=$('#ri').value.trim();if(!v){$('#ri').focus();return}const e=EX.find(x=>x[0]===v);ST.draft=e?{raw:v,...e[1]}:{raw:v,kind:'做事方式',mean:'照你的原話存下來：「'+v+'」。Agent 每次做決定前都會讀到這句',eff:'原型只會照原話存。正式版會先用白話重述一次，等你確認沒理解錯'};render()},
+  'rule-cancel':()=>{ST.draft=null;render();$('#ri').focus()},
+  'rule-add':()=>{const d=ST.draft;P.rules.push({id:'u'+Date.now(),hard:d.kind==='界線'?1:0,on:1,t:d.raw,d:d.kind==='界線'?d.mean:'',hit:'剛加入，還沒用到'});ST.draft=null;render();toast('加進去了。從下一次決定開始生效')},
+  auto:el=>{const a=P.auto[+el.dataset.i];if(a[3])return;a[1]=+el.dataset.j;render()},
+  sel:el=>{ST.sel=el.dataset.id;if(PAGE!=='strategies')go('strategies');else render()},
+  rs:el=>{ST.rs=el.dataset.id;if(PAGE!=='research')go('research');else render()},
+  bot:el=>{ST.bot=el.dataset.id;if(PAGE!=='exec')go('exec');else render()},
+  'idea-open':()=>dlg(`<h3>新想法</h3><p>用一句話寫下來就好，剩下的交給 Agent。</p><textarea class="inp" id="idt" placeholder="例如：連續三天下跌後的第一根陽線買進"></textarea><div class="chk" style="margin-top:12px">${ic('check','t2')}<span class="t2">Agent 會先對過你的規矩：幣種、週期、能不能做空</span></div><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn pri" data-act="idea-do">存成想法</button></div>`),
+  'idea-do':()=>{const v=$('#idt').value.trim();if(!v){$('#idt').focus();return}const id='u'+Date.now();DB.strats.push({id,name:v.length>14?v.slice(0,14)+'…':v,desc:v,sym:'BTC',tf:'4H',stage:'idea',by:'你',g:'wwwwww',seed:91,note:'剛寫下來，還只是一句話'});ST.sel=id;closeDlg();render();toast('存好了，在「想法」那一欄')},
+  'to-research':el=>{const s=DB.S(el.dataset.id);s.stage='research';s.g='rwwwww';s.note='Agent 開始研究，今晚 21:00 後回報';s.yrs=s.yrs||4.87;DB.todo=DB.todo.filter(t=>t.id!==s.id);render();toast('已交給 Agent。它會先跑扣掉成本的回測')},
+  'drop-open':el=>{const s=DB.S(el.dataset.id);dlg(`<h3>收掉「${esc(s.name)}」？</h3><p>研究紀錄會留著，之後想重新開始隨時可以。</p><label>原因（可以不填，Agent 會記得你為什麼不做）<input class="inp" id="dw"></label><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="drop-do" data-id="${s.id}">收掉</button></div>`)},
+  'drop-do':el=>{const s=DB.S(el.dataset.id);DB.strats=DB.strats.filter(x=>x.id!==s.id);DB.todo=DB.todo.filter(t=>t.id!==s.id);if(ST.sel===s.id)ST.sel='ens';if(ST.rs===s.id)ST.rs='don4h';closeDlg();if(PAGE==='research')go('strategies');else render();toast('已收掉：'+s.name)},
+  'deploy-open':el=>{const s=DB.S(el.dataset.id),A=acct(),bud=A.eq*A.levMax,used=bots().reduce((a,b)=>a+b.notional,0),add=1054.77,rc=ruleCheck(s);
+    if(ST.kill){toast('鎖定中，先解除鎖定才能部署');return}
+    dlg(`<h3>部署到 OKX 模擬盤</h3><p>這是模擬盤，不是真錢。部署後隨時可以停。</p>
+      <div class="say"><div class="rw"><span class="t2">策略</span><span style="font-weight:500">${s.name}</span></div><div class="rw"><span class="t2">在哪裡下單</span><span>${s.sym}-USDT 永續，${s.tf==='1D'?'日線':s.tf}</span></div><div class="rw"><span class="t2">一次幾張</span><span>1 張，約 ${f(add)} USDT　${by('start1')}</span></div><div class="rw"><span class="t2">曝險額度</span><span class="m">${f(used/bud*100,0)}% → ${f((used+add)/bud*100,0)}%</span></div></div>
+      <div class="k" style="margin:16px 0 4px">和你的規矩對過了</div>${rc.map(([c,n,t])=>`<div class="chk">${c==='p'?ic('check','t2'):ic('warn','acc')}<span><span class="t3">${n}　</span>${t}</span></div>`).join('')}<div class="chk">${ic('check','t2')}<span><span class="t3">額度　</span>部署後還在 0.50 倍以內</span></div>
+      <label style="display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--fg)"><input type="checkbox" id="dc" style="width:16px;height:16px;accent-color:var(--acc)">我看過研究報告了，同意讓它在模擬盤自動下單</label>
+      <div class="acts"><button class="btn" data-act="close">取消</button><button class="btn" data-act="rs" data-id="${s.id}">先看報告</button><button class="btn pri" data-act="deploy-do" data-id="${s.id}" id="db" disabled>確認部署</button></div>`)},
+  'deploy-do':el=>{const s=DB.S(el.dataset.id);s.stage='demo';s.g='pppprw';s.note='剛部署，等第一根 K 線收盤';DB.todo=DB.todo.filter(t=>t.id!==s.id);
+    if(!DB.bots.find(b=>b.id===s.id))DB.bots.push({id:s.id,inst:s.sym+'-USDT-SWAP',pos:'空手',side:0,qty:0,avg:null,mark:105477,un:0,today:0,total:0,days:0,drift:0,lev:0,notional:0,ref:1054.77,cnt:0,nextAt:'08:00',next:'1 小時 13 分',seed:131,fresh:true,wait:'剛部署，還沒有部位。等 08:00 這根日線收盤後做第一次決定'});
+    ST.bot=s.id;ST.sel=s.id;closeDlg();render();toast(s.name+' 已部署到模擬盤')},
+  'kill-open':el=>{ST.km=el.dataset.m||null;const B=bots(),pos=B.filter(b=>b.side).reduce((a,b)=>a+b.qty,0),un=acct().unreal,fee=B.reduce((a,b)=>a+b.notional,0)*.0005;
+    const o=(m,t,d)=>`<button class="opt ${ST.km===m?'on':''}" data-act="kill-pick" data-m="${m}" role="radio" aria-checked="${ST.km===m}"><span class="rd"></span><span><b>${t}</b><span class="s t2" style="display:block;margin-top:4px">${d}</span></span></button>`;
+    dlg(`<h3 class="down">緊急停止</h3><p>選一種停法。兩種都會撤掉還沒成交的委託，然後鎖住，直到你手動解除。</p><div role="radiogroup">
+      ${o('flat','平倉並停止',`用市價平掉 ${pos} 張部位。還沒實現的 ${sg(un)} 會變成已實現，手續費約 ${f(fee)} USDT`)}
+      ${o('keep','保留部位只停止',`所有 Bot 不再做決定，${pos} 張部位留在 OKX。之後沒有 Bot 看著它們，要你自己處理`)}</div>
+      <label>原因（可以不填）<input class="inp" id="kr" placeholder="例如：行情異常"></label>
+      <div class="acts"><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="kill-do" id="kb" ${ST.km?'':'disabled'}>${ST.km==='keep'?'停止，保留部位':ST.km==='flat'?'平倉並停止':'先選一種停法'}</button></div>`)},
+  'kill-pick':el=>{ST.km=el.dataset.m;$$('.opt').forEach(n=>{const on=n.dataset.m===ST.km;n.classList.toggle('on',on);n.setAttribute('aria-checked',on)});const b=$('#kb');b.disabled=false;b.textContent=ST.km==='keep'?'停止，保留部位':'平倉並停止'},
+  'kill-do':()=>{if(!ST.km)return;ST.kill={mode:ST.km,t:'06:47:52',r:($('#kr').value.trim()||'沒有填')};closeDlg();render();scrollTo(0,0)},
+  'unlock-open':()=>{const k=ST.kill;dlg(`<h3>解除鎖定</h3><p>${k.t} 你按了緊急停止（${k.mode==='flat'?'平倉並停止':'保留部位只停止'}）。原因：${esc(k.r)}</p>
+    <div class="chk">${ic('check','t2')}<span>CatOS 的帳和 OKX 核對一致</span></div><div class="chk">${ic('check','t2')}<span>沒有還在路上的委託</span></div><div class="chk">${ic('warn','acc')}<span>解除後 Bot 不會自己恢復，要你到執行頁一個一個重新啟動</span></div>
+    <label style="display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--fg)"><input type="checkbox" id="uc" style="width:16px;height:16px;accent-color:var(--acc)">我確認停下來的原因已經排除，可以解除</label><div class="acts"><button class="btn" data-act="close">取消</button><button class="btn pri" data-act="unlock-do" id="ub" disabled>解除鎖定</button></div>`)},
+  'unlock-do':()=>{const flat=ST.kill.mode==='flat';DB.bots.forEach(b=>ST.stop[b.id]=flat?'flat':'keep');ST.kill=null;closeDlg();render();toast('已解除鎖定。Bot 還停著，到執行頁重新啟動')},
+  'stop-open':el=>{const b=bots().find(x=>x.id===el.dataset.id),s=DB.S(b.id);ST.km=b.side?null:'keep';
+    dlg(`<h3>停止「${s.name}」</h3><p>只停這一個，其他 Bot 照常跑，系統不會鎖住。</p>${b.side?`<div role="radiogroup"><button class="opt" data-act="kill-pick" data-m="flat" role="radio" aria-checked="false"><span class="rd"></span><span><b>平倉後停止</b><span class="s t2" style="display:block;margin-top:4px">用市價平掉 ${b.qty} 張，還沒實現的 ${sg(b.un)} 變成已實現</span></span></button><button class="opt" data-act="kill-pick" data-m="keep" role="radio" aria-checked="false"><span class="rd"></span><span><b>保留部位只停止</b><span class="s t2" style="display:block;margin-top:4px">${b.qty} 張部位留著，之後沒有 Bot 看著它</span></span></button></div>`:'<p>它現在空手，停止後不會留下任何部位。</p>'}
+      <div class="acts"><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="stop-do" data-id="${b.id}" id="kb" ${ST.km?'':'disabled'}>${ST.km?'停止這個 Bot':'先選一種停法'}</button></div>`)},
+  'stop-do':el=>{ST.stop[el.dataset.id]=ST.km||'keep';closeDlg();render();toast('已停止：'+DB.S(el.dataset.id).name)},
+  'start-bot':el=>{if(ST.kill)return;delete ST.stop[el.dataset.id];render();toast('已重新啟動，等下一根 K 線收盤')}
+};
+document.addEventListener('click',e=>{const a=e.target.closest('[data-act],[data-go]');if(!a||a.disabled)return;if(a.dataset.act){if(ACT[a.dataset.act])ACT[a.dataset.act](a,e)}else{closeDlg();go(a.dataset.go)}});
+document.addEventListener('input',e=>{if(e.target.id==='uc')$('#ub').disabled=!e.target.checked;if(e.target.id==='dc')$('#db').disabled=!e.target.checked});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDlg();if((e.key==='Enter'||e.key===' ')&&e.target.matches('[role=button][data-act]')){e.preventDefault();e.target.click()}if(e.key==='Enter'&&e.target.id==='ri')ACT['rule-parse']()});
+addEventListener('hashchange',()=>{const p=location.hash.slice(1);if(PAGES[p]&&p!==PAGE)go(p)});
+let _rt;addEventListener('resize',()=>{clearTimeout(_rt);_rt=setTimeout(drawAll,120)});
+document.body.appendChild(TIP);
+if(window.__THEME)P.theme=window.__THEME;if(window.__DENSITY)P.density=window.__DENSITY;
+PAGE=window.__PAGE||location.hash.slice(1);if(!PAGES[PAGE])PAGE='overview';
+render();
+if(window.__AFTER)window.__AFTER();
+</script>
+</body>
+</html>
