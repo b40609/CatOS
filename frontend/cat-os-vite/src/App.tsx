@@ -5,6 +5,7 @@ import { stateAdapter } from '@/state/stateAdapter';
 // Import Page Routes
 import { Route as DashboardRoute } from '@/pages/index';
 import { Route as BotsRoute } from '@/pages/bots';
+import { Route as DemoBotRoute } from '@/pages/demo-bot';
 import { Route as RiskRoute } from '@/pages/risk';
 import { Route as StrategiesRoute } from '@/pages/strategies';
 import { Route as LogsRoute } from '@/pages/logs';
@@ -17,6 +18,7 @@ import { Route as ReviewRoute } from '@/pages/review';
 const routeMap: Record<string, React.ComponentType> = {
   '/': DashboardRoute.component,
   '/bots': BotsRoute.component,
+  '/demo-bot': DemoBotRoute.component,
   '/risk': RiskRoute.component,
   '/strategies': StrategiesRoute.component,
   '/logs': LogsRoute.component,

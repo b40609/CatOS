@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AccountMenu } from "@/components/catos/account-menu";
-import { Activity, Bot, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, Route, ScanLine, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
+import { Activity, Bot, Radio, LayoutDashboard, ScrollText, ShieldCheck, FlaskConical, SlidersHorizontal, Route, ScanLine, Settings2, PanelLeftClose, PanelLeftOpen, Cat, type LucideIcon } from "lucide-react";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -59,6 +59,7 @@ const GROUPS: NavigationGroup[] = [
     titleMono: "EXECUTION",
     items: [
       { to: "/bots", name: "實例監控", sub: "FLEET MONITOR", icon: Bot, hasPulse: true },
+      { to: "/demo-bot", name: "模擬盤 Bot", sub: "OKX DEMO", icon: Radio },
       { to: "/risk", name: "風控中心", sub: "RISK CONTROL", icon: ShieldCheck },
     ],
   },

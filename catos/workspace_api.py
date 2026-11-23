@@ -43,7 +43,7 @@ npm run build</pre>
 
 def workspace_build():
     digest = hashlib.sha256()
-    for path in (Path(__file__), ROOT / "catos" / "workspace_snapshot.py"):
+    for path in (Path(__file__), ROOT / "catos" / "workspace_snapshot.py", ROOT / "catos" / "demo_bot_view.py"):
         digest.update(path.name.encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()
@@ -125,7 +125,8 @@ def mount_workspace(app, *, evidence_root=None, ui_dist=None):
     return app
 
 
-def create_app(*, output_dir=None, evidence_root=None, simulation_root=None, ui_dist=None, replay_root=None):
+def create_app(*, output_dir=None, evidence_root=None, simulation_root=None, ui_dist=None, replay_root=None,
+               demo_bot_root=None):
     from catos.research_api import create_app as create_research_app
     from catos.local_sim_control_api import mount_simulation
     from catos.replay_api import mount_replay
@@ -133,6 +134,9 @@ def create_app(*, output_dir=None, evidence_root=None, simulation_root=None, ui_
                           evidence_root=evidence_root, ui_dist=ui_dist)
     # Read-only approvals and Bot replay progress (step 2); writes stay CLI-only.
     mount_replay(app, root=replay_root)
+    # Read-only OKX Demo Bot runs; starting and stopping stay in the terminal.
+    from catos.demo_bot_view import mount_demo_bot
+    mount_demo_bot(app, root=demo_bot_root or ROOT / "outputs" / "okx-demo-bot")
     return mount_simulation(app, simulation_root or ROOT / "outputs" / "local-sim-control")
 
 
