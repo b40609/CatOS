@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="zh-Hant" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CatOS 總覽卡片多版對照（Noir &amp; Gold）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* 8770 Noir & Gold 精確設計系統 token */
+  --bg: oklch(0.155 0.004 260);
+  --surface: oklch(0.19 0.004 260);
+  --surface2: oklch(0.22 0.005 260);
+  --raised: oklch(0.24 0.006 260);
+  --fg: oklch(0.94 0.004 260);
+  --muted: oklch(0.66 0.008 260);
+  --faint: oklch(0.49 0.008 260);
+  --border: oklch(0.28 0.006 260);
+  --border2: oklch(0.35 0.008 260);
+  --gold: #e8b45e;
+  --gold-soft: rgba(232,180,94,.13);
+  --gold-line: rgba(232,180,94,.38);
+  --up: #10b981;
+  --up-soft: rgba(16,185,129,.12);
+  --up-line: rgba(16,185,129,.34);
+  --down: #f43f5e;
+  --down-soft: rgba(244,63,94,.12);
+  --down-line: rgba(244,63,94,.34);
+  --warn: #f59e0b;
+  --warn-soft: rgba(245,158,11,.13);
+  --warn-line: rgba(245,158,11,.36);
+  --info: #7faee2;
+  --info-soft: rgba(127,174,226,.13);
+  --info-line: rgba(127,174,226,.34);
+  --violet: #8b8df8;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --sans: "Work Sans", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);color:var(--fg)}
+body{margin:0;background:var(--bg);color:var(--fg);font:12px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.t1{font-size:9px}.t2{font-size:10px}.t3{font-size:11px}.t4{font-size:12px}
+.up{color:var(--up)}.down{color:var(--down)}.gold{color:var(--gold)}.warn{color:var(--warn)}.info{color:var(--info)}.muted{color:var(--muted)}.faint{color:var(--faint)}
+.r{text-align:right}.b{font-weight:700}.nw{white-space:nowrap}
+
+/* 頁首導覽列 */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(17,18,21,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;letter-spacing:.02em}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(232,180,94,.6)}
+.navpills{display:flex;gap:4px;flex-wrap:wrap}
+.navpills a{padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--muted);text-decoration:none;font-size:11px;font-family:var(--mono);transition:all .12s}
+.navpills a:hover{color:var(--fg);border-color:var(--gold-line)}
+.topbar .meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.badge-sync{padding:2px 8px;border-radius:4px;border:1px solid var(--gold-line);background:var(--gold-soft);color:var(--gold);font-weight:600}
+
+.wrap{max-width:1620px;margin:0 auto;padding:20px 24px 80px;display:flex;flex-direction:column;gap:34px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-bottom:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.sec-head h2{margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sec-num{font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:4px;background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold-line)}
+.sec-head p{margin:0;font-size:11px;color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+@media(max-width:1260px){.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+
+/* 候選外框 */
+.opt-wrap{display:flex;flex-direction:column;gap:7px;min-width:0}
+.opt-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}
+.opt-tag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:700}
+.rec{font-size:9.5px;padding:1px 6px;border-radius:3px;background:var(--gold);color:#14120c;font-weight:700}
+.opt-note{font-size:10.5px;color:var(--muted)}
+
+/* 8770 標準卡片容器 */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.card-h{height:36px;padding:0 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none}
+.card-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;min-width:0;white-space:nowrap}
+.card-sub{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase}
+.card-body{padding:12px;min-width:0}
+.card-body.p0{padding:0}
+
+/* 8770 分段控制與小按鈕 */
+.seg{display:inline-flex;align-items:center;gap:2px;padding:2px;border-radius:5px;background:rgba(0,0,0,.32);border:1px solid var(--border);flex:none}
+.seg button{border:0;background:none;color:var(--muted);padding:2px 7px;border-radius:3px;font-size:10px;font-family:var(--mono);white-space:nowrap;transition:all .1s}
+.seg button:hover{color:var(--fg)}
+.seg button.on{background:var(--raised);color:var(--fg);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:3px;font-size:9.5px;font-family:var(--mono);font-weight:600;border:1px solid var(--border);background:var(--surface2);color:var(--muted);white-space:nowrap}
+.pill.up{background:var(--up-soft);border-color:var(--up-line);color:var(--up)}
+.pill.down{background:var(--down-soft);border-color:var(--down-line);color:var(--down)}
+.pill.warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--warn)}
+.pill.gold{background:var(--gold-soft);border-color:var(--gold-line);color:var(--gold)}
+.pill.info{background:var(--info-soft);border-color:var(--info-line);color:var(--info)}
+
+.btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;border:1px solid var(--border2);background:var(--surface2);color:var(--fg);font-size:10px;font-family:var(--mono);white-space:nowrap;transition:all .12s}
+.btn:hover{border-color:var(--gold);color:var(--gold)}
+.btn.pri{border-color:var(--gold-line);background:var(--gold-soft);color:var(--gold)}
+.btn.pri:hover{background:var(--gold);color:#14120c}
+.btn.ok{border-color:var(--up-line);background:var(--up-soft);color:var(--up)}
+.btn.danger{border-color:var(--down-line);background:var(--down-soft);color:var(--down)}
+
+/* 區塊 1: 曝險卡片 */
+.exp-grid{display:grid;grid-template-columns:178px minmax(0,1fr);gap:16px;align-items:center}
+@media(max-width:560px){.exp-grid{grid-template-columns:1fr}}
+.donut-wrap{display:grid;place-items:center;position:relative;cursor:pointer}
+.donut-wrap:hover .donut-hint{opacity:1}
+.donut-hint{position:absolute;bottom:-2px;font-size:9px;font-family:var(--mono);color:var(--faint);opacity:.65;transition:opacity .12s}
+.leg-row{display:grid;grid-template-columns:8px minmax(0,1fr) auto 40px;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;border-radius:4px}
+.leg-row:last-child{border-bottom:0}
+.leg-row:hover{background:rgba(255,255,255,.03)}
+.leg-dot{width:8px;height:8px;border-radius:50%}
+.leg-sub{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-left:5px}
+.sim-row{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border2);display:grid;grid-template-columns:8px minmax(0,1fr) auto 46px;gap:8px;align-items:center;font-size:10.5px;color:var(--muted)}
+.formula{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--faint);flex-wrap:wrap}
+
+/* 區塊 2: 策略管線寬度滑桿 & 3 版樣式 */
+.width-bar{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:11px;flex-wrap:wrap}
+.width-bar input[type=range]{width:220px;accent-color:var(--gold)}
+.pipe-cols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.pipe-stage-hd{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;padding:6px 12px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.22);font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.pipe-5hd{display:grid;grid-template-columns:repeat(5,1fr);text-align:center}
+.pipe-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center;transition:background .1s}
+.pipe-row:last-child{border-bottom:0}
+.pipe-row:hover{background:rgba(255,255,255,.03)}
+.pipe-nm{min-width:0}
+.pipe-nm b{display:block;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pipe-nm span{font-family:var(--mono);font-size:9.5px;color:var(--muted)}
+.track5{position:relative;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;height:28px}
+.track5 .line-bg{position:absolute;left:10%;right:10%;top:50%;height:2px;background:var(--border2);transform:translateY(-50%)}
+.track5 .line-fg{position:absolute;left:10%;top:50%;height:2px;transform:translateY(-50%);border-radius:2px}
+.node5{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2px}
+.ndot{width:11px;height:11px;border-radius:50%;background:var(--surface);border:2px solid var(--border2)}
+.ndot.done{background:var(--c);border-color:var(--c)}
+.ndot.cur{background:var(--surface);border:3px solid var(--c);box-shadow:0 0 0 3px rgba(232,180,94,.16)}
+.ndot.warn{background:var(--warn);border-color:var(--warn)}
+.ndot.fail{background:var(--down);border-color:var(--down)}
+.ndot.gold{background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,180,94,.25)}
+.nlab{position:absolute;top:14px;font-family:var(--mono);font-size:9px;white-space:nowrap;color:var(--muted)}
+
+/* 窄版自動降級（2A 卡片寬度 < 460px） */
+.narrow .pipe-stage-hd{display:none}
+.narrow .pipe-row{grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.narrow .track5{display:none}
+.narrow-bar{display:none}
+.narrow .narrow-bar{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px}
+.mini-pbar{width:64px;height:5px;border-radius:3px;background:var(--border);overflow:hidden}
+.mini-pbar i{display:block;height:100%;border-radius:3px}
+
+/* 2B: 9 關卡完整軌道 */
+.track9-hd{display:grid;grid-template-columns:138px minmax(0,1fr);gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.22);font-family:var(--mono);font-size:9px;color:var(--muted)}
+.bands9{display:grid;grid-template-columns:1fr 4fr 1fr 2fr 1fr;gap:3px;text-align:center}
+.bands9 span{background:rgba(255,255,255,.04);border-radius:3px;padding:2px 0}
+.bands9 span.y{background:var(--gold-soft);color:var(--gold)}
+.track9-row{display:grid;grid-template-columns:138px minmax(0,1fr);gap:8px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);align-items:center}
+.track9-row:last-child{border-bottom:0}
+.track9-row:hover{background:rgba(255,255,255,.03)}
+.t9{position:relative;display:grid;grid-template-columns:repeat(9,1fr);align-items:center;height:20px}
+.t9 .line-bg{position:absolute;left:5.5%;right:5.5%;top:50%;border-top:1.5px dotted var(--border2)}
+.t9 .line-fg{position:absolute;left:5.5%;top:50%;height:2px;margin-top:-1px}
+.st9{position:relative;z-index:2;justify-self:center;width:9px;height:9px;border-radius:50%;background:var(--surface);border:1.5px solid var(--border2)}
+.st9.p{background:var(--c);border-color:var(--c)}
+.st9.r{border:2.5px solid var(--c)}
+.st9.a{background:var(--warn);border-color:var(--warn)}
+.st9.f{background:var(--down);border-color:var(--down)}
+.st9.y{background:var(--gold);border-color:var(--gold);transform:rotate(45deg);border-radius:2px}
+
+/* 2C: 緊湊 6 關矩陣表 */
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{text-align:left;font-family:var(--mono);font-size:9.5px;font-weight:500;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.22);white-space:nowrap}
+.tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover td{background:rgba(255,255,255,.03)}
+.tbl th.r,.tbl td.r{text-align:right}
+.g6{display:inline-flex;gap:3px;align-items:center}
+.g6 i{width:12px;height:6px;border-radius:1.5px;background:var(--border)}
+.g6 i.p{background:var(--up)}.g6 i.r{background:var(--info)}.g6 i.a{background:var(--warn)}.g6 i.f{background:var(--down)}
+
+/* 區塊 3: 待處理項目 & 事件審計 */
+.aq-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.045)}
+.aq-row:last-child{border-bottom:0}
+.aq-row:hover{background:rgba(255,255,255,.025)}
+.aq-row.p0{border-left:2px solid var(--down);background:rgba(244,63,94,.04)}
+.aq-row.p1{border-left:2px solid var(--warn)}
+.aq-row.p2{border-left:2px solid var(--gold)}
+.aq-row.p3{border-left:2px solid var(--border2)}
+.aq-main{min-width:0}
+.aq-top{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;flex-wrap:wrap}
+.aq-fact{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aq-acts{display:flex;gap:5px;align-items:center;flex:none}
+.ev-row{display:grid;grid-template-columns:58px 46px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-family:var(--mono);font-size:10.5px}
+.ev-row:last-child{border-bottom:0}
+.ev-row:hover{background:rgba(255,255,255,.025)}
+.pin-banner{background:rgba(245,158,11,.06);border-bottom:1px solid var(--border)}
+.pin-hd{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;font-family:var(--mono);font-size:10px;color:var(--warn);cursor:pointer;user-select:none}
+.pin-hd:hover{background:rgba(245,158,11,.08)}
+
+/* 區塊 4: 策略＋持倉合併表 */
+.exp-detail{background:rgba(0,0,0,.24);padding:8px 14px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;font-family:var(--mono);font-size:10px}
+.exp-detail div span{display:block;color:var(--faint);font-size:9px}
+.exp-detail div b{color:var(--fg)}
+.clickable{cursor:pointer}
+
+/* 區塊 5: 5 卡全局預覽 */
+.full-frame{border:1px solid var(--border2);border-radius:8px;overflow:hidden;background:var(--bg)}
+.full-hdr{height:38px;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:10.5px}
+.full-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:8px;padding:8px}
+.full-left{display:grid;grid-template-rows:220px auto auto;gap:8px;min-width:0}
+.full-right{display:grid;grid-template-rows:295px minmax(0,1fr);gap:8px;min-width:0}
+@media(max-width:1180px){.full-grid{grid-template-columns:1fr}}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:80;background:var(--raised);border:1px solid var(--gold-line);color:var(--fg);padding:7px 14px;border-radius:6px;font-family:var(--mono);font-size:11px;box-shadow:0 12px 32px rgba(0,0,0,.6);display:none}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>catOS · 總覽卡片多版互動對照</div>
+  <nav class="navpills">
+    <a href="#s1">1. 曝險多視角</a>
+    <a href="#s2">2. 策略管線 (3版)</a>
+    <a href="#s3">3. 待處理項目 (3版)</a>
+    <a href="#s4">4. 策略與持倉合併 (2版)</a>
+    <a href="#s5">5. 合併後 5 卡總覽示意</a>
+  </nav>
+  <div class="meta">
+    <span class="badge-sync">同步真實 BTC 行情 · $11,170.47 (+11.70%)</span>
+    <span>Noir &amp; Gold · 100% 沿用 8770 視覺系統</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ==================== 區塊 1: 曝險額度多視角 ==================== -->
+  <section id="s1">
+    <div class="sec-head">
+      <h2><span class="sec-num">01</span> 曝險額度：Y 風格底版 × 多視角切換</h2>
+      <p>可實際點擊右上角視角分頁、單位切換與「部署試算」開關，體驗每個維度的判讀效果</p>
+    </div>
+    <div class="grid2" style="margin-top:14px">
+      <!-- 1A 推薦 -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag"><span class="rec">建議 1A</span> Y 結構 × 5 視角（策略 / 幣種 / 多空 / 損益 / 保證金）</span>
+          <label class="m t2 muted" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="simDeployToggle" checked style="accent-color:var(--gold)"> 顯示「擬部署策略 +16%」試算列
+          </label>
+        </div>
+        <div class="card" id="exp1A"></div>
+        <div class="opt-note">預設用 Y 的「策略曝險」一眼看誰佔額度；切「幣種」抓跨策略疊加單幣上限；切「多空」抓系統性單邊曝險；切「損益」辨識浮盈依賴度；「保證金」於 OKX 模擬盤顯示 mgnRatio。</div>
+      </div>
+
+      <!-- 1B 極簡 3 視角 -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag">對照 1B · 純曝險 3 視角（策略 / 幣種 / 多空）</span>
+          <span class="m t2 faint">拿掉損益與保證金分頁</span>
+        </div>
+        <div class="card" id="exp1B"></div>
+        <div class="opt-note">只保留純粹的倉位曝險維度，標題列更乾淨；損益留在權益卡、保證金安全墊留在風控中心頁。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 區塊 2: 策略管線 3 版 ==================== -->
+  <section id="s2">
+    <div class="sec-head">
+      <h2><span class="sec-num">02</span> 策略管線（原「想法走到哪」）：3 版實機對照</h2>
+      <p>拖動下方寬度滑桿，直接測試在 8770 拖拉分割線把卡片拉寬或壓窄時的實際視覺密度</p>
+    </div>
+
+    <div class="width-bar" style="margin-top:14px">
+      <span class="gold b">模擬 8770 卡片寬度：</span>
+      <input type="range" id="pipeWidth" min="360" max="900" value="540" step="10">
+      <span id="pipeWidthVal" class="b">540 px</span>
+      <div class="seg" style="margin-left:auto">
+        <button type="button" onclick="setPipeW(390)">窄卡 390px</button>
+        <button type="button" onclick="setPipeW(540)" class="on" id="pw540">標準 540px</button>
+        <button type="button" onclick="setPipeW(780)">寬卡 780px</button>
+      </div>
+    </div>
+
+    <div class="pipe-cols" style="margin-top:12px" id="pipeContainer">
+      <!-- 2A -->
+      <div class="opt-wrap" style="width:540px;max-width:100%" data-pipe-card>
+        <div class="opt-bar">
+          <span class="opt-tag"><span class="rec">建議 2A</span> 5 階段精簡軌道（窄卡自動轉進度條）</span>
+        </div>
+        <div class="card" id="pipe2A"></div>
+        <div class="opt-note">保留 X 的視覺軌道感，節點壓到 5 站（提案→研究→待核准→模擬盤→實盤）並內嵌進度數字（4/4、23/30d），壓窄到 &lt;460px 時自動降級成緊湊進度條不擠壓。</div>
+      </div>
+
+      <!-- 2B -->
+      <div class="opt-wrap" style="width:540px;max-width:100%" data-pipe-card>
+        <div class="opt-bar">
+          <span class="opt-tag">對照 2B · 9 關卡完整路線圖（X 原汁終端化）</span>
+        </div>
+        <div class="card" id="pipe2B"></div>
+        <div class="opt-note">完整呈現 6 道驗證關卡＋2 個決策關，適合固定擺在寬格位（&gt;620px）；卡片拉窄時節點間距較緊。</div>
+      </div>
+
+      <!-- 2C -->
+      <div class="opt-wrap" style="width:540px;max-width:100%" data-pipe-card>
+        <div class="opt-bar">
+          <span class="opt-tag">對照 2C · 緊湊 6 關矩陣表（最高密度）</span>
+        </div>
+        <div class="card" id="pipe2C"></div>
+        <div class="opt-note">不用點線軌道，改用 6 格微型方塊條＋階段膠囊＋當前狀態字。最省橫向空間，但視覺「推進感」略弱於 2A。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 區塊 3: 待處理項目 3 版 ==================== -->
+  <section id="s3">
+    <div class="sec-head">
+      <h2><span class="sec-num">03</span> 待處理項目（原「需要你決定的事」）：專業化 × 合併 vs 獨立</h2>
+      <p>徹底移除口語文案，按嚴重度（P0 風控鎖存 → P1 偏差警戒 → P2 待核准 → P3 提案）排序，可切換「模擬觸發 P0 鎖存」與點擊複製 CLI 指令</p>
+    </div>
+
+    <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label class="m t2" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer">
+        <input type="checkbox" id="simP0Toggle" style="accent-color:var(--down)"> 模擬插入一筆 <span class="down b">P0 風控鎖存（Soft Latch）</span>看排序置頂效果
+      </label>
+    </div>
+
+    <div class="grid3" style="margin-top:12px">
+      <!-- 3A -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag"><span class="rec">建議 3A</span> 併入「事件審計」當第一分頁 Tab</span>
+        </div>
+        <div class="card" id="aq3A"></div>
+        <div class="opt-note">省下一張卡片空間；待處理項不會被高頻事件洗掉；有 P0/P1 時分頁數字亮紅／琥珀色。平常需要查流水再點「成交」或「全部」。</div>
+      </div>
+
+      <!-- 3B -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag">對照 3B · 併入「事件審計」：頂部置頂區＋下方流水</span>
+        </div>
+        <div class="card" id="aq3B"></div>
+        <div class="opt-note">上方固定顯示待處理（點標題列可一鍵折疊），下方直接看即時成交與風控流水，免切分頁但垂直空間較緊。</div>
+      </div>
+
+      <!-- 3C -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag">對照 3C · 獨立「待處理項目」專業卡片</span>
+        </div>
+        <div class="card" id="aq3C"></div>
+        <div class="opt-note">與事件審計完全分離，頂部內建類型篩選器（全部／警戒／核准／提案）；適合當策略與持倉合併後還有空位，或掛在卡片管理按需打開。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 區塊 4: 策略實例 + 持倉明細合併 ==================== -->
+  <section id="s4">
+    <div class="sec-head">
+      <h2><span class="sec-num">04</span> 策略實例 ＋ 持倉明細 合併方案（騰出空間給策略管線）</h2>
+      <p>消除兩張表重複的標的／狀態／未實現損益欄位；4A 點擊任意一列可原地展開資金費率、強平安全墊與 P6 詳情</p>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <!-- 4A -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag"><span class="rec">建議 4A</span> 主表單一寬表合一 ＋ 點擊列展開交易所風控詳情</span>
+        </div>
+        <div class="card" id="bp4A"></div>
+        <div class="opt-note">同一列直接看完「策略狀態＋部位張數＋均價/標記價＋未實現/今日損益＋P6 停損價＋操作」，空手策略（rsi）也一目了然。點擊任一列展開次要風控明細。</div>
+      </div>
+
+      <!-- 4B -->
+      <div class="opt-wrap">
+        <div class="opt-bar">
+          <span class="opt-tag">對照 4B · 同格分頁 Tab（策略實例 ｜ 持倉明細 ｜ 掛單）</span>
+        </div>
+        <div class="card" id="bp4B"></div>
+        <div class="opt-note">保留原本兩張表的獨立結構，放進同一格切換。窄視窗不會擠，但無法同一眼同時對照策略狀態與開倉均價／P6 停損。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 區塊 5: 合併後 5 卡總覽全局示意 ==================== -->
+  <section id="s5">
+    <div class="sec-head">
+      <h2><span class="sec-num">05</span> 合併騰出空間後：總覽 5 卡全局排版示意（全部可拖移縮放）</h2>
+      <p>1A（多視角曝險）＋ 2A（策略管線）＋ 3A（待處理與事件審計）＋ 4A（策略與持倉合一）＋ 8770 原版權益卡，剛好滿版 5 卡、零重複、零廢話</p>
+    </div>
+
+    <div class="full-frame" style="margin-top:14px">
+      <div class="full-hdr">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="gold b">catOS</span>
+          <span class="muted">工作區 / 系統總覽</span>
+          <span class="pill up">OKX DEMO · 已連線</span>
+          <span class="muted">3 Bot 運行中 · BTC $91,265.8</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="pill">5/7 卡片已開啟（拖移排序 · 拖分割線縮放）</span>
+          <span class="btn pri">＋ 卡片管理</span>
+        </div>
+      </div>
+      <div class="full-grid">
+        <div class="full-left">
+          <!-- 原版 8770 權益卡片縮影 -->
+          <div class="card">
+            <div class="card-h">
+              <div class="card-title">帳戶權益與損益 <span class="card-sub">8770 原版保留</span></div>
+              <div class="seg"><button type="button" class="on">don4h · 138 點</button></div>
+            </div>
+            <div class="card-body" style="display:grid;grid-template-columns:188px minmax(0,1fr);gap:12px;height:184px;padding:10px 12px">
+              <div style="border-right:1px solid var(--border);padding-right:10px;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                  <div class="m t1 muted">帳戶總權益</div>
+                  <div class="m b" style="font-size:20px;line-height:1.2">$11,170.47</div>
+                  <div class="m t3 up b">+$141.21 (+1.28%)</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;border-top:1px solid var(--border);padding-top:6px" class="m t2">
+                  <div><span class="faint t1" style="display:block">已實現</span><b class="up">+$88.35</b></div>
+                  <div><span class="faint t1" style="display:block">未實現</span><b class="up">+$1,088.49</b></div>
+                  <div><span class="faint t1" style="display:block">日基準</span><b>$11,029.26</b></div>
+                  <div><span class="faint t1" style="display:block">手續費</span><b class="down">$6.37</b></div>
+                </div>
+              </div>
+              <div id="miniEqSvg" style="min-width:0;height:100%"></div>
+            </div>
+          </div>
+
+          <!-- 4A 策略與持倉合一 -->
+          <div class="card" id="fullBotsPos"></div>
+
+          <!-- 2A 策略管線 -->
+          <div class="card" id="fullPipe"></div>
+        </div>
+
+        <div class="full-right">
+          <!-- 1A 曝險多視角 -->
+          <div class="card" id="fullExp"></div>
+
+          <!-- 3A 待處理與事件審計 -->
+          <div class="card" id="fullAq"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const f = (n, d = 2) => Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const sg = (n, d = 2) => (n > 0 ? '+' : n < 0 ? '-' : '') + f(Math.abs(n), d);
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.style.display = 'none'; }, 2400);
+}
+
+/* ==================== 同步真實 OKX BTC 數據 ==================== */
+const ACCT = {
+  eq: 11170.47, start: 10000.00, day0: 11029.26, today: 141.21,
+  realized: 88.35, unrealized: 1088.49, fees: 6.37,
+  notional: 4563.29, capLev: 0.50, acctCapLev: 1.00,
+  margin: 456.33, avail: 10714.14, mgnRatio: 1758.55,
+};
+const CAP_USD = ACCT.eq * ACCT.capLev; // 5585.24
+
+const BOTS = [
+  {
+    id: 'don4h', name: 'Donchian 通道突破', inst: 'BTC-USDT-SWAP', sym: 'BTC', tf: '4H',
+    state: 'running', side: 1, qty: 3, avg: 69638.0, mark: 91265.8, stopPx: 86666.0,
+    un: 648.83, today: 84.72, total: 715.67, equity: 10715.67, notional: 2737.97,
+    lev: 0.25, drift: -0.12, days: 23, color: '#e8b45e', algoId: '1842904512',
+    spark: [0,12,64,58,70,70,70,98,185,320,490,610,565,640,715.67],
+  },
+  {
+    id: 'tsmom', name: '時間序列動能', inst: 'BTC-USDT-SWAP', sym: 'BTC', tf: '1D',
+    state: 'running', side: 1, qty: 2, avg: 69282.9, mark: 91265.8, stopPx: 82139.2,
+    un: 439.66, today: 56.49, total: 438.97, equity: 10438.97, notional: 1825.32,
+    lev: 0.16, drift: 0.05, days: 15, color: '#7faee2', algoId: '1842904889',
+    spark: [0,-18,12,86,154,230,312,388,360,402,438.97],
+  },
+  {
+    id: 'rsi', name: '均值回歸 RSI', inst: 'ETH-USDT-SWAP', sym: 'ETH', tf: '1H',
+    state: 'running', side: 0, qty: 0, avg: null, mark: 3124.8, stopPx: null,
+    un: 0, today: 0, total: 15.83, equity: 10015.83, notional: 0,
+    lev: 0, drift: -0.61, days: 14, color: '#8b8df8', algoId: null,
+    spark: [0,13.4,13.4,-6.0,-6.0,15.83,15.83],
+  },
+];
+
+const PIPELINE = [
+  { id: 'don4h', name: 'Donchian 通道突破', meta: 'BTC · 4H', stage: 3, stageLab: '模擬盤', prog: '23/30d', next: '剩 7 天滿期', g6: 'pppprp', g9: 'ppppppprw', c: '#e8b45e', tone: 'ok' },
+  { id: 'tsmom', name: '時間序列動能', meta: 'BTC · 1D', stage: 3, stageLab: '模擬盤', prog: '15/30d', next: '剩 15 天 · 回撤 -16.5%', g6: 'pppprp', g9: 'ppppppprw', c: '#7faee2', tone: 'ok' },
+  { id: 'rsi', name: '均值回歸 RSI', meta: 'ETH · 1H', stage: 3, stageLab: '模擬盤', prog: '-0.61%', next: '偏差逾警戒 0.50%', g6: 'ppppra', g9: 'ppppppraw', c: '#f59e0b', tone: 'warn' },
+  { id: 'ens', name: 'Donchian 多週期集成', meta: 'BTC · 1D', stage: 2, stageLab: '待核准', prog: '4/4 過', next: 'CLI 核准待執行', g6: 'ppppww', g9: 'pppppywww', c: '#e8b45e', tone: 'gold' },
+  { id: 'fund', name: '資金費擁擠過濾', meta: 'BTC · 4H', stage: 1, stageLab: '研究中', prog: '優化 62%', next: '48 組參數計算中', g6: 'prwwww', g9: 'pprwwwwww', c: '#7faee2', tone: 'info' },
+  { id: 'dcm', name: 'DCM 突破後回踩', meta: 'BTC · 15m', stage: 1, stageLab: '未通過', prog: '淨損 -4.6%', next: '成本過高，已擋下', g6: 'fwwwww', g9: 'pfwwwwwww', c: '#f43f5e', tone: 'fail' },
+  { id: 'vol', name: '波動率突破', meta: 'SOL · 4H · Agent', stage: 0, stageLab: '提案', prog: '待審', next: '非主力幣種 · 僅多', g6: 'wwwwww', g9: 'ywwwwwwww', c: '#a1a1aa', tone: 'muted' },
+  { id: 'wk', name: '週末效應', meta: 'BTC · 1D', stage: 0, stageLab: '提案', prog: '佇列', next: '待送研究', g6: 'wwwwww', g9: 'pwwwwwwww', c: '#71717a', tone: 'muted' },
+];
+
+const ACTIONS_BASE = [
+  {
+    sev: 'p1', cat: 'alert', tag: '偏差警戒', tagCls: 'warn',
+    title: 'mean-reversion-rsi · ETH-USDT-SWAP 1H',
+    fact: '模擬偏差 -0.61%（警戒線 0.50% / 門檻 1.00%）· 近 3 筆滑價偏高',
+    btns: [{ label: '檢視比對', cls: '', act: '開啟 mean-reversion-rsi 模擬盤 vs 回測逐筆比對' }],
+  },
+  {
+    sev: 'p2', cat: 'approve', tag: '待核准', tagCls: 'gold',
+    title: 'donchian-ensemble · BTC-USDT-SWAP 1D',
+    fact: '4/4 驗證通過 · 年化 +13.9% · 最大回撤 -11.3% · PBO 22%',
+    btns: [
+      { label: '檢視報告', cls: '', act: '開啟 donchian-ensemble 研究報告' },
+      { label: '複製核准指令', cls: 'pri', act: '已複製：.venv\\Scripts\\python.exe -m catos.cli strategy approve --profile ...' },
+    ],
+  },
+  {
+    sev: 'p3', cat: 'proposal', tag: '研究提案', tagCls: '',
+    title: 'vol-breakout · SOL-USDT-SWAP 4H',
+    fact: 'Agent 提交 · 策略資料夾策略 · 依規則預設只做多',
+    btns: [{ label: '檢視策略', cls: '', act: '開啟 strategies/vol-breakout/ 程式碼與預檢結果' }],
+  },
+];
+
+const P0_ITEM = {
+  sev: 'p0', cat: 'alert', tag: '風控鎖存', tagCls: 'down',
+  title: '帳戶 Soft Latch 已觸發 · 禁止開新倉',
+  fact: '風控期間損益 -5.12% 觸及 5.00% 門檻（11/16 06:14）· 需由 CLI demo rearm 解除',
+  btns: [
+    { label: '前往風控', cls: 'danger', act: '前往風控中心檢視鎖存紀錄' },
+    { label: '複製 rearm 指令', cls: '', act: '已複製：.venv\\Scripts\\python.exe -m catos.cli demo rearm' },
+  ],
+};
+
+const EVENTS = [
+  { t: '08:00:02', cat: 'RISK', tag: '風控', cls: 'info', msg: '帳本與 OKX 模擬盤對帳一致（部位 5 張 BTC · 權益 $11,170.47）', right: 'HEALTHY' },
+  { t: '08:00:00', cat: 'SYS', tag: '訊號', cls: '', msg: 'don4h BTC 4H 收 $91,265.8，高於平倉線 $86,666.0，維持多 3 張', right: 'HOLD' },
+  { t: '00:00:03', cat: 'RISK', tag: '風控', cls: 'info', msg: '建立台北日基準 20241116 · 起算權益 $11,029.26（Soft 5% / Hard 10%）', right: '$11,029.26' },
+  { t: '11/15 20:00', cat: 'ORDER', tag: '成交', cls: 'down', msg: 'rsi ETH-USDT-SWAP 賣出 3 張 @ $3,128.00 · 手續費 $0.47', right: '+$21.86' },
+  { t: '11/15 16:00', cat: 'ORDER', tag: '成交', cls: 'up', msg: 'rsi ETH-USDT-SWAP 買進 3 張 @ $3,052.00 · 手續費 $0.47', right: '多 3 張' },
+  { t: '11/05 20:00', cat: 'ORDER', tag: '成交', cls: 'up', msg: 'don4h BTC-USDT-SWAP 買進 3 張 @ $69,638.00 · 手續費 $1.04', right: '多 3 張' },
+  { t: '11/01 12:00', cat: 'ORDER', tag: '成交', cls: 'up', msg: 'tsmom BTC-USDT-SWAP 買進 2 張 @ $69,282.90 · 手續費 $0.69', right: '多 2 張' },
+];
+
+const EQ_SAMPLE = [10000,10002,10018,10068,10052,10070,10068,10068,10064,10112,10220,10340,10455,10510,10490,10690,10840,10960,11120,11040,10910,11029.26,11095,11170.47];
+
+/* ==================== 區塊 1: 曝險卡片渲染器 ==================== */
+const EXP_STATE = {
+  a: { tab: 'bots', unit: 'pct', sim: true },
+  b: { tab: 'bots', unit: 'pct' },
+};
+
+function renderExposureCard(targetId, stateKey, allowFullTabs) {
+  const st = EXP_STATE[stateKey];
+  const tabs = allowFullTabs
+    ? [['bots','策略'],['coin','幣種'],['delta','多空'],['pnl','損益'],['margin','保證金']]
+    : [['bots','策略'],['coin','幣種'],['delta','多空']];
+
+  const showSim = allowFullTabs && st.sim && (st.tab === 'bots' || st.tab === 'coin');
+  const pendUsd = 912.66; // 1 張 BTC @ 91,265.8
+
+  let centerMain = '', centerSub = '', topRight = '', formula = '', rows = [], arcs = [];
+
+  if (st.tab === 'bots') {
+    const used = ACCT.notional, rem = CAP_USD - used;
+    const pct = Math.round(used / CAP_USD * 100);
+    centerMain = st.unit === 'pct' ? `${pct}%` : st.unit === 'lev' ? `${f(used/ACCT.eq,2)}x` : `$${f(used,0)}`;
+    centerSub = st.unit === 'pct' ? '單幣上限已用' : st.unit === 'lev' ? '有效槓桿' : '名目總曝險';
+    topRight = `${f(used/ACCT.eq,2)} / ${f(ACCT.capLev,2)}x`;
+    arcs = [
+      { v: BOTS[0].notional, c: '#e8b45e' },
+      { v: BOTS[1].notional, c: '#7faee2' },
+      ...(showSim ? [{ v: pendUsd, c: '#71717a', op: 0.48 }] : []),
+    ];
+    rows = [
+      { c: '#e8b45e', nm: 'Donchian 通道突破', sub: 'BTC 多 3 張', val: `$${f(BOTS[0].notional)}`, pct: `${Math.round(BOTS[0].notional/CAP_USD*100)}%` },
+      { c: '#7faee2', nm: '時間序列動能', sub: 'BTC 多 2 張', val: `$${f(BOTS[1].notional)}`, pct: `${Math.round(BOTS[1].notional/CAP_USD*100)}%` },
+      { c: '#3f3f46', nm: '剩餘可用額度', sub: '未配置', val: `$${f(rem)}`, pct: `${Math.round(rem/CAP_USD*100)}%`, muted: true },
+    ];
+    formula = `額度 = 權益 $${f(ACCT.eq)} × 單幣上限 0.50x = $${f(CAP_USD)}`;
+  } else if (st.tab === 'coin') {
+    const used = ACCT.notional, rem = CAP_USD - used;
+    const pct = Math.round(used / CAP_USD * 100);
+    centerMain = st.unit === 'pct' ? `${pct}%` : st.unit === 'lev' ? `${f(used/ACCT.eq,2)}x` : `$${f(used,0)}`;
+    centerSub = 'BTC 單幣集中度';
+    topRight = `BTC 0.41 / 0.50x`;
+    arcs = [
+      { v: used, c: '#e8b45e' },
+      ...(showSim ? [{ v: pendUsd, c: '#71717a', op: 0.48 }] : []),
+    ];
+    rows = [
+      { c: '#e8b45e', nm: 'BTC-USDT-SWAP', sub: '2 策略疊加 · 逼近上限', val: `$${f(used)}`, pct: `${pct}%`, warn: true },
+      { c: '#8b8df8', nm: 'ETH-USDT-SWAP', sub: '空手 (1 策略)', val: '$0.00', pct: '0%', muted: true },
+      { c: '#3f3f46', nm: '單幣剩餘緩衝', sub: '距 0.50x', val: `$${f(rem)}`, pct: `${100-pct}%`, muted: true },
+    ];
+    formula = `帳戶總預算 1.00x ($${f(ACCT.eq)}) · 單幣預算 50% ($${f(CAP_USD)})`;
+  } else if (st.tab === 'delta') {
+    const longUsd = ACCT.notional, shortUsd = 0, netLev = longUsd / ACCT.eq;
+    centerMain = st.unit === 'usd' ? `+$${f(longUsd,0)}` : st.unit === 'pct' ? '100% 多' : `+${f(netLev,2)}x`;
+    centerSub = '淨多空曝險 (Net)';
+    topRight = `Gross 0.41x · Net +0.41x`;
+    arcs = [{ v: longUsd, c: '#10b981' }];
+    rows = [
+      { c: '#10b981', nm: '多頭總曝險 (LONG)', sub: '5 張 BTC', val: `+$${f(longUsd)}`, pct: '100%' },
+      { c: '#f43f5e', nm: '空頭總曝險 (SHORT)', sub: '0 張', val: '$0.00', pct: '0%', muted: true },
+      { c: '#e8b45e', nm: '淨方向曝險 (NET)', sub: '全單邊偏多', val: `+$${f(longUsd)}`, pct: '+0.41x' },
+    ];
+    formula = `對沖率 0% · 全組合方向同向暴露於 BTC 下行波動`;
+  } else if (st.tab === 'pnl') {
+    const totAbs = ACCT.realized + ACCT.unrealized + ACCT.fees;
+    centerMain = `+$${f(ACCT.eq - ACCT.start, 0)}`;
+    centerSub = '累計淨損益 (+11.7%)';
+    topRight = `浮盈佔比 ${Math.round(ACCT.unrealized / totAbs * 100)}%`;
+    arcs = [
+      { v: ACCT.unrealized, c: '#e8b45e' },
+      { v: ACCT.realized, c: '#10b981' },
+      { v: ACCT.fees, c: '#71717a' },
+    ];
+    rows = [
+      { c: '#e8b45e', nm: '未實現浮盈', sub: '持倉中 · 會隨回檔縮水', val: `+$${f(ACCT.unrealized)}`, pct: `${Math.round(ACCT.unrealized/totAbs*100)}%` },
+      { c: '#10b981', nm: '已實現損益', sub: '已落袋結算', val: `+$${f(ACCT.realized)}`, pct: `${Math.round(ACCT.realized/totAbs*100)}%` },
+      { c: '#71717a', nm: '手續費成本', sub: '累計 10 筆', val: `-$${f(ACCT.fees)}`, pct: `${Math.max(1,Math.round(ACCT.fees/totAbs*100))}%`, muted: true },
+    ];
+    formula = `淨利 $${f(ACCT.eq-ACCT.start)} = 已實現 $${f(ACCT.realized)} + 未實現 $${f(ACCT.unrealized)} - 手續費 $${f(ACCT.fees)}`;
+  } else {
+    centerMain = `${f(ACCT.mgnRatio,0)}x`;
+    centerSub = 'OKX 保證金率';
+    topRight = `安全門檻 >= 3.0x`;
+    arcs = [{ v: ACCT.margin, c: '#7faee2' }];
+    rows = [
+      { c: '#7faee2', nm: '已用保證金', sub: 'cross · 10x 估算', val: `$${f(ACCT.margin)}`, pct: `${Math.round(ACCT.margin/ACCT.eq*100)}%` },
+      { c: '#10b981', nm: '可用餘額', sub: '可開倉緩衝', val: `$${f(ACCT.avail)}`, pct: `${Math.round(ACCT.avail/ACCT.eq*100)}%` },
+      { c: '#e8b45e', nm: '維持保證金倍數', sub: 'OKX details[].mgnRatio', val: `${f(ACCT.mgnRatio,1)}x`, pct: '正常' },
+    ];
+    formula = `local-sim 不顯示此分頁；連線 OKX 模擬盤／實盤時自動啟用`;
+  }
+
+  const r = 74, L = 2 * Math.PI * r;
+  const denom = st.tab === 'pnl' ? (ACCT.realized + ACCT.unrealized + ACCT.fees)
+              : st.tab === 'margin' ? ACCT.eq
+              : st.tab === 'delta' ? ACCT.notional
+              : CAP_USD;
+  let acc = 0;
+  const arcSvg = arcs.map(a => {
+    const len = Math.min(L, L * a.v / (denom || 1));
+    const draw = Math.max(0, len - 3);
+    const s = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${a.c}" stroke-width="14" stroke-dasharray="${draw.toFixed(2)} ${(L - draw).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}" transform="rotate(-90 100 100)" ${a.op ? `opacity="${a.op}"` : ''}/>`;
+    acc += len;
+    return s;
+  }).join('');
+
+  const nextUnit = st.unit === 'pct' ? 'lev' : st.unit === 'lev' ? 'usd' : 'pct';
+  const unitBtn = (st.tab === 'bots' || st.tab === 'coin' || st.tab === 'delta')
+    ? `<div class="seg" title="切換中心數字單位">
+        ${[['pct','%'],['lev','x'],['usd','$']].map(([u,l]) => `<button type="button" class="${st.unit===u?'on':''}" onclick="setExpUnit('${stateKey}','${u}')">${l}</button>`).join('')}
+      </div>` : '';
+
+  document.getElementById(targetId).innerHTML = `
+    <div class="card-h">
+      <div class="card-title">曝險額度 <span class="pill up">正常</span></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${unitBtn}
+        <div class="seg">
+          ${tabs.map(([id,l]) => `<button type="button" class="${st.tab===id?'on':''}" onclick="setExpTab('${stateKey}','${id}')">${l}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px" class="m t2 muted">
+        <span>${st.tab==='bots'?'依策略拆解單幣額度':st.tab==='coin'?'跨策略單幣集中度檢查':st.tab==='delta'?'全帳戶多空方向淨曝險':st.tab==='pnl'?'已落袋 vs 持倉浮盈結構':'OKX 帳戶保證金狀態'}</span>
+        <span class="b" style="color:var(--fg)">${topRight}</span>
+      </div>
+      <div class="exp-grid">
+        <div class="donut-wrap" onclick="setExpUnit('${stateKey}','${nextUnit}')" title="點擊切換 % / x / $">
+          <svg viewBox="0 0 200 200" width="168" height="168">
+            <circle cx="100" cy="100" r="${r}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="14"/>
+            ${arcSvg}
+            <text x="100" y="96" text-anchor="middle" fill="var(--fg)" style="font:700 28px var(--mono)">${centerMain}</text>
+            <text x="100" y="116" text-anchor="middle" fill="var(--muted)" style="font:500 10.5px var(--sans)">${centerSub}</text>
+          </svg>
+          <span class="donut-hint">點擊圓環切單位</span>
+        </div>
+        <div>
+          ${rows.map(rw => `
+            <div class="leg-row">
+              <span class="leg-dot" style="background:${rw.c}"></span>
+              <span class="nw" style="overflow:hidden;text-overflow:ellipsis;${rw.muted?'color:var(--muted)':''}">${rw.nm}<span class="leg-sub ${rw.warn?'warn':''}">${rw.sub}</span></span>
+              <span class="m nw ${rw.muted?'muted':''}">${rw.val}</span>
+              <span class="m r b ${rw.warn?'warn':rw.muted?'faint':''}">${rw.pct}</span>
+            </div>`).join('')}
+          ${showSim ? `
+            <div class="sim-row">
+              <span class="leg-dot" style="background:#71717a;opacity:.6"></span>
+              <span class="nw">擬部署 · Donchian 多週期集成 <span class="faint">(1張)</span></span>
+              <span class="m">$${f(pendUsd)}</span>
+              <span class="m r warn">+${Math.round(pendUsd/CAP_USD*100)}%</span>
+            </div>` : ''}
+        </div>
+      </div>
+      <div class="formula"><span>${formula}</span></div>
+    </div>`;
+}
+
+window.setExpTab = (k, t) => { EXP_STATE[k].tab = t; renderAllExp(); };
+window.setExpUnit = (k, u) => { EXP_STATE[k].unit = u; renderAllExp(); };
+document.getElementById('simDeployToggle').addEventListener('change', e => {
+  EXP_STATE.a.sim = e.target.checked;
+  renderAllExp();
+});
+function renderAllExp() {
+  renderExposureCard('exp1A', 'a', true);
+  renderExposureCard('exp1B', 'b', false);
+  renderExposureCard('fullExp', 'a', true);
+}
+
+/* ==================== 區塊 2: 策略管線 3 版 ==================== */
+const PIPE_FILTER = { activeOnly: false };
+function renderPipe2A(targetId) {
+  const list = PIPE_FILTER.activeOnly ? PIPELINE.filter(s => s.stage >= 1 && s.tone !== 'fail') : PIPELINE;
+  const stages = ['提案', '研究驗證', '待核准', '模擬盤', '實盤'];
+  const pctMap = [8, 32, 55, 78, 100];
+  document.getElementById(targetId).innerHTML = `
+    <div class="card-h">
+      <div class="card-title">策略管線 <span class="card-sub">PIPELINE · ${list.length}</span></div>
+      <div class="seg">
+        <button type="button" class="${!PIPE_FILTER.activeOnly?'on':''}" onclick="setPipeFilter(false)">全部(${PIPELINE.length})</button>
+        <button type="button" class="${PIPE_FILTER.activeOnly?'on':''}" onclick="setPipeFilter(true)">進行中(${PIPELINE.filter(s=>s.stage>=1&&s.tone!=='fail').length})</button>
+      </div>
+    </div>
+    <div class="card-body p0">
+      <div class="pipe-stage-hd"><span>策略 / 標的</span><div class="pipe-5hd">${stages.map((s,i)=>`<span class="${i===2||i===4?'gold':''}">${s}</span>`).join('')}</div></div>
+      ${list.map(s => {
+        const fgW = s.stage * 20;
+        const nodes = stages.map((_, i) => {
+          let cls = '';
+          if (i < s.stage) cls = 'done';
+          else if (i === s.stage) {
+            cls = s.tone === 'fail' ? 'fail' : s.tone === 'warn' ? 'warn' : s.tone === 'gold' ? 'gold' : 'cur';
+          }
+          const lbl = i === s.stage ? `<span class="nlab ${s.tone==='fail'?'down':s.tone==='warn'?'warn':s.tone==='gold'?'gold':''}">${s.prog}</span>` : '';
+          return `<div class="node5"><span class="ndot ${cls}" style="--c:${s.c}"></span>${lbl}</div>`;
+        }).join('');
+        return `<div class="pipe-row clickable" onclick="toast('跳轉策略頁：${s.name}（${s.next}）')" title="${s.next}">
+          <div class="pipe-nm"><b>${s.name}</b><span>${s.meta}</span></div>
+          <div class="track5">
+            <span class="line-bg"></span>
+            <span class="line-fg" style="width:${fgW}%;background:${s.c}"></span>
+            ${nodes}
+          </div>
+          <div class="narrow-bar">
+            <span class="pill ${s.tone==='fail'?'down':s.tone==='warn'?'warn':s.tone==='gold'?'gold':s.tone==='ok'?'up':''}">${s.stageLab}</span>
+            <span class="mini-pbar"><i style="width:${pctMap[s.stage]}%;background:${s.c}"></i></span>
+            <span class="muted">${s.prog}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderPipe2B() {
+  document.getElementById('pipe2B').innerHTML = `
+    <div class="card-h">
+      <div class="card-title">策略路線圖 <span class="card-sub">9 GATES</span></div>
+      <span class="m t2 muted">金菱形 = 人工核准關</span>
+    </div>
+    <div class="card-body p0">
+      <div class="track9-hd">
+        <span>策略</span>
+        <div class="bands9"><span>提案</span><span>4 道驗證關</span><span class="y">核准</span><span>模擬盤 2 關</span><span class="y">實盤</span></div>
+      </div>
+      ${PIPELINE.map(s => {
+        const pts = [...s.g9];
+        const doneCount = pts.filter(c => c === 'p' || c === 'r' || c === 'a' || c === 'y' || c === 'f').length;
+        const fgW = Math.max(0, (doneCount - 1) / 8 * 89);
+        return `<div class="track9-row clickable" onclick="toast('跳轉策略頁：${s.name}（${s.next}）')" title="${s.next}">
+          <div class="pipe-nm"><b>${s.name}</b><span>${s.meta} · ${s.prog}</span></div>
+          <div class="t9">
+            <span class="line-bg"></span>
+            <span class="line-fg" style="width:${fgW.toFixed(1)}%;background:${s.c}"></span>
+            ${pts.map(c => `<span class="st9 ${c==='w'?'':c}" style="--c:${s.c}"></span>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderPipe2C() {
+  document.getElementById('pipe2C').innerHTML = `
+    <div class="card-h">
+      <div class="card-title">策略管線 <span class="card-sub">GATE MATRIX</span></div>
+      <span class="m t2 muted">6 關卡進度</span>
+    </div>
+    <div class="card-body p0" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>策略</th><th>階段</th><th>驗證關卡 (6)</th><th class="r">當前狀態</th></tr></thead>
+        <tbody>
+          ${PIPELINE.map(s => `<tr class="clickable" onclick="toast('跳轉策略頁：${s.name}')">
+            <td><b>${s.name}</b><div class="m t1 muted">${s.meta}</div></td>
+            <td><span class="pill ${s.tone==='fail'?'down':s.tone==='warn'?'warn':s.tone==='gold'?'gold':s.tone==='ok'?'up':s.tone==='info'?'info':''}">${s.stageLab}</span></td>
+            <td><span class="g6">${[...s.g6].map(c => `<i class="${c==='w'?'':c}"></i>`).join('')}</span></td>
+            <td class="r m t2 ${s.tone==='fail'?'down':s.tone==='warn'?'warn':s.tone==='gold'?'gold':'muted'}">${s.next}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+window.setPipeFilter = (v) => { PIPE_FILTER.activeOnly = v; renderPipe2A('pipe2A'); renderPipe2A('fullPipe'); };
+window.setPipeW = (w) => {
+  document.getElementById('pipeWidth').value = w;
+  document.getElementById('pipeWidthVal').textContent = `${w} px`;
+  document.querySelectorAll('[data-pipe-card]').forEach(el => {
+    el.style.width = `${w}px`;
+    el.classList.toggle('narrow', w < 460);
+  });
+};
+document.getElementById('pipeWidth').addEventListener('input', e => setPipeW(Number(e.target.value)));
+
+/* ==================== 區塊 3: 待處理項目 3 版 ==================== */
+const AQ_STATE = { p0: false, tab3A: 'action', pin3B: true, cat3C: 'all', tabFull: 'action' };
+function currentActions() { return AQ_STATE.p0 ? [P0_ITEM, ...ACTIONS_BASE] : ACTIONS_BASE; }
+
+function actionRowsHtml(list) {
+  if (!list.length) return `<div class="m t2 faint" style="padding:20px;text-align:center">無待處理項目</div>`;
+  return list.map(a => `
+    <div class="aq-row ${a.sev}">
+      <span class="pill ${a.tagCls}">${a.tag}</span>
+      <div class="aq-main">
+        <div class="aq-top"><span class="m">${a.title}</span></div>
+        <div class="aq-fact">${a.fact}</div>
+      </div>
+      <div class="aq-acts">
+        ${a.btns.map(b => `<button type="button" class="btn ${b.cls}" onclick="toast('${b.act.replace(/'/g,"\\'")}')">${b.label}</button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function eventRowsHtml(filter) {
+  const list = filter === 'all' ? EVENTS : EVENTS.filter(e => e.cat === filter);
+  return list.map(e => `
+    <div class="ev-row">
+      <span class="faint">${e.t}</span>
+      <span class="pill ${e.cls}">${e.tag}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.msg}</span>
+      <span class="r muted">${e.right}</span>
+    </div>`).join('');
+}
+
+function renderAq3A(targetId, stateField) {
+  const acts = currentActions();
+  const tab = AQ_STATE[stateField];
+  const hasUrgent = acts.some(a => a.sev === 'p0' || a.sev === 'p1');
+  const badgeCls = acts.some(a => a.sev === 'p0') ? 'down' : hasUrgent ? 'warn' : 'gold';
+  document.getElementById(targetId).innerHTML = `
+    <div class="card-h">
+      <div class="card-title">待處理與事件審計 <span class="pill ${badgeCls}">${acts.length} 待處理</span></div>
+      <div class="seg">
+        <button type="button" class="${tab==='action'?'on':''}" onclick="setAqTab('${stateField}','action')">待處理(${acts.length})</button>
+        <button type="button" class="${tab==='ORDER'?'on':''}" onclick="setAqTab('${stateField}','ORDER')">成交(4)</button>
+        <button type="button" class="${tab==='RISK'?'on':''}" onclick="setAqTab('${stateField}','RISK')">風控(2)</button>
+        <button type="button" class="${tab==='all'?'on':''}" onclick="setAqTab('${stateField}','all')">全部(${EVENTS.length})</button>
+      </div>
+    </div>
+    <div class="card-body p0">
+      ${tab === 'action' ? actionRowsHtml(acts) : eventRowsHtml(tab)}
+    </div>`;
+}
+
+function renderAq3B() {
+  const acts = currentActions();
+  document.getElementById('aq3B').innerHTML = `
+    <div class="card-h">
+      <div class="card-title">事件審計與待處理</div>
+      <span class="m t2 muted">置頂 ${acts.length} · 流水 ${EVENTS.length}</span>
+    </div>
+    <div class="card-body p0">
+      <div class="pin-banner">
+        <div class="pin-hd" onclick="AQ_STATE.pin3B=!AQ_STATE.pin3B;renderAq3B()">
+          <span>▲ 待處理項目（${acts.length} 筆 · 按嚴重度排序）</span>
+          <span>${AQ_STATE.pin3B ? '收合' : '展開'}</span>
+        </div>
+        ${AQ_STATE.pin3B ? actionRowsHtml(acts) : ''}
+      </div>
+      ${eventRowsHtml('all')}
+    </div>`;
+}
+
+function renderAq3C() {
+  const acts = currentActions();
+  const c = AQ_STATE.cat3C;
+  const shown = c === 'all' ? acts : acts.filter(a => a.cat === c);
+  document.getElementById('aq3C').innerHTML = `
+    <div class="card-h">
+      <div class="card-title">待處理項目 <span class="card-sub">ACTION QUEUE</span></div>
+      <div class="seg">
+        <button type="button" class="${c==='all'?'on':''}" onclick="setAq3C('all')">全部(${acts.length})</button>
+        <button type="button" class="${c==='alert'?'on':''}" onclick="setAq3C('alert')">警戒(${acts.filter(a=>a.cat==='alert').length})</button>
+        <button type="button" class="${c==='approve'?'on':''}" onclick="setAq3C('approve')">核准(1)</button>
+        <button type="button" class="${c==='proposal'?'on':''}" onclick="setAq3C('proposal')">提案(1)</button>
+      </div>
+    </div>
+    <div class="card-body p0">${actionRowsHtml(shown)}</div>`;
+}
+
+window.setAqTab = (field, t) => { AQ_STATE[field] = t; renderAllAq(); };
+window.setAq3C = (c) => { AQ_STATE.cat3C = c; renderAq3C(); };
+document.getElementById('simP0Toggle').addEventListener('change', e => {
+  AQ_STATE.p0 = e.target.checked;
+  renderAllAq();
+});
+function renderAllAq() {
+  renderAq3A('aq3A', 'tab3A');
+  renderAq3B();
+  renderAq3C();
+  renderAq3A('fullAq', 'tabFull');
+}
+
+/* ==================== 區塊 4: 策略實例 + 持倉明細合併 ==================== */
+const BP_STATE = { f4A: 'all', open4A: 'don4h', tab4B: 'bots', fFull: 'all', openFull: null };
+
+function sparkSvg(pts, up) {
+  const lo = Math.min(...pts), hi = Math.max(...pts), sp = hi - lo || 1;
+  const w = 54, h = 16;
+  const d = pts.map((v, i) => `${i?'L':'M'}${(i/(pts.length-1)*w).toFixed(1)},${(2+(hi-v)/sp*(h-4)).toFixed(1)}`).join('');
+  return `<svg width="${w}" height="${h}" style="vertical-align:middle"><path d="${d}" fill="none" stroke="${up?'#e8b45e':'#f43f5e'}" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+}
+
+function renderBp4A(targetId, filterKey, openKey) {
+  const flt = BP_STATE[filterKey];
+  const openId = BP_STATE[openKey];
+  const list = flt === 'open' ? BOTS.filter(b => b.qty > 0) : BOTS;
+  document.getElementById(targetId).innerHTML = `
+    <div class="card-h">
+      <div class="card-title">策略實例與持倉 <span class="card-sub">BOTS &amp; POSITIONS</span></div>
+      <div class="seg">
+        <button type="button" class="${flt==='all'?'on':''}" onclick="setBp4A('${filterKey}','all')">全部實例(3)</button>
+        <button type="button" class="${flt==='open'?'on':''}" onclick="setBp4A('${filterKey}','open')">持倉中(2)</button>
+        <button type="button" class="${flt==='orders'?'on':''}" onclick="setBp4A('${filterKey}','orders')">掛單(0)</button>
+      </div>
+    </div>
+    <div class="card-body p0" style="overflow-x:auto">
+      ${flt === 'orders' ? `<div class="m t2 faint" style="padding:26px;text-align:center">目前無在途掛單（v1 市價收盤執行）</div>` : `
+      <table class="tbl">
+        <thead><tr>
+          <th>實例 / 標的</th>
+          <th>部位 / 名目</th>
+          <th class="r">均價 / 標記價</th>
+          <th class="r">未實現 / 今日</th>
+          <th class="r">P6 停損 / 風控</th>
+          <th class="r">走勢與操作</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(b => {
+            const isOpen = openId === b.id;
+            return `<tr class="clickable" onclick="toggleBpRow('${openKey}','${b.id}')" title="點擊展開次要明細">
+              <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:${b.color};flex:none"></span>
+                  <b>${b.id}</b>
+                  <span class="m t1 muted">${b.tf}</span>
+                </div>
+                <div class="m t1 muted" style="padding-left:12px">${b.inst} · ${b.name}</div>
+              </td>
+              <td>
+                ${b.qty > 0
+                  ? `<span class="pill up">▲ 多 ${b.qty} 張</span><div class="m t1 muted" style="margin-top:2px">$${f(b.notional)} · <span class="up">已對帳</span></div>`
+                  : `<span class="pill">空手</span><div class="m t1 muted" style="margin-top:2px">等待訊號</div>`}
+              </td>
+              <td class="r m">
+                <div>${b.avg ? '$'+f(b.avg,1) : '—'}</div>
+                <div class="t1 muted">$${f(b.mark,1)}</div>
+              </td>
+              <td class="r m">
+                <div class="b ${b.un>0?'up':b.un<0?'down':'muted'}">${b.qty?sg(b.un)+' USD':'$0.00'}</div>
+                <div class="t1 ${b.today>0?'up':'muted'}">今日 ${sg(b.today)}</div>
+              </td>
+              <td class="r m">
+                ${b.stopPx ? `<div class="gold">$${f(b.stopPx,1)}</div><div class="t1 up">P6 已掛單 · 正常</div>`
+                           : `<div class="faint">無部位</div><div class="t1 ${Math.abs(b.drift)>0.5?'warn':'muted'}">偏差 ${sg(b.drift)}%</div>`}
+              </td>
+              <td class="r nw">
+                ${sparkSvg(b.spark, b.total >= 0)}
+                <button type="button" class="btn pri" style="margin-left:6px" onclick="event.stopPropagation();toast('開啟 ${b.id} 詳情頁')">詳情 ↗</button>
+              </td>
+            </tr>
+            ${isOpen ? `<tr><td colspan="6" style="padding:0">
+              <div class="exp-detail">
+                <div><span>累計損益</span><b class="${b.total>=0?'up':'down'}">${sg(b.total)} USDT</b></div>
+                <div><span>模擬盤偏差</span><b class="${Math.abs(b.drift)>0.5?'warn':''}">${sg(b.drift)}%</b></div>
+                <div><span>單策略槓桿</span><b>${f(b.lev,2)}x</b></div>
+                <div><span>P6 停損 algoId</span><b>${b.algoId ?? '未掛單'}</b></div>
+                <div><span>資金費率 / 強平墊</span><b>0.008% / 1758x</b></div>
+                <div><span>運行天數</span><b>第 ${b.days} 天</b></div>
+              </div>
+            </td></tr>` : ''}`;
+          }).join('')}
+        </tbody>
+      </table>`}
+    </div>`;
+}
+
+function renderBp4B() {
+  const t = BP_STATE.tab4B;
+  document.getElementById('bp4B').innerHTML = `
+    <div class="card-h">
+      <div class="card-title">執行與部位</div>
+      <div class="seg">
+        <button type="button" class="${t==='bots'?'on':''}" onclick="setBp4B('bots')">策略實例(3)</button>
+        <button type="button" class="${t==='pos'?'on':''}" onclick="setBp4B('pos')">持倉明細(2)</button>
+        <button type="button" class="${t==='ord'?'on':''}" onclick="setBp4B('ord')">掛單(0)</button>
+      </div>
+    </div>
+    <div class="card-body p0" style="overflow-x:auto">
+      ${t === 'bots' ? `
+        <table class="tbl">
+          <thead><tr><th>實例 / 標的</th><th>策略模型</th><th class="r">今日損益</th><th class="r">權益</th><th>風控</th><th class="r">操作</th></tr></thead>
+          <tbody>${BOTS.map(b => `<tr>
+            <td><b>${b.id}</b><div class="m t1 muted">${b.inst} ${b.tf} · 運行中</div></td>
+            <td>${b.name}<div class="m t1 muted">偏差 ${sg(b.drift)}%</div></td>
+            <td class="r m ${b.today>0?'up':'muted'}">${sg(b.today)}</td>
+            <td class="r m b">$${f(b.equity)}</td>
+            <td><span class="pill up">正常 ${f(b.lev,2)}x</span></td>
+            <td class="r"><button type="button" class="btn pri" onclick="toast('開啟 ${b.id} 詳情')">詳情 ↗</button></td>
+          </tr>`).join('')}</tbody>
+        </table>` : t === 'pos' ? `
+        <table class="tbl">
+          <thead><tr><th>合約 / 部位</th><th class="r">開倉 / 標記價</th><th class="r">未實現損益</th><th class="r">P6 強制停損</th><th class="r">操作</th></tr></thead>
+          <tbody>${BOTS.filter(b=>b.qty>0).map(b => `<tr>
+            <td><span class="pill up">▲ 多</span> <b>${b.inst}</b><div class="m t1 muted">${b.qty} 張 · 名目 $${f(b.notional)} · ${b.id}</div></td>
+            <td class="r m">$${f(b.avg,1)}<div class="t1 muted">$${f(b.mark,1)}</div></td>
+            <td class="r m up b">+$${f(b.un)}</td>
+            <td class="r m gold">$${f(b.stopPx,1)}<div class="t1 up">LIVE</div></td>
+            <td class="r"><button type="button" class="btn" disabled style="opacity:.45">平倉</button></td>
+          </tr>`).join('')}</tbody>
+        </table>` : `<div class="m t2 faint" style="padding:26px;text-align:center">目前無在途掛單</div>`}
+    </div>`;
+}
+
+window.setBp4A = (k, v) => { BP_STATE[k] = v; renderAllBp(); };
+window.toggleBpRow = (k, id) => { BP_STATE[k] = BP_STATE[k] === id ? null : id; renderAllBp(); };
+window.setBp4B = (v) => { BP_STATE.tab4B = v; renderBp4B(); };
+function renderAllBp() {
+  renderBp4A('bp4A', 'f4A', 'open4A');
+  renderBp4A('fullBotsPos', 'fFull', 'openFull');
+  renderBp4B();
+}
+
+/* ==================== 區塊 5: 迷你權益圖 ==================== */
+function renderMiniEq() {
+  const el = document.getElementById('miniEqSvg');
+  const w = Math.max(260, el.clientWidth || 420), h = 160;
+  const lo = 9950, hi = 11260;
+  const x = i => 8 + i / (EQ_SAMPLE.length - 1) * (w - 48);
+  const y = v => 12 + (hi - v) / (hi - lo) * (h - 28);
+  const line = EQ_SAMPLE.map((v, i) => `${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const area = `${line}L${x(EQ_SAMPLE.length-1).toFixed(1)},${y(10000).toFixed(1)}L${x(0).toFixed(1)},${y(10000).toFixed(1)}Z`;
+  el.innerHTML = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}">
+    <defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e8b45e" stop-opacity=".2"/><stop offset="100%" stop-color="#e8b45e" stop-opacity="0"/></linearGradient></defs>
+    <line x1="8" x2="${w-40}" y1="${y(10000)}" y2="${y(10000)}" stroke="rgba(255,255,255,.15)" stroke-dasharray="3 3"/>
+    <text x="${w-36}" y="${y(10000)+3}" fill="var(--gold)" style="font:700 9px var(--mono)">0.0%</text>
+    <text x="${w-36}" y="${y(11170)+3}" fill="var(--up)" style="font:700 9px var(--mono)">+11.7%</text>
+    <path d="${area}" fill="url(#eqg)"/>
+    <path d="${line}" fill="none" stroke="#e8b45e" stroke-width="2"/>
+    <circle cx="${x(EQ_SAMPLE.length-1)}" cy="${y(EQ_SAMPLE[EQ_SAMPLE.length-1])}" r="3.5" fill="#e8b45e"/>
+  </svg>`;
+}
+
+renderAllExp();
+renderPipe2A('pipe2A');
+renderPipe2A('fullPipe');
+renderPipe2B();
+renderPipe2C();
+renderAllAq();
+renderAllBp();
+renderMiniEq();
+window.addEventListener('resize', renderMiniEq);
+</script>
+</body>
+</html>
