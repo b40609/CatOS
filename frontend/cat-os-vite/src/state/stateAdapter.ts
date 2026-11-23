@@ -13,6 +13,7 @@
  */
 
 import { ResearchApiError } from '@/adapters/research-api-adapter';
+import { buildPreviewPickState, isPreviewPickMode } from '@/adapters/preview-pick-fixture';
 import { newRequestId, simulationApi } from '@/adapters/simulation-api-adapter';
 import type { WorkspaceAdapter } from '@/adapters/types';
 import type { BotMode, CommandType, EventDTO, WorkspaceStateDTO } from '@/contracts';
@@ -40,6 +41,12 @@ export class StateAdapter {
   /** First load for the current mode, then start polling (local only). */
   public async init(): Promise<void> {
     const store = useCatStore.getState();
+    if (isPreviewPickMode()) {
+      this.stopPolling();
+      this.applyState(buildPreviewPickState());
+      useCatStore.getState().setConnection({ status: 'ok', detail: null, http_status: 200, last_ok_ms: Date.now(), polling: false });
+      return;
+    }
     const generation = store.modeGeneration;
     this.adapter.setMode(store.mode);
     store.setConnection({ status: 'loading', detail: null, http_status: null });

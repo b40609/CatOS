@@ -410,6 +410,7 @@ const cl=n=>n>0?'up':n<0?'down':'';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=s=>()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
 function walk(seed,n,drift,vol,a=0,b=null){const r=rng(seed),d=[a];for(let i=1;i<n;i++)d.push(d[i-1]+(r()-0.5+drift)*vol);if(b!=null){const k=b-d[n-1];return d.map((v,i)=>v+k*i/(n-1))}return d}
+function path(seed,n,vol,anchors){const r=rng(seed),d=[0];for(let i=1;i<n;i++)d.push(d[i-1]+(r()-0.5)*vol);const c=anchors.slice().sort((a,b)=>a[0]-b[0]).map(([i,v])=>[i,v-d[i]]);return d.map((v,i)=>{let k=0;while(k<c.length-2&&i>c[k+1][0])k++;const a=c[k],b=c[Math.min(k+1,c.length-1)],t=b[0]===a[0]?0:Math.max(0,Math.min(1,(i-a[0])/(b[0]-a[0])));return v+a[1]+(b[1]-a[1])*t})}
 const ddOf=d=>{let m=-1e18;return d.map(v=>{m=Math.max(m,v);return (v-m)/m*100})};
 /* 收盤價會通過指定的錨點（[第幾根, 價格]），讓圖上的進出場和成交紀錄對得起來 */
 function mkCandlesA(seed,n,anchors,vol){const r=rng(seed),c=[0];for(let i=1;i<n;i++)c.push(c[i-1]+(r()-0.5)*vol);const A=anchors.slice().sort((a,b)=>a[0]-b[0]);
@@ -476,7 +477,7 @@ const DB={
   bots:[
     {id:'don4h',inst:'BTC-USDT-SWAP',pos:'多 2 張',side:1,qty:2,avg:103412.0,mark:105477.0,stopAt:102880.0,un:41.30,today:28.40,total:139.60,days:23,since:'10/25',drift:-0.12,lev:0.21,next:'00:12:40',wait:'持有多單。下一根 4 小時收盤低於 102,880.0 就平倉',seed:101},
     {id:'tsmom',inst:'BTC-USDT-SWAP',pos:'多 1 張',side:1,qty:1,avg:103287.0,mark:105477.0,stopAt:null,un:21.90,today:13.71,total:87.17,days:15,since:'11/02',drift:0.05,lev:0.10,next:'00:12:40',wait:'持有多單。90 天報酬轉負就平倉',seed:113},
-    {id:'rsi',inst:'ETH-USDT-SWAP',pos:'空手',side:0,qty:0,avg:null,mark:3412.6,stopAt:null,un:0,today:0,total:-12.40,days:13,since:'11/04',drift:-0.61,lev:0,next:'00:12:40',wait:'空手。RSI 低於 28 就買進 3 張',seed:127}
+    {id:'rsi',inst:'ETH-USDT-SWAP',pos:'空手',side:0,qty:0,avg:null,mark:3412.6,stopAt:null,un:0,today:0,total:-12.40,days:14,since:'11/03',drift:-0.61,lev:0,next:'00:12:40',wait:'空手。RSI 低於 28 就買進 3 張',seed:127}
   ],
   todo:[
     {k:'deploy',t:'Donchian 多週期集成 可以上模擬盤了',s:'前四關都通過，你的五項標準也全過。',a:'去部署',id:'ens'},
@@ -529,7 +530,7 @@ const DB={
 };
 DB.S=id=>DB.strats.find(s=>s.id===id);
 DB.B=id=>DB.bots.find(b=>b.id===id);
-DB.eq=walk(7,120,0.06,26,10000,10214.37);
+DB.eq=path(7,120,18,[[0,10000],[64,10156],[74,9969],[118,DB.acct.base],[119,DB.acct.eq]]);
 DB.bh=walk(3,260,0.03,5.5,100,172);
 DB.btEq=s=>walk(s.seed,260,0.02,2.2,100,100+s.ret*5);
 DB.btDd=s=>{const d=ddOf(DB.btEq(s)),m=Math.min(...d)||-1;return d.map(v=>v*s.dd/m)};

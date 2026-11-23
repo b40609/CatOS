@@ -38,26 +38,42 @@ export function SimulationStatusStrip({ className }: { className?: string }) {
     try { await stateAdapter.retryPendingCommand(); } catch { /* recorded in command history */ } finally { setBusy(false); }
   };
 
+  const isPreviewPick = service?.mode === "preview-pick";
+
   return (
     <div className={cn("flex items-center gap-2 text-t1 font-mono whitespace-nowrap min-w-0", className)}>
-      <span className={cn("flex items-center gap-1", statusTone)}>
-        <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400" : connection.status === "mode_not_open" ? "bg-cyan-400" : connection.status === "loading" ? "bg-muted-foreground animate-pulse" : "bg-rose-400")} />
-        {mode === "local" ? "本機模擬" : mode.toUpperCase()} · {statusText}
-      </span>
-      {service && (
+      {isPreviewPick ? (
         <>
-          <span className="text-border">|</span>
-          <span className="text-muted-foreground">槽位 <strong className="text-foreground">{SLOT_LABEL[service.slot] ?? service.slot}</strong></span>
-          <span className="text-border">|</span>
-          <span className="text-muted-foreground" title={service.instance_id}>instance {shortId(service.instance_id)}</span>
-          {service.restart_required && (
-            <span className="px-1.5 py-0.2 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 font-semibold"
-                  title={`loaded ${shortId(service.build_id)} ≠ current ${shortId(service.current_build_id)}`}>
-              來源已變更 · 需重啟服務
-            </span>
-          )}
-          {service.unavailable_reason && (
-            <span className="px-1.5 py-0.2 rounded border border-rose-500/40 bg-rose-500/10 text-rose-300">{service.unavailable_reason}</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/15 text-amber-300 font-semibold">
+            <span className="size-1.5 rounded-full bg-amber-400" />
+            對照假資料 · 與 X/Y/Z 同步
+          </span>
+          <a href="/" className="text-muted-foreground hover:text-foreground underline underline-offset-2">
+            回即時服務
+          </a>
+        </>
+      ) : (
+        <>
+          <span className={cn("flex items-center gap-1", statusTone)}>
+            <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400" : connection.status === "mode_not_open" ? "bg-cyan-400" : connection.status === "loading" ? "bg-muted-foreground animate-pulse" : "bg-rose-400")} />
+            {mode === "local" ? "本機模擬" : mode.toUpperCase()} · {statusText}
+          </span>
+          {service && (
+            <>
+              <span className="text-border">|</span>
+              <span className="text-muted-foreground">槽位 <strong className="text-foreground">{SLOT_LABEL[service.slot] ?? service.slot}</strong></span>
+              <span className="text-border">|</span>
+              <span className="text-muted-foreground" title={service.instance_id}>instance {shortId(service.instance_id)}</span>
+              {service.restart_required && (
+                <span className="px-1.5 py-0.2 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 font-semibold"
+                      title={`loaded ${shortId(service.build_id)} ≠ current ${shortId(service.current_build_id)}`}>
+                  來源已變更 · 需重啟服務
+                </span>
+              )}
+              {service.unavailable_reason && (
+                <span className="px-1.5 py-0.2 rounded border border-rose-500/40 bg-rose-500/10 text-rose-300">{service.unavailable_reason}</span>
+              )}
+            </>
           )}
         </>
       )}

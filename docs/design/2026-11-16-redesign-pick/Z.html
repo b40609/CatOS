@@ -332,6 +332,7 @@ const cl=n=>n>0?'up':n<0?'down':'';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const rng=s=>()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
 function walk(seed,n,drift,vol,a=0,b=null){const r=rng(seed),d=[a];for(let i=1;i<n;i++)d.push(d[i-1]+(r()-0.5+drift)*vol);if(b!=null){const k=b-d[n-1];return d.map((v,i)=>v+k*i/(n-1))}return d}
+function path(seed,n,vol,anchors){const r=rng(seed),d=[0];for(let i=1;i<n;i++)d.push(d[i-1]+(r()-0.5)*vol);const c=anchors.slice().sort((a,b)=>a[0]-b[0]).map(([i,v])=>[i,v-d[i]]);return d.map((v,i)=>{let k=0;while(k<c.length-2&&i>c[k+1][0])k++;const a=c[k],b=c[Math.min(k+1,c.length-1)],t=b[0]===a[0]?0:Math.max(0,Math.min(1,(i-a[0])/(b[0]-a[0])));return v+a[1]+(b[1]-a[1])*t})}
 const ddOf=d=>{let m=-1e18;return d.map(v=>{m=Math.max(m,v);return (v-m)/m*100})};
 function mkCandles(seed,n,last,vol){const r=rng(seed),o=[];let p=0;for(let i=0;i<n;i++){const op=p,c=op+(r()-0.46)*vol,h=Math.max(op,c)+r()*vol*0.45,l=Math.min(op,c)-r()*vol*0.45;o.push([op,h,l,c]);p=c}const k=last-o[n-1][3];return o.map(a=>a.map(v=>v+k))}
 const hms=s=>{s=Math.max(0,Math.round(s));const p=n=>String(n).padStart(2,'0');return p(Math.floor(s/3600))+':'+p(Math.floor(s%3600/60))+':'+p(s%60)};
@@ -342,7 +343,7 @@ const nowS=()=>NOW0+Math.floor((Date.now()-T0)/1000);
 const ME={name:'Kai',perTrade:1,dd:15,minRet:10,expo:0.50,soft:5,hard:10,maxParams:4};
 const TF={'15m':0,'1H':1,'4H':2,'1D':3};
 const DB={
-  acct:{eq:10214.37,start:10000,today:27.54,avail:9880.12,margin:334.25,dayStart:10186.83,days:23},
+  acct:{eq:10214.37,start:10000,today:42.11,avail:9880.12,margin:334.25,dayStart:10172.26,days:23},
   stages:[['idea','想法'],['research','研究中'],['validated','已驗證'],['demo','模擬盤'],['live','實盤']],
   gates:[['扣掉成本還賺','回測把手續費、滑價、資金費都算進去後，還是賺的'],['沒看過的資料也賺','用前一段選參數，在後一段沒看過的資料上測'],['不是靠運氣','試了很多組參數後，這個結果還站得住'],['Bot 和回測做同樣的事','同一段歷史，Bot 重播的每一筆成交都和回測相同'],['模擬盤跑滿 30 天','在 OKX 模擬盤連續執行，沒有中斷'],['模擬盤偏差小於 1%','模擬盤的損益和同期回測的差距']],
   gw:{p:'通過',f:'沒過',r:'進行中',w:'還沒開始',a:'要注意'},
@@ -350,7 +351,7 @@ const DB={
   strats:[
     {id:'don4h',name:'Donchian 通道突破',desc:'突破近期高點做多，跌破低點做空',sym:'BTC',tf:'4H',stage:'demo',by:'你',g:'pppprp',ret:11.4,dd:-9.8,n:103,dsr:0.71,pbo:20,seed:11,params:2,worst:-0.8,trials:21,yrs:4.87,from:2022,note:'模擬盤第 23 天',next:'模擬盤再跑 7 天，之後由你決定要不要上實盤',cost:[1912.4,-412.6,-188.3,-171.5],wf:[2.1,-0.8,3.4,1.2,-1.5,4.0,0.9]},
     {id:'tsmom',name:'時間序列動能',desc:'過去一段時間在漲就持有，在跌就空手',sym:'BTC',tf:'1D',stage:'demo',by:'你',g:'pppprp',ret:18.2,dd:-16.5,n:61,dsr:0.78,pbo:17,seed:23,params:1,worst:-0.9,trials:12,yrs:4.87,from:2022,note:'模擬盤第 15 天',next:'模擬盤再跑 15 天。上實盤前要先決定回撤的例外',cost:[2310.0,-146.0,-82.0,-262.0],wf:[3.8,1.1,-2.4,5.2,2.0,-1.2,4.4,0.7]},
-    {id:'rsi',name:'均值回歸 RSI',desc:'跌過頭買進，漲過頭賣出',sym:'ETH',tf:'1H',stage:'demo',by:'Agent',g:'ppppra',ret:9.1,dd:-7.2,n:388,dsr:0.58,pbo:31,seed:37,params:3,worst:-0.6,trials:36,yrs:2.87,from:2024,note:'偏差 −0.61%，接近 1% 門檻',next:'再觀察偏差。模擬盤還要跑 24 天',cost:[2468.0,-931.0,-498.0,-129.0],wf:[1.4,0.6,-1.1,2.2,-0.9,1.0,0.3]},
+    {id:'rsi',name:'均值回歸 RSI',desc:'跌過頭買進，漲過頭賣出',sym:'ETH',tf:'1H',stage:'demo',by:'Agent',g:'ppppra',ret:9.1,dd:-7.2,n:388,dsr:0.58,pbo:31,seed:37,params:3,worst:-0.6,trials:36,yrs:2.87,from:2024,note:'偏差 −0.61%，接近 1% 門檻',next:'再觀察偏差。模擬盤還要跑 16 天',cost:[2468.0,-931.0,-498.0,-129.0],wf:[1.4,0.6,-1.1,2.2,-0.9,1.0,0.3]},
     {id:'ens',name:'Donchian 多週期集成',desc:'三個週期的 Donchian 一起投票',sym:'BTC',tf:'1D',stage:'validated',by:'你',g:'ppppww',ret:13.9,dd:-11.3,n:74,dsr:0.74,pbo:22,seed:41,params:3,worst:-0.7,trials:18,yrs:4.87,from:2022,note:'前四關都過了，等你部署',next:'等你按下部署',cost:[2014.0,-298.0,-141.0,-185.0],wf:[2.6,-0.6,2.9,1.8,-1.9,3.1,1.2]},
     {id:'fund',name:'資金費擁擠過濾',desc:'資金費過高時不追多',sym:'BTC',tf:'4H',stage:'research',by:'Agent',g:'prwwww',ret:7.3,dd:-12.0,n:96,dsr:null,pbo:null,seed:53,params:4,worst:-0.9,trials:48,yrs:4.87,from:2022,note:'Agent 正在跑參數優化，62%',next:'等 Agent 跑完 48 組參數（現在 62%）',cost:[1392.0,-385.0,-172.0,-105.0],wf:null},
     {id:'dcm',name:'DCM 突破後回踩',desc:'突破後等回踩再進場',sym:'BTC',tf:'15m',stage:'research',by:'你',g:'fwwwww',ret:-4.6,dd:-14.9,n:1204,dsr:null,pbo:null,seed:67,params:6,worst:-1.3,trials:30,yrs:1,from:2025,note:'扣掉成本後是虧的',next:'建議擱置，或請 Agent 換個做法',cost:[1248.0,-1012.0,-655.0,-41.0],wf:null},
@@ -358,9 +359,9 @@ const DB={
     {id:'wk',name:'週末效應',desc:'只在週末持有',sym:'BTC',tf:'1D',stage:'idea',by:'你',g:'wwwwww',seed:83,note:'還只是一句話',next:'交給 Agent 研究'}
   ],
   bots:[
-    {id:'don4h',inst:'BTC-USDT-SWAP',coin:'BTC',pos:'多 2 張',side:1,qty:2,avg:103412.0,mark:105477.0,un:41.30,today:13.83,total:139.60,days:23,drift:-0.12,lev:0.20,notional:2109.54,next:13640,wait:'持有多單 2 張。下一根收盤低於 102,880.0 就平倉',risk:10.64,riskSay:'碰到平倉線時，這筆交易虧 10.64 USDT',seed:101},
-    {id:'tsmom',inst:'BTC-USDT-SWAP',coin:'BTC',pos:'多 1 張',side:1,qty:1,avg:103287.0,mark:105477.0,un:21.90,today:13.71,total:87.17,days:15,drift:0.05,lev:0.11,notional:1054.77,next:85640,wait:'持有多單 1 張。90 天報酬轉負就平倉',risk:34.87,riskSay:'價格要跌到約 99,800 才會平倉，那時這筆虧 34.87 USDT',seed:113},
-    {id:'rsi',inst:'ETH-USDT-SWAP',coin:'ETH',pos:'空手',side:0,qty:0,avg:null,mark:3412.6,un:0,today:0,total:-12.40,days:6,drift:-0.61,lev:0,notional:0,next:2840,wait:'空手。RSI 低於 28 就買進 3 張',risk:25.59,riskSay:'下次進場 3 張，停損設在 2.5%，最多虧 25.59 USDT',seed:127}
+    {id:'don4h',inst:'BTC-USDT-SWAP',coin:'BTC',pos:'多 2 張',side:1,qty:2,avg:103412.0,mark:105477.0,un:41.30,today:28.40,total:139.60,days:23,drift:-0.12,lev:0.21,notional:2109.54,next:13640,wait:'持有多單 2 張。下一根收盤低於 102,880.0 就平倉',risk:10.64,riskSay:'碰到平倉線時，這筆交易虧 10.64 USDT',seed:101},
+    {id:'tsmom',inst:'BTC-USDT-SWAP',coin:'BTC',pos:'多 1 張',side:1,qty:1,avg:103287.0,mark:105477.0,un:21.90,today:13.71,total:87.17,days:15,drift:0.05,lev:0.10,notional:1054.77,next:85640,wait:'持有多單 1 張。90 天報酬轉負就平倉',risk:34.87,riskSay:'價格要跌到約 99,800 才會平倉，那時這筆虧 34.87 USDT',seed:113},
+    {id:'rsi',inst:'ETH-USDT-SWAP',coin:'ETH',pos:'空手',side:0,qty:0,avg:null,mark:3412.6,un:0,today:0,total:-12.40,days:14,drift:-0.61,lev:0,notional:0,next:2840,wait:'空手。RSI 低於 28 就買進 3 張',risk:25.59,riskSay:'下次進場 3 張，停損設在 2.5%，最多虧 25.59 USDT',seed:127}
   ],
   pending:[],
   todo:[
@@ -371,7 +372,7 @@ const DB={
   night:[
     ['04:00','Donchian 通道突破 加碼 1 張 BTC，成交在 105,412.4','fill'],
     ['03:12','Agent 開始跑「資金費擁擠過濾」的 48 組參數，現在做到 62%','agent'],
-    ['00:00','新的一天開始。今天的起算權益 10,186.83','risk']
+    ['00:00','新的一天開始。今天的起算權益 10,172.26','risk']
   ],
   events:[
     ['08:00','risk','核對完成：CatOS 帳本和 OKX 的部位、餘額一致'],
@@ -380,7 +381,7 @@ const DB={
     ['07:30','you','勿擾結束。夜裡 3 則留到早上摘要'],
     ['04:00','fill','Donchian 通道突破　買進 1 張 BTC @ 105,412.4　手續費 0.53'],
     ['03:12','agent','Agent 送出參數優化：資金費擁擠過濾（48 組）'],
-    ['00:00','risk','今天的起算權益 10,186.83，虧損線 5%／10%'],
+    ['00:00','risk','今天的起算權益 10,172.26，虧損線 5%／10%'],
     ['昨 22:14','agent','Agent 提出新想法：波動率突破（SOL 4H）'],
     ['昨 21:00','fill','均值回歸 RSI　賣出 3 張 ETH @ 3,421.8　手續費 0.51'],
     ['昨 20:00','fill','均值回歸 RSI　買進 3 張 ETH @ 3,398.5　手續費 0.51'],
@@ -407,7 +408,7 @@ const DB={
   ]
 };
 DB.S=id=>DB.strats.find(s=>s.id===id);
-DB.eq=walk(7,120,0.06,26,10000,10214.37);
+DB.eq=path(7,120,18,[[0,10000],[64,10156],[74,9969],[118,DB.acct.dayStart],[119,DB.acct.eq]]);
 DB.eqDD=Math.min(...ddOf(DB.eq));
 DB.botEq=b=>walk(b.seed,b.days*6,0,9,0,b.total);
 DB.botBt=b=>walk(b.seed,b.days*6,0,9,0,b.total).map((v,i,a)=>v-(b.drift/100*10000)*i/(a.length-1)+Math.sin(i/5)*2.2);
@@ -597,7 +598,7 @@ const row=(...cells)=>{const c=cells.filter(Boolean);return c.length?`<div class
 function vOverview(){
   const A=acct(),bs=liveBots(),k=ST.kill,B=P.blocks,stop=bs.length-A.run;
   const items=bs.filter(b=>b.coin==='BTC'&&b.notional>0).map(b=>({n:DB.S(b.id).name,v:b.notional,c:BC[b.id]}));items.push({n:'還沒用的額度',v:Math.max(0,A.cap-A.btcN),c:'var(--line2)'});
-  CH.eq=(w,h)=>C.line({w,h,series:[{d:DB.eq,c:'var(--fg)',fill:.1,name:'權益',dot:1}],yfmt:v=>f(v,0),xl:[[0,'10/24'],[60,'11/04'],[119,'今天']],pad:[8,8,22,48]});
+  CH.eq=(w,h)=>C.line({w,h,series:[{d:DB.eq,c:'var(--fg)',fill:.1,name:'權益',dot:1}],yfmt:v=>f(v,0),xl:[[0,'10/25'],[59,'11/05'],[119,'今天']],pad:[8,8,22,48]});
   const h=k?`已緊急停止，鎖定中。${k.mode==='flat'?'部位都平掉了。':k.q?`${k.q} 張 BTC 部位還留著。`:'帳上沒有部位。'}`
     :`早安，${ME.name}。現在安全，今天${A.today>=0?'賺':'賠'} <span class="n ${cl(A.today)}">${sg(A.today)}</span> USDT。`;
   const p=k?'現在不能下任何新單。解除鎖定要你手動確認，Bot 也要你一個一個重新啟動。'
