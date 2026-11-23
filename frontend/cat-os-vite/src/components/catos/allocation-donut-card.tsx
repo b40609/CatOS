@@ -5,64 +5,74 @@ import { useCatStore } from "@/state/catStore";
 import type { BotControlState, DecimalString, PositionDTO, RiskStatus } from "@/contracts";
 import { formatDecimal, formatRatioPct, signOf, toPlotNumber } from "@/lib/format";
 
-// 定案配色：低彩度、高質感的資料系列色
+// 定案配色：Noir & Gold 低彩度金融色板
 const COLORS = {
-  position: "#e8b45e",  // 持倉 蜂蜜金
-  budget: "#10b981",    // 未用預算 / 多頭 翡翠綠
-  short: "#f43f5e",     // 空頭 / 虧損 玫瑰紅
-  fee: "#71717a",       // 手續費 費用灰
-  neutral: "#a1a1aa",   // 中性 鋅灰
-  muted: "#27272a",     // 不適用 / 尚無觀測 啞光槽
+  position: "#e8b45e", // 蜂蜜金
+  second: "#7faee2",   // 霧藍
+  violet: "#8b8df8",   // 靜藍紫
+  budget: "#10b981",   // 多頭 / 翡翠綠
+  short: "#f43f5e",    // 空頭 / 虧損 玫瑰紅
+  fee: "#71717a",      // 手續費 費用灰
+  neutral: "#a1a1aa",  // 中性 鋅灰
+  rem: "#3f3f46",      // 剩餘可用額度（啞灰槽）
+  muted: "#27272a",    // 尚無觀測
 };
 
-// 策略實例依序循環的系列色（不綁定任何幣種）
-const BOT_PALETTE = ["#e8b45e", "#7faee2", "#8b8df8", "#a1a1aa", "#f59e0b"];
+const BOT_PALETTE = ["#e8b45e", "#7faee2", "#8b8df8", "#10b981", "#f59e0b"];
 
 interface DonutItem {
   key: string;
   shortLabel: string;
-  compactLabel?: string; // 窄版極簡標籤
+  compactLabel?: string;
   sub: string;
-  amount: DecimalString | null; // 後端 Decimal 字串；null 代表不適用
-  amountStr: string;            // 顯示文字，一律由後端字串 formatDecimal 或明示文字而來
-  pct_share: number;            // 0..100，僅供幾何（弧長／進度條／佔比標籤）
+  amount: DecimalString | null; // 後端 Decimal 字串；null 代表不適用或非單一金額
+  amountStr: string;
+  pct_share: number; // 0..100，僅供幾何（弧長／佔比標籤）
   color: string;
   badgeStr: string;
   compactBadge?: string;
   isLoss?: boolean;
-  nearLimit?: boolean; // 逼近單幣上限提示
-  hidePct?: boolean;   // 非比例型資料（布林事實／空狀態）不顯示百分比
+  isMuted?: boolean;
+  nearLimit?: boolean;
+  hidePct?: boolean;
 }
 
-// 向量坐標系幾何常量 (以 200x200 viewBox 為基準，GPU 向量原生縮放，0 JS Resize 開銷)
-// 依據業界量化終端規範優化：降低軌道厚度至 9.5px，擴大中央負空間內徑至 140px，讓排版有充足呼吸感
+// 向量坐標系幾何常量 (200x200 viewBox，Y 版俐落厚環＋寬敞中央數字區)
 const VB_SIZE = 200;
 const CX = 100;
 const CY = 100;
-const R = 75;
-const STROKE_WIDTH = 9.5;
-const CIRCUMFERENCE = 2 * Math.PI * R; // 471.2389
-const SLICE_GAP = 2.5; // 幾何微縫隙
-const HUD_INNER_WIDTH = 140; // 環內可用文字寬度
+const R = 74;
+const STROKE_WIDTH = 13.5;
+const CIRCUMFERENCE = 2 * Math.PI * R;
+const SLICE_GAP = 2.6;
+const HUD_INNER_WIDTH = 132;
 
-export type DonutViewMode = "allocation" | "bots" | "delta" | "margin" | "pnl";
-export type HudFocus = "money" | "leverage";
+export type DonutViewMode = "bots" | "allocation" | "delta" | "pnl" | "margin";
+export type HudUnit = "pct" | "leverage" | "money";
 
-// 定案全 5 大核心維度分段標籤 (寬版完整名，窄版自動簡寫為 2 字標籤節省空間)
-const TABS: { id: DonutViewMode; label: string; shortLabel: string }[] = [
-  { id: "allocation", label: "幣種配置", shortLabel: "幣種" },
-  { id: "bots", label: "策略實例", shortLabel: "實例" },
-  { id: "delta", label: "多空部位曝險", shortLabel: "曝險" },
-  { id: "margin", label: "保證金佔用", shortLabel: "保證金" },
-  { id: "pnl", label: "損益分佈", shortLabel: "損益" },
+// 1A 定案 5 大視角：策略（預設）｜幣種｜多空｜損益｜保證金
+const TABS: { id: DonutViewMode; label: string }[] = [
+  { id: "bots", label: "策略" },
+  { id: "allocation", label: "幣種" },
+  { id: "delta", label: "多空" },
+  { id: "pnl", label: "損益" },
+  { id: "margin", label: "保證金" },
 ];
 
+const VIEW_CAPTION: Record<DonutViewMode, string> = {
+  bots: "依策略拆解單幣額度",
+  allocation: "跨策略單幣集中度檢查",
+  delta: "全帳戶多空方向淨曝險",
+  pnl: "已實現與持倉浮盈結構",
+  margin: "帳戶保證金模型狀態",
+};
+
 const SHARE_CAPTION: Record<DonutViewMode, string> = {
-  allocation: "佔預算",
-  bots: "佔預算",
+  bots: "佔額度",
+  allocation: "佔單幣上限",
   delta: "佔總曝險",
-  margin: "",
   pnl: "佔損益規模",
+  margin: "",
 };
 
 const BOT_STATE_LABEL: Record<BotControlState, string> = {
@@ -90,15 +100,13 @@ const TEXT_MODE_NOT_OPEN = "此模式未開放（demo/live 不在 v1 範圍）";
 
 /**
  * 圖形幾何專用：part 佔 whole 的百分比 (0..100)。
- * 這是本卡片唯一的 Decimal → float 轉換點（經 toPlotNumber），只用來決定弧長、
- * 進度條寬度與「佔比 x%」標籤；結果不得回流為任何金額、帳務或風控依據。
- * whole 為 null／0／非數字時回傳 0。
+ * 這是本卡片唯一的 Decimal → float 轉換點（經 toPlotNumber），僅用於弧長與佔比標籤，
+ * 結果不得回流為任何金額、帳務或風控依據。
  */
 function shareOf(part: DecimalString | null | undefined, whole: DecimalString | null | undefined): number {
   return sharePlot(toPlotNumber(part), toPlotNumber(whole));
 }
 
-/** shareOf 的數值核心；僅供損益分佈以 toPlotNumber 合計的幾何分母重用。 */
 function sharePlot(part: number, whole: number): number {
   if (!Number.isFinite(part) || !Number.isFinite(whole) || whole === 0) return 0;
   const pct = (Math.abs(part) / Math.abs(whole)) * 100;
@@ -106,36 +114,39 @@ function sharePlot(part: number, whole: number): number {
   return Math.min(100, Math.max(0, pct));
 }
 
-/** 槓桿倍數文字：null → 不適用，否則 "1.23x"。 */
 function leverageText(value: DecimalString | null | undefined): string {
   const text = formatDecimal(value, { digits: 2 });
   return text === TEXT_UNAVAILABLE ? text : `${text}x`;
 }
 
-/** 依字數讓 HUD 文字落在環內寬度（CJK 1em、其餘 0.62em），上限為原設計字級。 */
+function magnitude(value: string): string {
+  return value.trim().replace(/^[+-]/, "");
+}
+
 function hudFontSize(text: string, max: number): number {
   let units = 0;
   for (const ch of text) units += /[　-鿿＀-￯]/.test(ch) ? 1 : 0.62;
   if (units === 0) return max;
-  return Math.max(8, Math.min(max, Math.floor(HUD_INNER_WIDTH / units)));
+  return Math.max(9, Math.min(max, Math.floor(HUD_INNER_WIDTH / units)));
+}
+
+function nextHudUnit(unit: HudUnit): HudUnit {
+  return unit === "pct" ? "leverage" : unit === "leverage" ? "money" : "pct";
 }
 
 /**
- * 槓桿倍數與資產曝險卡片 (AllocationDonutCard)
- * - 徹底移除底部枯燥的 4 塊文字小框，將垂直空間 100% 留給圓環與清單
- * - 定案全 5 大維度即時切換：【幣種配置 | 策略實例 | 多空部位曝險 | 保證金佔用 | 損益分佈】
- * - 融合彭博高對比字體與微型進度刻度，支持【$ 金額主導】與【x 槓桿倍數】雙重直觀焦點
- * - 資料全部來自 useCatStore 的後端投影（risk／summary／bots／positions），金額不在前端運算
+ * 曝險額度卡片 (1A 定案：Y 風格底版 × 5 大視角切換 × 點擊圓環切換 % / x / $)
+ * - 標題列精簡無冗餘單位切換鈕，直接點擊圓環本體循環切換 % → x → $
+ * - 預設「策略」視角：中央單一大數字＋副標、按策略拆解明細列、底部單行額度公式
+ * - 所有金額皆直接格式化後端 Decimal 字串，不在前端進行帳務浮點運算
  */
 export function AllocationDonutCard({ className }: { className?: string }) {
-  const [viewMode, setViewMode] = useState<DonutViewMode>("allocation");
-  const [hudFocus, setHudFocus] = useState<HudFocus>("leverage");
+  const [viewMode, setViewMode] = useState<DonutViewMode>("bots");
+  const [hudUnit, setHudUnit] = useState<HudUnit>("pct");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 600, height: 240 });
+  const [dimensions, setDimensions] = useState({ width: 580, height: 260 });
 
-  // 業界標準全維度自適應形態降級 (WidgetKit / TradingView Form-Factor Degradation)：
-  // 實時監聽卡片物理容器的寬度與高度，當空間緊湊時無縫降級為單行背景長條圖態，0 衝突 0 跑板
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -151,9 +162,9 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return () => observer.disconnect();
   }, []);
 
-  const isNarrow = dimensions.width < 460;
+  const isNarrow = dimensions.width < 450;
   const isSuperNarrow = dimensions.width < 340;
-  const isShort = dimensions.height < 170;
+  const isShort = dimensions.height < 185;
   const isCompact = isNarrow || isShort;
 
   const risk = useCatStore((s) => s.risk);
@@ -173,12 +184,18 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   const symbolBudget = derived?.symbol_budget ?? null;
   const effectiveLeverage = derived?.effective_leverage ?? null;
 
-  // 幾何：名目佔總預算／單幣預算比例
-  const notionalShare = shareOf(notional, exposureBudget);
-  const symbolShare = shareOf(notional, symbolBudget);
-  const nearSymbolLimit = symbolShare >= 80;
+  // 額度分母：優先使用單幣上限 symbol_budget，缺省回退總預算 exposure_budget
+  const capBudget = symbolBudget ?? exposureBudget;
+  const capShare = shareOf(notional, capBudget);
+  const nearSymbolLimit = symbolBudget !== null && shareOf(notional, symbolBudget) >= 80;
 
-  // 空狀態：單一啞光切片 + 明示文字
+  const posByBot = useMemo(() => {
+    const map = new Map<string, PositionDTO>();
+    for (const p of positions) map.set(p.bot_id, p);
+    return map;
+  }, [positions]);
+
+  // 空狀態切片
   const unavailableItems: DonutItem[] = useMemo(() => [
     {
       key: "unavailable",
@@ -191,71 +208,61 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       color: COLORS.muted,
       badgeStr: "local-sim",
       compactBadge: "local",
+      isMuted: true,
       hidePct: true,
     },
   ], [unavailableText, unavailableSub, modeNotOpen]);
 
-  // 「未用預算」共用項目（幣種配置／策略實例）
-  const budgetItem: DonutItem = useMemo(() => ({
-    key: "budget",
-    shortLabel: "未用預算",
-    compactLabel: "預算",
-    sub: "緩衝",
+  // 剩餘可用額度（啞灰槽，不對 Decimal 做前端加減，僅呈現上限基準與剩餘比例）
+  const remainingItem: DonutItem = useMemo(() => ({
+    key: "remaining",
+    shortLabel: "剩餘可用額度",
+    compactLabel: "未用額度",
+    sub: symbolBudget ? "距單幣上限" : "距總預算",
     amount: null,
-    amountStr: `預算 ${formatDecimal(exposureBudget, { prefix: "$" })}`,
-    pct_share: Math.max(0, 100 - notionalShare),
-    color: COLORS.budget,
-    badgeStr: `單幣 ${formatDecimal(symbolBudget, { prefix: "$" })}`,
-    compactBadge: "上限",
-  }), [exposureBudget, symbolBudget, notionalShare]);
+    amountStr: `上限 ${formatDecimal(capBudget, { prefix: "$" })}`,
+    pct_share: Math.max(0, 100 - capShare),
+    color: COLORS.rem,
+    badgeStr: "未配置",
+    compactBadge: "未用",
+    isMuted: true,
+  }), [symbolBudget, capBudget, capShare]);
 
-  // 持倉所屬合約（由 risk.bot_id 對應的 Bot／部位取得，不寫死幣種）
-  const ownerBot = useMemo(() => bots.find((b) => b.bot_id === risk?.bot_id) ?? null, [bots, risk?.bot_id]);
-  const ownerInstId = ownerBot?.inst_id
-    ?? positions.find((p) => p.bot_id === risk?.bot_id)?.inst_id
-    ?? null;
-
-  // 1. 維度：幣種配置 (Notional Exposure · 名目曝險與預算佔比)
-  const allocationItems: DonutItem[] = useMemo(() => {
-    if (!risk) return unavailableItems;
-    return [
-      {
-        key: "position",
-        shortLabel: ownerInstId ? `${ownerInstId} 持倉` : "持倉",
-        compactLabel: ownerInstId ?? "持倉",
-        sub: "持倉",
-        amount: notional,
-        amountStr: formatDecimal(notional, { prefix: "$" }),
-        pct_share: notionalShare,
-        color: COLORS.position,
-        badgeStr: `${leverageText(effectiveLeverage)} 槓桿`,
-        compactBadge: leverageText(effectiveLeverage),
-        nearLimit: nearSymbolLimit,
-      },
-      budgetItem,
-    ];
-  }, [risk, unavailableItems, ownerInstId, notional, notionalShare, effectiveLeverage, nearSymbolLimit, budgetItem]);
-
-  // 2. 維度：策略實例 (Bot Allocation · 每個 Bot 一列，僅風控快照所屬 Bot 有名目)
+  // 1. 視角：策略（預設，Y 結構：按策略實例拆解單幣額度）
   const botItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
-    const rows: DonutItem[] = bots.map((bot, idx) => {
-      const owns = bot.bot_id === risk.bot_id;
-      const amount = owns ? notional : null;
-      return {
+    const rows: DonutItem[] = [];
+
+    bots.forEach((bot, idx) => {
+      const pos = posByBot.get(bot.bot_id) ?? null;
+      const posSign = signOf(pos?.position ?? bot.position);
+      const hasPos = posSign === "positive" || posSign === "negative";
+      const isShort = posSign === "negative";
+      const botNotional = pos?.notional ?? (bot.bot_id === risk.bot_id ? notional : null);
+      const share = hasPos ? shareOf(botNotional, capBudget) : shareOf(botNotional, capBudget);
+      const sym = (pos?.inst_id ?? bot.inst_id ?? "").replace("-USDT-SWAP", "");
+      const posBadge = hasPos && (pos?.position ?? bot.position)
+        ? `${sym ? `${sym} ` : ""}${isShort ? "空" : "多"} ${formatDecimal(magnitude((pos?.position ?? bot.position) as string), { digits: 0 })} 張`
+        : BOT_STATE_LABEL[bot.state] ?? bot.state;
+
+      // 多策略時若某策略空手（0 名目），仍保留於清單但歸為淡色提示
+      const isZero = !hasPos && (botNotional === null || signOf(botNotional) === "zero");
+      rows.push({
         key: `bot:${bot.bot_id}`,
-        shortLabel: bot.bot_id,
+        shortLabel: bot.strategy_name || bot.bot_id,
         compactLabel: bot.bot_id,
-        sub: bot.strategy_name,
-        amount,
-        amountStr: formatDecimal(amount, { prefix: "$" }),
-        pct_share: owns ? notionalShare : 0,
-        color: BOT_PALETTE[idx % BOT_PALETTE.length],
-        badgeStr: BOT_STATE_LABEL[bot.state] ?? bot.state,
-        compactBadge: BOT_STATE_LABEL[bot.state] ?? bot.state,
-        nearLimit: owns && nearSymbolLimit,
-      };
+        sub: bot.bot_id,
+        amount: botNotional,
+        amountStr: isZero ? "$0.00" : formatDecimal(botNotional, { prefix: "$" }),
+        pct_share: isZero ? 0 : share,
+        color: isZero ? COLORS.rem : BOT_PALETTE[idx % BOT_PALETTE.length],
+        badgeStr: isZero ? `${sym ? `${sym} ` : ""}空手` : posBadge,
+        compactBadge: isZero ? "空手" : posBadge,
+        isMuted: isZero,
+        nearLimit: bot.bot_id === risk.bot_id && nearSymbolLimit,
+      });
     });
+
     if (rows.length === 0) {
       rows.push({
         key: "no-bots",
@@ -267,14 +274,100 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         pct_share: 0,
         color: COLORS.neutral,
         badgeStr: "未啟用",
+        isMuted: true,
         hidePct: true,
       });
     }
-    rows.push(budgetItem);
-    return rows;
-  }, [risk, unavailableItems, bots, notional, notionalShare, nearSymbolLimit, budgetItem]);
 
-  // 3. 維度：多空部位曝險 (Long / Short Delta · 依 positions[] 方向拆分)
+    rows.push(remainingItem);
+    return rows;
+  }, [risk, unavailableItems, bots, posByBot, notional, capBudget, nearSymbolLimit, remainingItem]);
+
+  // 2. 視角：幣種（跨策略單幣集中度）
+  const allocationItems: DonutItem[] = useMemo(() => {
+    if (!risk) return unavailableItems;
+
+    // 依合約彙整策略數與持倉引用，不以 float 加總金額
+    const byInst = new Map<string, { botCount: number; openPositions: PositionDTO[] }>();
+    for (const bot of bots) {
+      const inst = bot.inst_id ?? "未指定合約";
+      const entry = byInst.get(inst) ?? { botCount: 0, openPositions: [] };
+      entry.botCount += 1;
+      byInst.set(inst, entry);
+    }
+    for (const p of positions) {
+      const inst = p.inst_id ?? p.symbol ?? "未指定合約";
+      const entry = byInst.get(inst) ?? { botCount: 0, openPositions: [] };
+      const s = signOf(p.position);
+      if (s === "positive" || s === "negative") entry.openPositions.push(p);
+      byInst.set(inst, entry);
+    }
+
+    const activeInsts = [...byInst.entries()].filter(([, info]) => info.openPositions.length > 0);
+    const rows: DonutItem[] = [];
+    let colorIdx = 0;
+
+    for (const [inst, info] of byInst.entries()) {
+      const openCount = info.openPositions.length;
+      let instNotional: DecimalString | null = null;
+      let pct = 0;
+      if (openCount === 0) {
+        instNotional = null;
+        pct = 0;
+      } else if (activeInsts.length === 1) {
+        // 全部持倉集中於單一合約：直接採用後端權威 risk.derived.notional（0 前端運算）
+        instNotional = notional;
+        pct = capShare;
+      } else if (openCount === 1) {
+        instNotional = info.openPositions[0].notional;
+        pct = shareOf(instNotional, capBudget);
+      } else {
+        // 多合約同時各有多策略時，僅用幾何加總顯示比例、金額不以浮點加總
+        const plotSum = info.openPositions.reduce((acc, p) => {
+          const n = toPlotNumber(p.notional);
+          return acc + (Number.isFinite(n) ? Math.abs(n) : 0);
+        }, 0);
+        pct = sharePlot(plotSum, toPlotNumber(capBudget));
+      }
+
+      const isZero = openCount === 0;
+      const color = isZero ? COLORS.violet : BOT_PALETTE[colorIdx++ % BOT_PALETTE.length];
+      rows.push({
+        key: `inst:${inst}`,
+        shortLabel: inst,
+        compactLabel: inst.replace("-USDT-SWAP", ""),
+        sub: `${info.botCount} 策略`,
+        amount: instNotional,
+        amountStr: isZero ? "$0.00" : instNotional ? formatDecimal(instNotional, { prefix: "$" }) : `${openCount} 筆持倉`,
+        pct_share: pct,
+        color: isZero ? COLORS.rem : color,
+        badgeStr: isZero ? `空手 (${info.botCount} 策略)` : openCount > 1 ? `${openCount} 策略疊加` : `${leverageText(effectiveLeverage)}`,
+        compactBadge: isZero ? "空手" : `${openCount} 筆`,
+        isMuted: isZero,
+        nearLimit: !isZero && pct >= 80,
+      });
+    }
+
+    if (rows.length === 0) {
+      rows.push({
+        key: "position-fallback",
+        shortLabel: "持倉曝險",
+        compactLabel: "持倉",
+        sub: "名目",
+        amount: notional,
+        amountStr: formatDecimal(notional, { prefix: "$" }),
+        pct_share: capShare,
+        color: COLORS.position,
+        badgeStr: leverageText(effectiveLeverage),
+        nearLimit: nearSymbolLimit,
+      });
+    }
+
+    rows.push(remainingItem);
+    return rows;
+  }, [risk, unavailableItems, bots, positions, notional, capBudget, capShare, effectiveLeverage, nearSymbolLimit, remainingItem]);
+
+  // 3. 視角：多空（方向淨曝險）
   const deltaItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const open = positions.filter((p) => {
@@ -284,83 +377,73 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     if (open.length === 0) {
       return [{
         key: "flat",
-        shortLabel: "空倉",
+        shortLabel: "空倉（無方向曝險）",
         compactLabel: "空倉",
         sub: "FLAT",
         amount: null,
-        amountStr: "無部位曝險",
+        amountStr: "$0.00",
         pct_share: 100,
-        color: COLORS.neutral,
+        color: COLORS.rem,
         badgeStr: "無方向",
+        isMuted: true,
         hidePct: true,
       }];
     }
-    // 幾何分母：各部位名目絕對值合計（僅經 toPlotNumber，不作金額顯示）
     const gross = open.reduce((acc, p) => {
       const n = toPlotNumber(p.notional);
       return acc + (Number.isFinite(n) ? Math.abs(n) : 0);
     }, 0);
     return open.map((p: PositionDTO) => {
       const isLong = signOf(p.position) === "positive";
-      const name = p.inst_id ?? p.bot_id;
+      const name = p.inst_id ? p.inst_id.replace("-USDT-SWAP", "") : p.bot_id;
       return {
         key: `pos:${p.bot_id}:${p.inst_id ?? ""}`,
-        shortLabel: `${name} ${isLong ? "多頭" : "空頭"}`,
-        compactLabel: isLong ? "多頭" : "空頭",
+        shortLabel: `${p.bot_id} · ${name} ${isLong ? "多頭" : "空頭"}`,
+        compactLabel: `${p.bot_id} ${isLong ? "多" : "空"}`,
         sub: isLong ? "LONG" : "SHORT",
         amount: p.notional,
-        amountStr: formatDecimal(p.notional, { prefix: "$" }),
+        amountStr: `${isLong ? "+" : "-"}${formatDecimal(p.notional, { prefix: "$" })}`,
         pct_share: sharePlot(toPlotNumber(p.notional), gross),
         color: isLong ? COLORS.budget : COLORS.short,
-        badgeStr: `部位 ${formatDecimal(p.position, { sign: true, digits: 4 })}`,
+        badgeStr: `${isLong ? "多" : "空"} ${formatDecimal(magnitude(p.position), { digits: 0 })} 張`,
         compactBadge: isLong ? "LONG" : "SHORT",
         isLoss: !isLong,
       };
     });
   }, [risk, unavailableItems, positions]);
 
-  // 4. 維度：保證金佔用 — v1 local-sim 無保證金模型，只呈現 margin_ok 布林事實
-  const marginItems: DonutItem[] = useMemo(() => {
-    if (!risk) return unavailableItems;
-    const marginOk = risk.snapshot?.margin_ok;
-    const verdict = marginOk === undefined ? TEXT_UNAVAILABLE : marginOk ? "通過" : "未通過";
-    return [{
-      key: "margin_ok",
-      shortLabel: `保證金檢查：${verdict}`,
-      compactLabel: "保證金",
-      sub: "margin_ok",
-      amount: null,
-      amountStr: verdict,
-      pct_share: 100,
-      color: marginOk === false ? COLORS.short : COLORS.muted,
-      badgeStr: "local-sim 無保證金模型",
-      compactBadge: verdict,
-      isLoss: marginOk === false,
-      hidePct: true,
-    }];
-  }, [risk, unavailableItems]);
-
-  // 5. 維度：損益分佈 (PnL Contribution · 已實現／未實現／手續費)
+  // 4. 視角：損益（已實現／未實現／手續費結構）
   const pnlItems: DonutItem[] = useMemo(() => {
     if (!summary) return unavailableItems;
     const realized = summary.realized_pnl;
     const unrealized = summary.unrealized_pnl;
     const fees = summary.fees;
-    // 幾何分母：三項絕對值合計（僅經 toPlotNumber，不作金額顯示）
-    const parts = [realized, unrealized, fees].map((v) => {
+    const parts = [unrealized, realized, fees].map((v) => {
       const n = toPlotNumber(v);
       return Number.isFinite(n) ? Math.abs(n) : 0;
     });
     const total = parts[0] + parts[1] + parts[2];
-    const toneColor = (v: DecimalString) => {
-      const sign = signOf(v);
-      return sign === "positive" ? COLORS.budget : sign === "negative" ? COLORS.short : COLORS.neutral;
+    const toneColor = (v: DecimalString, positiveColor: string) => {
+      const s = signOf(v);
+      return s === "positive" ? positiveColor : s === "negative" ? COLORS.short : COLORS.neutral;
     };
-    // 手續費為成本：後端字串非零且為正時，顯示加上 "-" 前綴（僅符號呈現，無運算）
     const feeSign = signOf(fees);
     const feeFormatted = formatDecimal(fees, { prefix: "$" });
     const feeStr = feeSign === "positive" ? `-${feeFormatted}` : feeFormatted;
     return [
+      {
+        key: "unrealized",
+        shortLabel: "未實現浮盈",
+        compactLabel: "未實現",
+        sub: "UNREALIZED",
+        amount: unrealized,
+        amountStr: formatDecimal(unrealized, { sign: true, prefix: "$" }),
+        pct_share: sharePlot(parts[0], total),
+        color: toneColor(unrealized, COLORS.position),
+        badgeStr: "持倉浮動",
+        compactBadge: "浮動",
+        isLoss: signOf(unrealized) === "negative",
+      },
       {
         key: "realized",
         shortLabel: "已實現損益",
@@ -368,24 +451,11 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         sub: "REALIZED",
         amount: realized,
         amountStr: formatDecimal(realized, { sign: true, prefix: "$" }),
-        pct_share: sharePlot(parts[0], total),
-        color: toneColor(realized),
+        pct_share: sharePlot(parts[1], total),
+        color: toneColor(realized, COLORS.budget),
         badgeStr: "已結算",
         compactBadge: "已結",
         isLoss: signOf(realized) === "negative",
-      },
-      {
-        key: "unrealized",
-        shortLabel: "未實現損益",
-        compactLabel: "未實現",
-        sub: "UNREALIZED",
-        amount: unrealized,
-        amountStr: formatDecimal(unrealized, { sign: true, prefix: "$" }),
-        pct_share: sharePlot(parts[1], total),
-        color: toneColor(unrealized),
-        badgeStr: "浮動",
-        compactBadge: "浮動",
-        isLoss: signOf(unrealized) === "negative",
       },
       {
         key: "fees",
@@ -399,24 +469,45 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         badgeStr: "累計成本",
         compactBadge: "成本",
         isLoss: feeSign !== "zero",
+        isMuted: true,
       },
     ];
   }, [summary, unavailableItems]);
 
-  // 當前選定維度之數據集
-  const currentItems = viewMode === "allocation"
-    ? allocationItems
-    : viewMode === "bots"
+  // 5. 視角：保證金（v1 local-sim 無保證金模型，誠實呈現 margin_ok 布林事實）
+  const marginItems: DonutItem[] = useMemo(() => {
+    if (!risk) return unavailableItems;
+    const marginOk = risk.snapshot?.margin_ok;
+    const verdict = marginOk === undefined ? TEXT_UNAVAILABLE : marginOk ? "通過" : "未通過";
+    return [{
+      key: "margin_ok",
+      shortLabel: `保證金檢查：${verdict}`,
+      compactLabel: "保證金",
+      sub: "margin_ok",
+      amount: null,
+      amountStr: verdict,
+      pct_share: 100,
+      color: marginOk === false ? COLORS.short : COLORS.rem,
+      badgeStr: "local-sim 無保證金模型",
+      compactBadge: verdict,
+      isLoss: marginOk === false,
+      isMuted: marginOk !== false,
+      hidePct: true,
+    }];
+  }, [risk, unavailableItems]);
+
+  const currentItems = viewMode === "bots"
     ? botItems
+    : viewMode === "allocation"
+    ? allocationItems
     : viewMode === "delta"
     ? deltaItems
-    : viewMode === "margin"
-    ? marginItems
-    : pnlItems;
+    : viewMode === "pnl"
+    ? pnlItems
+    : marginItems;
 
   const activeHoverItem = hoveredIndex !== null ? currentItems[hoveredIndex] ?? null : null;
 
-  // Header 風控狀態晶片
   const statusChip = risk ? RISK_STATUS_CHIP[risk.derived.status] ?? NO_OBSERVATION_CHIP : NO_OBSERVATION_CHIP;
   const statusTooltip = risk
     ? [risk.derived.can_increase ? "可增倉" : "禁增倉", risk.reasons.join(",")].filter(Boolean).join(" · ")
@@ -424,94 +515,132 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
   const leverageLimitText = limits ? `${formatDecimal(limits.leverage, { digits: 1 })}x` : TEXT_UNAVAILABLE;
   const symbolShareText = limits ? formatRatioPct(limits.symbol_share, { sign: false }) : TEXT_UNAVAILABLE;
+  const canToggleUnit = viewMode === "bots" || viewMode === "allocation" || viewMode === "delta";
 
-  // =========================================================================
-  // 定案圓環：Paperpillar 聚光燈聚焦環 (純向量自適應渲染，依模式切換 HUD 資訊)
-  // =========================================================================
-  const renderSpotlightDonut = () => {
+  // 次標右側摘要
+  const topRightSummary = useMemo(() => {
+    if (viewMode === "pnl") {
+      if (!summary) return TEXT_UNAVAILABLE;
+      return `風控期間 ${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })}`;
+    }
+    if (!risk) return TEXT_UNAVAILABLE;
+    if (viewMode === "margin") return "margin_ok";
+    if (viewMode === "delta") {
+      const dirSign = signOf(risk.snapshot?.position ?? null);
+      const dir = dirSign === "positive" ? "淨多" : dirSign === "negative" ? "淨空" : "空倉";
+      return `${dir} · ${leverageText(effectiveLeverage)}`;
+    }
+    const singleCap = limits && risk.derived.exposure_budget && risk.derived.symbol_budget
+      ? `${(toPlotNumber(limits.leverage) * toPlotNumber(limits.symbol_share)).toFixed(2)}x`
+      : leverageLimitText;
+    return `${leverageText(effectiveLeverage)} / ${singleCap}`;
+  }, [viewMode, summary, risk, effectiveLeverage, limits, leverageLimitText]);
+
+  // 中央 HUD 數據計算（Y 風格：單一大數字＋簡潔副標）
+  const renderDonut = () => {
     let accumulatedArc = 0;
 
-    // 中央 HUD 標題與數值計算 (依 Bloomberg / TradingView 金額與倍數雙錨定法則)
-    let hudTitle = hudFocus === "leverage" ? "帳戶有效槓桿" : "名目持倉總值";
-    let hudValue = hudFocus === "leverage"
-      ? leverageText(effectiveLeverage)
-      : formatDecimal(notional, { prefix: "$" });
-    let hudValueColor = "#f8fafc"; // 專業中性珍珠白，高對比無光暈
-    let hudSub = hudFocus === "leverage"
-      ? `上限 ${leverageLimitText} · 單幣 ${symbolShareText}`
-      : `總預算 ${formatDecimal(exposureBudget, { prefix: "$" })}`;
-    let progressPct = notionalShare;
-    let hudTag = hudFocus === "leverage" ? `${notionalShare.toFixed(0)}% 預算` : leverageText(effectiveLeverage);
-    let progressColor = hudFocus === "money" ? "#e8b45e" : "#10b981";
+    let hudValue = "";
+    let hudSub = "";
+    let hudValueColor = "#f8fafc";
 
-    if (viewMode === "delta") {
-      const dirSign = signOf(risk?.snapshot?.position ?? null);
-      hudTitle = "淨方向";
-      hudValue = dirSign === "positive" ? "多頭" : dirSign === "negative" ? "空頭" : "空倉";
-      hudValueColor = dirSign === "positive" ? "#10b981" : dirSign === "negative" ? "#f43f5e" : "#a1a1aa";
-      hudSub = `名目 ${formatDecimal(notional, { prefix: "$" })}`;
-      progressPct = notionalShare;
-      hudTag = `${notionalShare.toFixed(0)}% 預算`;
-      progressColor = hudValueColor;
-    } else if (viewMode === "margin") {
-      hudTitle = "保證金佔用";
-      hudValue = TEXT_UNAVAILABLE;
+    const hudUnavailable = viewMode === "pnl" ? summary === null : risk === null;
+    if (hudUnavailable) {
+      hudValue = modeNotOpen ? "未開放" : "尚無觀測";
+      hudSub = unavailableSub;
       hudValueColor = "#a1a1aa";
-      hudSub = "local-sim 無保證金模型";
-      progressPct = 0;
-      hudTag = "v1";
-      progressColor = COLORS.muted;
+    } else if (viewMode === "bots" || viewMode === "allocation") {
+      if (hudUnit === "pct") {
+        hudValue = `${Math.round(capShare)}%`;
+        hudSub = viewMode === "allocation" ? "單幣集中度" : symbolBudget ? "單幣上限已用" : "總預算已用";
+      } else if (hudUnit === "leverage") {
+        hudValue = leverageText(effectiveLeverage);
+        hudSub = `有效槓桿 · 上限 ${leverageLimitText}`;
+      } else {
+        hudValue = formatDecimal(notional, { prefix: "$" });
+        hudSub = "名目總曝險";
+      }
+    } else if (viewMode === "delta") {
+      const open = positions.filter((p) => {
+        const s = signOf(p.position);
+        return s === "positive" || s === "negative";
+      });
+      if (open.length === 0) {
+        hudValue = "空倉";
+        hudSub = "無方向曝險";
+        hudValueColor = "#a1a1aa";
+      } else {
+        let longPlot = 0;
+        let shortPlot = 0;
+        for (const p of open) {
+          const n = Math.abs(toPlotNumber(p.notional));
+          if (!Number.isFinite(n)) continue;
+          if (signOf(p.position) === "positive") longPlot += n;
+          else shortPlot += n;
+        }
+        const totalPlot = longPlot + shortPlot;
+        const isLongDom = longPlot >= shortPlot;
+        const domPct = totalPlot > 0 ? Math.round((Math.max(longPlot, shortPlot) / totalPlot) * 100) : 0;
+        hudValueColor = isLongDom ? "#10b981" : "#f43f5e";
+        if (hudUnit === "pct") {
+          hudValue = `${domPct}% ${isLongDom ? "多" : "空"}`;
+          hudSub = "多空方向佔比";
+        } else if (hudUnit === "leverage") {
+          hudValue = leverageText(effectiveLeverage);
+          hudSub = isLongDom ? "偏多有效槓桿" : "偏空有效槓桿";
+        } else {
+          hudValue = formatDecimal(notional, { prefix: "$" });
+          hudSub = "名目總曝險";
+        }
+      }
     } else if (viewMode === "pnl") {
       const pnl = summary?.period_pnl ?? null;
       const ratio = summary?.period_pnl_ratio ?? null;
-      const sign = signOf(pnl);
-      hudTitle = "風控期間損益";
+      const s = signOf(pnl);
       hudValue = formatDecimal(pnl, { sign: true, prefix: "$" });
-      hudValueColor = sign === "positive" ? "#10b981" : sign === "negative" ? "#f43f5e" : "#f8fafc";
-      hudSub = `${formatRatioPct(ratio)} · 權益 ${formatDecimal(summary?.equity ?? null, { prefix: "$" })}`;
-      // 幾何：虧損比例相對硬熔斷門檻的進度（僅虧損時有意義）
-      progressPct = sign === "negative" ? shareOf(ratio, limits?.hard_loss ?? null) : 0;
-      hudTag = formatRatioPct(ratio);
-      progressColor = hudValueColor;
-    }
-
-    // 空狀態覆寫（損益分佈看 summary，其餘看 risk）
-    const hudUnavailable = viewMode === "pnl" ? summary === null : risk === null;
-    if (hudUnavailable) {
-      hudTitle = viewMode === "pnl" ? "風控期間損益" : hudTitle;
-      hudValue = unavailableText;
-      hudValueColor = "#a1a1aa";
-      hudSub = unavailableSub;
-      progressPct = 0;
-      hudTag = "local-sim";
-      progressColor = COLORS.muted;
+      hudValueColor = s === "positive" ? "#10b981" : s === "negative" ? "#f43f5e" : "#f8fafc";
+      hudSub = `風控期間 ${formatRatioPct(ratio)}`;
+    } else {
+      const marginOk = risk?.snapshot?.margin_ok;
+      hudValue = marginOk === undefined ? TEXT_UNAVAILABLE : marginOk ? "通過" : "未通過";
+      hudValueColor = marginOk === false ? "#f43f5e" : "#a1a1aa";
+      hudSub = "local-sim 無保證金模型";
     }
 
     const shareCaption = SHARE_CAPTION[viewMode];
 
     return (
-      <div className={cn(
-        "h-full aspect-square flex items-center justify-center relative shrink-0 p-1",
-        isNarrow ? "max-w-[34%] max-h-[140px]" : "max-w-[44%]"
-      )}>
+      <div
+        onClick={() => {
+          if (canToggleUnit && !hudUnavailable) {
+            setHudUnit((u) => nextHudUnit(u));
+          }
+        }}
+        title={canToggleUnit && !hudUnavailable ? "點擊圓環切換顯示單位（% / x / $）" : undefined}
+        className={cn(
+          "h-full aspect-square flex flex-col items-center justify-center relative shrink-0 group/donut",
+          isNarrow ? "max-w-[36%] max-h-[146px]" : "max-w-[42%] max-h-[190px]",
+          canToggleUnit && !hudUnavailable && "cursor-pointer"
+        )}
+      >
         <svg
           viewBox={`0 0 ${VB_SIZE} ${VB_SIZE}`}
           className="h-full w-full max-h-full max-w-full aspect-square select-none"
         >
-          {/* 定義專屬 Monospace Tabular 字型樣式 */}
           <defs>
             <style>{`
-              .hud-text {
+              .hud-mono {
                 font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
                 font-feature-settings: 'tnum';
               }
             `}</style>
           </defs>
 
-          {/* 底槽導軌 (沉穩深岩底色，微距軌道) */}
-          <circle cx={CX} cy={CY} r={R} fill="none" stroke="#161922" strokeWidth={STROKE_WIDTH} />
+          {/* 啞光底槽 */}
+          <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={STROKE_WIDTH} />
 
           {currentItems.map((item, idx) => {
+            if (item.pct_share <= 0) return null;
             const fullArc = (item.pct_share / 100) * CIRCUMFERENCE;
             const arcLen = Math.max(0, fullArc - SLICE_GAP);
             const dasharray = `${arcLen} ${CIRCUMFERENCE - arcLen}`;
@@ -519,8 +648,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             accumulatedArc += fullArc;
 
             const isHovered = hoveredIndex === idx;
-            // 聚光燈核心：非懸停項目弱化至 25%，選中項目 100% 飽和高亮
-            const sliceOpacity = hoveredIndex === null ? 0.92 : isHovered ? 1.0 : 0.22;
+            const sliceOpacity = hoveredIndex === null ? (item.isMuted ? 0.55 : 0.94) : isHovered ? 1 : 0.22;
 
             return (
               <circle
@@ -530,215 +658,124 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                 r={R}
                 fill="none"
                 stroke={item.color}
-                strokeWidth={isHovered ? STROKE_WIDTH + 2.0 : STROKE_WIDTH}
+                strokeWidth={isHovered ? STROKE_WIDTH + 2 : STROKE_WIDTH}
                 strokeDasharray={dasharray}
                 strokeDashoffset={dashoffset}
                 strokeLinecap="butt"
                 opacity={sliceOpacity}
                 transform={`rotate(-90 ${CX} ${CY})`}
-                className="cursor-pointer transition-all duration-200"
-                style={{
-                  filter: isHovered ? `drop-shadow(0 0 6px ${item.color}80)` : undefined,
-                }}
+                className="transition-all duration-200"
                 onMouseEnter={() => setHoveredIndex(idx)}
                 onMouseLeave={() => setHoveredIndex(null)}
               />
             );
           })}
 
-          {/* 中央聚光 HUD (幾何同心居中，融合彭博清晰排版與微型進度刻度槽) */}
+          {/* 中央 HUD：Y 風格單一大數字＋副標（懸停切片時聚焦該切片） */}
           {activeHoverItem ? (
-            <g className="pointer-events-none select-none animate-in fade-in zoom-in-95 duration-100">
-              {isCompact ? (
-                // 緊湊態：只保留核心清晰大百分比（非比例型項目改顯示其文字）
-                <text
-                  x={CX}
-                  y={CY + 8}
-                  textAnchor="middle"
-                  fill="#f8fafc"
-                  fontSize={activeHoverItem.hidePct ? hudFontSize(activeHoverItem.amountStr, 26) : 26}
-                  fontWeight="600"
-                  className="hud-text"
-                >
-                  {activeHoverItem.hidePct ? activeHoverItem.amountStr : `${activeHoverItem.pct_share.toFixed(1)}%`}
-                </text>
-              ) : (
-                <>
-                  <text
-                    x={CX}
-                    y={CY - 16}
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="9"
-                    fontWeight="500"
-                    letterSpacing="0.06em"
-                    className="hud-text"
-                  >
-                    {activeHoverItem.shortLabel}
-                  </text>
-                  <text
-                    x={CX}
-                    y={CY + 8}
-                    textAnchor="middle"
-                    fill="#f8fafc"
-                    fontSize={hudFontSize(activeHoverItem.amountStr, 25)}
-                    fontWeight="600"
-                    className="hud-text"
-                  >
-                    {activeHoverItem.amountStr}
-                  </text>
-                  <text
-                    x={CX}
-                    y={CY + 25}
-                    textAnchor="middle"
-                    fill="#64748b"
-                    fontSize="8.5"
-                    className="hud-text"
-                  >
-                    {activeHoverItem.hidePct || !shareCaption
-                      ? (activeHoverItem.compactBadge || activeHoverItem.badgeStr)
-                      : `${shareCaption} ${activeHoverItem.pct_share.toFixed(1)}% · ${activeHoverItem.compactBadge || activeHoverItem.badgeStr}`}
-                  </text>
-                </>
-              )}
+            <g className="pointer-events-none select-none">
+              <text
+                x={CX}
+                y={CY - 12}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize={hudFontSize(activeHoverItem.shortLabel, 10)}
+                fontWeight="500"
+                className="hud-mono"
+              >
+                {activeHoverItem.shortLabel}
+              </text>
+              <text
+                x={CX}
+                y={CY + 10}
+                textAnchor="middle"
+                fill="#f8fafc"
+                fontSize={hudFontSize(activeHoverItem.hidePct ? activeHoverItem.amountStr : `${Math.round(activeHoverItem.pct_share)}%`, 28)}
+                fontWeight="700"
+                className="hud-mono"
+              >
+                {activeHoverItem.hidePct ? activeHoverItem.amountStr : `${Math.round(activeHoverItem.pct_share)}%`}
+              </text>
+              <text
+                x={CX}
+                y={CY + 27}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize={hudFontSize(activeHoverItem.amountStr, 9.5)}
+                className="hud-mono"
+              >
+                {activeHoverItem.hidePct || !shareCaption ? activeHoverItem.badgeStr : activeHoverItem.amountStr}
+              </text>
             </g>
           ) : (
             <g className="pointer-events-none select-none">
-              {isCompact ? (
-                // 緊湊態：單一清晰核心指標
+              <text
+                x={CX}
+                y={isCompact ? CY + 8 : CY + 4}
+                textAnchor="middle"
+                fill={hudValueColor}
+                fontSize={hudFontSize(hudValue, isCompact ? 26 : 30)}
+                fontWeight="700"
+                className="hud-mono"
+              >
+                {hudValue}
+              </text>
+              {!isCompact && (
                 <text
                   x={CX}
-                  y={CY + 8}
+                  y={CY + 23}
                   textAnchor="middle"
-                  fill={hudValueColor}
-                  fontSize={hudFontSize(hudValue, 26)}
-                  fontWeight="600"
-                  className="hud-text"
+                  fill="#94a3b8"
+                  fontSize={hudFontSize(hudSub, 10)}
+                  fontWeight="500"
+                  className="hud-mono"
                 >
-                  {hudValue}
+                  {hudSub}
                 </text>
-              ) : (
-                <>
-                  {/* 1. 頂部類別：沉穩弱化微型標籤，附帶倍數或百分比徽記 */}
-                  <text
-                    x={CX}
-                    y={CY - 16}
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="8.5"
-                    fontWeight="500"
-                    letterSpacing="0.06em"
-                    className="hud-text"
-                  >
-                    {hudTitle} · {hudTag}
-                  </text>
-
-                  {/* 2. 核心指標：俐落清晰珍珠白大數據 (金額或槓桿) */}
-                  <text
-                    x={CX}
-                    y={CY + 6}
-                    textAnchor="middle"
-                    fill={hudValueColor}
-                    fontSize={hudFontSize(hudValue, 25)}
-                    fontWeight="600"
-                    className="hud-text"
-                  >
-                    {hudValue}
-                  </text>
-
-                  {/* 3. 微型高科技進度刻度槽 (長 56px，直觀展示佔比) */}
-                  <rect
-                    x={72}
-                    y={CY + 14}
-                    width={56}
-                    height={3}
-                    rx={1.5}
-                    fill="#27272a"
-                  />
-                  <rect
-                    x={72}
-                    y={CY + 14}
-                    width={Math.max(2, 56 * (Math.min(100, progressPct) / 100))}
-                    height={3}
-                    rx={1.5}
-                    fill={progressColor}
-                  />
-
-                  {/* 4. 底部輔助指標：弱化灰色、緊湊交代上限與預算 */}
-                  <text
-                    x={CX}
-                    y={CY + 26}
-                    textAnchor="middle"
-                    fill="#64748b"
-                    fontSize={hudFontSize(hudSub, 8)}
-                    letterSpacing="0.02em"
-                    className="hud-text"
-                  >
-                    {hudSub}
-                  </text>
-                </>
               )}
             </g>
           )}
         </svg>
+
+        {canToggleUnit && !hudUnavailable && !isCompact && (
+          <span className="absolute -bottom-0.5 text-t1 font-mono text-muted-foreground/60 group-hover/donut:text-primary transition-colors pointer-events-none">
+            點擊圓環切單位
+          </span>
+        )}
       </div>
     );
   };
 
+  // 底部額度上限公式（僅有風控觀測且非極扁高度顯示）
+  const riskEquity = risk?.snapshot?.risk_equity ?? risk?.snapshot?.equity ?? summary?.equity ?? null;
+  const formulaLine = risk && !isShort
+    ? viewMode === "pnl"
+      ? `已實現 ${formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" })} · 未實現 ${formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" })} · 手續費 ${formatDecimal(summary?.fees, { prefix: "$" })}`
+      : viewMode === "margin"
+      ? "v1 local-sim 無保證金模型 · 僅驗證 margin_ok 布林事實"
+      : `上限 = 權益 ${formatDecimal(riskEquity, { prefix: "$" })} × 總槓桿 ${leverageLimitText} × 單幣 ${symbolShareText} = ${formatDecimal(symbolBudget, { prefix: "$" })}`
+    : null;
+
   return (
     <div ref={containerRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
-      {/* 1. 卡片頂部 Header：左側標題、風控狀態晶片與焦點切換器，右側高對比維度分段切換鈕 */}
+      {/* 1. 標題列：精簡無單位按鈕，只留標題＋風控狀態＋5 視角切換 */}
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <CardHeaderTitle
-            cardId="allocation"
-            title="槓桿倍數與資產曝險"
-            subtext={
-              <span
-                className={cn(
-                  "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap",
-                  statusChip.className
-                )}
-                title={statusTooltip}
-              >
-                {statusChip.label}
-              </span>
-            }
-          />
-
-          {/* 核心焦點切換鈕：金額主導 vs 槓桿倍數 */}
-          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-t2 font-mono">
-            <span className="text-amber-400 font-bold px-1 text-t1 sm:text-t1">焦點:</span>
-            <button
-              type="button"
-              onClick={() => setHudFocus("leverage")}
+        <CardHeaderTitle
+          cardId="allocation"
+          title="曝險額度"
+          subtext={
+            <span
               className={cn(
-                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
-                hudFocus === "leverage"
-                  ? "bg-secondary text-foreground font-semibold shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
+                "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap",
+                statusChip.className
               )}
-              title={`風控焦點：帳戶有效槓桿 (上限 ${leverageLimitText})`}
+              title={statusTooltip}
             >
-              x 槓桿
-            </button>
-            <button
-              type="button"
-              onClick={() => setHudFocus("money")}
-              className={cn(
-                "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
-                hudFocus === "money"
-                  ? "bg-secondary text-foreground font-semibold shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              title="資產焦點：名目持倉總額與總曝險預算"
-            >
-              $ 名目
-            </button>
-          </div>
-        </div>
+              {statusChip.label}
+            </span>
+          }
+        />
 
-        {/* 核心維度分段鈕 (幣種配置 | 策略實例 | 多空部位曝險 | 保證金佔用 | 損益分佈) */}
         <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-t2 font-mono">
           {TABS.map((tab) => {
             const isActive = viewMode === tab.id;
@@ -751,175 +788,102 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   setHoveredIndex(null);
                 }}
                 className={cn(
-                  "px-1.5 sm:px-2 py-0.5 rounded transition-all cursor-pointer font-medium select-none text-t2 sm:text-t3",
+                  "px-1.5 sm:px-2 py-0.5 rounded transition-colors cursor-pointer font-medium select-none text-t2 whitespace-nowrap",
                   isActive
-                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.16]"
-                    : "text-zinc-300 hover:text-white hover:bg-white/[0.08]"
+                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.14]"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
                 )}
               >
-                {isNarrow ? tab.shortLabel : tab.label}
+                {tab.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 2. 核心繪圖與內容展示區 (收攏左右間距、自適應流體縮放不裁切) */}
-      <div className="flex-1 min-h-0 w-full h-full relative overflow-hidden p-2 sm:p-2.5">
-        <div className="w-full h-full flex items-center justify-start gap-2.5 sm:gap-4 overflow-hidden font-mono max-w-[860px] mx-auto px-1">
+      {/* 2. 主內容區：次標一行 + 左側可點圓環 + 右側 Y 風格精簡明細表 */}
+      <div className="flex-1 min-h-0 flex flex-col px-3 py-2 overflow-hidden">
+        {!isShort && (
+          <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground mb-1.5 shrink-0">
+            <span className="truncate">{VIEW_CAPTION[viewMode]}</span>
+            <span className="font-semibold text-foreground shrink-0">{topRightSummary}</span>
+          </div>
+        )}
 
-          {/* 左側：純向量自適應 Paperpillar 聚光燈聚焦環 (h-full 嚴格受父級高度約束) */}
-          {renderSpotlightDonut()}
+        <div className="flex-1 min-h-0 flex items-center gap-3 sm:gap-4 overflow-hidden font-mono">
+          {renderDonut()}
 
-          {/* 右側：精緻高密度金融行 (min-w-0 自適應彈性收縮，杜絕推擠左側 Donut) */}
-          <div className={cn(
-            "flex-1 min-w-0 max-w-[480px] h-full flex flex-col py-0.5 overflow-hidden",
-            isCompact ? "justify-center gap-1" : "justify-between"
-          )}>
+          {/* 右側明細清單（Y 版乾淨表格行，無冗餘進度槽噪音） */}
+          <div className="flex-1 min-w-0 h-full flex flex-col justify-center divide-y divide-white/[0.05] overflow-y-auto pr-0.5">
             {currentItems.map((item, idx) => {
               const isHovered = hoveredIndex === idx;
-              const isNearLimit = item.nearLimit === true;
               const displayLabel = isNarrow ? (item.compactLabel || item.shortLabel) : item.shortLabel;
               const displayBadge = isSuperNarrow ? undefined : (isNarrow ? (item.compactBadge || item.badgeStr) : item.badgeStr);
 
-              if (isCompact) {
-                // 【超扁/極窄緊湊形態】：彭博/幣安標準單行背景長條圖 (Row Background Progress Fill)
-                // 進度長條作為該行背景微光填色帶 + 底緣 2px 聚光線，文字置於上方，零額外縱向開銷，永不穿透！
-                return (
-                  <div
-                    key={item.key}
-                    onMouseEnter={() => setHoveredIndex(idx)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                    className={cn(
-                      "group relative flex items-center justify-between px-2 py-1 rounded transition-all cursor-pointer border select-none overflow-hidden shrink-0 min-h-0",
-                      isHovered
-                        ? "bg-white/[0.09] border-primary/50 shadow-xs"
-                        : "bg-surface-raised/40 hover:bg-white/[0.04] border-white/[0.06]"
-                    )}
-                  >
-                    {/* 背景填色進度條 (直觀長條感 100% 保留) */}
-                    <div
-                      className="absolute left-0 top-0 bottom-0 pointer-events-none transition-all duration-300"
-                      style={{
-                        width: `${Math.min(100, item.pct_share)}%`,
-                        backgroundColor: item.color,
-                        opacity: isHovered ? 0.30 : 0.16,
-                      }}
-                    />
-                    {/* 底緣 2px 聚光進度線 */}
-                    <div
-                      className="absolute left-0 bottom-0 h-[2px] pointer-events-none transition-all duration-300"
-                      style={{
-                        width: `${Math.min(100, item.pct_share)}%`,
-                        backgroundColor: item.color,
-                        boxShadow: isHovered ? `0 0 6px ${item.color}` : undefined,
-                      }}
-                    />
-
-                    {/* 首行內容：左側標籤 + 徽章 */}
-                    <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 min-w-0">
-                      <span className="size-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-foreground text-t3 tracking-tight truncate shrink-0">{displayLabel}</span>
-                      {displayBadge && (
-                        <span className={cn(
-                          "px-1 py-0.2 rounded border text-t1 font-mono shrink-0 leading-none",
-                          item.isLoss
-                            ? "bg-rose-500/15 border-rose-500/30 text-rose-400 font-semibold"
-                            : "bg-white/[0.06] border-white/[0.10] text-zinc-300"
-                        )}>
-                          {displayBadge}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 右側：金額與佔比 */}
-                    <div className="relative z-10 flex items-center gap-1.5 shrink-0 ml-1">
-                      <span className={cn(
-                        "font-mono text-t3 font-medium tracking-tight",
-                        item.isLoss ? "text-rose-400 font-semibold" : "text-foreground"
-                      )}>
-                        {item.amountStr}
-                      </span>
-                      {!item.hidePct && (
-                        <span className="font-bold text-foreground text-t3 min-w-[34px] text-right font-mono">
-                          {item.pct_share.toFixed(1)}%
-                        </span>
-                      )}
-                      {isNearLimit && !isNarrow && (
-                        <span className="px-1 py-0.2 rounded text-t1 font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
-                          逼近50%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
-              // 【常規標準形態】：雙行式獨立進度條 (文字行 + 獨立底槽長條)
               return (
                 <div
                   key={item.key}
                   onMouseEnter={() => setHoveredIndex(idx)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   className={cn(
-                    "group flex flex-col justify-center px-2.5 py-1 sm:py-1.5 rounded-lg transition-all cursor-pointer border select-none min-h-0",
-                    isHovered
-                      ? "bg-white/[0.08] border-primary/45 shadow-xs"
-                      : "bg-surface-raised/40 hover:bg-white/[0.04] border-white/[0.06]"
+                    "flex items-center justify-between gap-2 px-1.5 py-1.5 rounded transition-colors cursor-pointer",
+                    isHovered ? "bg-white/[0.07]" : "hover:bg-white/[0.03]"
                   )}
                 >
-                  {/* 首行：標題、量化標籤、金額與佔比 */}
-                  <div className="flex items-center justify-between gap-1.5 leading-none">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="size-2 sm:size-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-foreground text-t3 sm:text-xs tracking-tight whitespace-nowrap shrink-0">{item.shortLabel}</span>
-                      <span className={cn(
-                        "px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded border text-t1 sm:text-t1 font-mono shrink-0 leading-none",
-                        item.isLoss
-                          ? "bg-rose-500/15 border-rose-500/30 text-rose-400 font-semibold"
-                          : "bg-white/[0.06] border-white/[0.10] text-zinc-300"
-                      )}>
-                        {item.badgeStr}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={cn(
-                        "font-mono text-t3 sm:text-xs font-medium tracking-tight",
-                        item.isLoss ? "text-rose-400 font-semibold" : "text-foreground"
-                      )}>
-                        {item.amountStr}
-                      </span>
-                      {!item.hidePct && (
-                        <span className="font-bold text-foreground text-t3 sm:text-xs min-w-[38px] text-right font-mono">
-                          {item.pct_share.toFixed(1)}%
-                        </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span
+                      className={cn(
+                        "text-t3 truncate",
+                        item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
                       )}
-                      {/* 僅當逼近單幣上限時靜默提醒 */}
-                      {isNearLimit && (
-                        <span className="px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded text-t1 sm:text-t1 font-bold bg-amber-500/20 text-amber-400 border border-amber-500/35 leading-none">
-                          逼近50%
-                        </span>
-                      )}
-                    </div>
+                    >
+                      {displayLabel}
+                    </span>
+                    {displayBadge && (
+                      <span
+                        className={cn(
+                          "text-t1 shrink-0 whitespace-nowrap",
+                          item.nearLimit ? "text-amber-400 font-semibold" : "text-muted-foreground/80"
+                        )}
+                      >
+                        {displayBadge}
+                      </span>
+                    )}
                   </div>
 
-                  {/* 次行：直觀長條圖 (微型圓角底槽與平滑填色) */}
-                  <div className="w-full h-1 bg-white/[0.08] rounded-full overflow-hidden relative mt-1 sm:mt-1.5 shrink-0">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${Math.min(100, item.pct_share)}%`,
-                        backgroundColor: item.color,
-                        boxShadow: isHovered ? `0 0 8px ${item.color}90` : undefined,
-                      }}
-                    />
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span
+                      className={cn(
+                        "text-t3 tabular-nums",
+                        item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground" : "text-foreground font-medium"
+                      )}
+                    >
+                      {item.amountStr}
+                    </span>
+                    {!item.hidePct && (
+                      <span
+                        className={cn(
+                          "text-t3 tabular-nums min-w-[34px] text-right",
+                          item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
+                        )}
+                      >
+                        {Math.round(item.pct_share)}%
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* 3. 底部單行額度公式 */}
+        {formulaLine && (
+          <div className="mt-1.5 pt-1.5 border-t border-border/60 text-t1 font-mono text-muted-foreground/75 truncate shrink-0">
+            {formulaLine}
+          </div>
+        )}
       </div>
     </div>
   );

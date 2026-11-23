@@ -29,6 +29,7 @@ export type CardId =
   | "allocation"
   | "fills"
   | "bots"
+  | "pipeline"
   | "incidents"
   | "market_watch"
   | "strategy_intents"
@@ -54,14 +55,15 @@ export interface LayoutProfile {
 
 export const CARD_TITLES: Record<CardId, { zh: string; en: string; icon: string }> = {
   equity: { zh: "帳戶權益與損益", en: "Equity & Drawdown", icon: "📈" },
-  positions: { zh: "持倉明細與交易所風控", en: "Positions & Orders", icon: "📊" },
-  bots: { zh: "策略機器人矩陣", en: "Bots Matrix", icon: "🤖" },
-  allocation: { zh: "槓桿倍數與資產曝險", en: "Leverage & Allocation", icon: "🪙" },
+  positions: { zh: "策略實例與持倉", en: "Bots & Positions", icon: "📊" },
+  bots: { zh: "策略實例與持倉", en: "Bots & Positions", icon: "🤖" },
+  pipeline: { zh: "策略管線", en: "Strategy Pipeline", icon: "🧭" },
+  allocation: { zh: "曝險額度", en: "Exposure & Risk", icon: "🪙" },
   fills: { zh: "即時成交流水", en: "Recent Fills", icon: "⚡" },
   incidents: { zh: "風險警報與異常事件", en: "Risk Incidents", icon: "🚨" },
   market_watch: { zh: "標的行情與資金費率", en: "Market Watch & Rates", icon: "⏱️" },
   strategy_intents: { zh: "策略目標與訊號強度", en: "Signals & Radar", icon: "🎯" },
-  activity_deck: { zh: "全域戰情日誌與成交流水", en: "Blotter & Activity Log", icon: "📜" },
+  activity_deck: { zh: "待處理與事件審計", en: "Actions & Audit Log", icon: "📜" },
   bot_inspector: { zh: "機器人深層檢測 (Master-Detail)", en: "Bot Inspector", icon: "🔍" },
 };
 
@@ -90,11 +92,11 @@ export interface LayoutPresetMeta {
 export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
   {
     id: "tsplit",
-    nameZh: "5卡標準戰情 (T-Split 上下解耦)",
+    nameZh: "5卡標準總覽 (T-Split 上下解耦)",
     shortName: "T-Split",
     tag: "推薦定案",
     cardCount: 5,
-    desc: "權益損益 · 策略機器人 · 槓桿曝險 / 持倉委託 · 交易日誌",
+    desc: "帳戶權益 · 曝險額度 / 策略實例與持倉 · 策略管線 · 待處理與事件審計",
   },
   {
     id: "quad",
@@ -102,23 +104,23 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
     shortName: "雙欄對稱",
     tag: "高頻盯盤",
     cardCount: 4,
-    desc: "左欄：權益損益+持倉委託 / 右欄：策略機器人+交易日誌 (50:50 對稱)",
+    desc: "左欄：權益損益+策略管線 / 右欄：策略實例與持倉+待處理與事件審計 (50:50)",
   },
   {
     id: "sentinel",
-    nameZh: "3卡風控防線 (盤口 60% 主視野)",
-    shortName: "風控防線",
+    nameZh: "3卡執行防線 (實例與持倉 60% 主視野)",
+    shortName: "執行防線",
     tag: "防線專注",
     cardCount: 3,
-    desc: "左側 60% 持倉與在途委託 / 右側 40% 策略機器人與交易日誌",
+    desc: "左側 60% 策略實例與持倉 / 右側 40% 策略管線與待處理事件審計",
   },
   {
     id: "flagship",
-    nameZh: "5卡操盤旗艦 (全景全功能監控)",
-    shortName: "操盤旗艦",
+    nameZh: "5卡全景總覽 (全核心模組展開)",
+    shortName: "全景總覽",
     tag: "全景多螢",
     cardCount: 5,
-    desc: "上層：權益損益+策略機器人+標的行情 / 下層：持倉委託+全域戰情日誌",
+    desc: "上層：權益損益+曝險額度 / 下層：策略實例與持倉+策略管線+待處理事件審計",
   },
   {
     id: "full9",
@@ -126,15 +128,15 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
     shortName: "5卡全景",
     tag: "完整大盤",
     cardCount: 5,
-    desc: "權益 · 機器人 · 槓桿 · 持倉 · 全域戰情日誌與成交流水",
+    desc: "權益 · 曝險額度 · 策略實例與持倉 · 策略管線 · 待處理與事件審計",
   },
   {
     id: "focus_positions",
-    nameZh: "單卡滿版專注 (部位與防線全螢幕)",
-    shortName: "部位全螢幕",
+    nameZh: "單卡滿版專注 (策略實例與持倉全螢幕)",
+    shortName: "實例全螢幕",
     tag: "單卡專注",
     cardCount: 1,
-    desc: "100% 滿版展示多空持倉、在途掛單撤單與交易所停損防線",
+    desc: "100% 滿版展示策略實例狀態、持倉部位、在途掛單與交易所風控明細",
   },
   {
     id: "empty",
@@ -142,28 +144,28 @@ export const RECOMMENDED_PRESETS: LayoutPresetMeta[] = [
     shortName: "一鍵清空",
     tag: "從零自訂",
     cardCount: 0,
-    desc: "完全清空主畫面卡片，自由從 [＋卡片] 挑選組裝專屬戰情視窗",
+    desc: "完全清空主畫面卡片，自由從控制中心挑選組裝專屬戰情視窗",
   },
 ];
 
 export const DEFAULT_PROFILES: LayoutProfile[] = [
   {
     id: "layout_tsplit_v1_core",
-    name: "量化戰情 T-Split (上下解耦 · 5卡定案)",
+    name: "系統總覽 T-Split (5卡定案)",
     shortName: "T-Split",
     ratioText: "T-Split",
     icon: "🔲",
-    desc: "權益損益 · 策略機器人 · 槓桿曝險 · 持倉委託 · 交易日誌",
+    desc: "帳戶權益 · 曝險額度 · 策略實例與持倉 · 策略管線 · 待處理與事件審計",
     isSystem: true,
     rootNode: createDefaultTree(),
-    leftColWidth: 60,
-    leftUpperHeight: 50,
-    rightUpperHeight: 50,
+    leftColWidth: 57,
+    leftUpperHeight: 34,
+    rightUpperHeight: 34,
     slots: {
       leftUpper: "equity",
-      leftLower: "positions",
+      leftLower: "bots",
       rightUpper: "allocation",
-      rightLower: "bots",
+      rightLower: "activity_deck",
     },
     updatedAt: "定案配置",
   },
@@ -174,10 +176,10 @@ export type SeamStyle = "seamless" | "compact" | "floating";
 export type DragPreviewMode = "real-card" | "minimal-blueprint" | "mini-tag";
 export type GripStyle = "clean_text" | "precision_dots" | "accent_notch" | "tactical_icon";
 
-const STORAGE_KEY_PROFILES = "catos_layout_profiles_v12_gold5";
-const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v12_gold5";
+const STORAGE_KEY_PROFILES = "catos_layout_profiles_v13_overview5";
+const STORAGE_KEY_CURRENT = "catos_current_layout_profile_id_v13_overview5";
 const STORAGE_KEY_TOOLBAR_MODE = "catos_toolbar_candidate_mode_v1";
-const STORAGE_KEY_TREE = "catos_layout_tree_root_v12_gold5";
+const STORAGE_KEY_TREE = "catos_layout_tree_root_v13_overview5";
 const STORAGE_KEY_SEAM_STYLE = "catos_seam_style_candidate_v1";
 const STORAGE_KEY_DRAG_PREVIEW = "catos_drag_preview_candidate_v1";
 const STORAGE_KEY_GRIP_STYLE = "catos_grip_style_candidate_v1";
@@ -296,39 +298,44 @@ function sanitizeAndPruneTree(root: LayoutNode | null): LayoutNode | null {
   if (!root) return null;
   let tree: LayoutNode | null = root;
 
-  // 1. 檢驗所有葉子節點
-  let leaves = getAllLeaves(tree);
+  // 1. 檢驗所有葉子節點，收斂已合併的舊卡 ID
+  const leaves = getAllLeaves(tree);
   let hasActivityDeck = leaves.some((l) => l.cardId === "activity_deck");
+  let hasBots = leaves.some((l) => l.cardId === "bots");
 
   for (const leaf of leaves) {
     if (leaf.cardId === "market_watch" || leaf.cardId === "strategy_intents") {
-      // 標的行情與策略目標已拆解融入頂部狀態總線與持倉，自樹結構中自動剪枝並平鋪相鄰卡片
       if (tree) {
         const next = removeLeaf(tree, leaf.id);
         if (next) tree = next;
       }
+    } else if (leaf.cardId === "positions") {
+      // 4A 定案：持倉明細已併入策略實例與持倉 (bots)
+      if (!hasBots && tree) {
+        tree = replaceLeafCard(tree, leaf.id, "bots");
+        hasBots = true;
+      } else if (tree) {
+        const next = removeLeaf(tree, leaf.id);
+        if (next) tree = next;
+      }
     } else if (leaf.cardId === "fills" || leaf.cardId === "incidents") {
-      if (!hasActivityDeck) {
-        // 第一個轉換為 activity_deck
+      if (!hasActivityDeck && tree) {
         tree = replaceLeafCard(tree, leaf.id, "activity_deck");
         hasActivityDeck = true;
-      } else {
-        // 其餘舊卡片節點直接自樹中拔除，自動平鋪展開相鄰視窗
-        if (tree) {
-          const next = removeLeaf(tree, leaf.id);
-          if (next) tree = next;
-        }
+      } else if (tree) {
+        const next = removeLeaf(tree, leaf.id);
+        if (next) tree = next;
       }
     }
   }
 
-  // 2. 拔除重複的 activity_deck 葉子
-  if (tree) {
-    const updatedLeaves = getAllLeaves(tree);
-    const activityLeaves = updatedLeaves.filter((l) => l.cardId === "activity_deck");
-    if (activityLeaves.length > 1) {
-      for (let i = 1; i < activityLeaves.length; i++) {
-        const next = removeLeaf(tree, activityLeaves[i].id);
+  // 2. 拔除重複的核心卡片葉子
+  for (const uniqueId of ["activity_deck", "bots", "pipeline"] as CardId[]) {
+    if (!tree) break;
+    const dupes = getAllLeaves(tree).filter((l) => l.cardId === uniqueId);
+    if (dupes.length > 1) {
+      for (let i = 1; i < dupes.length; i++) {
+        const next = removeLeaf(tree, dupes[i].id);
         if (next) tree = next;
       }
     }
@@ -386,7 +393,7 @@ function sanitizeAndPruneTree(root: LayoutNode | null): LayoutNode | null {
       activeProfile: DEFAULT_PROFILES[0],
       rootNode: defaultTree,
       seamStyle: "compact" as SeamStyle,
-      dragPreviewMode: "blueprint-snap" as DragPreviewMode,
+      dragPreviewMode: "real-card" as DragPreviewMode,
       gripStyle: "clean_text" as GripStyle,
     };
   }
@@ -568,7 +575,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         newTree = createFlagshipTree();
         break;
       case "focus_positions":
-        newTree = createFocusTree("positions");
+        newTree = createFocusTree("bots");
         break;
       case "empty":
         newTree = null;

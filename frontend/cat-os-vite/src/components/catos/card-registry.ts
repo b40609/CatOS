@@ -1,6 +1,6 @@
 import {
   TrendingUp,
-  LineChart,
+  GitBranch,
   Bot,
   PieChart,
   ScrollText,
@@ -33,7 +33,7 @@ export const ALL_CARDS: CardMeta[] = [
     nameZh: "帳戶權益與損益",
     nameEn: "Equity & Verified Drawdown",
     category: "資產風控",
-    desc: "實時淨值資產、台北日切 00:00 風控基準、當日損益監控與 7D 走勢圖",
+    desc: "實時淨值資產、台北日切 00:00 風控基準、風控期間損益與權益曲線",
     icon: TrendingUp,
     badge: "R1 基準",
     spec: {
@@ -46,81 +46,81 @@ export const ALL_CARDS: CardMeta[] = [
   },
   {
     id: "allocation",
-    nameZh: "槓桿倍數與資產曝險",
-    nameEn: "Leverage & Allocation Donut",
+    nameZh: "曝險額度",
+    nameEn: "Exposure & Multi-View Donut",
     category: "資產風控",
-    desc: "帳戶有效槓桿倍數、單幣曝險預算 50% 限制與多空甜甜圈資產分佈",
+    desc: "按策略／幣種／多空／損益／保證金 5 視角監控曝險上限，點擊圓環切換 % / x / $",
     icon: PieChart,
     badge: "1.0x／單幣 0.5x",
     spec: {
-      dataFeed: "OKX SWAP WebSocket",
-      latency: "100ms 實時",
+      dataFeed: "Supervisor Risk Projection",
+      latency: "實時對帳",
       engine: "事前槓桿審計",
       tier: "核心防線",
-      codeId: "LEVERAGE_DONUT_V1",
-    },
-  },
-  {
-    id: "positions",
-    nameZh: "持倉明細與交易所風控",
-    nameEn: "Positions & OKX Stop Guard",
-    category: "交易執行",
-    desc: "多空持倉明細、交易所條件單防線覆蓋、在途掛單撤單與即時凍結保證金",
-    icon: LineChart,
-    badge: "交易所條件單防線",
-    spec: {
-      dataFeed: "OKX 專用子帳戶",
-      latency: "事件驅動",
-      engine: "Mark 取整停損",
-      tier: "委託執行",
-      codeId: "POSITIONS_GUARD_DECK",
+      codeId: "EXPOSURE_DONUT_V2",
     },
   },
   {
     id: "bots",
-    nameZh: "策略機器人矩陣",
-    nameEn: "Bots Runtime Matrix",
+    nameZh: "策略實例與持倉",
+    nameEn: "Bots & Positions Matrix",
     category: "交易執行",
-    desc: "4 隻專用 KOL 策略進程、單幣獨佔約束、Worker 心跳檢測與一鍵啟停",
+    desc: "策略實例、多空持倉、均價／標記價、P6 停損與掛單合一寬表，點擊列展開詳情",
     icon: Bot,
-    badge: "單幣獨佔",
+    badge: "實例＋持倉合一",
     spec: {
-      dataFeed: "Supervisor IPC (JSON)",
+      dataFeed: "Supervisor IPC / Positions",
       latency: "500ms 輪詢",
       engine: "無憑證策略隔離",
       tier: "委託執行",
-      codeId: "BOT_SUPERVISOR_MATRIX",
+      codeId: "BOTS_POSITIONS_V2",
+    },
+  },
+  {
+    id: "pipeline",
+    nameZh: "策略管線",
+    nameEn: "Strategy Pipeline",
+    category: "策略行情",
+    desc: "5 階段生命週期軌道（提案 → 研究驗證 → 待核准 → 模擬盤 → 實盤），窄卡自動轉進度條",
+    icon: GitBranch,
+    badge: "5 階段軌道",
+    spec: {
+      dataFeed: "Catalog / Replay / Demo Bot",
+      latency: "30s 輪詢",
+      engine: "唯讀生命週期投影",
+      tier: "策略情報",
+      codeId: "STRATEGY_PIPELINE_V1",
     },
   },
   {
     id: "activity_deck",
-    nameZh: "全域戰情日誌與成交流水",
-    nameEn: "Unified Blotter & Activity Log",
+    nameZh: "待處理與事件審計",
+    nameEn: "Action Queue & Audit Log",
     category: "日誌審計",
-    desc: "全時序合流：未解除判定、風控告警、逐筆成交流水、在途委託與系統心跳",
+    desc: "依嚴重度排序的待處理佇列（鎖存／警戒／待核准）與完整事件審計成交流水",
     icon: ScrollText,
-    badge: "全時序合流",
+    badge: "待處理＋流水",
     spec: {
-      dataFeed: "Local SQLite (WAL)",
+      dataFeed: "Local SQLite (WAL) / Signals",
       latency: "逐筆寫入",
       engine: "不可竄改日誌鏈",
       tier: "日誌審計",
-      codeId: "ACTIVITY_DECK_V2",
+      codeId: "ACTION_AUDIT_DECK_V3",
     },
   },
 ];
 
 /**
  * 各卡片預設最小安全閱讀高度 (px)
- * 供使用者隨時根據每張卡片的資料密度與排版需求自訂調整預設值
  */
 export const CARD_DEFAULT_MIN_HEIGHTS: Partial<Record<CardId, number>> = {
-  equity: 340,           // 權益走勢圖 + 核心 KPI + 台北日切基準
-  positions: 340,        // 持倉明細與在途委託雙檢視表 + 底部撤單統計
-  bots: 320,             // 4 隻 KOL 機器人監控表格 + 狀態指示
-  allocation: 320,       // 槓桿儀表板 + 甜甜圈圓餅圖 + 幣種曝險進度條
-  activity_deck: 340,    // 全域戰情日誌時間軸
-  fills: 280,            // 即時成交流水表
-  incidents: 300,        // 風險警報與異常審計
-  bot_inspector: 380,    // 機器人深層檢測 (Master-Detail)
+  equity: 320,
+  allocation: 310,
+  bots: 320,
+  pipeline: 280,
+  activity_deck: 340,
+  positions: 320,
+  fills: 280,
+  incidents: 300,
+  bot_inspector: 380,
 };

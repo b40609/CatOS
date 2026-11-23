@@ -39,17 +39,17 @@ const SYSTEM_PRESETS: {
 }[] = [
   {
     id: "tsplit",
-    name: "標準交易視圖 (5-Split)",
+    name: "標準總覽視圖 (5-Split)",
     tag: "標準配置",
     cardsCount: 5,
-    desc: "上下 T-Split 佈局，核心策略與持倉並行監控 (經典定案)",
+    desc: "帳戶權益＋曝險額度 / 策略實例與持倉＋策略管線＋待處理事件審計",
   },
   {
     id: "full9",
     name: "全景監控視圖 (Full Overview)",
     tag: "全景視圖",
     cardsCount: 5,
-    desc: "全景展開版面，極大化可視資訊密度",
+    desc: "5 卡全景展開版面，極大化可視資訊密度",
   },
   {
     id: "quad",
@@ -60,10 +60,10 @@ const SYSTEM_PRESETS: {
   },
   {
     id: "focus_positions",
-    name: "持倉防線專注 (Focus)",
+    name: "策略實例與持倉專注 (Focus)",
     tag: "單卡滿版",
     cardsCount: 1,
-    desc: "100% 滿版展示多空持倉、在途掛單撤單與 交易所停損保護",
+    desc: "100% 滿版展示策略實例狀態、持倉部位、在途掛單與交易所風控明細",
   },
 ];
 

@@ -20,11 +20,11 @@ export function cloneTree(node: LayoutNode): LayoutNode {
 }
 
 /**
- * 系統預設排版：使用者定案實戰佈局 (User Confirmed Gold Standard)
- * - 頂層 (34% 高度，50:50 左右橫幅)：[帳戶權益 (equity)] ｜ [槓桿曝險 (allocation)]
+ * 系統預設排版：使用者拍板 5 卡總覽定案 (Overview 5-Card T-Split)
+ * - 頂層 (34% 高度，50:50 左右橫幅)：[帳戶權益 (equity)] ｜ [曝險額度 (allocation)]
  * - 底層 (66% 高度，左 57% / 右 43%)：
- *   - 左半部 (上下 50:50)：[策略機器人 (bots)] / [持倉與防線 (positions)]
- *   - 右半部 (縱向全高)：[全域戰情日誌與對帳流水 (activity_deck)]
+ *   - 左半部 (上下 52:48)：[策略實例與持倉 (bots)] / [策略管線 (pipeline)]
+ *   - 右半部 (縱向全高)：[待處理與事件審計 (activity_deck)]
  */
 export function createDefaultTree(): LayoutNode {
   return {
@@ -49,9 +49,9 @@ export function createDefaultTree(): LayoutNode {
         type: "split",
         id: "split-bottom-left",
         direction: "col",
-        ratio: 0.5,
+        ratio: 0.52,
         first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-        second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+        second: { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" },
       },
       second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
     },
@@ -60,8 +60,8 @@ export function createDefaultTree(): LayoutNode {
 
 /**
  * 推薦佈局 2：4卡象限盯盤 (雙欄經典對稱 · 50:50 純粹平衡)
- * 左欄：[帳戶權益 (equity)] / [部位防線 (positions)]
- * 右欄：[量化機器人 (bots)] / [全域戰情日誌 (activity_deck)]
+ * 左欄：[帳戶權益 (equity)] / [策略管線 (pipeline)]
+ * 右欄：[策略實例與持倉 (bots)] / [待處理與事件審計 (activity_deck)]
  */
 export function createQuadTree(): LayoutNode {
   return {
@@ -75,7 +75,7 @@ export function createQuadTree(): LayoutNode {
       direction: "col",
       ratio: 0.5,
       first: { type: "leaf", id: "leaf-equity", cardId: "equity" },
-      second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      second: { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" },
     },
     second: {
       type: "split",
@@ -89,9 +89,9 @@ export function createQuadTree(): LayoutNode {
 }
 
 /**
- * 推薦佈局 3：3卡風控防線專注 (左側 60% 盤口主視野)
- * 左欄 (60%)：[部位活動與盤口防線 (positions)] 滿版廣角
- * 右欄 (40%)：[量化機器人 (bots)] / [全域戰情日誌 (activity_deck)]
+ * 推薦佈局 3：3卡執行防線專注 (左側 60% 策略實例與持倉主視野)
+ * 左欄 (60%)：[策略實例與持倉 (bots)] 滿版廣角
+ * 右欄 (40%)：[策略管線 (pipeline)] / [待處理與事件審計 (activity_deck)]
  */
 export function createSentinelTree(): LayoutNode {
   return {
@@ -99,13 +99,13 @@ export function createSentinelTree(): LayoutNode {
     id: "split-sentinel-root",
     direction: "row",
     ratio: 0.6,
-    first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+    first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
     second: {
       type: "split",
       id: "split-sentinel-right",
       direction: "col",
-      ratio: 0.5,
-      first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
+      ratio: 0.45,
+      first: { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" },
       second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
     },
   };
@@ -169,7 +169,7 @@ export function createCompareIntentTree(): LayoutNode {
 }
 
 /**
- * 對照排版 2：持倉明細 vs 全域戰情日誌與成交流水
+ * 對照排版 2：策略實例與持倉 vs 待處理與事件審計
  */
 export function createCompareActivityTree(): LayoutNode {
   return {
@@ -177,19 +177,19 @@ export function createCompareActivityTree(): LayoutNode {
     id: "split-compare-activity",
     direction: "row",
     ratio: 0.5,
-    first: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+    first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
     second: { type: "leaf", id: "leaf-activity-deck", cardId: "activity_deck" },
   };
 }
 
 /**
- * 對照排版 3：黃金 5 大核心卡片全景排版 (T-Split 定案：行情與資金費率已全域頂部化與持倉嵌入)
+ * 對照排版 3：5 大核心卡片全景排版
  */
 export function createFull9Tree(): LayoutNode {
   return createDefaultTree();
 }
 
-export function createFocusTree(cardId: CardId = "positions"): LayoutNode {
+export function createFocusTree(cardId: CardId = "bots"): LayoutNode {
   return {
     type: "leaf",
     id: "leaf-" + cardId,
@@ -613,12 +613,12 @@ export function buildStableTreeFromCardIds(
   const rootRatio = getNodeRatio("split-root", 0.34);
   const topTierRatio = getNodeRatio("split-top-tier", 0.5);
   const bottomTierRatio = getNodeRatio("split-bottom-tier", 0.57);
-  const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.5);
+  const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.52);
 
   const hasEquity = activeCardIds.includes("equity");
   const hasAllocation = activeCardIds.includes("allocation");
-  const hasBots = activeCardIds.includes("bots");
-  const hasPositions = activeCardIds.includes("positions");
+  const hasBots = activeCardIds.includes("bots") || activeCardIds.includes("positions");
+  const hasPipeline = activeCardIds.includes("pipeline");
   const hasActivity = activeCardIds.includes("activity_deck");
 
   // 1. 上半部 (equity | allocation 左右 50:50)
@@ -638,21 +638,21 @@ export function buildStableTreeFromCardIds(
     topNode = { type: "leaf", id: "leaf-allocation", cardId: "allocation" };
   }
 
-  // 2. 下半部左欄 (bots / positions 上下 50:50)
+  // 2. 下半部左欄 (bots / pipeline 上下 52:48)
   let bottomLeftNode: LayoutNode | null = null;
-  if (hasBots && hasPositions) {
+  if (hasBots && hasPipeline) {
     bottomLeftNode = {
       type: "split",
       id: "split-bottom-left",
       direction: "col",
       ratio: bottomLeftRatio,
       first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
-      second: { type: "leaf", id: "leaf-positions", cardId: "positions" },
+      second: { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" },
     };
   } else if (hasBots) {
     bottomLeftNode = { type: "leaf", id: "leaf-bots", cardId: "bots" };
-  } else if (hasPositions) {
-    bottomLeftNode = { type: "leaf", id: "leaf-positions", cardId: "positions" };
+  } else if (hasPipeline) {
+    bottomLeftNode = { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" };
   }
 
   // 3. 下半部 (bottomLeftNode | activity_deck 左右 57:43)

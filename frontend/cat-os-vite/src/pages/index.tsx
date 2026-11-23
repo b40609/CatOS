@@ -1,13 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/catos/shell";
 import { AccountEquityBand } from "@/components/catos/account-equity-band";
-import { ActivityPanel } from "@/components/catos/activity-panel";
-import { V0BotTable } from "@/components/catos/v0-bot-table";
+import { BotsPositionsCard } from "@/components/catos/bots-positions-card";
+import { StrategyPipelineCard } from "@/components/catos/strategy-pipeline-card";
 import { AllocationDonutCard } from "@/components/catos/allocation-donut-card";
 import { LayoutModeToolbar } from "@/components/catos/layout-mode-toolbar";
-
 import { UnifiedIncidentActivityCard } from "@/components/catos/unified-incident-activity-card";
-
 import { WorkspaceGrid } from "@/components/catos/workspace-grid";
 import type { CardId } from "@/state/layoutStore";
 
@@ -15,9 +13,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Dashboard · catOS Quant Terminal" },
-      { name: "description", content: "catOS 戰情總覽：即時權益、持倉明細、成交動態、資產配置與風控狀態。模擬交易終端。" },
+      { name: "description", content: "catOS 系統總覽：帳戶權益、多視角曝險額度、策略實例與持倉、策略管線與待處理事件審計。" },
       { property: "og:title", content: "Dashboard · catOS Quant Terminal" },
-      { property: "og:description", content: "Crypto portfolio equity, drawdown, open positions, recent fills and risk posture in the catOS simulated quant terminal." },
+      { property: "og:description", content: "Crypto portfolio equity, multi-view exposure, bots & positions, strategy pipeline and action audit log in catOS." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -26,28 +24,23 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-
-  // 卡片工廠函數：根據 cardId 動態渲染對應卡片
   const renderCard = (cardId: CardId) => {
     switch (cardId) {
       case "equity":
         return <AccountEquityBand className="h-full" />;
 
-      case "positions":
-        return <ActivityPanel className="h-full" />;
-
-      case "bots":
-        return <V0BotTable className="h-full" />;
-
       case "allocation":
         return <AllocationDonutCard className="h-full" />;
 
-      case "incidents":
-        return <UnifiedIncidentActivityCard className="h-full" />;
+      case "bots":
+      case "positions":
+        return <BotsPositionsCard className="h-full" />;
+
+      case "pipeline":
+        return <StrategyPipelineCard className="h-full" />;
 
       case "activity_deck":
-        return <UnifiedIncidentActivityCard className="h-full" />;
-
+      case "incidents":
       case "fills":
         return <UnifiedIncidentActivityCard className="h-full" />;
 
@@ -64,7 +57,6 @@ function Dashboard() {
         </div>
       }
     >
-      {/* 定案方案 2：上下分層 T-Split 解耦樹 (120 FPS 流暢分割線拉伸) */}
       <WorkspaceGrid renderCard={renderCard} />
     </AppShell>
   );
