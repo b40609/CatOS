@@ -228,8 +228,8 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
         />
         <CardHeaderTabs<"all" | "active">
           items={[
-            { id: "all", label: `全部(${allRows.length})` },
-            { id: "active", label: `進行中(${activeCount})` },
+            { id: "all", label: "全部", count: allRows.length },
+            { id: "active", label: "進行中", count: activeCount },
           ]}
           value={activeOnly ? "active" : "all"}
           onChange={(id) => setActiveOnly(id === "active")}

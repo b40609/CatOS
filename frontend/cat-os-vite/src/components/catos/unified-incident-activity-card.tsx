@@ -5,7 +5,18 @@ import { useOverviewSignals } from '@/lib/overview-signals';
 import { useRouter } from '@/lib/router';
 import { CardHeaderTitle } from './card-header-title';
 import { CardHeaderTabs } from './card-header-tabs';
-import { ArrowRight, Check, ChevronDown, ChevronUp, Copy, Inbox } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Inbox,
+  ShieldAlert,
+  Sparkles,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatClock, formatDateTime, formatDecimal, shortId } from '@/lib/format';
 
@@ -22,13 +33,22 @@ export interface CategoryTabItem {
 }
 
 type ActionSeverity = 'p0' | 'p1' | 'p2' | 'p3';
+type MetricTone = 'default' | 'warn' | 'up' | 'down' | 'blue' | 'teal';
+
+interface ActionMetric {
+  label: string;
+  value: string;
+  tone?: MetricTone;
+}
 
 interface ActionQueueItem {
   id: string;
   sev: ActionSeverity;
   tag: string;
   title: string;
+  symbol?: string;
   fact: string;
+  metrics?: ActionMetric[];
   primaryAction?: { label: string; route?: string; switchTab?: string; tone?: 'danger' | 'primary' };
   copyCommand?: { label: string; command: string };
 }
@@ -221,8 +241,8 @@ function toRow(ev: EventDTO, instLabel: string): EventRow {
 function getBadgeMeta(ev: EventDTO, side: Side) {
   if (ev.level === 'ERROR') {
     return {
-      label: 'ERROR',
-      badgeClass: 'bg-rose-500/15 text-rose-200 border border-rose-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
+      label: '錯誤',
+      tagClass: 'text-rose-300 font-semibold',
       coreClass: 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.55)] ring-1 ring-rose-400/40',
       sonarClass: 'bg-rose-500/25',
       bloomAnimation: 'crystal-optical-bloom-rose',
@@ -230,8 +250,8 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
   }
   if (ev.level === 'WARN') {
     return {
-      label: 'WARN',
-      badgeClass: 'bg-amber-500/15 text-amber-200 border border-amber-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
+      label: '異常',
+      tagClass: 'text-amber-300 font-semibold',
       coreClass: 'bg-[#f59e0b] shadow-[0_0_8px_rgba(245,158,11,0.55)] ring-1 ring-amber-400/40',
       sonarClass: 'bg-amber-500/25',
       bloomAnimation: 'crystal-optical-bloom-amber',
@@ -240,10 +260,8 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
   if (ev.category === 'ORDER') {
     const isShort = side === 'sell';
     return {
-      label: '成交',
-      badgeClass: isShort
-        ? 'bg-rose-500/15 text-rose-200 border border-rose-500/25 rounded-full px-2 font-medium backdrop-blur-xs'
-        : 'bg-emerald-500/15 text-emerald-200 border border-emerald-500/25 rounded-full px-2 font-medium backdrop-blur-xs',
+      label: isShort ? '賣出' : '買入',
+      tagClass: isShort ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold',
       coreClass: isShort
         ? 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.45)] ring-1 ring-rose-400/30'
         : 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.45)] ring-1 ring-emerald-400/30',
@@ -254,42 +272,70 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
   if (ev.category === 'WORKER') {
     return {
       label: '訊號',
-      badgeClass: 'bg-white/[0.04] text-zinc-400 border border-white/[0.06] rounded-full px-2 font-medium backdrop-blur-xs',
+      tagClass: 'text-zinc-500 font-medium',
       coreClass: 'bg-zinc-600/70 ring-1 ring-zinc-600/40',
       sonarClass: 'bg-zinc-600/15',
       bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   }
   return {
-    label: ev.category === 'RISK' ? '風控' : 'INFO',
-    badgeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
-    coreClass: 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.5)] ring-1 ring-sky-400/40',
-    sonarClass: 'bg-sky-500/20',
+    label: ev.category === 'RISK' ? '風控' : '資訊',
+    tagClass: ev.category === 'RISK' ? 'text-[#9ec2e6] font-semibold' : 'text-zinc-400 font-medium',
+    coreClass: 'bg-[#7faee2] shadow-[0_0_6px_rgba(127,174,226,0.45)] ring-1 ring-[#7faee2]/40',
+    sonarClass: 'bg-[#7faee2]/20',
     bloomAnimation: 'crystal-optical-bloom-neutral',
   };
 }
 
 function levelCapsuleClass(level: EventLevel): string {
   return level === 'ERROR'
-    ? 'bg-rose-500/15 border border-rose-500/30 text-rose-200'
-    : 'bg-amber-500/15 border border-amber-500/30 text-amber-200';
+    ? 'text-rose-300 font-semibold'
+    : 'text-amber-300 font-semibold';
 }
 
-function severityRowClass(sev: ActionSeverity): string {
-  switch (sev) {
-    case 'p0': return 'border-l-2 border-l-rose-500 bg-rose-500/[0.06]';
-    case 'p1': return 'border-l-2 border-l-amber-500 bg-amber-500/[0.03]';
-    case 'p2': return 'border-l-2 border-l-primary bg-primary/[0.025]';
-    default: return 'border-l-2 border-l-border';
+const SEVERITY_STYLE: Record<
+  ActionSeverity,
+  {
+    cardClass: string;
+    iconBoxClass: string;
+    tagClass: string;
+    Icon: typeof ShieldAlert;
   }
-}
+> = {
+  p0: {
+    cardClass: 'border-rose-500/40 bg-gradient-to-r from-rose-500/[0.08] via-secondary/45 to-secondary/35',
+    iconBoxClass: 'bg-rose-500/15 border-rose-500/35 text-rose-400',
+    tagClass: 'text-rose-400',
+    Icon: ShieldAlert,
+  },
+  p1: {
+    cardClass: 'border-border/80 bg-secondary/45 hover:border-amber-500/35',
+    iconBoxClass: 'bg-amber-500/15 border-amber-500/35 text-amber-400',
+    tagClass: 'text-amber-400',
+    Icon: AlertTriangle,
+  },
+  p2: {
+    cardClass: 'border-border/80 bg-secondary/45 hover:border-[#7faee2]/45',
+    iconBoxClass: 'bg-[#7faee2]/15 border-[#7faee2]/35 text-[#9fc5ee]',
+    tagClass: 'text-[#9fc5ee]',
+    Icon: CheckCircle2,
+  },
+  p3: {
+    cardClass: 'border-border/80 bg-secondary/45 hover:border-teal-400/35',
+    iconBoxClass: 'bg-teal-400/15 border-teal-400/30 text-teal-300',
+    tagClass: 'text-teal-300',
+    Icon: Sparkles,
+  },
+};
 
-function severityBadgeClass(sev: ActionSeverity): string {
-  switch (sev) {
-    case 'p0': return 'bg-rose-500/15 border-rose-500/35 text-rose-300';
-    case 'p1': return 'bg-amber-500/15 border-amber-500/35 text-amber-300';
-    case 'p2': return 'bg-primary/15 border-primary/40 text-primary';
-    default: return 'bg-white/[0.05] border-white/[0.12] text-zinc-400';
+function metricToneClass(tone?: MetricTone): string {
+  switch (tone) {
+    case 'warn': return 'text-amber-300';
+    case 'up': return 'text-emerald-400';
+    case 'down': return 'text-rose-400';
+    case 'blue': return 'text-[#9fc5ee]';
+    case 'teal': return 'text-teal-300';
+    default: return 'text-foreground';
   }
 }
 
@@ -298,16 +344,30 @@ const PREVIEW_ACTIONS: ActionQueueItem[] = [
     id: 'preview-p1-rsi',
     sev: 'p1',
     tag: '偏差警戒',
-    title: 'mean-reversion-rsi · ETH-USDT-SWAP 1H',
+    title: 'mean-reversion-rsi',
+    symbol: 'ETH 1H',
     fact: '模擬偏差 -0.61%（警戒線 0.50% / 門檻 1.00%）· 近 3 筆滑價偏高',
+    metrics: [
+      { label: '模擬偏差', value: '-0.61%', tone: 'warn' },
+      { label: '警戒線', value: '0.50%' },
+      { label: '硬門檻', value: '1.00%' },
+      { label: '異常原因', value: '近 3 筆滑價偏高' },
+    ],
     primaryAction: { label: '檢視比對', route: '/demo-bot' },
   },
   {
     id: 'preview-p2-ens',
     sev: 'p2',
     tag: '待核准',
-    title: 'donchian-ensemble · BTC-USDT-SWAP 1D',
+    title: 'donchian-ensemble',
+    symbol: 'BTC 1D',
     fact: '4/4 驗證通過 · 年化 +13.9% · 最大回撤 -11.3% · PBO 22%',
+    metrics: [
+      { label: '驗證關卡', value: '4/4 通過', tone: 'blue' },
+      { label: '年化', value: '+13.9%', tone: 'up' },
+      { label: '最大回撤', value: '-11.3%' },
+      { label: 'PBO', value: '22%' },
+    ],
     primaryAction: { label: '檢視策略', route: '/strategies' },
     copyCommand: {
       label: '複製核准指令',
@@ -318,8 +378,14 @@ const PREVIEW_ACTIONS: ActionQueueItem[] = [
     id: 'preview-p3-vol',
     sev: 'p3',
     tag: '研究提案',
-    title: 'vol-breakout · SOL-USDT-SWAP 4H',
+    title: 'vol-breakout',
+    symbol: 'SOL 4H',
     fact: 'Agent 提交 · strategies/ 資料夾策略 · 依規則預設只做多',
+    metrics: [
+      { label: '來源', value: 'Agent 資料夾', tone: 'teal' },
+      { label: '方向限制', value: '預設只做多' },
+      { label: '狀態', value: '待排程回測' },
+    ],
     primaryAction: { label: '檢視策略', route: '/strategies' },
   },
 ];
@@ -371,8 +437,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   }, []);
 
   const { width: cardW } = dimensions;
-  const isNarrow = cardW < 520;
-  const isStackActionBtns = cardW < 450;
+  const isNarrow = cardW < 440;
+  const isStackActionBtns = cardW < 430;
   const isSuperNarrow = cardW < 360;
 
   const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
@@ -407,8 +473,13 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         id: 'p0-kill-switch',
         sev: 'p0',
         tag: '總開關觸發',
-        title: 'Kill-Switch 已鎖存 · 禁止啟動新 run',
+        title: 'Kill-Switch 已鎖存',
+        symbol: 'ALL · 禁啟新 run',
         fact: `原因：${reason} · 需由使用者確認原因後人工解除`,
+        metrics: [
+          { label: '觸發原因', value: reason, tone: 'down' },
+          { label: '解除方式', value: '風控頁人工解除' },
+        ],
         primaryAction: { label: '前往風控', route: '/risk', tone: 'danger' },
       });
     }
@@ -420,8 +491,13 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         id: `p0-risk-${risk.derived.status}`,
         sev: 'p0',
         tag: '風控鎖存',
-        title: `帳戶 ${label} 鎖存 · 禁止增倉`,
+        title: `帳戶 ${label} 已觸發`,
+        symbol: 'ALL · 禁止增倉',
         fact: `原因：${reasons} · 需人工檢核並於 CLI 解除`,
+        metrics: [
+          { label: '風控原因', value: reasons, tone: 'down' },
+          { label: '解除方式', value: 'CLI demo rearm' },
+        ],
         primaryAction: { label: '前往風控', route: '/risk', tone: 'danger' },
       });
     }
@@ -441,8 +517,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           id: `p0-demo-failed-${run.run_id}`,
           sev: 'p0',
           tag: '執行失敗',
-          title: `模擬盤 Bot 異常停止 · ${run.strategy_id ?? shortId(run.run_id)}`,
+          title: run.strategy_id ?? shortId(run.run_id),
+          symbol: 'OKX Demo',
           fact: `run ${shortId(run.run_id)} · ${run.stop_reason ?? '執行錯誤'} · 部位 ${run.position ?? '0'} 張`,
+          metrics: [
+            { label: 'run', value: shortId(run.run_id) },
+            { label: '原因', value: run.stop_reason ?? '執行錯誤', tone: 'down' },
+            { label: '部位', value: `${run.position ?? '0'} 張` },
+          ],
           primaryAction: { label: '檢視 Bot', route: '/demo-bot', tone: 'danger' },
         });
       } else if (run.state === 'running' && run.stale) {
@@ -450,8 +532,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           id: `p1-demo-stale-${run.run_id}`,
           sev: 'p1',
           tag: '無回應',
-          title: `模擬盤 Bot 心跳逾時 · ${run.strategy_id ?? shortId(run.run_id)}`,
+          title: run.strategy_id ?? shortId(run.run_id),
+          symbol: 'OKX Demo',
           fact: `run ${shortId(run.run_id)} 超過兩根 K 線未寫入紀錄 · 當前部位 ${run.position ?? '0'} 張`,
+          metrics: [
+            { label: 'run', value: shortId(run.run_id) },
+            { label: '狀態', value: '逾兩根 K 線未寫入', tone: 'warn' },
+            { label: '部位', value: `${run.position ?? '0'} 張` },
+          ],
           primaryAction: { label: '檢視 Bot', route: '/demo-bot' },
         });
       }
@@ -464,8 +552,13 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           id: `p1-approval-changed-${approval.approval_id}`,
           sev: 'p1',
           tag: '來源異動',
-          title: `已核准策略來源已變更 · ${approval.strategy_id}`,
+          title: approval.strategy_id,
+          symbol: '雜湊不符',
           fact: `核准 ${shortId(approval.approval_id)} 雜湊不符，Bot 與 IPC 已停止解析，需重審核准`,
+          metrics: [
+            { label: '核准 ID', value: shortId(approval.approval_id) },
+            { label: '狀態', value: 'Bot 與 IPC 已停止解析', tone: 'warn' },
+          ],
           primaryAction: { label: '檢視策略', route: '/strategies' },
         });
       }
@@ -479,7 +572,12 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         sev: 'p1',
         tag: latest.event.level === 'ERROR' ? '事件錯誤' : '事件警戒',
         title: latest.title,
+        symbol: `seq ${latest.event.seq}`,
         fact: `近期累計 ${alertEvents.length} 筆異常事件 · 最新 seq ${latest.event.seq} (${latest.time})`,
+        metrics: [
+          { label: '累計異常', value: `${alertEvents.length} 筆`, tone: 'warn' },
+          { label: '最新時間', value: latest.time },
+        ],
         primaryAction: { label: '檢視異常', switchTab: 'ALERT' },
       });
     }
@@ -496,8 +594,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           id: `p2-folder-${s.id}`,
           sev: 'p2',
           tag: '待核准',
-          title: `${s.name || s.id} · strategies/${s.id}/`,
+          title: s.name || s.id,
+          symbol: `strategies/${s.id}/`,
           fact: `資料夾策略尚無有效核准紀錄，僅供研究回測；部署前須由使用者於 CLI 核准`,
+          metrics: [
+            { label: '來源', value: '資料夾策略', tone: 'blue' },
+            { label: '目前階段', value: '僅供研究回測' },
+            { label: '部署條件', value: 'CLI 人工核准' },
+          ],
           primaryAction: { label: '檢視策略', route: '/strategies' },
           copyCommand: {
             label: '複製核准指令',
@@ -531,17 +635,17 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return [
       {
         id: 'ACTION',
-        label: `待處理(${actionItems.length})`,
-        shortLabel: actionItems.length > 0 ? `待(${actionItems.length})` : '待處理',
+        label: '待處理',
+        shortLabel: '待',
         badgeCount: actionItems.length,
         isCritical: hasP0,
         isAlert: !hasP0 && (hasP1 || actionItems.length > 0),
         filterFn: () => false,
       },
-      { id: 'ALL', label: `全部(${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
-      { id: 'ALERT', label: `異常(${countAlert})`, shortLabel: countAlert > 0 ? `異(${countAlert})` : '異常', badgeCount: countAlert, isAlert: countAlert > 0, filterFn: isAlert },
-      { id: 'ORDER', label: `成交(${countOrder})`, shortLabel: '成交', badgeCount: countOrder, filterFn: (e) => e.category === 'ORDER' },
-      { id: 'RISK', label: `風控(${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => e.category === 'RISK' },
+      { id: 'ALL', label: '全部', shortLabel: '全', badgeCount: events.length, filterFn: () => true },
+      { id: 'ALERT', label: '異常', shortLabel: '異', badgeCount: countAlert, isAlert: countAlert > 0, filterFn: isAlert },
+      { id: 'ORDER', label: '成交', shortLabel: '成', badgeCount: countOrder, filterFn: (e) => e.category === 'ORDER' },
+      { id: 'RISK', label: '風控', shortLabel: '風', badgeCount: countRisk, filterFn: (e) => e.category === 'RISK' },
     ];
   }, [events, actionItems.length, hasP0, hasP1]);
 
@@ -613,6 +717,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           items={(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => ({
             id: tab.id,
             label: isNarrow ? tab.shortLabel : tab.label,
+            count: tab.badgeCount,
             tone: tab.isCritical ? 'critical' : tab.isAlert ? 'alert' : 'default',
           }))}
           value={category}
@@ -620,84 +725,129 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         />
       </div>
 
-      {/* 2. 主內容區：單欄待處理佇列＋下方近期審計流水 */}
+      {/* 2. 主內容區：單欄待處理內嵌圖示指標卡＋下方垂直時間軸近期流水 */}
       {category === 'ACTION' ? (
         <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
-          {/* 上半：待處理佇列 */}
-          <div className="divide-y divide-border/50 shrink-0">
+          {/* 上半：待處理佇列（融合結構化指標條與霧藍核准分流 × 內嵌微卡槽與語意圖示方塊） */}
+          <div className="p-2.5 space-y-2 shrink-0">
             {actionItems.length === 0 ? (
-              <div className="py-6 text-center text-t2 text-muted-foreground">
+              <div className="py-5 text-center text-t2 text-muted-foreground">
                 無待處理項目
               </div>
             ) : (
               actionItems.map((item) => {
                 const isCopied = copiedId === item.id;
+                const style = SEVERITY_STYLE[item.sev];
+                const IconComp = style.Icon;
+
                 return (
                   <div
                     key={item.id}
                     className={cn(
-                      'px-3 py-2.5 flex gap-2.5 transition-colors hover:bg-white/[0.03]',
-                      isStackActionBtns ? 'flex-col items-stretch' : 'items-center justify-between',
-                      severityRowClass(item.sev)
+                      'rounded-md border px-2.5 py-2 transition-colors flex flex-col gap-2',
+                      style.cardClass
                     )}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={cn('px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0', severityBadgeClass(item.sev))}>
-                          {item.tag}
-                        </span>
-                        <span className="text-t3 font-semibold text-foreground truncate font-sans">
-                          {item.title}
-                        </span>
-                      </div>
-                      <p className="text-t2 text-muted-foreground mt-1 leading-snug truncate font-sans" title={item.fact}>
-                        {item.fact}
-                      </p>
-                    </div>
-
-                    <div className={cn('flex items-center gap-1.5 shrink-0', isStackActionBtns && 'justify-end')}>
-                      {item.primaryAction && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (item.primaryAction?.switchTab) {
-                              handleSelectTab(item.primaryAction.switchTab);
-                            } else if (item.primaryAction?.route) {
-                              navigate(item.primaryAction.route);
-                            }
-                          }}
+                    {/* 上排：28px 語意圖示方塊 ＋ 分類／策略／標的晶片 ＋ 右側操作鈕 */}
+                    <div
+                      className={cn(
+                        'flex gap-2.5',
+                        isStackActionBtns ? 'flex-col items-stretch' : 'items-center justify-between'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div
                           className={cn(
-                            'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap',
-                            item.primaryAction.tone === 'danger'
-                              ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
-                              : 'border-border/80 bg-secondary/60 text-foreground hover:border-primary/60 hover:text-primary'
+                            'size-7 rounded-md border grid place-items-center shrink-0',
+                            style.iconBoxClass
                           )}
                         >
-                          {item.primaryAction.label}
-                        </button>
-                      )}
+                          <IconComp className="size-3.5" />
+                        </div>
 
-                      {item.copyCommand && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
-                          title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
-                          className="px-2 py-1 rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-t2 font-mono transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
-                        >
-                          {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                          <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
-                        </button>
-                      )}
+                        <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                          <span className={cn('text-t1 font-mono font-bold shrink-0', style.tagClass)}>
+                            {item.tag}
+                          </span>
+                          <span className="text-t3 font-semibold text-foreground truncate font-sans">
+                            {item.title}
+                          </span>
+                          {item.symbol && (
+                            <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-t1 font-mono text-muted-foreground leading-none shrink-0 truncate max-w-[170px]" title={item.symbol}>
+                              {item.symbol}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={cn('flex items-center gap-1.5 shrink-0', isStackActionBtns && 'justify-end')}>
+                        {item.primaryAction && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (item.primaryAction?.switchTab) {
+                                handleSelectTab(item.primaryAction.switchTab);
+                              } else if (item.primaryAction?.route) {
+                                navigate(item.primaryAction.route);
+                              }
+                            }}
+                            className={cn(
+                              'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap',
+                              item.primaryAction.tone === 'danger'
+                                ? 'border-rose-500/45 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
+                                : 'border-border/90 bg-background/50 text-foreground hover:border-[#7faee2]/60 hover:text-[#b8d4f2]'
+                            )}
+                          >
+                            {item.primaryAction.label}
+                          </button>
+                        )}
+
+                        {item.copyCommand && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
+                            title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
+                            className="px-2 py-1 rounded border border-[#7faee2]/45 bg-[#7faee2]/15 text-[#b8d4f2] hover:bg-[#7faee2] hover:text-[#111318] text-t2 font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+                          >
+                            {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                            <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* 下排：結構化指標條（免讀長句，關鍵數值一眼掃描） */}
+                    {item.metrics && item.metrics.length > 0 ? (
+                      <div className="rounded border border-border/50 bg-background/50 px-2.5 py-1 flex items-center flex-wrap gap-y-1 font-mono text-t1">
+                        {item.metrics.map((m, idx) => (
+                          <span
+                            key={`${item.id}-m-${idx}`}
+                            className={cn(
+                              'inline-flex items-center gap-1.5',
+                              idx < item.metrics!.length - 1 && 'pr-2.5 mr-2.5 border-r border-border/45'
+                            )}
+                          >
+                            <span className="text-muted-foreground/80 font-sans">{m.label}</span>
+                            <span className={cn('font-semibold tabular-nums', metricToneClass(m.tone))}>
+                              {m.value}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-t2 text-muted-foreground leading-snug truncate font-sans pl-9" title={item.fact}>
+                        {item.fact}
+                      </p>
+                    )}
                   </div>
                 );
               })
             )}
           </div>
 
-          {/* 下半：近期審計與成交流水 */}
-          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/15">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0">
+          {/* 下半：近期審計與成交流水（垂直時間軸導軌微光節點 × 無框中文分類色字） */}
+          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/20">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-background/40 border-b border-border/60 shrink-0">
               <span className="text-t1 font-mono text-muted-foreground">
                 近期審計與成交流水 · {events.length} 筆
               </span>
@@ -717,35 +867,44 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                 <span className="text-t2 font-sans">{emptyMessage}</span>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.04]">
-                {recentHighlights.map((row) => {
-                  const meta = getBadgeMeta(row.event, row.side);
-                  return (
-                    <div
-                      key={row.key}
-                      onClick={() => {
-                        handleSelectTab('ALL');
-                        setExpandedKey(row.key);
-                      }}
-                      className="px-3 py-2 flex items-center justify-between gap-2 hover:bg-white/[0.03] transition-colors cursor-pointer text-t2"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-zinc-500 text-t1 shrink-0 tabular-nums">{row.time}</span>
-                        <span className={cn('px-1.5 py-0.2 rounded text-t1 shrink-0', meta.badgeClass)}>
-                          {meta.label}
-                        </span>
-                        <span className={cn('truncate', row.isAlert ? 'text-zinc-100 font-medium' : 'text-zinc-300')}>
-                          {row.title}
-                        </span>
+              <div className="relative px-3 py-2">
+                <div className="absolute left-[18px] top-3.5 bottom-3.5 w-[1px] bg-white/[0.10] pointer-events-none" />
+                <div className="space-y-0.5">
+                  {recentHighlights.map((row) => {
+                    const meta = getBadgeMeta(row.event, row.side);
+                    return (
+                      <div
+                        key={row.key}
+                        onClick={() => {
+                          handleSelectTab('ALL');
+                          setExpandedKey(row.key);
+                        }}
+                        className="relative flex items-center justify-between gap-2 pl-5 pr-1.5 py-1.5 rounded hover:bg-white/[0.03] transition-colors cursor-pointer text-t2"
+                      >
+                        <span
+                          className={cn(
+                            'absolute left-[3px] top-1/2 -translate-y-1/2 size-1.5 rounded-full pointer-events-none',
+                            meta.coreClass
+                          )}
+                        />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-zinc-500 text-t1 shrink-0 tabular-nums">{row.time}</span>
+                          <span className={cn('text-t1 font-mono shrink-0 w-7', meta.tagClass)}>
+                            {meta.label}
+                          </span>
+                          <span className={cn('truncate', row.isAlert ? 'text-zinc-100 font-medium' : 'text-zinc-300')}>
+                            {row.title}
+                          </span>
+                        </div>
+                        {row.rightText && cardW >= 420 && (
+                          <span className="text-t1 text-muted-foreground shrink-0 tabular-nums">
+                            {row.rightText}
+                          </span>
+                        )}
                       </div>
-                      {row.rightText && cardW >= 420 && (
-                        <span className="text-t1 text-muted-foreground shrink-0 tabular-nums">
-                          {row.rightText}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -771,9 +930,9 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               <span className="text-t2">{emptyMessage}</span>
             </div>
           ) : (
-            <div className="relative pl-3 space-y-2">
+            <div className="relative pl-3 space-y-1.5">
               <div className="absolute left-[20px] -translate-x-1/2 top-2 bottom-2 w-[20px] pointer-events-none z-0 overflow-hidden">
-                <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.08]" />
+                <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.10]" />
                 <div className="absolute left-[2px] bottom-0 w-[20px]" style={{ display: 'none' }}>
                   <div
                     className="hidden"
@@ -814,7 +973,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                     }}
                     className="relative flex items-start gap-2.5 group"
                   >
-                    <div className="relative mt-1 shrink-0 z-10 flex items-center justify-center size-4 pointer-events-none">
+                    <div className="relative mt-1.5 shrink-0 z-10 flex items-center justify-center size-4 pointer-events-none">
                       <span
                         className={cn(
                           'absolute inline-flex size-2 rounded-full pointer-events-none',
@@ -841,7 +1000,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                     <div
                       onClick={() => toggleRow(row.key)}
                       className={cn(
-                        'flex-1 min-w-0 transition-all duration-150 cursor-pointer p-2 rounded-md',
+                        'flex-1 min-w-0 transition-all duration-150 cursor-pointer px-2 py-1.5 rounded-md',
                         isExp
                           ? 'bg-white/[0.035]'
                           : isError
@@ -852,23 +1011,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       )}
                     >
                       <div className="flex items-center justify-between gap-2 text-t2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-zinc-500 text-t1 shrink-0 font-mono">{row.time}</span>
-                          <span className={cn('px-1.5 py-0.2 rounded text-t1 shrink-0', meta.badgeClass)}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-zinc-500 text-t1 shrink-0 font-mono tabular-nums">{row.time}</span>
+                          <span className={cn('text-t1 font-mono shrink-0 w-7', meta.tagClass)}>
                             {meta.label}
                           </span>
-                          {row.side && (
-                            <span
-                              className={cn(
-                                'px-1.5 py-0.2 rounded text-t1 font-mono shrink-0 font-semibold border',
-                                row.side === 'buy'
-                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                  : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
-                              )}
-                            >
-                              {row.side === 'buy' ? '買入' : '賣出'}
-                            </span>
-                          )}
                           {cardW >= 460 && (
                             <span className="text-zinc-500 text-t1 shrink-0 font-mono">
                               [{shortId(ev.run_id)}]
@@ -886,11 +1033,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         <div className="flex items-center gap-2 shrink-0">
                           {row.rightText && cardW >= 460 ? (
-                            <span className="text-t2 font-mono tracking-tight text-zinc-300">
+                            <span className="text-t2 font-mono tracking-tight text-zinc-300 tabular-nums">
                               {row.rightText}
                             </span>
                           ) : row.isAlert ? (
-                            <span className={cn('text-t1 font-medium px-2 py-0.2 rounded-full backdrop-blur-xs', levelCapsuleClass(ev.level))}>
+                            <span className={cn('text-t1 font-mono', levelCapsuleClass(ev.level))}>
                               {ev.level}
                             </span>
                           ) : null}

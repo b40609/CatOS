@@ -194,9 +194,9 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
           />
           <CardHeaderTabs<BotsPositionsFilter>
             items={[
-              { id: "all", label: dims.width < 360 ? `全(${bots.length})` : `全部(${bots.length})` },
-              { id: "open", label: dims.width < 360 ? `倉(${openCount})` : `持倉中(${openCount})` },
-              { id: "orders", label: dims.width < 360 ? "掛(0)" : "掛單(0)" },
+              { id: "all", label: dims.width < 360 ? "全" : "全部", count: bots.length },
+              { id: "open", label: dims.width < 360 ? "倉" : "持倉中", count: openCount },
+              { id: "orders", label: dims.width < 360 ? "掛" : "掛單", count: 0 },
             ]}
             value={filter}
             onChange={setFilter}
