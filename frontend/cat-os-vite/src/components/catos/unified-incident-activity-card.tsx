@@ -137,6 +137,18 @@ function sideOf(ev: EventDTO): Side {
   return side === 'buy' || side === 'sell' ? side : null;
 }
 
+function isZeroQty(value: string | null): boolean {
+  if (!value) return true;
+  return /^-?0+(\.0*)?$/.test(value.trim());
+}
+
+function isQuietHeartbeat(ev: EventDTO): boolean {
+  if (ev.category !== 'WORKER' || ev.level !== 'INFO') return false;
+  if (ev.kind === 'warmup') return true;
+  if (ev.kind !== 'signal') return false;
+  return asString(ev.payload.reason) === 'bar_closed';
+}
+
 export function eventTitle(ev: EventDTO, instLabel: string): string {
   const p = ev.payload;
   switch (ev.kind) {
@@ -147,7 +159,7 @@ export function eventTitle(ev: EventDTO, instLabel: string): string {
     case 'stop_requested':
       return `已請求停止 · run ${shortId(ev.run_id)}`;
     case 'warmup':
-      return `預熱 #${asText(p.seq)} · ${asText(p.disposition)}`;
+      return `預熱 #${asText(p.seq)} · ${instLabel} 指標暖機`;
     case 'day_basis': {
       const basis = asRecord(p.basis);
       return `日基準建立 · day ${asText(basis?.day)} · 權益 ${money(basis?.equity)}`;
@@ -155,7 +167,15 @@ export function eventTitle(ev: EventDTO, instLabel: string): string {
     case 'signal': {
       const reason = asString(p.reason);
       const target = asString(p.target);
-      return `#${asText(p.seq)} ${asText(p.disposition)}${reason ? ' · ' + reason : ''}${target !== null ? ' · 目標 ' + qty(target) : ''}`;
+      const disp = asString(p.disposition) ?? '';
+      const hasPos = !isZeroQty(target);
+      if (reason === 'bar_closed') {
+        const shortInst = instLabel.replace('-USDT-SWAP', '');
+        return hasPos
+          ? `#${asText(p.seq)} ${shortInst} 收盤續抱 · 目標 ${qty(target)} 張`
+          : `#${asText(p.seq)} ${shortInst} 收盤觀望 · 空手`;
+      }
+      return `#${asText(p.seq)} ${disp || '訊號'}${reason ? ' · ' + reason : ''}${target !== null ? ' · 目標 ' + qty(target) : ''}`;
     }
     case 'fill': {
       const request = asRecord(p.request);
@@ -225,7 +245,13 @@ function buildDetailFields(ev: EventDTO): DetailField[] | null {
 
 function toRow(ev: EventDTO, instLabel: string): EventRow {
   const isAlert = ev.level === 'WARN' || ev.level === 'ERROR';
-  const rightText = ev.kind === 'fill' ? `權益 ${money(ev.payload.equity)}` : null;
+  const account = asRecord(ev.payload.account);
+  const rightText =
+    ev.kind === 'fill'
+      ? `權益 ${money(ev.payload.equity)}`
+      : ev.kind === 'signal' && asString(account?.equity)
+      ? `權益 ${money(account?.equity)}`
+      : null;
   return {
     key: String(ev.seq),
     event: ev,
@@ -270,17 +296,46 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
     };
   }
   if (ev.category === 'WORKER') {
+    if (ev.kind === 'warmup') {
+      return {
+        label: '預熱',
+        tagClass: 'text-teal-300/90 font-semibold',
+        coreClass: 'bg-teal-400 shadow-[0_0_6px_rgba(45,212,191,0.45)] ring-1 ring-teal-400/35',
+        sonarClass: 'bg-teal-400/20',
+        bloomAnimation: 'crystal-optical-bloom-neutral',
+      };
+    }
+    const disp = (asString(ev.payload.disposition) ?? '').toUpperCase();
+    const hasPos = !isZeroQty(asString(ev.payload.target));
+    if (disp && disp !== 'NO_INTENT' && disp !== 'HOLD') {
+      return {
+        label: '意圖',
+        tagClass: 'text-[#9fc5ee] font-semibold',
+        coreClass: 'bg-[#7faee2] shadow-[0_0_7px_rgba(127,174,226,0.5)] ring-1 ring-[#7faee2]/40',
+        sonarClass: 'bg-[#7faee2]/20',
+        bloomAnimation: 'crystal-optical-bloom-neutral',
+      };
+    }
+    if (disp === 'HOLD' || hasPos) {
+      return {
+        label: '續抱',
+        tagClass: 'text-[#e8b45e] font-semibold',
+        coreClass: 'bg-[#e8b45e] shadow-[0_0_6px_rgba(232,180,94,0.45)] ring-1 ring-[#e8b45e]/35',
+        sonarClass: 'bg-[#e8b45e]/20',
+        bloomAnimation: 'crystal-optical-bloom-amber',
+      };
+    }
     return {
-      label: '訊號',
-      tagClass: 'text-zinc-500 font-medium',
-      coreClass: 'bg-zinc-600/70 ring-1 ring-zinc-600/40',
-      sonarClass: 'bg-zinc-600/15',
+      label: '觀望',
+      tagClass: 'text-[#a5a8f8] font-medium',
+      coreClass: 'bg-[#8b8df8] shadow-[0_0_6px_rgba(139,141,248,0.4)] ring-1 ring-[#8b8df8]/35',
+      sonarClass: 'bg-[#8b8df8]/20',
       bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   }
   return {
     label: ev.category === 'RISK' ? '風控' : '資訊',
-    tagClass: ev.category === 'RISK' ? 'text-[#9ec2e6] font-semibold' : 'text-zinc-400 font-medium',
+    tagClass: ev.category === 'RISK' ? 'text-[#9ec2e6] font-semibold' : 'text-zinc-300 font-medium',
     coreClass: 'bg-[#7faee2] shadow-[0_0_6px_rgba(127,174,226,0.45)] ring-1 ring-[#7faee2]/40',
     sonarClass: 'bg-[#7faee2]/20',
     bloomAnimation: 'crystal-optical-bloom-neutral',
@@ -412,6 +467,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [category, setCategory] = useState<string>('ACTION');
+  const [showHeartbeats, setShowHeartbeats] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const userPickedTabRef = useRef(false);
 
@@ -653,10 +709,20 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return availableTabs.find((t) => t.id === category) ?? availableTabs[0];
   }, [availableTabs, category]);
 
+  const quietHeartbeatCount = useMemo(
+    () => rows.filter((r) => isQuietHeartbeat(r.event)).length,
+    [rows]
+  );
+
   const filteredRows = useMemo(() => {
     if (!currentTab || currentTab.id === 'ACTION') return [];
-    return rows.filter((row) => currentTab.filterFn(row.event));
-  }, [rows, currentTab]);
+    const base = rows.filter((row) => currentTab.filterFn(row.event));
+    if (currentTab.id === 'ALL' && !showHeartbeats && quietHeartbeatCount > 0) {
+      const important = base.filter((row) => !isQuietHeartbeat(row.event));
+      if (important.length > 0) return important;
+    }
+    return base;
+  }, [rows, currentTab, showHeartbeats, quietHeartbeatCount]);
 
   useEffect(() => {
     if (!containerRef.current || category === 'ACTION') return;
@@ -910,20 +976,42 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           </div>
         </div>
       ) : (
-        <div
-          key={`timeline-${expandedKey}`}
-          ref={containerRef}
-          className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative custom-scrollbar"
-          style={{
-            '--photon-duration': `${DURATION_SEC}s`,
-            '--photon-length': `${PHOTON_LENGTH}px`,
-            '--photon-width': `${PHOTON_WIDTH}px`,
-            '--photon-opacity': `${(PHOTON_BRIGHTNESS / 100).toFixed(2)}`,
-            '--bloom-intensity': `${(BLOOM_INTENSITY / 100).toFixed(2)}`,
-            '--glass-blur': `${GLASS_BLUR}px`,
-            '--card-shimmer-opacity': `${(CARD_SHIMMER / 100).toFixed(2)}`,
-          } as React.CSSProperties}
-        >
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {category === 'ALL' && quietHeartbeatCount > 0 && (
+            <div className="flex items-center justify-between px-3 py-1.5 bg-background/40 border-b border-border/60 shrink-0 gap-2">
+              <span className="text-t1 font-mono text-muted-foreground truncate">
+                {showHeartbeats
+                  ? `完整事件流水 · ${filteredRows.length} 筆（含 ${quietHeartbeatCount} 筆收盤心跳）`
+                  : `重點交易與審計事件 · ${filteredRows.length} 筆（已隱藏 ${quietHeartbeatCount} 筆收盤心跳）`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowHeartbeats((v) => !v)}
+                className={cn(
+                  'px-2 py-0.5 rounded border text-t1 font-mono transition-colors cursor-pointer whitespace-nowrap shrink-0 outline-none focus:outline-none',
+                  showHeartbeats
+                    ? 'border-[#7faee2]/45 bg-[#7faee2]/15 text-[#b8d4f2]'
+                    : 'border-border/80 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-[#7faee2]/45'
+                )}
+              >
+                {showHeartbeats ? '隱藏 K 線心跳' : `顯示 K 線心跳 (${quietHeartbeatCount})`}
+              </button>
+            </div>
+          )}
+          <div
+            key={`timeline-${expandedKey}-${showHeartbeats}`}
+            ref={containerRef}
+            className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative custom-scrollbar"
+            style={{
+              '--photon-duration': `${DURATION_SEC}s`,
+              '--photon-length': `${PHOTON_LENGTH}px`,
+              '--photon-width': `${PHOTON_WIDTH}px`,
+              '--photon-opacity': `${(PHOTON_BRIGHTNESS / 100).toFixed(2)}`,
+              '--bloom-intensity': `${(BLOOM_INTENSITY / 100).toFixed(2)}`,
+              '--glass-blur': `${GLASS_BLUR}px`,
+              '--card-shimmer-opacity': `${(CARD_SHIMMER / 100).toFixed(2)}`,
+            } as React.CSSProperties}
+          >
           {showEmpty ? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-1">
               <Inbox className="size-6 text-zinc-500/80 mb-1" />
@@ -1016,9 +1104,9 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                           <span className={cn('text-t1 font-mono shrink-0 w-7', meta.tagClass)}>
                             {meta.label}
                           </span>
-                          {cardW >= 460 && (
-                            <span className="text-zinc-500 text-t1 shrink-0 font-mono">
-                              [{shortId(ev.run_id)}]
+                          {cardW >= 460 && ev.bot_id && (
+                            <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 text-t1 leading-none shrink-0 font-mono">
+                              {ev.bot_id}
                             </span>
                           )}
                           <span
@@ -1033,7 +1121,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                         <div className="flex items-center gap-2 shrink-0">
                           {row.rightText && cardW >= 460 ? (
-                            <span className="text-t2 font-mono tracking-tight text-zinc-300 tabular-nums">
+                            <span className="text-t1 font-mono tracking-tight text-muted-foreground tabular-nums">
                               {row.rightText}
                             </span>
                           ) : row.isAlert ? (
@@ -1044,7 +1132,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                           <button
                             type="button"
-                            className="text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-transform duration-200"
+                            className="text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-transform duration-200 outline-none focus:outline-none"
                             aria-label={isExp ? '收合' : '展開'}
                           >
                             {isExp ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
@@ -1074,7 +1162,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
                           <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-t1 text-zinc-500">
                             <span className="truncate">
-                              {`seq ${ev.seq} · ${row.syntheticLabel ? '合成時間 ' + row.syntheticLabel + ' · ' : ''}${ev.category}`}
+                              {`seq ${ev.seq} · run ${shortId(ev.run_id)} · ${row.syntheticLabel ? '合成時間 ' + row.syntheticLabel + ' · ' : ''}${ev.category}`}
                             </span>
                           </div>
                         </div>
@@ -1085,6 +1173,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               })}
             </div>
           )}
+          </div>
         </div>
       )}
 

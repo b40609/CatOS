@@ -28,7 +28,7 @@ export function CardHeaderTabs<T extends string>({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 shrink-0 whitespace-nowrap select-none",
+        "flex items-center gap-0.5 bg-background/70 border border-border/80 rounded-md p-0.5 shrink-0 whitespace-nowrap select-none",
         className
       )}
     >
@@ -48,7 +48,7 @@ export function CardHeaderTabs<T extends string>({
             type="button"
             onClick={() => onChange(item.id)}
             className={cn(
-              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-t2 font-sans leading-snug transition-colors cursor-pointer whitespace-nowrap shrink-0",
+              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-t2 font-sans leading-snug transition-colors cursor-pointer whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#7faee2]/60",
               isActive
                 ? "bg-[#7faee2]/[0.15] border-[#7faee2]/45 text-[#b8d4f2] font-semibold"
                 : item.tone === "critical"
