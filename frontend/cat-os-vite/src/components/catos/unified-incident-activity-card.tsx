@@ -287,11 +287,11 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
     const isShort = side === 'sell';
     return {
       label: isShort ? '賣出' : '買入',
-      tagClass: isShort ? 'text-rose-400 font-semibold' : 'text-emerald-400 font-semibold',
+      tagClass: isShort ? 'text-down font-semibold' : 'text-up font-semibold',
       coreClass: isShort
-        ? 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.45)] ring-1 ring-rose-400/30'
-        : 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.45)] ring-1 ring-emerald-400/30',
-      sonarClass: isShort ? 'bg-rose-500/20' : 'bg-emerald-500/20',
+        ? 'bg-down ring-1 ring-down/40'
+        : 'bg-up ring-1 ring-up/40',
+      sonarClass: isShort ? 'bg-down/20' : 'bg-up/20',
       bloomAnimation: isShort ? 'crystal-optical-bloom-rose' : 'crystal-optical-bloom-emerald',
     };
   }
@@ -300,7 +300,7 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
       return {
         label: '預熱',
         tagClass: 'text-teal-300/90 font-semibold',
-        coreClass: 'bg-teal-400 shadow-[0_0_6px_rgba(45,212,191,0.45)] ring-1 ring-teal-400/35',
+        coreClass: 'bg-teal-400 ring-1 ring-teal-400/35',
         sonarClass: 'bg-teal-400/20',
         bloomAnimation: 'crystal-optical-bloom-neutral',
       };
@@ -310,34 +310,34 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
     if (disp && disp !== 'NO_INTENT' && disp !== 'HOLD') {
       return {
         label: '意圖',
-        tagClass: 'text-[#9fc5ee] font-semibold',
-        coreClass: 'bg-[#7faee2] shadow-[0_0_7px_rgba(127,174,226,0.5)] ring-1 ring-[#7faee2]/40',
-        sonarClass: 'bg-[#7faee2]/20',
+        tagClass: 'text-info font-semibold',
+        coreClass: 'bg-info ring-1 ring-info/40',
+        sonarClass: 'bg-info/20',
         bloomAnimation: 'crystal-optical-bloom-neutral',
       };
     }
     if (disp === 'HOLD' || hasPos) {
       return {
         label: '續抱',
-        tagClass: 'text-[#e8b45e] font-semibold',
-        coreClass: 'bg-[#e8b45e] shadow-[0_0_6px_rgba(232,180,94,0.45)] ring-1 ring-[#e8b45e]/35',
-        sonarClass: 'bg-[#e8b45e]/20',
+        tagClass: 'text-primary font-semibold',
+        coreClass: 'bg-primary ring-1 ring-primary/40',
+        sonarClass: 'bg-primary/20',
         bloomAnimation: 'crystal-optical-bloom-amber',
       };
     }
     return {
       label: '觀望',
-      tagClass: 'text-[#a5a8f8] font-medium',
-      coreClass: 'bg-[#8b8df8] shadow-[0_0_6px_rgba(139,141,248,0.4)] ring-1 ring-[#8b8df8]/35',
-      sonarClass: 'bg-[#8b8df8]/20',
+      tagClass: 'text-info/85 font-medium',
+      coreClass: 'bg-info/80 ring-1 ring-info/35',
+      sonarClass: 'bg-info/15',
       bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   }
   return {
     label: ev.category === 'RISK' ? '風控' : '資訊',
-    tagClass: ev.category === 'RISK' ? 'text-[#9ec2e6] font-semibold' : 'text-zinc-300 font-medium',
-    coreClass: 'bg-[#7faee2] shadow-[0_0_6px_rgba(127,174,226,0.45)] ring-1 ring-[#7faee2]/40',
-    sonarClass: 'bg-[#7faee2]/20',
+    tagClass: ev.category === 'RISK' ? 'text-info font-semibold' : 'text-zinc-300 font-medium',
+    coreClass: 'bg-info ring-1 ring-info/40',
+    sonarClass: 'bg-info/20',
     bloomAnimation: 'crystal-optical-bloom-neutral',
   };
 }
@@ -370,9 +370,9 @@ const SEVERITY_STYLE: Record<
     Icon: AlertTriangle,
   },
   p2: {
-    cardClass: 'border-border/80 bg-secondary/45 hover:border-[#7faee2]/45',
-    iconBoxClass: 'bg-[#7faee2]/15 border-[#7faee2]/35 text-[#9fc5ee]',
-    tagClass: 'text-[#9fc5ee]',
+    cardClass: 'border-border/80 bg-secondary/45 hover:border-primary/45',
+    iconBoxClass: 'bg-primary/15 border-primary/35 text-primary',
+    tagClass: 'text-primary',
     Icon: CheckCircle2,
   },
   p3: {
@@ -386,9 +386,9 @@ const SEVERITY_STYLE: Record<
 function metricToneClass(tone?: MetricTone): string {
   switch (tone) {
     case 'warn': return 'text-amber-300';
-    case 'up': return 'text-emerald-400';
-    case 'down': return 'text-rose-400';
-    case 'blue': return 'text-[#9fc5ee]';
+    case 'up': return 'text-up';
+    case 'down': return 'text-down';
+    case 'blue': return 'text-primary';
     case 'teal': return 'text-teal-300';
     default: return 'text-foreground';
   }
@@ -858,10 +858,10 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                               }
                             }}
                             className={cn(
-                              'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap',
+                              'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap outline-none focus:outline-none',
                               item.primaryAction.tone === 'danger'
                                 ? 'border-rose-500/45 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
-                                : 'border-border/90 bg-background/50 text-foreground hover:border-[#7faee2]/60 hover:text-[#b8d4f2]'
+                                : 'border-border/90 bg-background/50 text-foreground hover:border-primary/60 hover:text-primary'
                             )}
                           >
                             {item.primaryAction.label}
@@ -873,7 +873,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                             type="button"
                             onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
                             title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
-                            className="px-2 py-1 rounded border border-[#7faee2]/45 bg-[#7faee2]/15 text-[#b8d4f2] hover:bg-[#7faee2] hover:text-[#111318] text-t2 font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+                            className="px-2 py-1 rounded border border-primary/45 bg-primary/15 text-primary hover:bg-primary hover:text-primary-foreground text-t2 font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap outline-none focus:outline-none"
                           >
                             {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                             <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
@@ -990,8 +990,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                 className={cn(
                   'px-2 py-0.5 rounded border text-t1 font-mono transition-colors cursor-pointer whitespace-nowrap shrink-0 outline-none focus:outline-none',
                   showHeartbeats
-                    ? 'border-[#7faee2]/45 bg-[#7faee2]/15 text-[#b8d4f2]'
-                    : 'border-border/80 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-[#7faee2]/45'
+                    ? 'border-primary/45 bg-primary/15 text-primary'
+                    : 'border-border/80 bg-secondary/50 text-muted-foreground hover:text-foreground hover:border-primary/45'
                 )}
               >
                 {showHeartbeats ? '隱藏 K 線心跳' : `顯示 K 線心跳 (${quietHeartbeatCount})`}

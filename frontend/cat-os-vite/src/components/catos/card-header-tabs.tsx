@@ -15,9 +15,9 @@ interface CardHeaderTabsProps<T extends string = string> {
 }
 
 /**
- * 系統總覽卡片右上角統一分頁切換列（融合定案：霧藍微光選中膠囊 × Linear 獨立微底數標）
- * - 去厚重雙層外框，未選中純文字＋獨立圓角數標方塊，選中項呈現霧藍微光膠囊
- * - 固定 1px border 佔位，切換零抖動，全總覽 4 張卡 100% 一致
+ * 系統總覽卡片右上角統一分頁切換列
+ * - 採外框軌道＋括號等寬計數＋主題色立體選中膠囊
+ * - 所有強調色皆讀取全域 CSS 主題變數（--primary / --border / --background），跟隨 Personal OS 主題切換即時變色
  */
 export function CardHeaderTabs<T extends string>({
   items,
@@ -28,19 +28,13 @@ export function CardHeaderTabs<T extends string>({
   return (
     <div
       className={cn(
-        "flex items-center gap-0.5 bg-background/70 border border-border/80 rounded-md p-0.5 shrink-0 whitespace-nowrap select-none",
+        "flex items-center gap-0.5 bg-background/70 border border-border rounded-md p-0.5 shrink-0 whitespace-nowrap select-none",
         className
       )}
     >
       {items.map((item) => {
         const isActive = item.id === value;
-        const countClass = isActive
-          ? "bg-[#7faee2]/25 text-[#d7e8fb]"
-          : item.tone === "critical"
-          ? "bg-rose-500/20 text-rose-300"
-          : item.tone === "alert"
-          ? "bg-amber-500/20 text-amber-300"
-          : "bg-white/[0.07] text-muted-foreground";
+        const text = item.count !== undefined ? `${item.label}(${item.count})` : item.label;
 
         return (
           <button
@@ -48,27 +42,17 @@ export function CardHeaderTabs<T extends string>({
             type="button"
             onClick={() => onChange(item.id)}
             className={cn(
-              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-t2 font-sans leading-snug transition-colors cursor-pointer whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[#7faee2]/60",
+              "px-2 py-0.5 rounded border text-t2 font-mono leading-snug transition-colors cursor-pointer whitespace-nowrap shrink-0 tabular-nums outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/60",
               isActive
-                ? "bg-[#7faee2]/[0.15] border-[#7faee2]/45 text-[#b8d4f2] font-semibold"
+                ? "bg-primary/15 border-primary/45 text-primary font-semibold shadow-xs"
                 : item.tone === "critical"
-                ? "border-transparent text-rose-300/90 hover:text-rose-200 hover:bg-white/[0.04] font-medium"
+                ? "border-transparent text-rose-400 hover:text-rose-300 hover:bg-white/[0.04] font-semibold"
                 : item.tone === "alert"
-                ? "border-transparent text-amber-300/90 hover:text-amber-200 hover:bg-white/[0.04] font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.04] font-medium"
+                ? "border-transparent text-amber-400 hover:text-amber-300 hover:bg-white/[0.04]"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
             )}
           >
-            <span>{item.label}</span>
-            {item.count !== undefined && (
-              <span
-                className={cn(
-                  "px-1 rounded text-t1 font-mono font-semibold leading-tight tabular-nums",
-                  countClass
-                )}
-              >
-                {item.count}
-              </span>
-            )}
+            {text}
           </button>
         );
       })}
