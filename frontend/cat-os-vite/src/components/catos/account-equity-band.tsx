@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
-import { BorderBeam } from "./motion/border-beam";
 import { useCatStore } from "@/state/catStore";
 import { StateAdapter } from "@/state/stateAdapter";
 import { formatClock, formatDateTime, formatDecimal, formatRatioPct, toPlotNumber, toneOf, shortId } from "@/lib/format";
@@ -15,6 +14,13 @@ const STATE_LABEL: Record<string, string> = {
   starting: "啟動中", running: "運行中", stopping: "停止中", completed: "已完成",
   stopped: "已停止", failed: "失敗", recovery_required: "待恢復",
 };
+
+function formatShortAxisDate(ms: number | null | undefined, multiDay: boolean): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms)) return "不適用";
+  if (!multiDay) return formatClock(ms, false);
+  const full = formatDateTime(ms); // "MM/DD HH:mm"
+  return full.split(" ")[0] || full;
+}
 
 /**
  * 帳戶權益與損益 (AccountEquityBand)
@@ -39,7 +45,6 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   const runId = bot?.current_run_id ?? null;
   const curve = useMemo(() => StateAdapter.equityCurve(events, runId), [events, runId]);
 
-  // 自適應容器尺寸監聽
   useEffect(() => {
     const el = bandRef.current;
     if (!el) return;
@@ -66,13 +71,12 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     return () => ro.disconnect();
   }, []);
 
-  const isNarrow = bandDimensions.width < 500;
+  const isNarrow = bandDimensions.width < 520;
   const isShort = bandDimensions.height < 170;
   const isCompact = isNarrow || isShort;
 
-  // 幾何座標：以序列首點為 0%，純展示用途
   const height = Math.max(120, chartHeight);
-  const axisW = isNarrow ? 40 : 54;
+  const axisW = isNarrow ? 42 : 52;
   const xAxisH = 20;
   const plotW = Math.max(1, chartWidth - axisW);
   const plotH = Math.max(1, height - xAxisH);
@@ -84,6 +88,13 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     return values.map((v) => (Number.isNaN(v) ? Number.NaN : (v / base - 1) * 100));
   }, [curve]);
   const n = points.length;
+
+  // 若曲線跨度超過 36 小時，X 軸改顯示日期 MM/DD 避免只看到重複時分
+  const isMultiDay = useMemo(() => {
+    if (curve.length < 2) return false;
+    const span = (curve[curve.length - 1]?.time_ms ?? 0) - (curve[0]?.time_ms ?? 0);
+    return span > 36 * 3600 * 1000;
+  }, [curve]);
 
   const niceStep = (span: number) => {
     const raw = span / 3;
@@ -106,7 +117,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, [points]);
 
   const getX = (k: number) => (n > 1 ? (k / (n - 1)) * plotW : plotW / 2);
-  const getY = (v: number) => 10 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * (plotH - 24);
+  const getY = (v: number) => 10 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * (plotH - 22);
 
   const line = useMemo(() => {
     let d = "";
@@ -130,7 +141,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
 
   const xTicks = useMemo(() => {
     if (n === 0) return [] as number[];
-    const fractions = plotW < 320 ? [0, 1] : plotW < 480 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+    const fractions = plotW < 280 ? [0, 1] : plotW < 460 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
     return [...new Set(fractions.map((f) => Math.round(f * (n - 1))))];
   }, [n, plotW]);
 
@@ -144,6 +155,12 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
 
   const hover = hoverIdx !== null && curve[hoverIdx] ? curve[hoverIdx] : null;
   const hoverPct = hoverIdx !== null ? points[hoverIdx] : Number.NaN;
+  const lastValidIdx = useMemo(() => {
+    for (let i = points.length - 1; i >= 0; i--) {
+      if (!Number.isNaN(points[i])) return i;
+    }
+    return -1;
+  }, [points]);
   const fmtPctNumber = (v: number) => (Number.isNaN(v) ? "不適用" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
 
   const emptyReason =
@@ -156,94 +173,113 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     : null;
 
   const Kpi = ({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) => (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-t2 text-muted-foreground">{label}</span>
-      <span className={cn("text-xs font-semibold leading-tight", tone ?? "text-foreground")}>{value}</span>
-      {sub && <span className="text-t1 text-muted-foreground">{sub}</span>}
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-t2 text-muted-foreground font-sans truncate">{label}</span>
+      <span className={cn("text-xs font-semibold leading-tight tabular-nums truncate", tone ?? "text-foreground")}>{value}</span>
+      {sub && <span className="text-t1 text-muted-foreground/75 truncate leading-tight" title={sub}>{sub}</span>}
     </div>
   );
 
   return (
-    <div ref={bandRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden", className)}>
+    <div ref={bandRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {showHeader && (
         <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
-          <CardHeaderTitle cardId="equity" title="帳戶權益與損益" />
-          <div className="flex items-center gap-0.5 bg-background/70 border border-border/70 rounded p-0.5 text-t1 font-mono shrink-0">
-            <span className="px-2 py-0.5 rounded bg-secondary text-foreground font-bold shadow-xs">
-              {bot ? bot.bot_id : "sim"}
-            </span>
-            <span className="px-1.5 py-0.5 text-muted-foreground whitespace-nowrap">
-              {runId ? `run ${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
+          <CardHeaderTitle
+            cardId="equity"
+            title="帳戶權益與損益"
+            subtext={
+              !isNarrow ? (
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap inline-flex items-center gap-1",
+                  connection.status === "ok"
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                )}>
+                  <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400" : "bg-amber-400")} />
+                  {connection.status === "ok" ? "local-sim" : connection.status}
+                </span>
+              ) : undefined
+            }
+          />
+          <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded px-2 py-0.5 text-t2 font-mono shrink-0">
+            <span className="text-foreground font-semibold">{bot ? bot.bot_id : "sim"}</span>
+            <span className="text-border">·</span>
+            <span className="text-muted-foreground whitespace-nowrap">
+              {runId ? `${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
             </span>
           </div>
         </div>
       )}
 
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        <BorderBeam size={180} duration={8} borderWidth={1.5} colorFrom="var(--color-primary, #e8b45e)" />
-
-        {/* 左側 KPI 欄：全部來自 summary（後端 Decimal 計算） */}
+        {/* 左側 KPI 欄：全部來自 summary（後端 Decimal 計算），精簡副標杜絕中文單字斷行 */}
         <div className={cn(
-          "shrink-0 border-r border-border/80 flex flex-col justify-between overflow-y-auto bg-surface/30 custom-scrollbar",
-          isNarrow ? "w-[130px] p-2 gap-1.5" : "w-[205px] p-2.5 gap-2"
+          "shrink-0 border-r border-border/70 flex flex-col justify-between overflow-y-auto bg-background/20 custom-scrollbar",
+          isNarrow ? "w-[144px] px-2.5 py-2.5 gap-2" : "w-[216px] px-3 py-3 gap-2.5"
         )}>
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-t2 text-muted-foreground uppercase font-mono tracking-wider flex items-center justify-between">
-                <span>帳戶總權益</span>
-                {!isNarrow && (
-                  <span className={cn("text-t1 font-mono flex items-center gap-1",
-                    connection.status === "ok" ? "text-emerald-400" : "text-amber-400")}>
-                    <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400 animate-ping" : "bg-amber-400")} />
-                    {connection.status === "ok" ? "local-sim" : connection.status}
-                  </span>
-                )}
-              </span>
-              <div className={cn("font-mono font-bold text-foreground tracking-tight", isNarrow ? "text-lg" : "text-2xl")}>
-                {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
-              </div>
-              <div className={cn("font-mono font-semibold", isNarrow ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
-                {summary?.period_pnl != null
-                  ? `${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(summary.period_pnl_ratio)})`
-                  : "風控期間損益 不適用"}
-              </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-t2 text-muted-foreground font-sans">帳戶總權益</span>
+            <div className={cn("font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight mt-0.5", isNarrow ? "text-lg" : "text-2xl")}>
+              {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
             </div>
+            <div className={cn("font-mono font-semibold tabular-nums mt-0.5", isNarrow ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
+              {summary?.period_pnl != null
+                ? `${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(summary.period_pnl_ratio)})`
+                : "風控期間損益 不適用"}
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 font-mono">
-              <Kpi label="已實現損益" value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
-                   tone={summary ? toneOf(summary.realized_pnl) : undefined} sub="OKX 專用子帳戶 (模擬)" />
-              <Kpi label="未實現損益" value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
-                   tone={summary ? toneOf(summary.unrealized_pnl) : undefined} sub={risk?.snapshot ? `mark $${formatDecimal(risk.snapshot.mark)}` : "尚無 mark"} />
-              <Kpi label="風控期間基準" value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
-                   sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算 (合成基準)` : "尚無基準"} />
-              <Kpi label="手續費累計" value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
-                   tone={summary ? "text-rose-400" : undefined} sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined} />
-            </div>
+          <div className="grid grid-cols-2 gap-x-2.5 gap-y-2.5 pt-2.5 border-t border-border/60 font-mono">
+            <Kpi
+              label="已實現損益"
+              value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
+              tone={summary ? toneOf(summary.realized_pnl) : undefined}
+              sub="OKX 模擬子帳戶"
+            />
+            <Kpi
+              label="未實現損益"
+              value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
+              tone={summary ? toneOf(summary.unrealized_pnl) : undefined}
+              sub={risk?.snapshot ? `標記 $${formatDecimal(risk.snapshot.mark)}` : "尚無標記價"}
+            />
+            <Kpi
+              label="風控期間基準"
+              value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
+              sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
+            />
+            <Kpi
+              label="手續費累計"
+              value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
+              tone={summary ? "text-rose-400" : undefined}
+              sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
+            />
           </div>
         </div>
 
-        {/* 右側 SVG 走勢圖：本次 run 的權益曲線 */}
-        <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-1.5" : "p-2.5")}>
-          <div className="flex items-center justify-between gap-2 text-t3 font-mono text-muted-foreground h-5 shrink-0 px-1 min-w-0">
+        {/* 右側 SVG 走勢圖 */}
+        <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-2" : "px-3 py-2.5")}>
+          <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground h-5 shrink-0 min-w-0">
             <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
-              <span className="w-2.5 h-[2px] bg-primary inline-block" />
-              <span>{isNarrow ? `run 權益 · ${curve.length} 點` : `本次 run 權益曲線 · 合成時間 · ${curve.length} 點`}</span>
+              <span className="w-2.5 h-[2px] bg-primary inline-block rounded-full" />
+              <span>{isNarrow ? `權益曲線 · ${curve.length} 點` : `本次 run 權益曲線 · ${curve.length} 點`}</span>
             </div>
             <div className="min-w-0 truncate text-right">
               {hover ? (
-                <span className="text-foreground font-mono text-t2 whitespace-nowrap">
-                  [{formatClock(hover.time_ms, false)}] 權益 {formatDecimal(hover.equity, { prefix: "$" })} ·{" "}
+                <span className="text-foreground font-mono text-t2 whitespace-nowrap tabular-nums">
+                  {formatDateTime(hover.time_ms)} · {formatDecimal(hover.equity, { prefix: "$" })} ·{" "}
                   <span className="text-primary font-bold">{fmtPctNumber(hoverPct)}</span>
                 </span>
               ) : (
-                <span className="text-muted-foreground/60 text-t2 whitespace-nowrap hidden lg:inline">游標懸停檢視各 bar 的權益</span>
+                <span className="text-muted-foreground/55 text-t1 whitespace-nowrap hidden xl:inline">
+                  懸停檢視各 K 線權益
+                </span>
               )}
             </div>
           </div>
 
           <div
             ref={chartContainerRef}
-            className="flex-1 w-full relative min-h-[140px] cursor-crosshair mt-1"
+            className="flex-1 w-full relative min-h-[130px] cursor-crosshair mt-1"
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIdx(null)}
           >
@@ -255,40 +291,80 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
               <svg width={chartWidth} height={height} className="w-full h-full overflow-visible">
                 <defs>
                   <linearGradient id="v0EqGradReact2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.16} />
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.20} />
                     <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
 
                 {yBounds.ticks.map((t) => (
                   <g key={t}>
-                    <line x1={0} x2={plotW} y1={getY(t)} y2={getY(t)} stroke="currentColor" className="text-border/40"
-                          strokeDasharray={t === 0 ? undefined : "3 3"} strokeWidth={t === 0 ? 1 : 0.75} />
-                    <text x={plotW + 6} y={getY(t) + 3} fill="currentColor"
-                          className={cn("text-t1 font-mono", t === 0 ? "text-primary font-bold" : "text-muted-foreground/60")}>
+                    <line
+                      x1={0}
+                      x2={plotW}
+                      y1={getY(t)}
+                      y2={getY(t)}
+                      stroke="currentColor"
+                      className={t === 0 ? "text-border/75" : "text-border/35"}
+                      strokeDasharray={t === 0 ? undefined : "3 3"}
+                      strokeWidth={t === 0 ? 1 : 0.75}
+                    />
+                    <text
+                      x={plotW + 6}
+                      y={getY(t) + 3}
+                      fill="currentColor"
+                      className={cn("text-t1 font-mono", t === 0 ? "text-primary font-semibold" : "text-muted-foreground/65")}
+                    >
                       {t > 0 ? `+${t.toFixed(2)}%` : `${t.toFixed(2)}%`}
                     </text>
                   </g>
                 ))}
 
                 {xTicks.map((idx) => (
-                  <text key={idx} x={getX(idx)} y={plotH + 13}
-                        textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
-                        fill="currentColor" className="text-t1 font-mono text-muted-foreground/60">
-                    {formatClock(curve[idx]?.time_ms, false)}
+                  <text
+                    key={idx}
+                    x={getX(idx)}
+                    y={plotH + 14}
+                    textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
+                    fill="currentColor"
+                    className="text-t1 font-mono text-muted-foreground/65"
+                  >
+                    {formatShortAxisDate(curve[idx]?.time_ms, isMultiDay)}
                   </text>
                 ))}
 
                 {areaPath && <path d={areaPath} fill="url(#v0EqGradReact2)" />}
-                {line && <path d={line} fill="none" stroke="var(--primary)" strokeWidth={2} />}
-                {n === 1 && <circle cx={getX(0)} cy={getY(points[0])} r={3} fill="var(--primary)" />}
+                {line && <path d={line} fill="none" stroke="var(--primary)" strokeWidth={1.75} strokeLinejoin="round" />}
+                {lastValidIdx >= 0 && hoverIdx === null && (
+                  <circle
+                    cx={getX(lastValidIdx)}
+                    cy={getY(points[lastValidIdx])}
+                    r={3}
+                    fill="var(--primary)"
+                    stroke="var(--background)"
+                    strokeWidth={1.5}
+                  />
+                )}
 
                 {hoverIdx !== null && (
                   <g>
-                    <line x1={getX(hoverIdx)} x2={getX(hoverIdx)} y1={8} y2={plotH} stroke="var(--primary)"
-                          strokeWidth={1} strokeDasharray="2 2" opacity={0.8} />
-                    <circle cx={getX(hoverIdx)} cy={getY(points[hoverIdx] ?? 0)} r={3.5} fill="var(--primary)"
-                            stroke="var(--background)" strokeWidth={1.5} />
+                    <line
+                      x1={getX(hoverIdx)}
+                      x2={getX(hoverIdx)}
+                      y1={8}
+                      y2={plotH}
+                      stroke="var(--primary)"
+                      strokeWidth={1}
+                      strokeDasharray="2 2"
+                      opacity={0.75}
+                    />
+                    <circle
+                      cx={getX(hoverIdx)}
+                      cy={getY(points[hoverIdx] ?? 0)}
+                      r={3.5}
+                      fill="var(--primary)"
+                      stroke="var(--background)"
+                      strokeWidth={1.5}
+                    />
                   </g>
                 )}
               </svg>

@@ -49,7 +49,7 @@ export function createDefaultTree(): LayoutNode {
         type: "split",
         id: "split-bottom-left",
         direction: "col",
-        ratio: 0.52,
+        ratio: 0.45,
         first: { type: "leaf", id: "leaf-bots", cardId: "bots" },
         second: { type: "leaf", id: "leaf-pipeline", cardId: "pipeline" },
       },
@@ -613,7 +613,7 @@ export function buildStableTreeFromCardIds(
   const rootRatio = getNodeRatio("split-root", 0.34);
   const topTierRatio = getNodeRatio("split-top-tier", 0.5);
   const bottomTierRatio = getNodeRatio("split-bottom-tier", 0.57);
-  const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.52);
+  const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.45);
 
   const hasEquity = activeCardIds.includes("equity");
   const hasAllocation = activeCardIds.includes("allocation");

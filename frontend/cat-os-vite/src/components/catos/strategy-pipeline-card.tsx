@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
 import { useCatStore } from "@/state/catStore";
 import { useOverviewSignals } from "@/lib/overview-signals";
@@ -49,9 +50,9 @@ function tonePillClass(tone: PipelineTone): string {
 
 function toneTextClass(tone: PipelineTone): string {
   switch (tone) {
-    case "warn": return "text-amber-300";
-    case "gold": return "text-primary";
-    case "fail": return "text-rose-400";
+    case "warn": return "text-amber-300 font-semibold";
+    case "gold": return "text-primary font-semibold";
+    case "fail": return "text-rose-400 font-semibold";
     case "ok": return "text-emerald-400";
     default: return "text-muted-foreground";
   }
@@ -59,7 +60,8 @@ function toneTextClass(tone: PipelineTone): string {
 
 /**
  * 策略管線卡片 (2A 定案：5 階段精簡軌道＋窄卡自動轉進度條)
- * 正式模式從 /api/research/catalog、/api/workspace/replay、/api/workspace/demo-bot 與 local-sim 登錄表彙整真實階段。
+ * - 自適應策略名欄寬（寬卡 196px / 中卡 164px），大幅減少策略名截斷
+ * - 軌道節點上提、下方進度文字與底線保留清晰呼吸空間
  */
 export function StrategyPipelineCard({ className }: { className?: string }) {
   const registeredStrategies = useCatStore((s) => s.strategies);
@@ -68,7 +70,7 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
   const { navigate } = useRouter();
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(560);
+  const [width, setWidth] = useState(640);
   const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
@@ -82,6 +84,10 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
   }, []);
 
   const isNarrow = width < 460;
+  const isWide = width >= 680;
+  const gridColsClass = isWide
+    ? "grid-cols-[196px_minmax(0,1fr)_14px]"
+    : "grid-cols-[164px_minmax(0,1fr)_14px]";
 
   const allRows = useMemo<PipelineRow[]>(() => {
     if (signals.previewPick) return PREVIEW_PIPELINE;
@@ -176,7 +182,7 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
         result.push({
           id: item.id,
           name: item.name,
-          meta: `${item.version}`,
+          meta: item.version,
           stage: 1,
           stageLabel: "研究目錄",
           progress: "僅研究",
@@ -189,7 +195,6 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
       }
     }
 
-    // 依階段由高到低排：模擬盤 → 待核准/已核准 → 研究 → 提案
     return result.sort((a, b) => b.stage - a.stage || a.name.localeCompare(b.name));
   }, [signals, registeredStrategies, bots]);
 
@@ -197,14 +202,14 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
   const rows = activeOnly ? allRows.filter((r) => r.active) : allRows;
 
   return (
-    <div ref={cardRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
+    <div ref={cardRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="pipeline"
           title="策略管線"
           subtext={
-            <span className="text-t1 font-mono text-muted-foreground">
-              PIPELINE · {rows.length}
+            <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60 text-t1 font-mono text-muted-foreground leading-none">
+              {rows.length} 策略
             </span>
           }
         />
@@ -214,7 +219,9 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
             onClick={() => setActiveOnly(false)}
             className={cn(
               "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap",
-              !activeOnly ? "bg-secondary text-foreground font-semibold shadow-xs" : "text-muted-foreground hover:text-foreground"
+              !activeOnly
+                ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             全部({allRows.length})
@@ -224,7 +231,9 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
             onClick={() => setActiveOnly(true)}
             className={cn(
               "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap",
-              activeOnly ? "bg-secondary text-foreground font-semibold shadow-xs" : "text-muted-foreground hover:text-foreground"
+              activeOnly
+                ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             進行中({activeCount})
@@ -234,7 +243,7 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
 
       {/* 寬版 5 階段表頭 */}
       {!isNarrow && rows.length > 0 && (
-        <div className="grid grid-cols-[152px_minmax(0,1fr)] gap-2.5 px-3 py-1.5 border-b border-border/70 bg-background/35 text-t1 font-mono text-muted-foreground shrink-0">
+        <div className={cn("grid gap-2.5 px-3 py-1.5 border-b border-border/70 bg-background/35 text-t1 font-mono text-muted-foreground shrink-0", gridColsClass)}>
           <span>策略 / 標的</span>
           <div className="grid grid-cols-5 text-center">
             {STAGES.map((label, idx) => (
@@ -243,10 +252,11 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
               </span>
             ))}
           </div>
+          <span />
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border/40">
+      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border/40 custom-scrollbar pb-2">
         {rows.length === 0 ? (
           <div className="h-full flex items-center justify-center py-8 text-t2 font-mono text-muted-foreground">
             {signals.loaded ? "尚無策略紀錄" : "讀取策略管線中…"}
@@ -258,13 +268,15 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
               onClick={() => navigate(row.route)}
               title={row.detail}
               className={cn(
-                "px-3 py-2 hover:bg-secondary/30 transition-colors cursor-pointer items-center",
-                isNarrow ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : "grid grid-cols-[152px_minmax(0,1fr)] gap-2.5"
+                "px-3 py-2.5 hover:bg-white/[0.03] transition-colors cursor-pointer items-center group",
+                isNarrow ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : cn("grid gap-2.5", gridColsClass)
               )}
             >
               <div className="min-w-0">
-                <div className="text-t3 font-semibold text-foreground truncate leading-tight">{row.name}</div>
-                <div className="text-t1 font-mono text-muted-foreground truncate mt-0.5">{row.meta}</div>
+                <div className="text-t3 font-semibold text-foreground group-hover:text-primary transition-colors truncate leading-tight font-sans">
+                  {row.name}
+                </div>
+                <div className="text-t1 font-mono text-muted-foreground/80 truncate mt-0.5">{row.meta}</div>
               </div>
 
               {isNarrow ? (
@@ -278,46 +290,53 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
                   <span className={cn("min-w-[44px] text-right", toneTextClass(row.tone))}>{row.progress}</span>
                 </div>
               ) : (
-                <div className="relative grid grid-cols-5 items-center h-7">
-                  <span className="absolute left-[10%] right-[10%] top-1/2 -translate-y-1/2 h-[2px] bg-border/90" />
-                  <span
-                    className="absolute left-[10%] top-1/2 -translate-y-1/2 h-[2px] rounded-full"
-                    style={{ width: `${row.stage * 20}%`, backgroundColor: row.color }}
-                  />
-                  {STAGES.map((st, idx) => {
-                    const isDone = idx < row.stage;
-                    const isCurrent = idx === row.stage;
-                    return (
-                      <div key={st} className="relative z-10 flex flex-col items-center">
-                        <span
-                          className={cn(
-                            "size-2.5 rounded-full border-2 bg-surface",
-                            isDone && "border-transparent",
-                            isCurrent && row.tone === "gold" && "shadow-[0_0_0_3px_rgba(232,180,94,0.25)]",
-                            isCurrent && row.tone === "warn" && "shadow-[0_0_0_3px_rgba(245,158,11,0.22)]",
-                            isCurrent && row.tone === "fail" && "shadow-[0_0_0_3px_rgba(244,63,94,0.22)]"
+                <>
+                  {/* 軌道節點置於上半部，下方保留明確空間給進度文字 */}
+                  <div className="relative grid grid-cols-5 items-start pt-1 h-8">
+                    <span className="absolute left-[10%] right-[10%] top-[9px] h-[2px] bg-white/[0.09] rounded-full" />
+                    <span
+                      className="absolute left-[10%] top-[9px] h-[2px] rounded-full transition-all"
+                      style={{ width: `${row.stage * 20}%`, backgroundColor: row.color }}
+                    />
+                    {STAGES.map((st, idx) => {
+                      const isDone = idx < row.stage;
+                      const isCurrent = idx === row.stage;
+                      return (
+                        <div key={st} className="relative z-10 flex flex-col items-center">
+                          <span
+                            className={cn(
+                              "size-2.5 rounded-full border-2",
+                              isDone && "border-transparent",
+                              isCurrent && row.tone === "gold" && "shadow-[0_0_0_3px_rgba(232,180,94,0.22)]",
+                              isCurrent && row.tone === "warn" && "shadow-[0_0_0_3px_rgba(245,158,11,0.22)]",
+                              isCurrent && row.tone === "fail" && "shadow-[0_0_0_3px_rgba(244,63,94,0.22)]"
+                            )}
+                            style={{
+                              borderColor: isDone || isCurrent ? row.color : "rgba(255,255,255,0.18)",
+                              backgroundColor: isDone || (isCurrent && (row.tone === "gold" || row.tone === "warn" || row.tone === "fail"))
+                                ? row.color
+                                : "var(--surface)",
+                            }}
+                          />
+                          {isCurrent && (
+                            <span className={cn("mt-1.5 text-t1 font-mono whitespace-nowrap leading-none", toneTextClass(row.tone))}>
+                              {row.progress}
+                            </span>
                           )}
-                          style={{
-                            borderColor: isDone || isCurrent ? row.color : "var(--border)",
-                            backgroundColor: isDone || (isCurrent && (row.tone === "gold" || row.tone === "warn" || row.tone === "fail"))
-                              ? row.color
-                              : "var(--surface)",
-                          }}
-                        />
-                        {isCurrent && (
-                          <span className={cn("absolute top-3.5 text-t1 font-mono whitespace-nowrap leading-none", toneTextClass(row.tone))}>
-                            {row.progress}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <ChevronRight className="size-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors justify-self-end" />
+                </>
               )}
             </div>
           ))
         )}
       </div>
+
+      {/* 底部微妙漸層暗示可滾動，避免最後一列被生硬切半 */}
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-surface/90 to-transparent" />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type { EventDTO, EventLevel } from '@/contracts';
 import { useOverviewSignals } from '@/lib/overview-signals';
 import { useRouter } from '@/lib/router';
 import { CardHeaderTitle } from './card-header-title';
-import { Check, ChevronDown, ChevronUp, Copy, Inbox } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronUp, Copy, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatClock, formatDateTime, formatDecimal, shortId } from '@/lib/format';
 
@@ -34,7 +34,6 @@ interface ActionQueueItem {
 
 const SEV_ORDER: Record<ActionSeverity, number> = { p0: 0, p1: 1, p2: 2, p3: 3 };
 
-// 2026-10-22 使用者拍板定案參數 (純白光子 · 11s 時序湧動 · 完全無框)
 export const INCIDENT_ACTIVITY_PARAMS = {
   durationSec: 11,
   photonLength: 15,
@@ -60,8 +59,6 @@ const {
 
 const NA = '不適用';
 
-// ---- payload 安全存取（payload 為 Record<string, unknown>，所有金額皆為 Decimal 字串） ----
-
 type Rec = Record<string, unknown>;
 
 function asRecord(value: unknown): Rec | null {
@@ -72,7 +69,6 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-/** 顯示用文字：字串／數字／布林直接呈現，其餘顯示 不適用。 */
 function asText(value: unknown): string {
   if (typeof value === 'string') return value || NA;
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
@@ -80,12 +76,10 @@ function asText(value: unknown): string {
   return NA;
 }
 
-/** Decimal 字串金額：只經 formatDecimal，缺失或格式錯誤顯示 不適用。 */
 function money(value: unknown, sign = false): string {
   return formatDecimal(asString(value), { prefix: '$', sign });
 }
 
-/** 合約張數／部位：Decimal 字串，無法解析時原樣顯示，不轉 Number。 */
 function qty(value: unknown): string {
   const text = asString(value);
   if (text === null) return NA;
@@ -224,7 +218,6 @@ function toRow(ev: EventDTO, instLabel: string): EventRow {
   };
 }
 
-// 小圓點與標籤樣式：定案固化方案 C (macOS Sequoia 晶透黑曜石微膠囊風格)
 function getBadgeMeta(ev: EventDTO, side: Side) {
   if (ev.level === 'ERROR') {
     return {
@@ -260,14 +253,13 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
   }
   if (ev.category === 'WORKER') {
     return {
-      label: 'INFO',
+      label: '訊號',
       badgeClass: 'bg-white/[0.04] text-zinc-400 border border-white/[0.06] rounded-full px-2 font-medium backdrop-blur-xs',
       coreClass: 'bg-zinc-600/70 ring-1 ring-zinc-600/40',
       sonarClass: 'bg-zinc-600/15',
       bloomAnimation: 'crystal-optical-bloom-neutral',
     };
   }
-  // RISK / SYSTEM / SUPERVISOR
   return {
     label: ev.category === 'RISK' ? '風控' : 'INFO',
     badgeClass: 'bg-sky-500/15 text-sky-300 border border-sky-500/30 rounded-full px-2 font-medium backdrop-blur-xs',
@@ -280,14 +272,14 @@ function getBadgeMeta(ev: EventDTO, side: Side) {
 function levelCapsuleClass(level: EventLevel): string {
   return level === 'ERROR'
     ? 'bg-rose-500/15 border border-rose-500/30 text-rose-200'
-    : 'bg-amber-500/15 border border-amber-500/30 text-amber-200 animate-pulse';
+    : 'bg-amber-500/15 border border-amber-500/30 text-amber-200';
 }
 
 function severityRowClass(sev: ActionSeverity): string {
   switch (sev) {
-    case 'p0': return 'border-l-2 border-l-rose-500 bg-rose-500/[0.05]';
+    case 'p0': return 'border-l-2 border-l-rose-500 bg-rose-500/[0.06]';
     case 'p1': return 'border-l-2 border-l-amber-500 bg-amber-500/[0.03]';
-    case 'p2': return 'border-l-2 border-l-primary bg-primary/[0.03]';
+    case 'p2': return 'border-l-2 border-l-primary bg-primary/[0.025]';
     default: return 'border-l-2 border-l-border';
   }
 }
@@ -301,7 +293,6 @@ function severityBadgeClass(sev: ActionSeverity): string {
   }
 }
 
-// 3A 預覽對照資料（僅在 ?preview=pick 啟用，零口語終端文案）
 const PREVIEW_ACTIONS: ActionQueueItem[] = [
   {
     id: 'preview-p1-rsi',
@@ -338,9 +329,9 @@ interface UnifiedIncidentActivityCardProps {
 }
 
 /**
- * 待處理與事件審計卡片 (3A 定案：待處理作為第一分頁，與事件審計同格切換)
- * - 嚴格依 P0 風控鎖存 > P1 偏差警戒/異常 > P2 待核准 > P3 研究提案 排序
- * - 核准與解除鎖存遵守 CatOS 紅線：僅提供檢視路徑或複製 CLI 指令，不於網頁執行核准
+ * 待處理與事件審計卡片 (3A 定案：待處理作為第一分頁，並於下方銜接近期事件流消除空洞)
+ * - 標題列精簡為 5 個核心分頁（待處理 / 全部 / 異常 / 成交 / 風控），1440px 絕不切字
+ * - 核准與解除鎖存嚴守 CatOS 紅線：僅提供檢視或複製 CLI 指令
  */
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
   const events = useCatStore((s) => s.events);
@@ -354,16 +345,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const { navigate } = useRouter();
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [category, setCategory] = useState<string>('ALL');
+  const [category, setCategory] = useState<string>('ACTION');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const userPickedTabRef = useRef(false);
 
-  // DOM 容器與節點座標引用
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const [dimensions, setDimensions] = useState({ width: 600, height: 240 });
+  const [dimensions, setDimensions] = useState({ width: 560, height: 320 });
 
   useEffect(() => {
     const el = cardRef.current;
@@ -399,13 +389,19 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       .map((ev) => toRow(ev, instById.get(ev.bot_id) ?? '合約'));
   }, [events, instById]);
 
+  // 近期重要流水（在待處理分頁下方銜接展示，優先挑成交／風控／異常，不足再用最新事件補齊至 6 筆）
+  const recentHighlights = useMemo<EventRow[]>(() => {
+    const priority = rows.filter((r) => r.event.category === 'ORDER' || r.event.category === 'RISK' || r.isAlert);
+    const chosen = priority.length >= 4 ? priority.slice(0, 6) : rows.slice(0, 6);
+    return chosen;
+  }, [rows]);
+
   // 彙整待處理項目（P0 > P1 > P2 > P3）
   const actionItems = useMemo<ActionQueueItem[]>(() => {
     if (signals.previewPick) return PREVIEW_ACTIONS;
 
     const list: ActionQueueItem[] = [];
 
-    // P0: Kill-Switch 總開關已觸發
     if (killSwitch?.engaged) {
       const reason = killSwitch.engaged_record?.reason ?? killSwitch.error ?? 'fail-closed';
       list.push({
@@ -418,7 +414,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       });
     }
 
-    // P0: 帳戶 Soft / Hard 風控鎖存
     if (risk && (risk.derived.status === 'soft_latch' || risk.derived.status === 'hard_latch')) {
       const label = risk.derived.status === 'hard_latch' ? 'Hard Latch' : 'Soft Latch';
       const reasons = risk.reasons.length > 0 ? risk.reasons.join(', ') : '風控期間損益達門檻';
@@ -432,7 +427,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       });
     }
 
-    // P0 / P1: OKX 模擬盤 Bot 異常停止或心跳逾時（只取每個策略最新一筆 run）
     const demoRuns = signals.demoBot?.runs ?? [];
     const latestDemoByStrat = new Map<string, typeof demoRuns[number]>();
     for (const run of demoRuns) {
@@ -464,7 +458,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       }
     }
 
-    // P1: 已核准策略原始碼異動（核准失效）
     const approvals = signals.replay?.approvals ?? [];
     for (const approval of approvals) {
       if (approval.state === 'active' && approval.source === 'changed') {
@@ -479,7 +472,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       }
     }
 
-    // P1: 事件流 WARN / ERROR 彙總
     const alertEvents = rows.filter((r) => r.isAlert);
     if (alertEvents.length > 0) {
       const latest = alertEvents[0];
@@ -493,7 +485,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       });
     }
 
-    // P2: strategies/ 資料夾未核准策略（僅提供複製 CLI 指令，嚴格不在網頁核准）
     const activeApprovedIds = new Set(
       approvals.filter((a) => a.state === 'active' && a.source === 'current').map((a) => a.strategy_id)
     );
@@ -520,7 +511,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return list.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
   }, [signals, killSwitch, risk, rows, strategies]);
 
-  // 初次載入若有待處理項且使用者尚未手動切分頁，自動停在待處理分頁
+  // 初始載入完成且無任何待處理項目時自動切至 ALL；若有待處理則保持 ACTION
   useEffect(() => {
     if (userPickedTabRef.current) return;
     if (actionItems.length > 0) {
@@ -533,13 +524,12 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const hasP0 = actionItems.some((a) => a.sev === 'p0');
   const hasP1 = actionItems.some((a) => a.sev === 'p1');
 
+  // 精簡 5 核心分頁（待處理 / 全部 / 異常 / 成交 / 風控），1440px 絕不切字
   const availableTabs = useMemo<CategoryTabItem[]>(() => {
     const isAlert = (e: EventDTO) => e.level === 'WARN' || e.level === 'ERROR';
     const countAlert = events.filter(isAlert).length;
-    const countRisk = events.filter((e) => e.category === 'RISK').length;
     const countOrder = events.filter((e) => e.category === 'ORDER').length;
-    const countWorker = events.filter((e) => e.category === 'WORKER').length;
-    const countSystem = events.filter((e) => e.category === 'SYSTEM').length;
+    const countRisk = events.filter((e) => e.category === 'RISK').length;
 
     return [
       {
@@ -553,15 +543,13 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       },
       { id: 'ALL', label: `全部(${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
       { id: 'ALERT', label: `異常(${countAlert})`, shortLabel: countAlert > 0 ? `異常(${countAlert})` : '異常', badgeCount: countAlert, isAlert: countAlert > 0, filterFn: isAlert },
-      { id: 'RISK', label: `風控(${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => e.category === 'RISK' },
       { id: 'ORDER', label: `成交(${countOrder})`, shortLabel: '成交', badgeCount: countOrder, filterFn: (e) => e.category === 'ORDER' },
-      { id: 'WORKER', label: `Worker(${countWorker})`, shortLabel: 'Worker', badgeCount: countWorker, filterFn: (e) => e.category === 'WORKER' },
-      { id: 'SYSTEM', label: `系統(${countSystem})`, shortLabel: '系統', badgeCount: countSystem, filterFn: (e) => e.category === 'SYSTEM' },
+      { id: 'RISK', label: `風控(${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => e.category === 'RISK' },
     ];
   }, [events, actionItems.length, hasP0, hasP1]);
 
   const currentTab = useMemo(() => {
-    return availableTabs.find((t) => t.id === category) ?? availableTabs[1];
+    return availableTabs.find((t) => t.id === category) ?? availableTabs[0];
   }, [availableTabs, category]);
 
   const filteredRows = useMemo(() => {
@@ -614,123 +602,176 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       : '此分類無事件';
 
   const showEmpty = connectionStatus === 'mode_not_open' || filteredRows.length === 0;
-  const headerCount = category === 'ACTION' ? `${actionItems.length} 項` : `${filteredRows.length} 筆`;
 
   return (
     <div ref={cardRef} className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
-      {/* 1. Header 區域：待處理與事件審計 + 第一分頁為待處理(N) */}
+      {/* 1. Header：統一規格，精簡 5 分頁絕不裁切 */}
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="activity_deck"
           title="待處理與事件審計"
-          subtext={
-            !isNarrow ? (
-              <span className="text-t2 font-mono text-muted-foreground ml-1">
-                {headerCount}
-              </span>
-            ) : undefined
-          }
         />
 
-        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 overflow-x-auto max-w-[66%] custom-scrollbar">
-          {(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleSelectTab(tab.id)}
-              className={cn(
-                'px-1.5 sm:px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0',
-                category === tab.id
-                  ? 'bg-secondary text-foreground font-semibold shadow-xs'
-                  : tab.isCritical
-                  ? 'text-rose-400 hover:text-rose-300 font-semibold'
-                  : tab.isAlert
-                  ? 'text-amber-300/90 hover:text-amber-200'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {isNarrow ? tab.shortLabel : tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
+          {(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => {
+            const isActive = category === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleSelectTab(tab.id)}
+                className={cn(
+                  'px-1.5 sm:px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0',
+                  isActive
+                    ? 'bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]'
+                    : tab.isCritical
+                    ? 'text-rose-400 hover:text-rose-300 font-semibold'
+                    : tab.isAlert
+                    ? 'text-amber-300/90 hover:text-amber-200'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {isNarrow ? tab.shortLabel : tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* 2. 主內容區：ACTION 分頁顯示專業待處理佇列；其餘分頁維持時間軸事件流 */}
+      {/* 2. 主內容區：ACTION 分頁顯示專業待處理佇列 + 底部自然銜接近期審計流水 */}
       {category === 'ACTION' ? (
-        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-border/50">
-          {actionItems.length === 0 ? (
-            <div className="h-full flex items-center justify-center py-8 text-t2 text-muted-foreground">
-              無待處理項目
-            </div>
-          ) : (
-            actionItems.map((item) => {
-              const isCopied = copiedId === item.id;
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    'px-3 py-2.5 flex items-center justify-between gap-2.5 transition-colors hover:bg-white/[0.025]',
-                    severityRowClass(item.sev)
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={cn('px-1.5 py-0.5 rounded border text-t1 font-semibold leading-none shrink-0', severityBadgeClass(item.sev))}>
-                        {item.tag}
-                      </span>
-                      <span className="text-t3 font-semibold text-foreground truncate font-sans">
-                        {item.title}
-                      </span>
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
+          {/* 上半：待處理佇列 */}
+          <div className="divide-y divide-border/50 shrink-0">
+            {actionItems.length === 0 ? (
+              <div className="py-6 text-center text-t2 text-muted-foreground">
+                無待處理項目
+              </div>
+            ) : (
+              actionItems.map((item) => {
+                const isCopied = copiedId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'px-3 py-2.5 flex items-center justify-between gap-2.5 transition-colors hover:bg-white/[0.03]',
+                      severityRowClass(item.sev)
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={cn('px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0', severityBadgeClass(item.sev))}>
+                          {item.tag}
+                        </span>
+                        <span className="text-t3 font-semibold text-foreground truncate font-sans">
+                          {item.title}
+                        </span>
+                      </div>
+                      <p className="text-t2 text-muted-foreground mt-1 leading-snug truncate font-sans" title={item.fact}>
+                        {item.fact}
+                      </p>
                     </div>
-                    <p className="text-t2 text-muted-foreground mt-1 leading-snug truncate" title={item.fact}>
-                      {item.fact}
-                    </p>
-                  </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {item.primaryAction && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (item.primaryAction?.switchTab) {
-                            handleSelectTab(item.primaryAction.switchTab);
-                          } else if (item.primaryAction?.route) {
-                            navigate(item.primaryAction.route);
-                          }
-                        }}
-                        className={cn(
-                          'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap',
-                          item.primaryAction.tone === 'danger'
-                            ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
-                            : 'border-border/80 bg-secondary/60 text-foreground hover:border-primary/60 hover:text-primary'
-                        )}
-                      >
-                        {item.primaryAction.label}
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.primaryAction && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.primaryAction?.switchTab) {
+                              handleSelectTab(item.primaryAction.switchTab);
+                            } else if (item.primaryAction?.route) {
+                              navigate(item.primaryAction.route);
+                            }
+                          }}
+                          className={cn(
+                            'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap',
+                            item.primaryAction.tone === 'danger'
+                              ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                              : 'border-border/80 bg-secondary/60 text-foreground hover:border-primary/60 hover:text-primary'
+                          )}
+                        >
+                          {item.primaryAction.label}
+                        </button>
+                      )}
 
-                    {item.copyCommand && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
-                        title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
-                        className="px-2 py-1 rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-t2 font-mono transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
-                      >
-                        {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                        <span>{isCopied ? '已複製指令' : item.copyCommand.label}</span>
-                      </button>
-                    )}
+                      {item.copyCommand && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
+                          title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
+                          className="px-2 py-1 rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground text-t2 font-mono transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap"
+                        >
+                          {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                          <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
+
+          {/* 下半：銜接近期事件流水預覽（徹底消除大塊空白，保留即時脈動） */}
+          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/15">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0">
+              <span className="text-t1 font-mono text-muted-foreground">
+                近期審計與成交流水 · {events.length} 筆
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('ALL')}
+                className="text-t1 font-mono text-primary/85 hover:text-primary inline-flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>展開完整流水</span>
+                <ArrowRight className="size-2.5" />
+              </button>
+            </div>
+
+            {recentHighlights.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-6 text-muted-foreground/75 gap-1">
+                <Inbox className="size-5 text-zinc-600" />
+                <span className="text-t2 font-sans">{emptyMessage}</span>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.04]">
+                {recentHighlights.map((row) => {
+                  const meta = getBadgeMeta(row.event, row.side);
+                  return (
+                    <div
+                      key={row.key}
+                      onClick={() => {
+                        handleSelectTab('ALL');
+                        setExpandedKey(row.key);
+                      }}
+                      className="px-3 py-2 flex items-center justify-between gap-2 hover:bg-white/[0.03] transition-colors cursor-pointer text-t2"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-zinc-500 text-t1 shrink-0 tabular-nums">{row.time}</span>
+                        <span className={cn('px-1.5 py-0.2 rounded text-t1 shrink-0', meta.badgeClass)}>
+                          {meta.label}
+                        </span>
+                        <span className={cn('truncate', row.isAlert ? 'text-zinc-100 font-medium' : 'text-zinc-300')}>
+                          {row.title}
+                        </span>
+                      </div>
+                      {row.rightText && (
+                        <span className="text-t1 text-muted-foreground shrink-0 tabular-nums hidden sm:inline">
+                          {row.rightText}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div
           key={`timeline-${expandedKey}`}
           ref={containerRef}
-          className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative"
+          className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative custom-scrollbar"
           style={{
             '--photon-duration': `${DURATION_SEC}s`,
             '--photon-length': `${PHOTON_LENGTH}px`,
@@ -747,8 +788,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               <span className="text-t2">{emptyMessage}</span>
             </div>
           ) : (
-            <div className="relative pl-3 space-y-2.5">
-              {/* 導軌系統 */}
+            <div className="relative pl-3 space-y-2">
               <div className="absolute left-[20px] -translate-x-1/2 top-2 bottom-2 w-[20px] pointer-events-none z-0 overflow-hidden">
                 <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.08]" />
                 <div className="absolute left-[2px] bottom-0 w-[20px]" style={{ display: 'none' }}>
@@ -916,8 +956,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         </div>
       )}
 
-      {/* 3. 後端環形緩衝省略提示 */}
-      {eventsOmitted > 0 && category !== 'ACTION' && (
+      {eventsOmitted > 0 && (
         <div className="shrink-0 px-3 py-1 border-t border-border/60 bg-secondary/30 text-t1 font-mono text-amber-300/90">
           後端環形緩衝已省略 {eventsOmitted} 筆
         </div>

@@ -5,7 +5,7 @@ import { useCatStore } from "@/state/catStore";
 import type { BotControlState, DecimalString, PositionDTO, RiskStatus } from "@/contracts";
 import { formatDecimal, formatRatioPct, signOf, toPlotNumber } from "@/lib/format";
 
-// 定案配色：Noir & Gold 低彩度金融色板
+// Noir & Gold 低彩度金融色板
 const COLORS = {
   position: "#e8b45e", // 蜂蜜金
   second: "#7faee2",   // 霧藍
@@ -14,8 +14,8 @@ const COLORS = {
   short: "#f43f5e",    // 空頭 / 虧損 玫瑰紅
   fee: "#71717a",      // 手續費 費用灰
   neutral: "#a1a1aa",  // 中性 鋅灰
-  rem: "#3f3f46",      // 剩餘可用額度（啞灰槽）
-  muted: "#27272a",    // 尚無觀測
+  rem: "#3f3f46",      // 剩餘可用額度啞灰
+  muted: "#27272a",    // 尚無觀測底槽
 };
 
 const BOT_PALETTE = ["#e8b45e", "#7faee2", "#8b8df8", "#10b981", "#f59e0b"];
@@ -25,9 +25,9 @@ interface DonutItem {
   shortLabel: string;
   compactLabel?: string;
   sub: string;
-  amount: DecimalString | null; // 後端 Decimal 字串；null 代表不適用或非單一金額
+  amount: DecimalString | null; // 後端 Decimal 字串；null 代表非單一金額
   amountStr: string;
-  pct_share: number; // 0..100，僅供幾何（弧長／佔比標籤）
+  pct_share: number; // 0..100，僅供幾何弧長與佔比標籤
   color: string;
   badgeStr: string;
   compactBadge?: string;
@@ -37,20 +37,18 @@ interface DonutItem {
   hidePct?: boolean;
 }
 
-// 向量坐標系幾何常量 (200x200 viewBox，Y 版俐落厚環＋寬敞中央數字區)
 const VB_SIZE = 200;
 const CX = 100;
 const CY = 100;
 const R = 74;
-const STROKE_WIDTH = 13.5;
+const STROKE_WIDTH = 14;
 const CIRCUMFERENCE = 2 * Math.PI * R;
 const SLICE_GAP = 2.6;
-const HUD_INNER_WIDTH = 132;
+const HUD_INNER_WIDTH = 128;
 
 export type DonutViewMode = "bots" | "allocation" | "delta" | "pnl" | "margin";
 export type HudUnit = "pct" | "leverage" | "money";
 
-// 1A 定案 5 大視角：策略（預設）｜幣種｜多空｜損益｜保證金
 const TABS: { id: DonutViewMode; label: string }[] = [
   { id: "bots", label: "策略" },
   { id: "allocation", label: "幣種" },
@@ -94,15 +92,7 @@ const RISK_STATUS_CHIP: Record<RiskStatus, { label: string; className: string }>
 const NO_OBSERVATION_CHIP = { label: "尚無觀測", className: "bg-zinc-500/15 border-zinc-500/35 text-zinc-400" };
 
 const TEXT_UNAVAILABLE = "不適用";
-const TEXT_NO_RISK = "尚無風控觀測";
-const TEXT_NO_RISK_SUB = "啟動模擬 run 後顯示";
-const TEXT_MODE_NOT_OPEN = "此模式未開放（demo/live 不在 v1 範圍）";
 
-/**
- * 圖形幾何專用：part 佔 whole 的百分比 (0..100)。
- * 這是本卡片唯一的 Decimal → float 轉換點（經 toPlotNumber），僅用於弧長與佔比標籤，
- * 結果不得回流為任何金額、帳務或風控依據。
- */
 function shareOf(part: DecimalString | null | undefined, whole: DecimalString | null | undefined): number {
   return sharePlot(toPlotNumber(part), toPlotNumber(whole));
 }
@@ -135,9 +125,9 @@ function nextHudUnit(unit: HudUnit): HudUnit {
 }
 
 /**
- * 曝險額度卡片 (1A 定案：Y 風格底版 × 5 大視角切換 × 點擊圓環切換 % / x / $)
- * - 標題列精簡無冗餘單位切換鈕，直接點擊圓環本體循環切換 % → x → $
- * - 預設「策略」視角：中央單一大數字＋副標、按策略拆解明細列、底部單行額度公式
+ * 曝險額度卡片 (1A 定案：Y 結構底版 × 5 視角 × 點擊圓環本體切換 % / x / $)
+ * - 標題列無單位切換按鈕，點擊圓環本體循環切換並在圓環下方以極簡微指示顯示當前單位
+ * - 空觀測狀態呈現制度預設上限規格（不左右重複廢話）
  * - 所有金額皆直接格式化後端 Decimal 字串，不在前端進行帳務浮點運算
  */
 export function AllocationDonutCard({ className }: { className?: string }) {
@@ -162,32 +152,30 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return () => observer.disconnect();
   }, []);
 
-  const isNarrow = dimensions.width < 450;
+  const isNarrow = dimensions.width < 460;
   const isSuperNarrow = dimensions.width < 340;
   const isShort = dimensions.height < 185;
   const isCompact = isNarrow || isShort;
 
   const risk = useCatStore((s) => s.risk);
   const summary = useCatStore((s) => s.summary);
+  const killSwitch = useCatStore((s) => s.killSwitch);
   const bots = useCatStore((s) => s.bots);
   const positions = useCatStore((s) => s.positions);
   const connectionStatus = useCatStore((s) => s.connection.status);
 
   const modeNotOpen = connectionStatus === "mode_not_open";
-  const unavailableText = modeNotOpen ? TEXT_MODE_NOT_OPEN : TEXT_NO_RISK;
-  const unavailableSub = modeNotOpen ? "v1 僅提供 local-sim" : TEXT_NO_RISK_SUB;
+  const unavailableSub = modeNotOpen ? "v1 僅提供 local-sim" : "啟動模擬 run 後啟用";
 
   const derived = risk?.derived ?? null;
-  const limits = risk?.limits ?? null;
+  const limits = risk?.limits ?? killSwitch?.default_limits ?? null;
   const notional = derived?.notional ?? null;
   const exposureBudget = derived?.exposure_budget ?? null;
   const symbolBudget = derived?.symbol_budget ?? null;
   const effectiveLeverage = derived?.effective_leverage ?? null;
 
-  // 額度分母：優先使用單幣上限 symbol_budget，缺省回退總預算 exposure_budget
   const capBudget = symbolBudget ?? exposureBudget;
   const capShare = shareOf(notional, capBudget);
-  const nearSymbolLimit = symbolBudget !== null && shareOf(notional, symbolBudget) >= 80;
 
   const posByBot = useMemo(() => {
     const map = new Map<string, PositionDTO>();
@@ -195,40 +183,70 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return map;
   }, [positions]);
 
-  // 空狀態切片
+  const leverageLimitText = limits ? `${formatDecimal(limits.leverage, { digits: 1 })}x` : TEXT_UNAVAILABLE;
+  const symbolShareText = limits ? formatRatioPct(limits.symbol_share, { sign: false }) : TEXT_UNAVAILABLE;
+  const softLossText = limits ? formatRatioPct(limits.soft_loss, { sign: false }) : TEXT_UNAVAILABLE;
+  const hardLossText = limits ? formatRatioPct(limits.hard_loss, { sign: false }) : TEXT_UNAVAILABLE;
+
+  // 空狀態：右側展示制度上限規格，取代重複廢話
   const unavailableItems: DonutItem[] = useMemo(() => [
     {
-      key: "unavailable",
-      shortLabel: unavailableText,
-      compactLabel: modeNotOpen ? "未開放" : "尚無觀測",
-      sub: unavailableSub,
+      key: "cfg-lev",
+      shortLabel: "帳戶有效槓桿上限",
+      compactLabel: "槓桿上限",
+      sub: "預設上限",
       amount: null,
-      amountStr: unavailableSub,
-      pct_share: 100,
-      color: COLORS.muted,
-      badgeStr: "local-sim",
-      compactBadge: "local",
+      amountStr: leverageLimitText,
+      pct_share: 0,
+      color: COLORS.position,
+      badgeStr: "全帳戶",
       isMuted: true,
       hidePct: true,
     },
-  ], [unavailableText, unavailableSub, modeNotOpen]);
+    {
+      key: "cfg-sym",
+      shortLabel: "單一幣種預算占比",
+      compactLabel: "單幣上限",
+      sub: "集中度限制",
+      amount: null,
+      amountStr: symbolShareText,
+      pct_share: 0,
+      color: COLORS.second,
+      badgeStr: "單幣上限",
+      isMuted: true,
+      hidePct: true,
+    },
+    {
+      key: "cfg-loss",
+      shortLabel: "日損風控鎖存門檻",
+      compactLabel: "日損鎖存",
+      sub: "Soft / Hard",
+      amount: null,
+      amountStr: `${softLossText} / ${hardLossText}`,
+      pct_share: 0,
+      color: COLORS.rem,
+      badgeStr: "人工解除",
+      isMuted: true,
+      hidePct: true,
+    },
+  ], [leverageLimitText, symbolShareText, softLossText, hardLossText]);
 
-  // 剩餘可用額度（啞灰槽，不對 Decimal 做前端加減，僅呈現上限基準與剩餘比例）
+  // 剩餘可用額度：金額欄不誤印總上限，清爽標示未配置與剩餘比例
   const remainingItem: DonutItem = useMemo(() => ({
     key: "remaining",
     shortLabel: "剩餘可用額度",
     compactLabel: "未用額度",
     sub: symbolBudget ? "距單幣上限" : "距總預算",
     amount: null,
-    amountStr: `上限 ${formatDecimal(capBudget, { prefix: "$" })}`,
+    amountStr: "未配置",
     pct_share: Math.max(0, 100 - capShare),
     color: COLORS.rem,
-    badgeStr: "未配置",
-    compactBadge: "未用",
+    badgeStr: symbolBudget ? "單幣緩衝" : "緩衝",
+    compactBadge: "緩衝",
     isMuted: true,
-  }), [symbolBudget, capBudget, capShare]);
+  }), [symbolBudget, capShare]);
 
-  // 1. 視角：策略（預設，Y 結構：按策略實例拆解單幣額度）
+  // 1. 視角：策略（預設）
   const botItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const rows: DonutItem[] = [];
@@ -239,13 +257,12 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       const hasPos = posSign === "positive" || posSign === "negative";
       const isShort = posSign === "negative";
       const botNotional = pos?.notional ?? (bot.bot_id === risk.bot_id ? notional : null);
-      const share = hasPos ? shareOf(botNotional, capBudget) : shareOf(botNotional, capBudget);
+      const share = shareOf(botNotional, capBudget);
       const sym = (pos?.inst_id ?? bot.inst_id ?? "").replace("-USDT-SWAP", "");
       const posBadge = hasPos && (pos?.position ?? bot.position)
         ? `${sym ? `${sym} ` : ""}${isShort ? "空" : "多"} ${formatDecimal(magnitude((pos?.position ?? bot.position) as string), { digits: 0 })} 張`
         : BOT_STATE_LABEL[bot.state] ?? bot.state;
 
-      // 多策略時若某策略空手（0 名目），仍保留於清單但歸為淡色提示
       const isZero = !hasPos && (botNotional === null || signOf(botNotional) === "zero");
       rows.push({
         key: `bot:${bot.bot_id}`,
@@ -259,7 +276,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         badgeStr: isZero ? `${sym ? `${sym} ` : ""}空手` : posBadge,
         compactBadge: isZero ? "空手" : posBadge,
         isMuted: isZero,
-        nearLimit: bot.bot_id === risk.bot_id && nearSymbolLimit,
       });
     });
 
@@ -281,13 +297,12 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
     rows.push(remainingItem);
     return rows;
-  }, [risk, unavailableItems, bots, posByBot, notional, capBudget, nearSymbolLimit, remainingItem]);
+  }, [risk, unavailableItems, bots, posByBot, notional, capBudget, remainingItem]);
 
-  // 2. 視角：幣種（跨策略單幣集中度）
+  // 2. 視角：幣種
   const allocationItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
 
-    // 依合約彙整策略數與持倉引用，不以 float 加總金額
     const byInst = new Map<string, { botCount: number; openPositions: PositionDTO[] }>();
     for (const bot of bots) {
       const inst = bot.inst_id ?? "未指定合約";
@@ -315,14 +330,12 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         instNotional = null;
         pct = 0;
       } else if (activeInsts.length === 1) {
-        // 全部持倉集中於單一合約：直接採用後端權威 risk.derived.notional（0 前端運算）
         instNotional = notional;
         pct = capShare;
       } else if (openCount === 1) {
         instNotional = info.openPositions[0].notional;
         pct = shareOf(instNotional, capBudget);
       } else {
-        // 多合約同時各有多策略時，僅用幾何加總顯示比例、金額不以浮點加總
         const plotSum = info.openPositions.reduce((acc, p) => {
           const n = toPlotNumber(p.notional);
           return acc + (Number.isFinite(n) ? Math.abs(n) : 0);
@@ -331,7 +344,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       }
 
       const isZero = openCount === 0;
-      const color = isZero ? COLORS.violet : BOT_PALETTE[colorIdx++ % BOT_PALETTE.length];
+      const color = isZero ? COLORS.rem : BOT_PALETTE[colorIdx++ % BOT_PALETTE.length];
       rows.push({
         key: `inst:${inst}`,
         shortLabel: inst,
@@ -340,34 +353,19 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         amount: instNotional,
         amountStr: isZero ? "$0.00" : instNotional ? formatDecimal(instNotional, { prefix: "$" }) : `${openCount} 筆持倉`,
         pct_share: pct,
-        color: isZero ? COLORS.rem : color,
-        badgeStr: isZero ? `空手 (${info.botCount} 策略)` : openCount > 1 ? `${openCount} 策略疊加` : `${leverageText(effectiveLeverage)}`,
+        color,
+        badgeStr: isZero ? `空手 (${info.botCount} 策略)` : openCount > 1 ? `${openCount} 策略疊加` : leverageText(effectiveLeverage),
         compactBadge: isZero ? "空手" : `${openCount} 筆`,
         isMuted: isZero,
         nearLimit: !isZero && pct >= 80,
       });
     }
 
-    if (rows.length === 0) {
-      rows.push({
-        key: "position-fallback",
-        shortLabel: "持倉曝險",
-        compactLabel: "持倉",
-        sub: "名目",
-        amount: notional,
-        amountStr: formatDecimal(notional, { prefix: "$" }),
-        pct_share: capShare,
-        color: COLORS.position,
-        badgeStr: leverageText(effectiveLeverage),
-        nearLimit: nearSymbolLimit,
-      });
-    }
-
     rows.push(remainingItem);
     return rows;
-  }, [risk, unavailableItems, bots, positions, notional, capBudget, capShare, effectiveLeverage, nearSymbolLimit, remainingItem]);
+  }, [risk, unavailableItems, bots, positions, notional, capBudget, capShare, effectiveLeverage, remainingItem]);
 
-  // 3. 視角：多空（方向淨曝險）
+  // 3. 視角：多空
   const deltaItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const open = positions.filter((p) => {
@@ -412,7 +410,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     });
   }, [risk, unavailableItems, positions]);
 
-  // 4. 視角：損益（已實現／未實現／手續費結構）
+  // 4. 視角：損益
   const pnlItems: DonutItem[] = useMemo(() => {
     if (!summary) return unavailableItems;
     const realized = summary.realized_pnl;
@@ -474,7 +472,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     ];
   }, [summary, unavailableItems]);
 
-  // 5. 視角：保證金（v1 local-sim 無保證金模型，誠實呈現 margin_ok 布林事實）
+  // 5. 視角：保證金
   const marginItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const marginOk = risk.snapshot?.margin_ok;
@@ -513,18 +511,15 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     ? [risk.derived.can_increase ? "可增倉" : "禁增倉", risk.reasons.join(",")].filter(Boolean).join(" · ")
     : unavailableSub;
 
-  const leverageLimitText = limits ? `${formatDecimal(limits.leverage, { digits: 1 })}x` : TEXT_UNAVAILABLE;
-  const symbolShareText = limits ? formatRatioPct(limits.symbol_share, { sign: false }) : TEXT_UNAVAILABLE;
   const canToggleUnit = viewMode === "bots" || viewMode === "allocation" || viewMode === "delta";
 
-  // 次標右側摘要
   const topRightSummary = useMemo(() => {
     if (viewMode === "pnl") {
-      if (!summary) return TEXT_UNAVAILABLE;
+      if (!summary) return "尚未啟動";
       return `風控期間 ${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })}`;
     }
-    if (!risk) return TEXT_UNAVAILABLE;
-    if (viewMode === "margin") return "margin_ok";
+    if (!risk) return `上限 ${leverageLimitText} · 單幣 ${symbolShareText}`;
+    if (viewMode === "margin") return "local-sim 無模型";
     if (viewMode === "delta") {
       const dirSign = signOf(risk.snapshot?.position ?? null);
       const dir = dirSign === "positive" ? "淨多" : dirSign === "negative" ? "淨空" : "空倉";
@@ -534,9 +529,8 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       ? `${(toPlotNumber(limits.leverage) * toPlotNumber(limits.symbol_share)).toFixed(2)}x`
       : leverageLimitText;
     return `${leverageText(effectiveLeverage)} / ${singleCap}`;
-  }, [viewMode, summary, risk, effectiveLeverage, limits, leverageLimitText]);
+  }, [viewMode, summary, risk, effectiveLeverage, limits, leverageLimitText, symbolShareText]);
 
-  // 中央 HUD 數據計算（Y 風格：單一大數字＋簡潔副標）
   const renderDonut = () => {
     let accumulatedArc = 0;
 
@@ -546,9 +540,9 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
     const hudUnavailable = viewMode === "pnl" ? summary === null : risk === null;
     if (hudUnavailable) {
-      hudValue = modeNotOpen ? "未開放" : "尚無觀測";
-      hudSub = unavailableSub;
-      hudValueColor = "#a1a1aa";
+      hudValue = modeNotOpen ? "未開放" : "0%";
+      hudSub = modeNotOpen ? "v1 僅 local-sim" : "尚無風控觀測";
+      hudValueColor = "#71717a";
     } else if (viewMode === "bots" || viewMode === "allocation") {
       if (hudUnit === "pct") {
         hudValue = `${Math.round(capShare)}%`;
@@ -616,10 +610,10 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             setHudUnit((u) => nextHudUnit(u));
           }
         }}
-        title={canToggleUnit && !hudUnavailable ? "點擊圓環切換顯示單位（% / x / $）" : undefined}
+        title={canToggleUnit && !hudUnavailable ? "點擊圓環循環切換顯示單位（% → x → $）" : undefined}
         className={cn(
           "h-full aspect-square flex flex-col items-center justify-center relative shrink-0 group/donut",
-          isNarrow ? "max-w-[36%] max-h-[146px]" : "max-w-[42%] max-h-[190px]",
+          isNarrow ? "max-w-[36%] max-h-[146px]" : "max-w-[42%] max-h-[196px]",
           canToggleUnit && !hudUnavailable && "cursor-pointer"
         )}
       >
@@ -636,7 +630,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             `}</style>
           </defs>
 
-          {/* 啞光底槽 */}
           <circle cx={CX} cy={CY} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={STROKE_WIDTH} />
 
           {currentItems.map((item, idx) => {
@@ -648,7 +641,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             accumulatedArc += fullArc;
 
             const isHovered = hoveredIndex === idx;
-            const sliceOpacity = hoveredIndex === null ? (item.isMuted ? 0.55 : 0.94) : isHovered ? 1 : 0.22;
+            const sliceOpacity = hoveredIndex === null ? (item.isMuted ? 0.45 : 0.94) : isHovered ? 1 : 0.22;
 
             return (
               <circle
@@ -671,8 +664,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             );
           })}
 
-          {/* 中央 HUD：Y 風格單一大數字＋副標（懸停切片時聚焦該切片） */}
-          {activeHoverItem ? (
+          {activeHoverItem && !activeHoverItem.hidePct ? (
             <g className="pointer-events-none select-none">
               <text
                 x={CX}
@@ -690,11 +682,11 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                 y={CY + 10}
                 textAnchor="middle"
                 fill="#f8fafc"
-                fontSize={hudFontSize(activeHoverItem.hidePct ? activeHoverItem.amountStr : `${Math.round(activeHoverItem.pct_share)}%`, 28)}
+                fontSize={hudFontSize(`${Math.round(activeHoverItem.pct_share)}%`, 28)}
                 fontWeight="700"
                 className="hud-mono"
               >
-                {activeHoverItem.hidePct ? activeHoverItem.amountStr : `${Math.round(activeHoverItem.pct_share)}%`}
+                {Math.round(activeHoverItem.pct_share)}%
               </text>
               <text
                 x={CX}
@@ -704,14 +696,14 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                 fontSize={hudFontSize(activeHoverItem.amountStr, 9.5)}
                 className="hud-mono"
               >
-                {activeHoverItem.hidePct || !shareCaption ? activeHoverItem.badgeStr : activeHoverItem.amountStr}
+                {shareCaption ? activeHoverItem.amountStr : activeHoverItem.badgeStr}
               </text>
             </g>
           ) : (
             <g className="pointer-events-none select-none">
               <text
                 x={CX}
-                y={isCompact ? CY + 8 : CY + 4}
+                y={isCompact ? CY + 8 : CY + 2}
                 textAnchor="middle"
                 fill={hudValueColor}
                 fontSize={hudFontSize(hudValue, isCompact ? 26 : 30)}
@@ -723,7 +715,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
               {!isCompact && (
                 <text
                   x={CX}
-                  y={CY + 23}
+                  y={CY + 21}
                   textAnchor="middle"
                   fill="#94a3b8"
                   fontSize={hudFontSize(hudSub, 10)}
@@ -733,32 +725,66 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   {hudSub}
                 </text>
               )}
+              {canToggleUnit && !hudUnavailable && !isCompact && (
+                <g transform={`translate(${CX}, ${CY + 39})`}>
+                  <text
+                    x={-16}
+                    y={0}
+                    textAnchor="middle"
+                    fill={hudUnit === "pct" ? "#e8b45e" : "#52525b"}
+                    fontSize="9"
+                    fontWeight={hudUnit === "pct" ? "700" : "500"}
+                    className="hud-mono"
+                  >
+                    %
+                  </text>
+                  <text x={-8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
+                  <text
+                    x={0}
+                    y={0}
+                    textAnchor="middle"
+                    fill={hudUnit === "leverage" ? "#e8b45e" : "#52525b"}
+                    fontSize="9"
+                    fontWeight={hudUnit === "leverage" ? "700" : "500"}
+                    className="hud-mono"
+                  >
+                    x
+                  </text>
+                  <text x={8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
+                  <text
+                    x={16}
+                    y={0}
+                    textAnchor="middle"
+                    fill={hudUnit === "money" ? "#e8b45e" : "#52525b"}
+                    fontSize="9"
+                    fontWeight={hudUnit === "money" ? "700" : "500"}
+                    className="hud-mono"
+                  >
+                    $
+                  </text>
+                </g>
+              )}
             </g>
           )}
         </svg>
-
-        {canToggleUnit && !hudUnavailable && !isCompact && (
-          <span className="absolute -bottom-0.5 text-t1 font-mono text-muted-foreground/60 group-hover/donut:text-primary transition-colors pointer-events-none">
-            點擊圓環切單位
-          </span>
-        )}
       </div>
     );
   };
 
-  // 底部額度上限公式（僅有風控觀測且非極扁高度顯示）
   const riskEquity = risk?.snapshot?.risk_equity ?? risk?.snapshot?.equity ?? summary?.equity ?? null;
-  const formulaLine = risk && !isShort
-    ? viewMode === "pnl"
+  const formulaLine = !isShort
+    ? !risk
+      ? `啟動模擬 run 後即時監控部位曝險 · 預設單幣上限為總預算 ${symbolShareText}`
+      : viewMode === "pnl"
       ? `已實現 ${formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" })} · 未實現 ${formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" })} · 手續費 ${formatDecimal(summary?.fees, { prefix: "$" })}`
       : viewMode === "margin"
       ? "v1 local-sim 無保證金模型 · 僅驗證 margin_ok 布林事實"
-      : `上限 = 權益 ${formatDecimal(riskEquity, { prefix: "$" })} × 總槓桿 ${leverageLimitText} × 單幣 ${symbolShareText} = ${formatDecimal(symbolBudget, { prefix: "$" })}`
+      : `已用 ${formatDecimal(notional, { prefix: "$" })} / 單幣上限 ${formatDecimal(symbolBudget, { prefix: "$" })}（權益 ${formatDecimal(riskEquity, { prefix: "$" })} × ${leverageLimitText} × ${symbolShareText}）`
     : null;
 
   return (
     <div ref={containerRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
-      {/* 1. 標題列：精簡無單位按鈕，只留標題＋風控狀態＋5 視角切換 */}
+      {/* 1. 標題列：精簡無單位按鈕，只留標題＋狀態晶片＋5 視角切換 */}
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="allocation"
@@ -790,7 +816,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                 className={cn(
                   "px-1.5 sm:px-2 py-0.5 rounded transition-colors cursor-pointer font-medium select-none text-t2 whitespace-nowrap",
                   isActive
-                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.14]"
+                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
                 )}
               >
@@ -801,20 +827,20 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         </div>
       </div>
 
-      {/* 2. 主內容區：次標一行 + 左側可點圓環 + 右側 Y 風格精簡明細表 */}
-      <div className="flex-1 min-h-0 flex flex-col px-3 py-2 overflow-hidden">
+      {/* 2. 主內容區：整體置中收斂 max-w，避免寬屏下左右分離留大片空白 */}
+      <div className="flex-1 min-h-0 flex flex-col px-3.5 py-2.5 overflow-hidden">
         {!isShort && (
           <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground mb-1.5 shrink-0">
-            <span className="truncate">{VIEW_CAPTION[viewMode]}</span>
-            <span className="font-semibold text-foreground shrink-0">{topRightSummary}</span>
+            <span className="truncate font-sans">{VIEW_CAPTION[viewMode]}</span>
+            <span className="font-semibold text-foreground shrink-0 tabular-nums">{topRightSummary}</span>
           </div>
         )}
 
-        <div className="flex-1 min-h-0 flex items-center gap-3 sm:gap-4 overflow-hidden font-mono">
+        <div className="flex-1 min-h-0 flex items-center justify-center gap-4 sm:gap-6 overflow-hidden font-mono max-w-[780px] w-full mx-auto">
           {renderDonut()}
 
-          {/* 右側明細清單（Y 版乾淨表格行，無冗餘進度槽噪音） */}
-          <div className="flex-1 min-w-0 h-full flex flex-col justify-center divide-y divide-white/[0.05] overflow-y-auto pr-0.5">
+          {/* 右側明細清單（Y 版乾淨表格行，比例平衡） */}
+          <div className="flex-1 min-w-0 max-w-[440px] h-full flex flex-col justify-center divide-y divide-white/[0.05] overflow-y-auto pr-0.5">
             {currentItems.map((item, idx) => {
               const isHovered = hoveredIndex === idx;
               const displayLabel = isNarrow ? (item.compactLabel || item.shortLabel) : item.shortLabel;
@@ -826,15 +852,15 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   onMouseEnter={() => setHoveredIndex(idx)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   className={cn(
-                    "flex items-center justify-between gap-2 px-1.5 py-1.5 rounded transition-colors cursor-pointer",
-                    isHovered ? "bg-white/[0.07]" : "hover:bg-white/[0.03]"
+                    "flex items-center justify-between gap-2 px-2 py-1.5 rounded transition-colors cursor-pointer",
+                    isHovered ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
                   )}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                     <span
                       className={cn(
-                        "text-t3 truncate",
+                        "text-t3 truncate font-sans",
                         item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
                       )}
                     >
@@ -843,8 +869,8 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     {displayBadge && (
                       <span
                         className={cn(
-                          "text-t1 shrink-0 whitespace-nowrap",
-                          item.nearLimit ? "text-amber-400 font-semibold" : "text-muted-foreground/80"
+                          "text-t1 font-mono shrink-0 whitespace-nowrap",
+                          item.nearLimit ? "text-amber-400 font-semibold" : "text-muted-foreground/75"
                         )}
                       >
                         {displayBadge}
@@ -856,7 +882,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     <span
                       className={cn(
                         "text-t3 tabular-nums",
-                        item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground" : "text-foreground font-medium"
+                        item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-medium"
                       )}
                     >
                       {item.amountStr}
@@ -865,7 +891,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                       <span
                         className={cn(
                           "text-t3 tabular-nums min-w-[34px] text-right",
-                          item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
+                          item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-semibold"
                         )}
                       >
                         {Math.round(item.pct_share)}%
