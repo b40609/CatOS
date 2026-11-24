@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-Hant" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CatOS · 待處理與事件審計 · 6 套配色方案實機對照</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: oklch(0.155 0.004 260);
+  --surface: oklch(0.19 0.004 260);
+  --surface2: oklch(0.22 0.005 260);
+  --raised: oklch(0.25 0.006 260);
+  --fg: oklch(0.94 0.004 260);
+  --muted: oklch(0.65 0.008 260);
+  --faint: oklch(0.49 0.008 260);
+  --border: oklch(0.30 0.006 260);
+  --border2: oklch(0.37 0.008 260);
+  --gold: #e8b45e;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --sans: "Work Sans", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:12px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 頂部控制列 */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:rgba(16,17,21,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+  padding:10px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(232,180,94,.55)}
+.ctrl-group{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap}
+.chk{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px;border-radius:5px;border:1px solid var(--border);
+  background:var(--surface);font-family:var(--mono);font-size:11px;color:var(--fg);cursor:pointer;user-select:none;
+}
+.chk input{accent-color:var(--gold);margin:0}
+
+.wrap{max-width:1660px;margin:0 auto;padding:20px 24px 72px}
+.intro{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.intro h1{margin:0;font-size:15px;font-weight:700}
+.intro p{margin:0;font-size:11.5px;color:var(--muted)}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+@media(max-width:1180px){.grid{grid-template-columns:1fr}}
+
+.scheme-block{display:flex;flex-direction:column;gap:8px;min-width:0}
+.scheme-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.scheme-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700}
+.scheme-code{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  padding:2px 7px;border-radius:4px;background:rgba(232,180,94,.14);
+  color:var(--gold);border:1px solid rgba(232,180,94,.35);
+}
+.scheme-desc{font-size:11px;color:var(--muted)}
+.swatches{display:inline-flex;align-items:center;gap:4px}
+.sw{width:11px;height:11px;border-radius:3px;border:1px solid rgba(255,255,255,.16)}
+
+/* 卡片共用骨架（固定單欄結構，與 8770 真實寬高一致） */
+.card{
+  background:var(--c-card, var(--surface));
+  border:1px solid var(--c-border, var(--border));
+  border-radius:6px;overflow:hidden;
+  display:flex;flex-direction:column;min-width:0;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+}
+.card-h{
+  height:36px;padding:0 12px;
+  background:var(--c-head, var(--surface2));
+  border-bottom:1px solid var(--c-border, var(--border));
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.card-h-title{font-size:12px;font-weight:600;color:var(--c-fg, var(--fg));white-space:nowrap}
+.tabs{
+  display:inline-flex;align-items:center;gap:2px;padding:2px;
+  background:var(--c-tab-bg, rgba(0,0,0,.32));
+  border:1px solid var(--c-tab-bd, var(--border));border-radius:5px;
+}
+.tabs button{
+  border:1px solid transparent;background:transparent;
+  color:var(--c-tab-muted, var(--muted));
+  padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:10px;
+  white-space:nowrap;transition:all .12s;
+}
+.tabs button:hover{color:var(--c-fg, var(--fg))}
+.tabs button.on{
+  background:var(--c-tab-on-bg, var(--raised));
+  color:var(--c-tab-on-fg, var(--fg));
+  border-color:var(--c-tab-on-bd, rgba(255,255,255,.12));
+  font-weight:600;
+}
+.tabs button.alert-tab{color:var(--c-tab-alert, #f59e0b)}
+.tabs button.crit-tab{color:var(--c-tab-crit, #f43f5e);font-weight:600}
+
+/* 待處理佇列（單欄） */
+.aq-list{display:flex;flex-direction:column}
+.aq-item{
+  padding:10px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--c-div, rgba(255,255,255,.05));
+  border-left:var(--c-stripe-w, 2px) solid transparent;
+  transition:background .12s;
+}
+.aq-item:last-child{border-bottom:0}
+.aq-item:hover{background:var(--c-row-hover, rgba(255,255,255,.028))}
+.aq-main{min-width:0;flex:1}
+.aq-top{display:flex;align-items:center;gap:7px;min-width:0}
+.aq-title{font-size:11.5px;font-weight:600;color:var(--c-fg, var(--fg));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aq-fact{font-size:10.5px;color:var(--c-muted, var(--muted));margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aq-acts{display:flex;align-items:center;gap:6px;flex:none}
+
+.tag{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 6px;border-radius:var(--c-tag-r, 4px);
+  font-family:var(--mono);font-size:9.5px;font-weight:600;line-height:1.1;
+  border:1px solid transparent;white-space:nowrap;flex:none;
+}
+.dot-ind{width:6px;height:6px;border-radius:50%;flex:none;display:inline-block}
+
+.btn{
+  padding:4px 9px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:500;
+  border:1px solid var(--c-btn-bd, var(--border2));
+  background:var(--c-btn-bg, rgba(255,255,255,.04));
+  color:var(--c-btn-fg, var(--fg));
+  white-space:nowrap;transition:all .12s;display:inline-flex;align-items:center;gap:4px;
+}
+.btn:hover{border-color:var(--c-btn-hbd, var(--gold));color:var(--c-btn-hfg, var(--gold))}
+.btn.pri{
+  border-color:var(--c-pri-bd, rgba(232,180,94,.42));
+  background:var(--c-pri-bg, rgba(232,180,94,.12));
+  color:var(--c-pri-fg, #e8b45e);
+  font-weight:600;
+}
+.btn.pri:hover{background:var(--c-pri-hbg, #e8b45e);color:var(--c-pri-hfg, #12100b)}
+.btn.danger{
+  border-color:var(--c-dng-bd, rgba(244,63,94,.42));
+  background:var(--c-dng-bg, rgba(244,63,94,.12));
+  color:var(--c-dng-fg, #fda4af);
+}
+
+/* 近期流水區（單欄下方銜接） */
+.ev-wrap{
+  border-top:1px solid var(--c-border, var(--border));
+  background:var(--c-ev-bg, rgba(0,0,0,.16));
+  display:flex;flex-direction:column;
+}
+.ev-subbar{
+  padding:5px 12px;background:var(--c-ev-sub, rgba(0,0,0,.22));
+  border-bottom:1px solid var(--c-div, rgba(255,255,255,.05));
+  display:flex;align-items:center;justify-content:space-between;
+  font-family:var(--mono);font-size:9.5px;color:var(--c-faint, var(--faint));
+}
+.ev-more{background:none;border:0;color:var(--c-link, var(--gold));font-family:var(--mono);font-size:9.5px;padding:0}
+.ev-more:hover{text-decoration:underline}
+.ev-row{
+  padding:7px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border-bottom:1px solid var(--c-ev-div, rgba(255,255,255,.035));
+  font-family:var(--mono);font-size:10.5px;transition:background .1s;
+}
+.ev-row:last-child{border-bottom:0}
+.ev-row:hover{background:rgba(255,255,255,.024)}
+.ev-left{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
+.ev-time{color:var(--c-time, #646975);font-size:9.5px;flex:none}
+.ev-msg{color:var(--c-ev-fg, #cbd1dc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-msg.is-alert{color:var(--c-fg, #f4f5f7);font-weight:500}
+.ev-right{color:var(--c-time, #7d8390);font-size:9.5px;flex:none;white-space:nowrap}
+
+/* ============ 方案 A：克制金墨（Noir & Gold Refined） ============ */
+.theme-a{
+  --c-card:#18191e; --c-head:#1f2128; --c-border:#2b2e38; --c-div:rgba(255,255,255,.05);
+  --c-ev-bg:#131419; --c-ev-sub:#16181e; --c-link:#e8b45e;
+  --c-pri-bg:rgba(232,180,94,.12); --c-pri-bd:rgba(232,180,94,.38); --c-pri-fg:#e8b45e;
+}
+.theme-a .aq-item.p0{border-left-color:#f43f5e;background:rgba(244,63,94,.045)}
+.theme-a .aq-item.p1{border-left-color:#e89b3c;background:rgba(232,155,60,.025)}
+.theme-a .aq-item.p2{border-left-color:#e8b45e;background:transparent}
+.theme-a .aq-item.p3{border-left-color:#3a3f4b;background:transparent}
+.theme-a .tag.p0{background:rgba(244,63,94,.14);border-color:rgba(244,63,94,.34);color:#fda4af}
+.theme-a .tag.p1{background:rgba(232,155,60,.13);border-color:rgba(232,155,60,.34);color:#f6bd68}
+.theme-a .tag.p2{background:rgba(232,180,94,.11);border-color:rgba(232,180,94,.32);color:#e8b45e}
+.theme-a .tag.p3{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.10);color:#9ca3af}
+/* 方案 A 流水改沉靜極簡標籤，去霓虹夜市感 */
+.theme-a .ev-badge{font-size:9px;padding:1px 6px;border-radius:3px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#9ca3af;flex:none}
+.theme-a .ev-badge.warn{border-color:rgba(232,155,60,.32);background:rgba(232,155,60,.10);color:#f6bd68}
+.theme-a .ev-badge.buy{border-color:rgba(16,185,129,.25);background:rgba(16,185,129,.07);color:#6ee7b7}
+.theme-a .ev-badge.sell{border-color:rgba(244,63,94,.24);background:rgba(244,63,94,.07);color:#fda4af}
+
+/* ============ 方案 B：極簡單色訊號（Bloomberg / Linear Monochrome） ============ */
+.theme-b{
+  --c-card:#141518; --c-head:#1a1b1f; --c-border:#272930; --c-div:rgba(255,255,255,.055);
+  --c-tab-bg:#101114; --c-tab-on-bg:#2a2c34; --c-tab-alert:#e4e6eb;
+  --c-ev-bg:#111215; --c-ev-sub:#15161a; --c-link:#d4d7de;
+  --c-btn-bg:#1d1f26; --c-btn-bd:#31343f; --c-btn-fg:#d8dce4; --c-btn-hbd:#fff; --c-btn-hfg:#fff;
+  --c-pri-bg:#f4f5f7; --c-pri-bd:#f4f5f7; --c-pri-fg:#111215; --c-pri-hbg:#ffffff; --c-pri-hfg:#000;
+  --c-stripe-w:3px;
+}
+.theme-b .aq-item.p0{border-left-color:#ef4444;background:rgba(239,68,68,.04)}
+.theme-b .aq-item.p1{border-left-color:#f59e0b}
+.theme-b .aq-item.p2{border-left-color:#e4e6eb}
+.theme-b .aq-item.p3{border-left-color:#363944}
+.theme-b .tag{background:transparent;border:0;padding:0;font-size:10px;letter-spacing:.03em}
+.theme-b .tag.p0{color:#f87171}
+.theme-b .tag.p1{color:#fbbf24}
+.theme-b .tag.p2{color:#f4f5f7}
+.theme-b .tag.p3{color:#717582}
+.theme-b .ev-badge{font-size:9px;padding:0;color:#7c818f;min-width:30px;flex:none}
+.theme-b .ev-badge.warn{color:#fbbf24}
+.theme-b .ev-badge.buy{color:#34d399}
+.theme-b .ev-badge.sell{color:#fb7185}
+
+/* ============ 方案 C：冷曜石 × 冰藍分層（警戒暖橘 vs 核准冰藍，徹底分流） ============ */
+.theme-c{
+  --c-card:#151922; --c-head:#1b212d; --c-border:#283142; --c-div:rgba(148,179,224,.08);
+  --c-tab-bg:#10141c; --c-tab-bd:#252e3e; --c-tab-on-bg:#243045; --c-tab-on-bd:rgba(96,165,250,.32);
+  --c-tab-alert:#fbbf24; --c-ev-bg:#11151d; --c-ev-sub:#151b26; --c-link:#60a5fa;
+  --c-btn-bg:#1b2230; --c-btn-bd:#2d394d; --c-btn-fg:#d7e1f0; --c-btn-hbd:#60a5fa; --c-btn-hfg:#93c5fd;
+  --c-pri-bg:rgba(96,165,250,.14); --c-pri-bd:rgba(96,165,250,.40); --c-pri-fg:#93c5fd; --c-pri-hbg:#60a5fa; --c-pri-hfg:#0c1320;
+}
+.theme-c .aq-item.p0{border-left-color:#fb7185;background:rgba(251,113,133,.05)}
+.theme-c .aq-item.p1{border-left-color:#fbbf24;background:rgba(251,191,36,.03)}
+.theme-c .aq-item.p2{border-left-color:#60a5fa;background:rgba(96,165,250,.03)}
+.theme-c .aq-item.p3{border-left-color:#475569}
+.theme-c .tag.p0{background:rgba(251,113,133,.14);border-color:rgba(251,113,133,.34);color:#fda4af}
+.theme-c .tag.p1{background:rgba(251,191,36,.13);border-color:rgba(251,191,36,.34);color:#fcd34d}
+.theme-c .tag.p2{background:rgba(96,165,250,.14);border-color:rgba(96,165,250,.36);color:#93c5fd}
+.theme-c .tag.p3{background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.20);color:#94a3b8}
+.theme-c .ev-badge{font-size:9px;padding:1px 6px;border-radius:99px;background:rgba(148,163,184,.09);color:#94a3b8;flex:none}
+.theme-c .ev-badge.risk{background:rgba(96,165,250,.12);color:#93c5fd}
+.theme-c .ev-badge.warn{background:rgba(251,191,36,.13);color:#fcd34d}
+.theme-c .ev-badge.buy{background:rgba(52,211,153,.11);color:#6ee7b7}
+.theme-c .ev-badge.sell{background:rgba(251,113,133,.11);color:#fda4af}
+
+/* ============ 方案 D：低飽和莫蘭迪金融（Muted Editorial） ============ */
+.theme-d{
+  --c-card:#1b1a1c; --c-head:#222124; --c-border:#312f34; --c-div:rgba(255,255,255,.05);
+  --c-fg:#eceae6; --c-muted:#9b9791; --c-faint:#706c66; --c-time:#7a7670; --c-ev-fg:#c9c5be;
+  --c-tab-bg:#161517; --c-tab-on-bg:#2c2a2e; --c-tab-alert:#cfa668;
+  --c-ev-bg:#161517; --c-ev-sub:#1b1a1c; --c-link:#cfa668;
+  --c-btn-bg:#242326; --c-btn-bd:#38363b; --c-btn-fg:#dedad3; --c-btn-hbd:#cfa668; --c-btn-hfg:#e5c58d;
+  --c-pri-bg:rgba(207,166,104,.14); --c-pri-bd:rgba(207,166,104,.32); --c-pri-fg:#dfb97b; --c-pri-hbg:#cfa668; --c-pri-hfg:#181614;
+  --c-tag-r:3px;
+}
+.theme-d .aq-item.p0{border-left-color:#c96773;background:rgba(201,103,115,.045)}
+.theme-d .aq-item.p1{border-left-color:#c9985a;background:rgba(201,152,90,.025)}
+.theme-d .aq-item.p2{border-left-color:#7d9cb8;background:rgba(125,156,184,.025)}
+.theme-d .aq-item.p3{border-left-color:#4b484f}
+.theme-d .tag.p0{background:rgba(201,103,115,.15);color:#e29aa3}
+.theme-d .tag.p1{background:rgba(201,152,90,.15);color:#e0b882}
+.theme-d .tag.p2{background:rgba(125,156,184,.16);color:#a7c3dc}
+.theme-d .tag.p3{background:rgba(255,255,255,.05);color:#9b9791}
+.theme-d .ev-badge{font-size:9px;padding:1px 6px;border-radius:3px;background:rgba(255,255,255,.045);color:#a8a49d;flex:none}
+.theme-d .ev-badge.risk{background:rgba(125,156,184,.13);color:#a7c3dc}
+.theme-d .ev-badge.warn{background:rgba(201,152,90,.14);color:#e0b882}
+.theme-d .ev-badge.buy{background:rgba(94,168,138,.13);color:#8ac9af}
+.theme-d .ev-badge.sell{background:rgba(201,103,115,.13);color:#df969f}
+
+/* ============ 方案 E：微卡片槽 × 香檳金主次分明（Inset Cards） ============ */
+.theme-e{
+  --c-card:#17181c; --c-head:#1e2026; --c-border:#2b2e36; --c-div:transparent;
+  --c-ev-bg:#131418; --c-ev-sub:#17181d; --c-link:#e8b45e;
+  --c-pri-bg:#e8b45e; --c-pri-bd:#e8b45e; --c-pri-fg:#14120c; --c-pri-hbg:#f2c77b; --c-pri-hfg:#14120c;
+  --c-btn-bg:#21232b; --c-btn-bd:#313540; --c-btn-fg:#d8dce4;
+  --c-stripe-w:0px;
+}
+.theme-e .aq-list{padding:8px 10px;gap:6px}
+.theme-e .aq-item{
+  border-radius:6px;border:1px solid #282b34;background:#1d1f26;padding:9px 11px;
+}
+.theme-e .aq-item.p0{border-color:rgba(244,63,94,.42);background:rgba(244,63,94,.07)}
+.theme-e .aq-item.p1{border-color:rgba(245,158,11,.34);background:rgba(245,158,11,.04)}
+.theme-e .aq-item.p2{border-color:rgba(232,180,94,.34);background:rgba(232,180,94,.04)}
+.theme-e .tag.p0{background:#f43f5e;color:#fff}
+.theme-e .tag.p1{background:rgba(245,158,11,.18);color:#fbbf24}
+.theme-e .tag.p2{background:rgba(232,180,94,.16);color:#e8b45e}
+.theme-e .tag.p3{background:rgba(255,255,255,.06);color:#9ca3af}
+.theme-e .ev-badge{font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.05);color:#9ca3af;flex:none}
+.theme-e .ev-badge.warn{color:#fbbf24;background:rgba(245,158,11,.12)}
+.theme-e .ev-badge.buy{color:#34d399;background:rgba(16,185,129,.10)}
+.theme-e .ev-badge.sell{color:#fb7185;background:rgba(244,63,94,.10)}
+
+/* ============ 方案 F：瑞士極淨點線排版（Zero-Pill Typographic） ============ */
+.theme-f{
+  --c-card:#16171b; --c-head:#1c1d22; --c-border:#282a32; --c-div:rgba(255,255,255,.06);
+  --c-tab-bg:transparent; --c-tab-bd:transparent; --c-tab-on-bg:rgba(255,255,255,.08); --c-tab-on-bd:transparent;
+  --c-ev-bg:#141519; --c-ev-sub:#18191e; --c-link:#e5e7eb;
+  --c-btn-bg:transparent; --c-btn-bd:#333642; --c-btn-fg:#d1d5db; --c-btn-hbd:#e8b45e; --c-btn-hfg:#e8b45e;
+  --c-pri-bg:transparent; --c-pri-bd:#e8b45e; --c-pri-fg:#e8b45e; --c-pri-hbg:rgba(232,180,94,.14); --c-pri-hfg:#f3ca7e;
+  --c-stripe-w:0px;
+}
+.theme-f .tag{padding:0;border:0;background:transparent;font-size:10px}
+.theme-f .tag.p0{color:#fb7185}
+.theme-f .tag.p1{color:#f59e0b}
+.theme-f .tag.p2{color:#e8b45e}
+.theme-f .tag.p3{color:#8b909c}
+.theme-f .ev-badge{font-size:9.5px;padding:0;color:#808594;min-width:30px;flex:none}
+.theme-f .ev-badge.warn{color:#f59e0b}
+.theme-f .ev-badge.buy{color:#34d399}
+.theme-f .ev-badge.sell{color:#fb7185}
+
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:80;
+  background:#22242c;border:1px solid rgba(232,180,94,.45);color:var(--fg);
+  padding:7px 14px;border-radius:6px;font-family:var(--mono);font-size:11px;
+  box-shadow:0 12px 32px rgba(0,0,0,.6);display:none;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>catOS · 待處理與事件審計 · 6 套配色方案實機對照</div>
+  <div class="ctrl-group">
+    <label class="chk"><input type="checkbox" id="toggleP0"> 模擬插入 P0 風控鎖存（看紅燈配色）</label>
+    <label class="chk"><input type="checkbox" id="toggleFeed" checked> 待處理頁下方銜接近期流水</label>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <h1>固定維持「原本單欄結構」，只比較配色層次、標籤語意與按鈕輕重</h1>
+    <p>每張卡皆可實際切換頂部分頁與點擊按鈕；直接告訴我偏好哪一套（例如「選 C」或「A 的底色＋C 的冰藍待核准」）。</p>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SCHEMES = [
+  {
+    id: 'a', code: '方案 A', name: '克制金墨（Noir & Gold 精煉版）',
+    desc: '沿用 8770 黑金底色，把下方流水改為極淡低彩標籤，拿掉原本紅綠藍黃搶眼的雜訊。',
+    swatches: ['#18191e', '#f43f5e', '#e89b3c', '#e8b45e', '#6ee7b7'],
+    dotStyle: false,
+  },
+  {
+    id: 'b', code: '方案 B', name: '極簡單色訊號（Bloomberg / Linear）',
+    desc: '90% 高質感純灰階，只有左側 3px 精準色條＋純白主按鈕，零彩色膠囊、最肅殺耐看。',
+    swatches: ['#141518', '#ef4444', '#fbbf24', '#f4f5f7', '#7c818f'],
+    dotStyle: false,
+  },
+  {
+    id: 'c', code: '方案 C', name: '冷曜石 × 冰藍分流（警戒暖橘 / 核准冰藍）',
+    desc: '徹底解決「偏差警戒」與「待核准」都是黃橘色分不清的問題：風險用暖琥珀、核准用冰藍。',
+    swatches: ['#151922', '#fb7185', '#fbbf24', '#60a5fa', '#6ee7b7'],
+    dotStyle: false,
+  },
+  {
+    id: 'd', code: '方案 D', name: '莫蘭迪低飽和金融（Muted Editorial）',
+    desc: '全面降彩度約 35%，酒紅、沙金、灰藍、鼠尾草綠無框霧底，長盯盤最不刺眼。',
+    swatches: ['#1b1a1c', '#c96773', '#cfa668', '#7d9cb8', '#5ea88a'],
+    dotStyle: false,
+  },
+  {
+    id: 'e', code: '方案 E', name: '微卡片槽 × 香檳金實心主鈕',
+    desc: '待處理項改為獨立微圓角卡片槽，搭配香檳金實心按鈕，與下方緊湊流水拉開立體層次。',
+    swatches: ['#17181c', '#1d1f26', '#f43f5e', '#e8b45e', '#34d399'],
+    dotStyle: false,
+  },
+  {
+    id: 'f', code: '方案 F', name: '瑞士極淨點線排版（Zero-Pill）',
+    desc: '完全移除所有彩色膠囊，改以 6px 實心狀態圓點＋清晰字重對比，像頂級券商審計報表。',
+    swatches: ['#16171b', '#fb7185', '#f59e0b', '#e8b45e', '#34d399'],
+    dotStyle: true,
+  },
+];
+
+const P0_ROW = {
+  sev: 'p0', tag: '風控鎖存', dot: '#f43f5e',
+  title: '帳戶 Soft Latch 已觸發 · 禁止增倉',
+  fact: '風控期間損益 -5.12% 觸及 5.00% 門檻 · 需人工檢核並於 CLI 解除',
+  btns: [{ label: '前往風控', cls: 'danger' }],
+};
+
+const BASE_ACTIONS = [
+  {
+    sev: 'p1', tag: '偏差警戒', dot: '#f59e0b',
+    title: 'mean-reversion-rsi · ETH-USDT-SWAP 1H',
+    fact: '模擬偏差 -0.61%（警戒線 0.50% / 門檻 1.00%）· 近 3 筆滑價偏高',
+    btns: [{ label: '檢視比對', cls: '' }],
+  },
+  {
+    sev: 'p2', tag: '待核准', dot: '#e8b45e',
+    title: 'donchian-ensemble · BTC-USDT-SWAP 1D',
+    fact: '4/4 驗證通過 · 年化 +13.9% · 最大回撤 -11.3% · PBO 22%',
+    btns: [
+      { label: '檢視策略', cls: '' },
+      { label: '複製核准指令', cls: 'pri', copy: true },
+    ],
+  },
+  {
+    sev: 'p3', tag: '研究提案', dot: '#71717a',
+    title: 'vol-breakout · SOL-USDT-SWAP 4H',
+    fact: 'Agent 提交 · strategies/ 資料夾策略 · 依規則預設只做多',
+    btns: [{ label: '檢視策略', cls: '' }],
+  },
+];
+
+const EVENTS = [
+  { t: '08:00:02', type: 'risk', label: '風控', msg: 'run pickdon4 · reconciling → running（帳本與 OKX 部位、餘額一致）', right: '' },
+  { t: '07:59:58', type: 'warn', label: 'WARN', msg: '#29 NO_INTENT · ETH 1H 收 3,124.8 (RSI 46)，偏差 -0.61% 超過 0.5% 提醒線', right: '', alert: true },
+  { t: '00:00:03', type: 'risk', label: '風控', msg: '日基準建立 · day 20241116 · 權益 $11,029.26', right: '' },
+  { t: '16:00:01', type: 'sell', label: '賣出', msg: 'ETH-USDT-SWAP 賣出 3 張 @ $3,128.00', right: '權益 $11,094.28' },
+  { t: '12:00:01', type: 'buy',  label: '買入', msg: 'ETH-USDT-SWAP 買入 3 張 @ $3,052.00', right: '權益 $11,094.28' },
+  { t: '04:00:01', type: 'sell', label: '賣出', msg: 'ETH-USDT-SWAP 賣出 3 張 @ $2,830.50', right: '權益 $10,378.12' },
+];
+
+const state = {
+  p0: false,
+  showFeed: true,
+  tabs: Object.fromEntries(SCHEMES.map(s => [s.id, 'ACTION'])),
+};
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+function renderEvRow(ev, scheme) {
+  const dotColor = ev.type === 'warn' ? '#f59e0b' : ev.type === 'buy' ? '#34d399' : ev.type === 'sell' ? '#fb7185' : '#71717a';
+  const badgeHtml = scheme.dotStyle
+    ? `<span class="dot-ind" style="background:${dotColor}"></span><span class="ev-badge ${ev.type}">${ev.label}</span>`
+    : `<span class="ev-badge ${ev.type}">${ev.label}</span>`;
+  return `
+    <div class="ev-row">
+      <div class="ev-left">
+        <span class="ev-time">${ev.t}</span>
+        ${badgeHtml}
+        <span class="ev-msg ${ev.alert ? 'is-alert' : ''}">${ev.msg}</span>
+      </div>
+      ${ev.right ? `<span class="ev-right">${ev.right}</span>` : ''}
+    </div>
+  `;
+}
+
+function renderAll() {
+  const actions = state.p0 ? [P0_ROW, ...BASE_ACTIONS] : BASE_ACTIONS;
+  const grid = document.getElementById('grid');
+
+  grid.innerHTML = SCHEMES.map(s => {
+    const activeTab = state.tabs[s.id];
+    const filteredEvents = activeTab === 'ALERT' ? EVENTS.filter(e => e.alert)
+      : activeTab === 'ORDER' ? EVENTS.filter(e => e.type === 'buy' || e.type === 'sell')
+      : activeTab === 'RISK' ? EVENTS.filter(e => e.type === 'risk')
+      : EVENTS;
+
+    const tabsHtml = [
+      ['ACTION', `待處理(${actions.length})`, state.p0 ? 'crit-tab' : 'alert-tab'],
+      ['ALL', '全部(225)', ''],
+      ['ALERT', '異常(1)', 'alert-tab'],
+      ['ORDER', '成交(10)', ''],
+      ['RISK', '風控(3)', ''],
+    ].map(([id, label, cls]) =>
+      `<button type="button" class="${activeTab === id ? 'on' : cls}" onclick="setTab('${s.id}','${id}')">${label}</button>`
+    ).join('');
+
+    const bodyHtml = activeTab === 'ACTION'
+      ? `
+        <div class="aq-list">
+          ${actions.map(item => `
+            <div class="aq-item ${item.sev}">
+              <div class="aq-main">
+                <div class="aq-top">
+                  <span class="tag ${item.sev}">
+                    ${s.dotStyle ? `<span class="dot-ind" style="background:${item.dot}"></span>` : ''}
+                    ${item.tag}
+                  </span>
+                  <span class="aq-title">${item.title}</span>
+                </div>
+                <div class="aq-fact">${item.fact}</div>
+              </div>
+              <div class="aq-acts">
+                ${item.btns.map(b => `<button type="button" class="btn ${b.cls}" onclick="showToast('${b.copy ? '已複製 CLI 核准指令' : '前往：' + b.label}')">${b.label}</button>`).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        ${state.showFeed ? `
+          <div class="ev-wrap">
+            <div class="ev-subbar">
+              <span>近期審計與成交流水 · 225 筆</span>
+              <button type="button" class="ev-more" onclick="setTab('${s.id}','ALL')">展開全部 →</button>
+            </div>
+            ${EVENTS.map(ev => renderEvRow(ev, s)).join('')}
+          </div>
+        ` : ''}
+      `
+      : `
+        <div class="ev-wrap" style="border-top:0">
+          ${filteredEvents.map(ev => renderEvRow(ev, s)).join('')}
+        </div>
+      `;
+
+    return `
+      <section class="scheme-block">
+        <div class="scheme-meta">
+          <div class="scheme-title">
+            <span class="scheme-code">${s.code}</span>
+            <span>${s.name}</span>
+          </div>
+          <div class="swatches" title="主色票">
+            ${s.swatches.map(c => `<span class="sw" style="background:${c}"></span>`).join('')}
+          </div>
+        </div>
+        <div class="scheme-desc">${s.desc}</div>
+        <div class="card theme-${s.id}">
+          <div class="card-h">
+            <span class="card-h-title">待處理與事件審計</span>
+            <div class="tabs">${tabsHtml}</div>
+          </div>
+          ${bodyHtml}
+        </div>
+      </section>
+    `;
+  }).join('');
+}
+
+window.setTab = (schemeId, tabId) => {
+  state.tabs[schemeId] = tabId;
+  renderAll();
+};
+
+document.getElementById('toggleP0').addEventListener('change', e => {
+  state.p0 = e.target.checked;
+  renderAll();
+});
+document.getElementById('toggleFeed').addEventListener('change', e => {
+  state.showFeed = e.target.checked;
+  renderAll();
+});
+
+renderAll();
+</script>
+</body>
+</html>

@@ -328,10 +328,9 @@ interface UnifiedIncidentActivityCardProps {
 }
 
 /**
- * 待處理與事件審計卡片 (3A 定案 · 比例驅動全形態自適應)
- * - 寬扁橫式 (width >= 700 && width / height >= 1.55)：待處理分頁自動切換為左右雙欄（左佇列、右近期流水）
- * - 標準直式：上待處理佇列＋下近期審計流水
- * - 窄卡 (< 440px)：待處理項目按鈕自動換行至底部，文字絕不被擠壓截斷
+ * 待處理與事件審計卡片 (3A 定案：單欄待處理佇列＋下方近期審計流水)
+ * - 固定維持單欄縱向結構，不於寬卡拆為左右兩欄
+ * - 窄卡 (< 450px)：待處理項目按鈕自動換行至底部，文字不被擠壓截斷
  */
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
   const events = useCatStore((s) => s.events);
@@ -370,11 +369,10 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return () => observer.disconnect();
   }, []);
 
-  const { width: cardW, height: cardH } = dimensions;
+  const { width: cardW } = dimensions;
   const isNarrow = cardW < 520;
   const isStackActionBtns = cardW < 450;
   const isSuperNarrow = cardW < 360;
-  const isWideSplit = cardW >= 700 && cardW / Math.max(1, cardH) >= 1.55;
 
   const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
 
@@ -601,9 +599,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
   const showEmpty = connectionStatus === 'mode_not_open' || filteredRows.length === 0;
 
-  // 在寬扁橫式雙欄時，每欄實際寬度約一半，按鈕需跟著判斷是否換行
-  const actionBtnStack = isStackActionBtns || (isWideSplit && cardW < 920);
-
   return (
     <div ref={cardRef} className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
       {/* 1. Header：自適應 5 核心分頁 */}
@@ -639,16 +634,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         </div>
       </div>
 
-      {/* 2. 主內容區：寬扁比例自動切換左右雙欄，直式維持上下分區 */}
+      {/* 2. 主內容區：單欄待處理佇列＋下方近期審計流水 */}
       {category === 'ACTION' ? (
-        <div
-          className={cn(
-            'flex-1 min-h-0 overflow-hidden',
-            isWideSplit ? 'grid grid-cols-2 divide-x divide-border/80' : 'flex flex-col overflow-y-auto custom-scrollbar'
-          )}
-        >
-          {/* 區塊 A：待處理佇列 */}
-          <div className={cn('divide-y divide-border/50', isWideSplit ? 'min-h-0 overflow-y-auto custom-scrollbar' : 'shrink-0')}>
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
+          {/* 上半：待處理佇列 */}
+          <div className="divide-y divide-border/50 shrink-0">
             {actionItems.length === 0 ? (
               <div className="py-6 text-center text-t2 text-muted-foreground">
                 無待處理項目
@@ -660,8 +650,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                   <div
                     key={item.id}
                     className={cn(
-                      'px-3 py-2.5 flex gap-2 transition-colors hover:bg-white/[0.03]',
-                      actionBtnStack ? 'flex-col items-stretch' : 'items-center justify-between',
+                      'px-3 py-2.5 flex gap-2.5 transition-colors hover:bg-white/[0.03]',
+                      isStackActionBtns ? 'flex-col items-stretch' : 'items-center justify-between',
                       severityRowClass(item.sev)
                     )}
                   >
@@ -679,7 +669,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       </p>
                     </div>
 
-                    <div className={cn('flex items-center gap-1.5 shrink-0', actionBtnStack && 'justify-end')}>
+                    <div className={cn('flex items-center gap-1.5 shrink-0', isStackActionBtns && 'justify-end')}>
                       {item.primaryAction && (
                         <button
                           type="button"
@@ -719,9 +709,9 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
             )}
           </div>
 
-          {/* 區塊 B：近期審計與成交流水 */}
-          <div className={cn('flex flex-col bg-background/15 min-h-0', isWideSplit ? 'overflow-y-auto custom-scrollbar' : 'flex-1 border-t border-border/80')}>
-            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0 sticky top-0 z-10 backdrop-blur-xs">
+          {/* 下半：近期審計與成交流水 */}
+          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/15">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0">
               <span className="text-t1 font-mono text-muted-foreground">
                 近期審計與成交流水 · {events.length} 筆
               </span>
