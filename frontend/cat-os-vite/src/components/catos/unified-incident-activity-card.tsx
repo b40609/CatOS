@@ -4,6 +4,7 @@ import type { EventDTO, EventLevel } from '@/contracts';
 import { useOverviewSignals } from '@/lib/overview-signals';
 import { useRouter } from '@/lib/router';
 import { CardHeaderTitle } from './card-header-title';
+import { CardHeaderTabs } from './card-header-tabs';
 import { ArrowRight, Check, ChevronDown, ChevronUp, Copy, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatClock, formatDateTime, formatDecimal, shortId } from '@/lib/format';
@@ -608,30 +609,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
           title={isSuperNarrow ? '待處理 / 審計' : '待處理與事件審計'}
         />
 
-        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
-          {(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => {
-            const isActive = category === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleSelectTab(tab.id)}
-                className={cn(
-                  'px-1.5 sm:px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0',
-                  isActive
-                    ? 'bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]'
-                    : tab.isCritical
-                    ? 'text-rose-400 hover:text-rose-300 font-semibold'
-                    : tab.isAlert
-                    ? 'text-amber-300/90 hover:text-amber-200'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {isNarrow ? tab.shortLabel : tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <CardHeaderTabs
+          items={(isSuperNarrow ? availableTabs.slice(0, 4) : availableTabs).map((tab) => ({
+            id: tab.id,
+            label: isNarrow ? tab.shortLabel : tab.label,
+            tone: tab.isCritical ? 'critical' : tab.isAlert ? 'alert' : 'default',
+          }))}
+          value={category}
+          onChange={handleSelectTab}
+        />
       </div>
 
       {/* 2. 主內容區：單欄待處理佇列＋下方近期審計流水 */}

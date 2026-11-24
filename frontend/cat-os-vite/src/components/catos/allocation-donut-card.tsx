@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { CardHeaderTitle } from "./card-header-title";
+import { CardHeaderTabs } from "./card-header-tabs";
 import { cn } from "@/lib/utils";
 import { useCatStore } from "@/state/catStore";
 import type { BotControlState, DecimalString, PositionDTO, RiskStatus } from "@/contracts";
@@ -780,29 +781,17 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           }
         />
 
-        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 text-t2 font-mono">
-          {TABS.map((tab) => {
-            const isActive = viewMode === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setViewMode(tab.id);
-                  setHoveredIndex(null);
-                }}
-                className={cn(
-                  "px-1.5 sm:px-2 py-0.5 rounded transition-colors cursor-pointer font-medium select-none text-t2 whitespace-nowrap",
-                  isActive
-                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
-                )}
-              >
-                {isSuperNarrow ? tab.shortLabel : tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <CardHeaderTabs
+          items={TABS.map((tab) => ({
+            id: tab.id,
+            label: isSuperNarrow ? tab.shortLabel : tab.label,
+          }))}
+          value={viewMode}
+          onChange={(id) => {
+            setViewMode(id);
+            setHoveredIndex(null);
+          }}
+        />
       </div>
 
       {/* 2. 主內容區：依寬高比自動切換 Y 版直式上下 / 超扁 2 欄 / 標準橫排 */}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { CardHeaderTitle } from "./card-header-title";
+import { CardHeaderTabs } from "./card-header-tabs";
 import { useCatStore } from "@/state/catStore";
 import { useOverviewSignals } from "@/lib/overview-signals";
 import { useRouter } from "@/lib/router";
@@ -225,32 +226,14 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
             ) : undefined
           }
         />
-        <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveOnly(false)}
-            className={cn(
-              "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap",
-              !activeOnly
-                ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            全部({allRows.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveOnly(true)}
-            className={cn(
-              "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap",
-              activeOnly
-                ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            進行中({activeCount})
-          </button>
-        </div>
+        <CardHeaderTabs<"all" | "active">
+          items={[
+            { id: "all", label: `全部(${allRows.length})` },
+            { id: "active", label: `進行中(${activeCount})` },
+          ]}
+          value={activeOnly ? "active" : "all"}
+          onChange={(id) => setActiveOnly(id === "active")}
+        />
       </div>
 
       {/* 寬版 5 階段表頭 */}

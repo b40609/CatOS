@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
+import { CardHeaderTabs } from "./card-header-tabs";
 import {
   ACCOUNT_SOURCE_LABEL,
   BOT_STATE_LABEL,
@@ -191,29 +192,15 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
               ) : undefined
             }
           />
-          <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 whitespace-nowrap">
-            {(
-              [
-                { id: "all", label: dims.width < 360 ? `全(${bots.length})` : `全部(${bots.length})` },
-                { id: "open", label: dims.width < 360 ? `倉(${openCount})` : `持倉中(${openCount})` },
-                { id: "orders", label: dims.width < 360 ? "掛(0)" : "掛單(0)" },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  "px-1.5 sm:px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
-                  filter === f.id
-                    ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          <CardHeaderTabs<BotsPositionsFilter>
+            items={[
+              { id: "all", label: dims.width < 360 ? `全(${bots.length})` : `全部(${bots.length})` },
+              { id: "open", label: dims.width < 360 ? `倉(${openCount})` : `持倉中(${openCount})` },
+              { id: "orders", label: dims.width < 360 ? "掛(0)" : "掛單(0)" },
+            ]}
+            value={filter}
+            onChange={setFilter}
+          />
         </div>
       )}
 
