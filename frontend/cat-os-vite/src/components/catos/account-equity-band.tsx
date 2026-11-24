@@ -24,8 +24,10 @@ function formatShortAxisDate(ms: number | null | undefined, multiDay: boolean): 
 
 /**
  * 帳戶權益與損益 (AccountEquityBand)
- * 資料來源：GET /state 的 summary（KPI）與 events 中最近一次 run 的 signal.account.equity 序列（曲線）。
- * 金額全程為 Decimal 字串，只做格式化；曲線幾何以 toPlotNumber 轉換，標籤仍使用原字串。
+ * 依卡片寬高比自動切換三種形態：
+ * - 直式/窄卡 (width < 480 && height >= 260)：上下堆疊（上 KPI 摘要、下滿寬曲線）
+ * - 超扁橫卡 (height < 210)：緊湊單欄主 KPI＋全高走勢圖
+ * - 標準／寬卡：左側自適應寬度 KPI 欄＋右側走勢圖
  */
 export function AccountEquityBand({ className, showHeader = true }: AccountEquityBandProps) {
   const summary = useCatStore((s) => s.summary);
@@ -35,11 +37,11 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   const connection = useCatStore((s) => s.connection);
 
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [chartWidth, setChartWidth] = useState(600);
-  const [chartHeight, setChartHeight] = useState(240);
+  const [chartWidth, setChartWidth] = useState(500);
+  const [chartHeight, setChartHeight] = useState(200);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const bandRef = useRef<HTMLDivElement>(null);
-  const [bandDimensions, setBandDimensions] = useState({ width: 600, height: 240 });
+  const [bandDimensions, setBandDimensions] = useState({ width: 640, height: 260 });
 
   const bot = bots[0] ?? null;
   const runId = bot?.current_run_id ?? null;
@@ -57,6 +59,12 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     return () => observer.disconnect();
   }, []);
 
+  const { width: cardW, height: cardH } = bandDimensions;
+  const isStacked = (cardW < 480 && cardH >= 260) || (cardH > 340 && cardH / Math.max(1, cardW) >= 0.78);
+  const isShort = !isStacked && cardH < 210;
+  const isNarrow = cardW < 520;
+  const isWide = !isStacked && cardW >= 780;
+
   useEffect(() => {
     const el = chartContainerRef.current;
     if (!el) return;
@@ -69,15 +77,11 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     const ro = new ResizeObserver(updateSize);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [isStacked, isShort]);
 
-  const isNarrow = bandDimensions.width < 520;
-  const isShort = bandDimensions.height < 170;
-  const isCompact = isNarrow || isShort;
-
-  const height = Math.max(120, chartHeight);
-  const axisW = isNarrow ? 42 : 52;
-  const xAxisH = 20;
+  const height = Math.max(68, chartHeight);
+  const axisW = chartWidth < 260 ? 38 : isNarrow ? 44 : 52;
+  const xAxisH = height < 100 ? 15 : 20;
   const plotW = Math.max(1, chartWidth - axisW);
   const plotH = Math.max(1, height - xAxisH);
 
@@ -89,7 +93,6 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, [curve]);
   const n = points.length;
 
-  // 若曲線跨度超過 36 小時，X 軸改顯示日期 MM/DD 避免只看到重複時分
   const isMultiDay = useMemo(() => {
     if (curve.length < 2) return false;
     const span = (curve[curve.length - 1]?.time_ms ?? 0) - (curve[0]?.time_ms ?? 0);
@@ -97,7 +100,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, [curve]);
 
   const niceStep = (span: number) => {
-    const raw = span / 3;
+    const raw = span / (plotH < 100 ? 2 : 3);
     const mag = 10 ** Math.floor(Math.log10(raw || 1));
     const stepN = raw / mag;
     return (stepN < 1.5 ? 1 : stepN < 3 ? 2 : stepN < 7 ? 5 : 10) * mag;
@@ -114,10 +117,11 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     const ticks: number[] = [];
     for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(Number(t.toFixed(6)));
     return { lo, hi, ticks };
-  }, [points]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, plotH]);
 
   const getX = (k: number) => (n > 1 ? (k / (n - 1)) * plotW : plotW / 2);
-  const getY = (v: number) => 10 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * (plotH - 22);
+  const getY = (v: number) => 8 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * Math.max(10, plotH - 18);
 
   const line = useMemo(() => {
     let d = "";
@@ -134,14 +138,14 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   const areaPath = useMemo(() => {
     const firstK = points.findIndex((v) => !Number.isNaN(v));
     if (firstK < 0 || !line) return "";
-    const zeroY = Math.min(plotH - 8, Math.max(8, getY(0)));
+    const zeroY = Math.min(plotH - 6, Math.max(6, getY(0)));
     return `${line}L${getX(n - 1).toFixed(1)},${zeroY.toFixed(1)}L${getX(firstK).toFixed(1)},${zeroY.toFixed(1)}Z`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line, n, plotW, plotH, yBounds]);
 
   const xTicks = useMemo(() => {
     if (n === 0) return [] as number[];
-    const fractions = plotW < 280 ? [0, 1] : plotW < 460 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
+    const fractions = plotW < 240 ? [0, 1] : plotW < 420 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
     return [...new Set(fractions.map((f) => Math.round(f * (n - 1))))];
   }, [n, plotW]);
 
@@ -172,11 +176,11 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     : curve.length === 0 ? "本次 run 尚無已收盤 K 線觀測"
     : null;
 
-  const Kpi = ({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) => (
+  const Kpi = ({ label, value, sub, tone, hideSub }: { label: string; value: string; sub?: string; tone?: string; hideSub?: boolean }) => (
     <div className="flex flex-col gap-0.5 min-w-0">
       <span className="text-t2 text-muted-foreground font-sans truncate">{label}</span>
-      <span className={cn("text-xs font-semibold leading-tight tabular-nums truncate", tone ?? "text-foreground")}>{value}</span>
-      {sub && <span className="text-t1 text-muted-foreground/75 truncate leading-tight" title={sub}>{sub}</span>}
+      <span className={cn("font-semibold leading-tight tabular-nums truncate", isWide ? "text-sm" : "text-xs", tone ?? "text-foreground")}>{value}</span>
+      {!hideSub && sub && <span className="text-t1 text-muted-foreground/75 truncate leading-tight" title={sub}>{sub}</span>}
     </div>
   );
 
@@ -188,7 +192,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
             cardId="equity"
             title="帳戶權益與損益"
             subtext={
-              !isNarrow ? (
+              cardW >= 380 ? (
                 <span className={cn(
                   "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap inline-flex items-center gap-1",
                   connection.status === "ok"
@@ -203,65 +207,98 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
           />
           <div className="flex items-center gap-1 bg-background/60 border border-border/60 rounded px-2 py-0.5 text-t2 font-mono shrink-0">
             <span className="text-foreground font-semibold">{bot ? bot.bot_id : "sim"}</span>
-            <span className="text-border">·</span>
-            <span className="text-muted-foreground whitespace-nowrap">
-              {runId ? `${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
-            </span>
+            {cardW >= 340 && (
+              <>
+                <span className="text-border">·</span>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {runId ? `${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        {/* 左側 KPI 欄：全部來自 summary（後端 Decimal 計算），精簡副標杜絕中文單字斷行 */}
+      {/* 依寬高比自動切換：直式上下堆疊 vs 橫式左右並排 */}
+      <div className={cn("flex flex-1 min-h-0 overflow-hidden relative", isStacked ? "flex-col" : "flex-row")}>
+        {/* KPI 區塊 */}
         <div className={cn(
-          "shrink-0 border-r border-border/70 flex flex-col justify-between overflow-y-auto bg-background/20 custom-scrollbar",
-          isNarrow ? "w-[144px] px-2.5 py-2.5 gap-2" : "w-[216px] px-3 py-3 gap-2.5"
+          "shrink-0 bg-background/20 overflow-y-auto custom-scrollbar",
+          isStacked
+            ? "w-full border-b border-border/70 px-3 py-2.5 flex flex-col gap-2"
+            : isShort
+            ? "w-[178px] border-r border-border/70 px-2.5 py-2 flex flex-col justify-center gap-1.5"
+            : isWide
+            ? "w-[252px] border-r border-border/70 px-3.5 py-3 flex flex-col justify-between gap-2.5"
+            : isNarrow
+            ? "w-[168px] border-r border-border/70 px-2.5 py-2.5 flex flex-col justify-between gap-2"
+            : "w-[216px] border-r border-border/70 px-3 py-3 flex flex-col justify-between gap-2.5"
         )}>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-t2 text-muted-foreground font-sans">帳戶總權益</span>
-            <div className={cn("font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight mt-0.5", isNarrow ? "text-lg" : "text-2xl")}>
-              {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
+          <div className={cn("flex", isStacked ? "items-baseline justify-between gap-2 flex-wrap" : "flex-col gap-0.5")}>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              {!isShort && <span className="text-t2 text-muted-foreground font-sans">帳戶總權益</span>}
+              <div className={cn(
+                "font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight",
+                isShort ? "text-lg" : isWide ? "text-3xl" : isNarrow ? "text-xl" : "text-2xl"
+              )}>
+                {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
+              </div>
             </div>
-            <div className={cn("font-mono font-semibold tabular-nums mt-0.5", isNarrow ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
+            <div className={cn("font-mono font-semibold tabular-nums", isShort ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
               {summary?.period_pnl != null
                 ? `${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(summary.period_pnl_ratio)})`
                 : "風控期間損益 不適用"}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-2.5 gap-y-2.5 pt-2.5 border-t border-border/60 font-mono">
+          <div className={cn(
+            "grid font-mono border-t border-border/60",
+            isStacked
+              ? (cardW >= 360 ? "grid-cols-4 gap-2 pt-2" : "grid-cols-2 gap-2 pt-2")
+              : isShort
+              ? "grid-cols-2 gap-x-2 gap-y-1 pt-1.5"
+              : "grid-cols-2 gap-x-2.5 gap-y-2.5 pt-2.5"
+          )}>
             <Kpi
               label="已實現損益"
               value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
               tone={summary ? toneOf(summary.realized_pnl) : undefined}
               sub="OKX 模擬子帳戶"
+              hideSub={isShort || isStacked}
             />
             <Kpi
               label="未實現損益"
               value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
               tone={summary ? toneOf(summary.unrealized_pnl) : undefined}
               sub={risk?.snapshot ? `標記 $${formatDecimal(risk.snapshot.mark)}` : "尚無標記價"}
+              hideSub={isShort || isStacked}
             />
-            <Kpi
-              label="風控期間基準"
-              value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
-              sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
-            />
-            <Kpi
-              label="手續費累計"
-              value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
-              tone={summary ? "text-rose-400" : undefined}
-              sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
-            />
+            {!isShort && (
+              <>
+                <Kpi
+                  label="風控期間基準"
+                  value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
+                  sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
+                  hideSub={isStacked}
+                />
+                <Kpi
+                  label="手續費累計"
+                  value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
+                  tone={summary ? "text-rose-400" : undefined}
+                  sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
+                  hideSub={isStacked}
+                />
+              </>
+            )}
           </div>
         </div>
 
-        {/* 右側 SVG 走勢圖 */}
-        <div className={cn("flex-1 flex flex-col min-w-0", isCompact ? "p-2" : "px-3 py-2.5")}>
-          <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground h-5 shrink-0 min-w-0">
+        {/* SVG 走勢圖（移除硬性 min-h 死鎖，完美貼合任何高度比例） */}
+        <div className={cn("flex-1 flex flex-col min-w-0 min-h-0", isShort ? "px-2.5 py-1.5" : "px-3 py-2.5")}>
+          <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground h-4 shrink-0 min-w-0">
             <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
               <span className="w-2.5 h-[2px] bg-primary inline-block rounded-full" />
-              <span>{isNarrow ? `權益曲線 · ${curve.length} 點` : `本次 run 權益曲線 · ${curve.length} 點`}</span>
+              <span>{chartWidth < 300 ? `權益 · ${curve.length} 點` : `本次 run 權益曲線 · ${curve.length} 點`}</span>
             </div>
             <div className="min-w-0 truncate text-right">
               {hover ? (
@@ -270,16 +307,18 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
                   <span className="text-primary font-bold">{fmtPctNumber(hoverPct)}</span>
                 </span>
               ) : (
-                <span className="text-muted-foreground/55 text-t1 whitespace-nowrap hidden xl:inline">
-                  懸停檢視各 K 線權益
-                </span>
+                chartWidth >= 360 && (
+                  <span className="text-muted-foreground/55 text-t1 whitespace-nowrap">
+                    懸停檢視各 K 線權益
+                  </span>
+                )
               )}
             </div>
           </div>
 
           <div
             ref={chartContainerRef}
-            className="flex-1 w-full relative min-h-[130px] cursor-crosshair mt-1"
+            className="flex-1 w-full relative min-h-0 cursor-crosshair mt-1"
             onPointerMove={handlePointerMove}
             onPointerLeave={() => setHoverIdx(null)}
           >
@@ -309,12 +348,12 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
                       strokeWidth={t === 0 ? 1 : 0.75}
                     />
                     <text
-                      x={plotW + 6}
+                      x={plotW + 5}
                       y={getY(t) + 3}
                       fill="currentColor"
                       className={cn("text-t1 font-mono", t === 0 ? "text-primary font-semibold" : "text-muted-foreground/65")}
                     >
-                      {t > 0 ? `+${t.toFixed(2)}%` : `${t.toFixed(2)}%`}
+                      {t > 0 ? `+${t.toFixed(1)}%` : `${t.toFixed(1)}%`}
                     </text>
                   </g>
                 ))}
@@ -323,7 +362,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
                   <text
                     key={idx}
                     x={getX(idx)}
-                    y={plotH + 14}
+                    y={plotH + (xAxisH - 5)}
                     textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
                     fill="currentColor"
                     className="text-t1 font-mono text-muted-foreground/65"
@@ -350,7 +389,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
                     <line
                       x1={getX(hoverIdx)}
                       x2={getX(hoverIdx)}
-                      y1={8}
+                      y1={6}
                       y2={plotH}
                       stroke="var(--primary)"
                       strokeWidth={1}

@@ -13,7 +13,7 @@ interface PipelineRow {
   id: string;
   name: string;
   meta: string;
-  stage: 0 | 1 | 2 | 3 | 4; // 0:提案 1:研究驗證 2:待核准 3:模擬盤 4:實盤
+  stage: 0 | 1 | 2 | 3 | 4;
   stageLabel: string;
   progress: string;
   detail: string;
@@ -59,9 +59,11 @@ function toneTextClass(tone: PipelineTone): string {
 }
 
 /**
- * 策略管線卡片 (2A 定案：5 階段精簡軌道＋窄卡自動轉進度條)
- * - 自適應策略名欄寬（寬卡 196px / 中卡 164px），大幅減少策略名截斷
- * - 軌道節點上提、下方進度文字與底線保留清晰呼吸空間
+ * 策略管線卡片 (2A 定案 · 比例驅動自適應)
+ * - 窄卡 (< 460px)：緊湊進度條態（< 340px 極窄收合進度條只留階段膠囊與進度）
+ * - 標準卡 (460–819px)：策略名 + 5 階段軌道 + 箭頭
+ * - 寬卡 (>= 820px)：策略名 + 5 階段軌道 + 右欄當前說明（避免軌道過度拉長）
+ * - 扁卡 (< 200px)：自動緊縮行高
  */
 export function StrategyPipelineCard({ className }: { className?: string }) {
   const registeredStrategies = useCatStore((s) => s.strategies);
@@ -70,24 +72,32 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
   const { navigate } = useRouter();
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const [dims, setDims] = useState({ width: 640, height: 280 });
   const [activeOnly, setActiveOnly] = useState(false);
 
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) setWidth(entry.contentRect.width);
+      for (const entry of entries) {
+        setDims({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const isNarrow = width < 460;
-  const isWide = width >= 680;
-  const gridColsClass = isWide
-    ? "grid-cols-[196px_minmax(0,1fr)_14px]"
-    : "grid-cols-[164px_minmax(0,1fr)_14px]";
+  const isNarrow = dims.width < 460;
+  const isSuperNarrow = dims.width < 340;
+  const isUltraWide = dims.width >= 820;
+  const isWide = dims.width >= 660;
+  const isFlat = dims.height < 200;
+
+  const gridColsClass = isUltraWide
+    ? "grid-cols-[204px_minmax(0,1fr)_210px_14px]"
+    : isWide
+    ? "grid-cols-[192px_minmax(0,1fr)_14px]"
+    : "grid-cols-[156px_minmax(0,1fr)_14px]";
 
   const allRows = useMemo<PipelineRow[]>(() => {
     if (signals.previewPick) return PREVIEW_PIPELINE;
@@ -208,9 +218,11 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
           cardId="pipeline"
           title="策略管線"
           subtext={
-            <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60 text-t1 font-mono text-muted-foreground leading-none">
-              {rows.length} 策略
-            </span>
+            !isSuperNarrow ? (
+              <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60 text-t1 font-mono text-muted-foreground leading-none">
+                {rows.length} 策略
+              </span>
+            ) : undefined
           }
         />
         <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
@@ -252,6 +264,7 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
               </span>
             ))}
           </div>
+          {isUltraWide && <span>當前進度與狀態</span>}
           <span />
         </div>
       )}
@@ -268,7 +281,8 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
               onClick={() => navigate(row.route)}
               title={row.detail}
               className={cn(
-                "px-3 py-2.5 hover:bg-white/[0.03] transition-colors cursor-pointer items-center group",
+                "px-3 hover:bg-white/[0.03] transition-colors cursor-pointer items-center group",
+                isFlat ? "py-1.5" : "py-2.5",
                 isNarrow ? "grid grid-cols-[minmax(0,1fr)_auto] gap-2" : cn("grid gap-2.5", gridColsClass)
               )}
             >
@@ -284,15 +298,16 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
                   <span className={cn("px-1.5 py-0.5 rounded border leading-none font-semibold", tonePillClass(row.tone))}>
                     {row.stageLabel}
                   </span>
-                  <span className="w-12 h-1.5 rounded-full bg-border overflow-hidden inline-block">
-                    <span className="block h-full rounded-full" style={{ width: `${STAGE_BAR_PCT[row.stage]}%`, backgroundColor: row.color }} />
-                  </span>
-                  <span className={cn("min-w-[44px] text-right", toneTextClass(row.tone))}>{row.progress}</span>
+                  {!isSuperNarrow && (
+                    <span className="w-12 h-1.5 rounded-full bg-border overflow-hidden inline-block">
+                      <span className="block h-full rounded-full" style={{ width: `${STAGE_BAR_PCT[row.stage]}%`, backgroundColor: row.color }} />
+                    </span>
+                  )}
+                  <span className={cn("min-w-[40px] text-right", toneTextClass(row.tone))}>{row.progress}</span>
                 </div>
               ) : (
                 <>
-                  {/* 軌道節點置於上半部，下方保留明確空間給進度文字 */}
-                  <div className="relative grid grid-cols-5 items-start pt-1 h-8">
+                  <div className={cn("relative grid grid-cols-5 items-start pt-1", isFlat ? "h-7" : "h-8")}>
                     <span className="absolute left-[10%] right-[10%] top-[9px] h-[2px] bg-white/[0.09] rounded-full" />
                     <span
                       className="absolute left-[10%] top-[9px] h-[2px] rounded-full transition-all"
@@ -327,6 +342,11 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
                       );
                     })}
                   </div>
+                  {isUltraWide && (
+                    <span className="text-t2 text-muted-foreground font-sans truncate">
+                      {row.detail}
+                    </span>
+                  )}
                   <ChevronRight className="size-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors justify-self-end" />
                 </>
               )}
@@ -335,7 +355,6 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
         )}
       </div>
 
-      {/* 底部微妙漸層暗示可滾動，避免最後一列被生硬切半 */}
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-surface/90 to-transparent" />
     </div>
   );

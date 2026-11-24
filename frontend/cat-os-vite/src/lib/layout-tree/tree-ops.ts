@@ -550,21 +550,15 @@ export function calculateTreeMinHeight(
 ): number {
   if (!node) return 0;
   if (node.type === "leaf") {
-    return minHeights[node.cardId] || 300;
+    return minHeights[node.cardId] || 150;
   }
   const hFirst = calculateTreeMinHeight(node.first, minHeights);
   const hSecond = calculateTreeMinHeight(node.second, minHeights);
   if (node.direction === "row") {
-    // 左右並排：高度取二者之較大值
     return Math.max(hFirst, hSecond);
-  } else {
-    // 上下垂直分割：二者高度相加 + 5px 間隙
-    const sumMin = hFirst + hSecond + 5;
-    const r = Math.max(0.1, Math.min(0.9, node.ratio));
-    const ratioFirst = Math.ceil(hFirst / r);
-    const ratioSecond = Math.ceil(hSecond / (1 - r));
-    return Math.max(sumMin, Math.min(ratioFirst, ratioSecond));
   }
+  // 僅累計子樹實體最小底線，不以 ratio 反推放大畫布，確保使用者拖拉分割線 1:1 貼合視窗縮放
+  return hFirst + hSecond + 5;
 }
 
 

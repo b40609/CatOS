@@ -320,11 +320,11 @@ export function WorkspaceGrid({ renderCard }: WorkspaceGridProps) {
   return (
     <div
       className={cn(
-        "relative flex flex-col w-full min-w-0 h-[820px] lg:h-[calc(100vh-80px)] min-h-[660px] overflow-y-auto overflow-x-hidden custom-scrollbar",
+        "relative flex flex-col w-full min-w-0 h-[calc(100dvh-76px)] min-h-[540px] overflow-y-auto overflow-x-hidden custom-scrollbar",
         draggingInfo ? "select-none" : "select-text"
       )}
     >
-      {/* 平鋪樹狀工作區：當卡片過多時依據最小閱讀高度自動向下撐開畫布並支援滾動 */}
+      {/* 平鋪樹狀工作區：正常貼合 100% 視窗高度，讓使用者拖拉比例 1:1 跟手；僅在多層極限堆疊時觸發安全捲動 */}
       <div
         ref={containerRef}
         style={{

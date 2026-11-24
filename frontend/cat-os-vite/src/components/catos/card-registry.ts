@@ -111,16 +111,16 @@ export const ALL_CARDS: CardMeta[] = [
 ];
 
 /**
- * 各卡片預設最小安全閱讀高度 (px)
+ * 各卡片最小安全閱讀高度 (px)：確保 5 卡標準佈局完整貼合單一視窗，僅在極限多層堆疊時撐開捲動
  */
 export const CARD_DEFAULT_MIN_HEIGHTS: Partial<Record<CardId, number>> = {
-  equity: 320,
-  allocation: 310,
-  bots: 320,
-  pipeline: 280,
-  activity_deck: 340,
-  positions: 320,
-  fills: 280,
-  incidents: 300,
-  bot_inspector: 380,
+  equity: 170,
+  allocation: 170,
+  bots: 165,
+  pipeline: 165,
+  activity_deck: 220,
+  positions: 165,
+  fills: 160,
+  incidents: 160,
+  bot_inspector: 200,
 };

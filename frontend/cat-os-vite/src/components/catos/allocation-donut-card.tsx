@@ -5,17 +5,16 @@ import { useCatStore } from "@/state/catStore";
 import type { BotControlState, DecimalString, PositionDTO, RiskStatus } from "@/contracts";
 import { formatDecimal, formatRatioPct, signOf, toPlotNumber } from "@/lib/format";
 
-// Noir & Gold 低彩度金融色板
 const COLORS = {
-  position: "#e8b45e", // 蜂蜜金
-  second: "#7faee2",   // 霧藍
-  violet: "#8b8df8",   // 靜藍紫
-  budget: "#10b981",   // 多頭 / 翡翠綠
-  short: "#f43f5e",    // 空頭 / 虧損 玫瑰紅
-  fee: "#71717a",      // 手續費 費用灰
-  neutral: "#a1a1aa",  // 中性 鋅灰
-  rem: "#3f3f46",      // 剩餘可用額度啞灰
-  muted: "#27272a",    // 尚無觀測底槽
+  position: "#e8b45e",
+  second: "#7faee2",
+  violet: "#8b8df8",
+  budget: "#10b981",
+  short: "#f43f5e",
+  fee: "#71717a",
+  neutral: "#a1a1aa",
+  rem: "#3f3f46",
+  muted: "#27272a",
 };
 
 const BOT_PALETTE = ["#e8b45e", "#7faee2", "#8b8df8", "#10b981", "#f59e0b"];
@@ -25,9 +24,9 @@ interface DonutItem {
   shortLabel: string;
   compactLabel?: string;
   sub: string;
-  amount: DecimalString | null; // 後端 Decimal 字串；null 代表非單一金額
+  amount: DecimalString | null;
   amountStr: string;
-  pct_share: number; // 0..100，僅供幾何弧長與佔比標籤
+  pct_share: number;
   color: string;
   badgeStr: string;
   compactBadge?: string;
@@ -49,12 +48,12 @@ const HUD_INNER_WIDTH = 128;
 export type DonutViewMode = "bots" | "allocation" | "delta" | "pnl" | "margin";
 export type HudUnit = "pct" | "leverage" | "money";
 
-const TABS: { id: DonutViewMode; label: string }[] = [
-  { id: "bots", label: "策略" },
-  { id: "allocation", label: "幣種" },
-  { id: "delta", label: "多空" },
-  { id: "pnl", label: "損益" },
-  { id: "margin", label: "保證金" },
+const TABS: { id: DonutViewMode; label: string; shortLabel: string }[] = [
+  { id: "bots", label: "策略", shortLabel: "策" },
+  { id: "allocation", label: "幣種", shortLabel: "幣" },
+  { id: "delta", label: "多空", shortLabel: "向" },
+  { id: "pnl", label: "損益", shortLabel: "益" },
+  { id: "margin", label: "保證金", shortLabel: "保" },
 ];
 
 const VIEW_CAPTION: Record<DonutViewMode, string> = {
@@ -125,10 +124,10 @@ function nextHudUnit(unit: HudUnit): HudUnit {
 }
 
 /**
- * 曝險額度卡片 (1A 定案：Y 結構底版 × 5 視角 × 點擊圓環本體切換 % / x / $)
- * - 標題列無單位切換按鈕，點擊圓環本體循環切換並在圓環下方以極簡微指示顯示當前單位
- * - 空觀測狀態呈現制度預設上限規格（不左右重複廢話）
- * - 所有金額皆直接格式化後端 Decimal 字串，不在前端進行帳務浮點運算
+ * 曝險額度卡片 (1A 定案 · 比例驅動全形態自適應)
+ * - 直式/窄高比例：自動切換為 Y 版經典上下排佈（上居中大圓環、下滿寬明細列）
+ * - 超扁橫條：左小圓環＋右側 2 欄緊湊網格（一次看清不捲動）
+ * - 標準／寬大橫式：圓環與明細尺寸隨容器實測寬高自由放大縮小，無硬性尺寸死鎖
  */
 export function AllocationDonutCard({ className }: { className?: string }) {
   const [viewMode, setViewMode] = useState<DonutViewMode>("bots");
@@ -152,10 +151,26 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return () => observer.disconnect();
   }, []);
 
-  const isNarrow = dimensions.width < 460;
-  const isSuperNarrow = dimensions.width < 340;
-  const isShort = dimensions.height < 185;
-  const isCompact = isNarrow || isShort;
+  const { width: cardW, height: cardH } = dimensions;
+  // 依容器寬高比自動判定三種形態
+  const isVertical = (cardW < 450 && cardH >= 285) || (cardH >= 320 && cardH / Math.max(1, cardW) >= 0.78);
+  const isFlat = !isVertical && cardH < 195;
+  const isNarrow = cardW < 460;
+  const isSuperNarrow = cardW < 340;
+  const isLarge = !isVertical && !isFlat && cardW >= 740 && cardH >= 280;
+
+  // 圓環動態直徑（跟隨容器寬高自由縮放，完全告別尺寸寫死）
+  const donutSizePx = useMemo(() => {
+    if (isVertical) {
+      return Math.round(Math.max(116, Math.min(240, cardW * 0.56, (cardH - 120) * 0.48)));
+    }
+    if (isFlat) {
+      return Math.round(Math.max(88, Math.min(132, cardH - 52, cardW * 0.28)));
+    }
+    const availH = cardH - 104;
+    const availW = cardW * 0.36;
+    return Math.round(Math.max(118, Math.min(268, availH, availW)));
+  }, [isVertical, isFlat, cardW, cardH]);
 
   const risk = useCatStore((s) => s.risk);
   const summary = useCatStore((s) => s.summary);
@@ -188,7 +203,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   const softLossText = limits ? formatRatioPct(limits.soft_loss, { sign: false }) : TEXT_UNAVAILABLE;
   const hardLossText = limits ? formatRatioPct(limits.hard_loss, { sign: false }) : TEXT_UNAVAILABLE;
 
-  // 空狀態：右側展示制度上限規格，取代重複廢話
   const unavailableItems: DonutItem[] = useMemo(() => [
     {
       key: "cfg-lev",
@@ -231,7 +245,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     },
   ], [leverageLimitText, symbolShareText, softLossText, hardLossText]);
 
-  // 剩餘可用額度：金額欄不誤印總上限，清爽標示未配置與剩餘比例
   const remainingItem: DonutItem = useMemo(() => ({
     key: "remaining",
     shortLabel: "剩餘可用額度",
@@ -246,7 +259,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     isMuted: true,
   }), [symbolBudget, capShare]);
 
-  // 1. 視角：策略（預設）
   const botItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const rows: DonutItem[] = [];
@@ -299,7 +311,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return rows;
   }, [risk, unavailableItems, bots, posByBot, notional, capBudget, remainingItem]);
 
-  // 2. 視角：幣種
   const allocationItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
 
@@ -365,7 +376,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     return rows;
   }, [risk, unavailableItems, bots, positions, notional, capBudget, capShare, effectiveLeverage, remainingItem]);
 
-  // 3. 視角：多空
   const deltaItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const open = positions.filter((p) => {
@@ -410,7 +420,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     });
   }, [risk, unavailableItems, positions]);
 
-  // 4. 視角：損益
   const pnlItems: DonutItem[] = useMemo(() => {
     if (!summary) return unavailableItems;
     const realized = summary.realized_pnl;
@@ -472,7 +481,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     ];
   }, [summary, unavailableItems]);
 
-  // 5. 視角：保證金
   const marginItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
     const marginOk = risk.snapshot?.margin_ok;
@@ -602,6 +610,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     }
 
     const shareCaption = SHARE_CAPTION[viewMode];
+    const compactHud = donutSizePx < 120;
 
     return (
       <div
@@ -611,16 +620,13 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           }
         }}
         title={canToggleUnit && !hudUnavailable ? "點擊圓環循環切換顯示單位（% → x → $）" : undefined}
+        style={{ width: donutSizePx, height: donutSizePx }}
         className={cn(
-          "h-full aspect-square flex flex-col items-center justify-center relative shrink-0 group/donut",
-          isNarrow ? "max-w-[36%] max-h-[146px]" : "max-w-[42%] max-h-[196px]",
+          "flex items-center justify-center relative shrink-0",
           canToggleUnit && !hudUnavailable && "cursor-pointer"
         )}
       >
-        <svg
-          viewBox={`0 0 ${VB_SIZE} ${VB_SIZE}`}
-          className="h-full w-full max-h-full max-w-full aspect-square select-none"
-        >
+        <svg viewBox={`0 0 ${VB_SIZE} ${VB_SIZE}`} className="w-full h-full select-none">
           <defs>
             <style>{`
               .hud-mono {
@@ -703,16 +709,16 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             <g className="pointer-events-none select-none">
               <text
                 x={CX}
-                y={isCompact ? CY + 8 : CY + 2}
+                y={compactHud ? CY + 8 : CY + 2}
                 textAnchor="middle"
                 fill={hudValueColor}
-                fontSize={hudFontSize(hudValue, isCompact ? 26 : 30)}
+                fontSize={hudFontSize(hudValue, compactHud ? 28 : 30)}
                 fontWeight="700"
                 className="hud-mono"
               >
                 {hudValue}
               </text>
-              {!isCompact && (
+              {!compactHud && (
                 <text
                   x={CX}
                   y={CY + 21}
@@ -725,43 +731,13 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   {hudSub}
                 </text>
               )}
-              {canToggleUnit && !hudUnavailable && !isCompact && (
+              {canToggleUnit && !hudUnavailable && !compactHud && (
                 <g transform={`translate(${CX}, ${CY + 39})`}>
-                  <text
-                    x={-16}
-                    y={0}
-                    textAnchor="middle"
-                    fill={hudUnit === "pct" ? "#e8b45e" : "#52525b"}
-                    fontSize="9"
-                    fontWeight={hudUnit === "pct" ? "700" : "500"}
-                    className="hud-mono"
-                  >
-                    %
-                  </text>
+                  <text x={-16} y={0} textAnchor="middle" fill={hudUnit === "pct" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "pct" ? "700" : "500"} className="hud-mono">%</text>
                   <text x={-8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
-                  <text
-                    x={0}
-                    y={0}
-                    textAnchor="middle"
-                    fill={hudUnit === "leverage" ? "#e8b45e" : "#52525b"}
-                    fontSize="9"
-                    fontWeight={hudUnit === "leverage" ? "700" : "500"}
-                    className="hud-mono"
-                  >
-                    x
-                  </text>
+                  <text x={0} y={0} textAnchor="middle" fill={hudUnit === "leverage" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "leverage" ? "700" : "500"} className="hud-mono">x</text>
                   <text x={8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
-                  <text
-                    x={16}
-                    y={0}
-                    textAnchor="middle"
-                    fill={hudUnit === "money" ? "#e8b45e" : "#52525b"}
-                    fontSize="9"
-                    fontWeight={hudUnit === "money" ? "700" : "500"}
-                    className="hud-mono"
-                  >
-                    $
-                  </text>
+                  <text x={16} y={0} textAnchor="middle" fill={hudUnit === "money" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "money" ? "700" : "500"} className="hud-mono">$</text>
                 </g>
               )}
             </g>
@@ -772,7 +748,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   };
 
   const riskEquity = risk?.snapshot?.risk_equity ?? risk?.snapshot?.equity ?? summary?.equity ?? null;
-  const formulaLine = !isShort
+  const formulaLine = !isFlat
     ? !risk
       ? `啟動模擬 run 後即時監控部位曝險 · 預設單幣上限為總預算 ${symbolShareText}`
       : viewMode === "pnl"
@@ -784,21 +760,23 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
   return (
     <div ref={containerRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
-      {/* 1. 標題列：精簡無單位按鈕，只留標題＋狀態晶片＋5 視角切換 */}
+      {/* 1. 標題列：超窄自動隱藏狀態晶片並精簡 Tab，絕不擠爆 */}
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="allocation"
           title="曝險額度"
           subtext={
-            <span
-              className={cn(
-                "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap",
-                statusChip.className
-              )}
-              title={statusTooltip}
-            >
-              {statusChip.label}
-            </span>
+            !isSuperNarrow ? (
+              <span
+                className={cn(
+                  "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap",
+                  statusChip.className
+                )}
+                title={statusTooltip}
+              >
+                {statusChip.label}
+              </span>
+            ) : undefined
           }
         />
 
@@ -820,31 +798,53 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     : "text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
                 )}
               >
-                {tab.label}
+                {isSuperNarrow ? tab.shortLabel : tab.label}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 2. 主內容區：整體置中收斂 max-w，避免寬屏下左右分離留大片空白 */}
-      <div className="flex-1 min-h-0 flex flex-col px-3.5 py-2.5 overflow-hidden">
-        {!isShort && (
+      {/* 2. 主內容區：依寬高比自動切換 Y 版直式上下 / 超扁 2 欄 / 標準橫排 */}
+      <div className={cn("flex-1 min-h-0 flex flex-col overflow-hidden", isFlat ? "px-3 py-1.5" : "px-3.5 py-2.5")}>
+        {!isFlat && (
           <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground mb-1.5 shrink-0">
             <span className="truncate font-sans">{VIEW_CAPTION[viewMode]}</span>
             <span className="font-semibold text-foreground shrink-0 tabular-nums">{topRightSummary}</span>
           </div>
         )}
 
-        <div className="flex-1 min-h-0 flex items-center justify-center gap-4 sm:gap-6 overflow-hidden font-mono max-w-[780px] w-full mx-auto">
+        <div
+          className={cn(
+            "flex-1 min-h-0 flex items-center justify-center overflow-hidden font-mono w-full mx-auto",
+            isVertical
+              ? "flex-col gap-3"
+              : isFlat
+              ? "flex-row gap-3"
+              : "flex-row gap-5 sm:gap-7"
+          )}
+        >
           {renderDonut()}
 
-          {/* 右側明細清單（Y 版乾淨表格行，比例平衡） */}
-          <div className="flex-1 min-w-0 max-w-[440px] h-full flex flex-col justify-center divide-y divide-white/[0.05] overflow-y-auto pr-0.5">
+          {/* 明細清單：扁卡自動切 2 欄網格；直卡滿寬；大卡自動放大間距與字級 */}
+          <div
+            className={cn(
+              "min-w-0 overflow-y-auto custom-scrollbar pr-0.5",
+              isVertical
+                ? "w-full flex-1 flex flex-col justify-start divide-y divide-white/[0.05]"
+                : isFlat
+                ? "flex-1 grid grid-cols-2 gap-x-3 gap-y-1 content-center"
+                : "flex-1 max-w-[520px] h-full flex flex-col justify-center divide-y divide-white/[0.05]"
+            )}
+          >
             {currentItems.map((item, idx) => {
               const isHovered = hoveredIndex === idx;
-              const displayLabel = isNarrow ? (item.compactLabel || item.shortLabel) : item.shortLabel;
-              const displayBadge = isSuperNarrow ? undefined : (isNarrow ? (item.compactBadge || item.badgeStr) : item.badgeStr);
+              const displayLabel = isNarrow || isFlat ? (item.compactLabel || item.shortLabel) : item.shortLabel;
+              const displayBadge = isSuperNarrow || isFlat
+                ? undefined
+                : isNarrow
+                ? (item.compactBadge || item.badgeStr)
+                : item.badgeStr;
 
               return (
                 <div
@@ -852,7 +852,8 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   onMouseEnter={() => setHoveredIndex(idx)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   className={cn(
-                    "flex items-center justify-between gap-2 px-2 py-1.5 rounded transition-colors cursor-pointer",
+                    "flex items-center justify-between gap-2 rounded transition-colors cursor-pointer",
+                    isFlat ? "px-1.5 py-1 bg-white/[0.02]" : isLarge ? "px-2.5 py-2" : "px-2 py-1.5",
                     isHovered ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
                   )}
                 >
@@ -860,7 +861,8 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                     <span
                       className={cn(
-                        "text-t3 truncate font-sans",
+                        "truncate font-sans",
+                        isLarge ? "text-t4" : "text-t3",
                         item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
                       )}
                     >
@@ -878,10 +880,11 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <span
                       className={cn(
-                        "text-t3 tabular-nums",
+                        "tabular-nums",
+                        isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
                         item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-medium"
                       )}
                     >
@@ -890,7 +893,8 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     {!item.hidePct && (
                       <span
                         className={cn(
-                          "text-t3 tabular-nums min-w-[34px] text-right",
+                          "tabular-nums min-w-[32px] text-right",
+                          isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
                           item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-semibold"
                         )}
                       >
@@ -904,7 +908,6 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* 3. 底部單行額度公式 */}
         {formulaLine && (
           <div className="mt-1.5 pt-1.5 border-t border-border/60 text-t1 font-mono text-muted-foreground/75 truncate shrink-0">
             {formulaLine}

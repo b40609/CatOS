@@ -116,7 +116,6 @@ function sideOf(ev: EventDTO): Side {
   return side === 'buy' || side === 'sell' ? side : null;
 }
 
-/** 控制面事件的單行標題；系統日誌與風控中心共用。 */
 export function eventTitle(ev: EventDTO, instLabel: string): string {
   const p = ev.payload;
   switch (ev.kind) {
@@ -329,9 +328,10 @@ interface UnifiedIncidentActivityCardProps {
 }
 
 /**
- * 待處理與事件審計卡片 (3A 定案：待處理作為第一分頁，並於下方銜接近期事件流消除空洞)
- * - 標題列精簡為 5 個核心分頁（待處理 / 全部 / 異常 / 成交 / 風控），1440px 絕不切字
- * - 核准與解除鎖存嚴守 CatOS 紅線：僅提供檢視或複製 CLI 指令
+ * 待處理與事件審計卡片 (3A 定案 · 比例驅動全形態自適應)
+ * - 寬扁橫式 (width >= 700 && width / height >= 1.55)：待處理分頁自動切換為左右雙欄（左佇列、右近期流水）
+ * - 標準直式：上待處理佇列＋下近期審計流水
+ * - 窄卡 (< 440px)：待處理項目按鈕自動換行至底部，文字絕不被擠壓截斷
  */
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
   const events = useCatStore((s) => s.events);
@@ -370,8 +370,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return () => observer.disconnect();
   }, []);
 
-  const isNarrow = dimensions.width < 520;
-  const isSuperNarrow = dimensions.width < 390;
+  const { width: cardW, height: cardH } = dimensions;
+  const isNarrow = cardW < 520;
+  const isStackActionBtns = cardW < 450;
+  const isSuperNarrow = cardW < 360;
+  const isWideSplit = cardW >= 700 && cardW / Math.max(1, cardH) >= 1.55;
 
   const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
 
@@ -389,14 +392,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       .map((ev) => toRow(ev, instById.get(ev.bot_id) ?? '合約'));
   }, [events, instById]);
 
-  // 近期重要流水（在待處理分頁下方銜接展示，優先挑成交／風控／異常，不足再用最新事件補齊至 6 筆）
   const recentHighlights = useMemo<EventRow[]>(() => {
     const priority = rows.filter((r) => r.event.category === 'ORDER' || r.event.category === 'RISK' || r.isAlert);
-    const chosen = priority.length >= 4 ? priority.slice(0, 6) : rows.slice(0, 6);
-    return chosen;
+    return priority.length >= 4 ? priority.slice(0, 6) : rows.slice(0, 6);
   }, [rows]);
 
-  // 彙整待處理項目（P0 > P1 > P2 > P3）
   const actionItems = useMemo<ActionQueueItem[]>(() => {
     if (signals.previewPick) return PREVIEW_ACTIONS;
 
@@ -511,7 +511,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return list.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev]);
   }, [signals, killSwitch, risk, rows, strategies]);
 
-  // 初始載入完成且無任何待處理項目時自動切至 ALL；若有待處理則保持 ACTION
   useEffect(() => {
     if (userPickedTabRef.current) return;
     if (actionItems.length > 0) {
@@ -524,7 +523,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const hasP0 = actionItems.some((a) => a.sev === 'p0');
   const hasP1 = actionItems.some((a) => a.sev === 'p1');
 
-  // 精簡 5 核心分頁（待處理 / 全部 / 異常 / 成交 / 風控），1440px 絕不切字
   const availableTabs = useMemo<CategoryTabItem[]>(() => {
     const isAlert = (e: EventDTO) => e.level === 'WARN' || e.level === 'ERROR';
     const countAlert = events.filter(isAlert).length;
@@ -535,14 +533,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       {
         id: 'ACTION',
         label: `待處理(${actionItems.length})`,
-        shortLabel: actionItems.length > 0 ? `待處理(${actionItems.length})` : '待處理',
+        shortLabel: actionItems.length > 0 ? `待(${actionItems.length})` : '待處理',
         badgeCount: actionItems.length,
         isCritical: hasP0,
         isAlert: !hasP0 && (hasP1 || actionItems.length > 0),
         filterFn: () => false,
       },
       { id: 'ALL', label: `全部(${events.length})`, shortLabel: '全部', badgeCount: events.length, filterFn: () => true },
-      { id: 'ALERT', label: `異常(${countAlert})`, shortLabel: countAlert > 0 ? `異常(${countAlert})` : '異常', badgeCount: countAlert, isAlert: countAlert > 0, filterFn: isAlert },
+      { id: 'ALERT', label: `異常(${countAlert})`, shortLabel: countAlert > 0 ? `異(${countAlert})` : '異常', badgeCount: countAlert, isAlert: countAlert > 0, filterFn: isAlert },
       { id: 'ORDER', label: `成交(${countOrder})`, shortLabel: '成交', badgeCount: countOrder, filterFn: (e) => e.category === 'ORDER' },
       { id: 'RISK', label: `風控(${countRisk})`, shortLabel: '風控', badgeCount: countRisk, filterFn: (e) => e.category === 'RISK' },
     ];
@@ -603,13 +601,16 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
 
   const showEmpty = connectionStatus === 'mode_not_open' || filteredRows.length === 0;
 
+  // 在寬扁橫式雙欄時，每欄實際寬度約一半，按鈕需跟著判斷是否換行
+  const actionBtnStack = isStackActionBtns || (isWideSplit && cardW < 920);
+
   return (
     <div ref={cardRef} className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
-      {/* 1. Header：統一規格，精簡 5 分頁絕不裁切 */}
+      {/* 1. Header：自適應 5 核心分頁 */}
       <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
         <CardHeaderTitle
           cardId="activity_deck"
-          title="待處理與事件審計"
+          title={isSuperNarrow ? '待處理 / 審計' : '待處理與事件審計'}
         />
 
         <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0">
@@ -638,11 +639,16 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         </div>
       </div>
 
-      {/* 2. 主內容區：ACTION 分頁顯示專業待處理佇列 + 底部自然銜接近期審計流水 */}
+      {/* 2. 主內容區：寬扁比例自動切換左右雙欄，直式維持上下分區 */}
       {category === 'ACTION' ? (
-        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
-          {/* 上半：待處理佇列 */}
-          <div className="divide-y divide-border/50 shrink-0">
+        <div
+          className={cn(
+            'flex-1 min-h-0 overflow-hidden',
+            isWideSplit ? 'grid grid-cols-2 divide-x divide-border/80' : 'flex flex-col overflow-y-auto custom-scrollbar'
+          )}
+        >
+          {/* 區塊 A：待處理佇列 */}
+          <div className={cn('divide-y divide-border/50', isWideSplit ? 'min-h-0 overflow-y-auto custom-scrollbar' : 'shrink-0')}>
             {actionItems.length === 0 ? (
               <div className="py-6 text-center text-t2 text-muted-foreground">
                 無待處理項目
@@ -654,7 +660,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                   <div
                     key={item.id}
                     className={cn(
-                      'px-3 py-2.5 flex items-center justify-between gap-2.5 transition-colors hover:bg-white/[0.03]',
+                      'px-3 py-2.5 flex gap-2 transition-colors hover:bg-white/[0.03]',
+                      actionBtnStack ? 'flex-col items-stretch' : 'items-center justify-between',
                       severityRowClass(item.sev)
                     )}
                   >
@@ -672,7 +679,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className={cn('flex items-center gap-1.5 shrink-0', actionBtnStack && 'justify-end')}>
                       {item.primaryAction && (
                         <button
                           type="button"
@@ -712,18 +719,18 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
             )}
           </div>
 
-          {/* 下半：銜接近期事件流水預覽（徹底消除大塊空白，保留即時脈動） */}
-          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/15">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0">
+          {/* 區塊 B：近期審計與成交流水 */}
+          <div className={cn('flex flex-col bg-background/15 min-h-0', isWideSplit ? 'overflow-y-auto custom-scrollbar' : 'flex-1 border-t border-border/80')}>
+            <div className="flex items-center justify-between px-3 py-1.5 bg-background/35 border-b border-border/60 shrink-0 sticky top-0 z-10 backdrop-blur-xs">
               <span className="text-t1 font-mono text-muted-foreground">
                 近期審計與成交流水 · {events.length} 筆
               </span>
               <button
                 type="button"
                 onClick={() => handleSelectTab('ALL')}
-                className="text-t1 font-mono text-primary/85 hover:text-primary inline-flex items-center gap-0.5 cursor-pointer"
+                className="text-t1 font-mono text-primary/85 hover:text-primary inline-flex items-center gap-0.5 cursor-pointer shrink-0"
               >
-                <span>展開完整流水</span>
+                <span>展開全部</span>
                 <ArrowRight className="size-2.5" />
               </button>
             </div>
@@ -755,8 +762,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                           {row.title}
                         </span>
                       </div>
-                      {row.rightText && (
-                        <span className="text-t1 text-muted-foreground shrink-0 tabular-nums hidden sm:inline">
+                      {row.rightText && cardW >= 420 && (
+                        <span className="text-t1 text-muted-foreground shrink-0 tabular-nums">
                           {row.rightText}
                         </span>
                       )}
@@ -886,9 +893,11 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                               {row.side === 'buy' ? '買入' : '賣出'}
                             </span>
                           )}
-                          <span className="text-zinc-500 text-t1 shrink-0 font-mono hidden sm:inline">
-                            [{shortId(ev.run_id)}]
-                          </span>
+                          {cardW >= 460 && (
+                            <span className="text-zinc-500 text-t1 shrink-0 font-mono">
+                              [{shortId(ev.run_id)}]
+                            </span>
+                          )}
                           <span
                             className={cn(
                               'truncate leading-tight tracking-tight text-t2',
@@ -900,8 +909,8 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          {row.rightText ? (
-                            <span className="text-t2 font-mono tracking-tight text-zinc-300 hidden sm:inline">
+                          {row.rightText && cardW >= 460 ? (
+                            <span className="text-t2 font-mono tracking-tight text-zinc-300">
                               {row.rightText}
                             </span>
                           ) : row.isAlert ? (
@@ -926,7 +935,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                           className="mt-2 pt-2 border-t border-white/[0.05] text-t1 space-y-2 text-zinc-300 snap-accordion-enter"
                         >
                           {detailFields ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-t1 font-mono">
+                            <div className={cn('grid gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-t1 font-mono', cardW < 420 ? 'grid-cols-2' : 'grid-cols-4')}>
                               {detailFields.map((field) => (
                                 <div key={field.label} className="min-w-0">
                                   <span className="text-muted-foreground block text-t1 uppercase tracking-wider">{field.label}</span>

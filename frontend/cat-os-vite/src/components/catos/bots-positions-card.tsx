@@ -38,9 +38,10 @@ function settlementLabel(settlement: string | undefined): string {
 }
 
 /**
- * 策略實例與持倉合一卡片 (4A 定案：單一寬表合一＋點擊列展開交易所風控明細)
- * - 高密度自適應欄位：1440px / 1920px 下操作鈕永遠完整可見、表頭零折行、免橫向捲軸
- * - 標題列與其他 4 卡統一純繁中風格
+ * 策略實例與持倉合一卡片 (4A 定案 · 比例驅動全形態自適應)
+ * - 窄卡 (< 480px)：自動切換為卡片堆疊清單態（免橫捲、不切字，點擊一樣展開 6 格詳情）
+ * - 標準／寬卡：依容器實測寬度階梯解鎖欄位（風控/P6 → 均價/標記 → 微型走勢線）
+ * - 扁卡 (< 210px)：自動收緊列高與底欄
  */
 export function BotsPositionsCard({ className, showHeader = true }: BotsPositionsCardProps) {
   const bots = useCatStore((s) => s.bots);
@@ -56,21 +57,25 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
   const [filter, setFilter] = useState<BotsPositionsFilter>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const [cardWidth, setCardWidth] = useState(760);
+  const [dims, setDims] = useState({ width: 760, height: 280 });
 
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) setCardWidth(entry.contentRect.width);
+      for (const entry of entries) {
+        setDims({ width: entry.contentRect.width, height: entry.contentRect.height });
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const showRiskCol = cardWidth >= 560;
-  const showPriceCol = cardWidth >= 740;
-  const showSpark = cardWidth >= 860;
+  const isCardMode = dims.width < 480;
+  const isFlat = dims.height < 210;
+  const showRiskCol = dims.width >= 580;
+  const showPriceCol = dims.width >= 740;
+  const showSpark = dims.width >= 860;
   const colSpan = 4 + (showPriceCol ? 1 : 0) + (showRiskCol ? 1 : 0);
 
   const posByBot = useMemo(() => {
@@ -130,6 +135,47 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
     : filter === "open" ? "目前無未平倉部位"
     : "無符合條件的實例";
 
+  const renderExpandedGrid = (bot: BotViewDTO, hasPos: boolean, avgPx: string | null, markPx: string | null, botRisk: typeof risk) => (
+    <div className={cn("grid gap-2 font-mono text-t1", isCardMode ? "grid-cols-2" : "grid-cols-3 lg:grid-cols-6")}>
+      <div>
+        <span className="text-muted-foreground block font-sans">均價 / 標記價</span>
+        <span className="text-foreground font-semibold tabular-nums">
+          {hasPos ? formatDecimal(avgPx, { prefix: "$" }) : "空手"} / {formatDecimal(markPx, { prefix: "$" })}
+        </span>
+      </div>
+      <div>
+        <span className="text-muted-foreground block font-sans">已實現損益</span>
+        <span className={cn("font-semibold tabular-nums", toneOf(bot.realized_pnl))}>
+          {formatDecimal(bot.realized_pnl, { sign: true, prefix: "$" })}
+        </span>
+      </div>
+      <div>
+        <span className="text-muted-foreground block font-sans">手續費累計</span>
+        <span className="text-rose-400 font-semibold tabular-nums">
+          {formatDecimal(bot.fees, { prefix: "$", digits: 4 })}
+        </span>
+      </div>
+      <div>
+        <span className="text-muted-foreground block font-sans">風控期間損益</span>
+        <span className={cn("font-semibold tabular-nums", toneOf(botRisk?.derived.period_pnl))}>
+          {botRisk
+            ? `${formatDecimal(botRisk.derived.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(botRisk.derived.period_pnl_ratio)})`
+            : "不適用"}
+        </span>
+      </div>
+      <div>
+        <span className="text-muted-foreground block font-sans">資金費 / 強平墊</span>
+        <span className="text-muted-foreground">合成 funding=0 · 無模型</span>
+      </div>
+      <div>
+        <span className="text-muted-foreground block font-sans">帳戶來源 / run</span>
+        <span className="text-foreground">
+          {bot.account_source ? ACCOUNT_SOURCE_LABEL[bot.account_source] : "無觀測"} · {shortId(bot.current_run_id)}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <div ref={cardRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
       {showHeader && (
@@ -138,17 +184,19 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
             cardId="bots"
             title="策略實例與持倉"
             subtext={
-              <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60 text-t1 font-mono text-muted-foreground leading-none">
-                {openCount}/{bots.length} 持倉
-              </span>
+              dims.width >= 390 ? (
+                <span className="px-1.5 py-0.5 rounded bg-background/60 border border-border/60 text-t1 font-mono text-muted-foreground leading-none">
+                  {openCount}/{bots.length} 持倉
+                </span>
+              ) : undefined
             }
           />
           <div className="flex items-center gap-0.5 bg-background/60 border border-border/60 rounded p-0.5 shrink-0 whitespace-nowrap">
             {(
               [
-                { id: "all", label: `全部(${bots.length})` },
-                { id: "open", label: `持倉中(${openCount})` },
-                { id: "orders", label: "掛單(0)" },
+                { id: "all", label: dims.width < 360 ? `全(${bots.length})` : `全部(${bots.length})` },
+                { id: "open", label: dims.width < 360 ? `倉(${openCount})` : `持倉中(${openCount})` },
+                { id: "orders", label: dims.width < 360 ? "掛(0)" : "掛單(0)" },
               ] as const
             ).map((f) => (
               <button
@@ -156,7 +204,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                 type="button"
                 onClick={() => setFilter(f.id)}
                 className={cn(
-                  "px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
+                  "px-1.5 sm:px-2 py-0.5 text-t2 font-mono rounded transition-colors cursor-pointer whitespace-nowrap shrink-0",
                   filter === f.id
                     ? "bg-secondary text-foreground font-semibold shadow-xs border border-white/[0.12]"
                     : "text-muted-foreground hover:text-foreground"
@@ -170,13 +218,118 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
       )}
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {filter === "orders" ? (
-            <div className="h-full flex flex-col items-center justify-center py-8 text-center text-muted-foreground px-4 font-mono">
+            <div className="h-full flex flex-col items-center justify-center py-6 text-center text-muted-foreground px-4 font-mono">
               <span className="text-t3 text-foreground/80">v1 沒有在途掛單</span>
               <span className="text-t2 text-muted-foreground/70 mt-1">已收盤 K 線市價執行，無掛單簿</span>
             </div>
+          ) : isCardMode ? (
+            /* 窄卡直式堆疊清單態 (< 480px)：免橫捲、完整不切邊 */
+            rows.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground font-mono text-t3">{emptyText}</div>
+            ) : (
+              <div className="divide-y divide-border/50">
+                {rows.map((bot) => {
+                  const pos = posByBot.get(bot.bot_id) ?? null;
+                  const posVal = pos?.position ?? bot.position;
+                  const posSign = signOf(posVal);
+                  const hasPos = posSign === "positive" || posSign === "negative";
+                  const isShort = posSign === "negative";
+                  const isActive = ACTIVE_STATES.has(bot.state);
+                  const isExpanded = expandedId === bot.bot_id;
+                  const botRisk = risk && risk.bot_id === bot.bot_id ? risk : null;
+                  const avgPx = pos?.average_entry ?? bot.average_entry;
+                  const markPx = pos?.mark ?? bot.mark;
+                  const unrealized = pos?.unrealized_pnl ?? bot.unrealized_pnl;
+                  const notional = pos?.notional ?? (botRisk ? botRisk.derived.notional : null);
+                  const shortInst = (bot.inst_id ?? "不適用").replace("-USDT-SWAP", "");
+                  const busyKey = controls.busy;
+
+                  return (
+                    <div key={bot.bot_id} className={cn("transition-colors", isExpanded && "bg-white/[0.03]")}>
+                      <div
+                        onClick={() => {
+                          selectBot(bot.bot_id);
+                          setExpandedId((prev) => (prev === bot.bot_id ? null : bot.bot_id));
+                        }}
+                        className="px-3 py-2 cursor-pointer hover:bg-white/[0.03] flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isExpanded ? <ChevronDown className="size-3 text-primary shrink-0" /> : <ChevronRight className="size-3 text-muted-foreground/60 shrink-0" />}
+                            <span className={cn("size-2 rounded-full shrink-0", isActive ? "bg-emerald-400" : "bg-muted-foreground/50")} />
+                            <span className="text-t4 font-bold font-mono text-foreground truncate">{bot.bot_id}</span>
+                            <span className="text-t1 font-mono text-primary font-semibold shrink-0">{shortInst}</span>
+                            <span className="text-t1 font-mono text-muted-foreground shrink-0">{shortTimeframe(bot.timeframe_ms)}</span>
+                          </div>
+                          <span className={cn("text-t4 font-bold font-mono tabular-nums shrink-0", toneOf(unrealized))}>
+                            {formatDecimal(unrealized, { sign: true, prefix: "$" })}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pl-4">
+                          <div className="flex items-center gap-1.5 min-w-0 font-mono text-t1">
+                            {hasPos && posVal ? (
+                              <>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded border font-bold leading-none whitespace-nowrap",
+                                  isShort ? "bg-rose-400/10 text-rose-400 border-rose-400/25" : "bg-emerald-400/10 text-emerald-400 border-emerald-400/25"
+                                )}>
+                                  {isShort ? "▼ 空" : "▲ 多"} {formatDecimal(magnitude(posVal), { digits: 0 })} 張
+                                </span>
+                                <span className="text-muted-foreground truncate tabular-nums">
+                                  {formatDecimal(notional, { prefix: "$" })}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground truncate font-sans">空手 · {bot.strategy_name}</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isActive ? (
+                              <button
+                                type="button"
+                                disabled={!controls.canStop || busyKey !== null}
+                                onClick={(e) => { e.stopPropagation(); void controls.stop(bot); }}
+                                className="px-1.5 py-0.5 rounded text-t1 font-mono border border-border/80 bg-background/60 text-muted-foreground hover:text-foreground disabled:opacity-40 cursor-pointer"
+                              >
+                                暫停
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={!controls.canStart || busyKey !== null}
+                                onClick={(e) => { e.stopPropagation(); void controls.start(bot); }}
+                                className="px-1.5 py-0.5 rounded text-t1 font-mono border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 disabled:opacity-40 cursor-pointer"
+                              >
+                                恢復
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); selectBot(bot.bot_id); navigate("/bots"); }}
+                              className="px-1.5 py-0.5 rounded text-t1 font-mono border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground inline-flex items-center gap-0.5 cursor-pointer"
+                            >
+                              詳情<ArrowUpRight className="size-2.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="px-3.5 py-2 bg-background/50 border-t border-border/50">
+                          {renderExpandedGrid(bot, hasPos, avgPx, markPx, botRisk)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : (
+            /* 寬表模式 (>= 480px)：按寬度階梯解鎖欄位 */
             <table className="w-full text-left border-collapse">
               <thead className="border-b border-border/80 bg-background/40 text-t1 font-mono text-muted-foreground sticky top-0 z-10 backdrop-blur-sm">
                 <tr>
@@ -214,6 +367,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                     const notional = pos?.notional ?? (botRisk ? botRisk.derived.notional : null);
                     const busyKey = controls.busy;
                     const shortInst = (bot.inst_id ?? "不適用").replace("-USDT-SWAP", "");
+                    const rowPy = isFlat ? "py-1.5" : "py-2.5";
 
                     return (
                       <Fragment key={bot.bot_id}>
@@ -229,8 +383,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                           )}
                           title="點擊展開均價、手續費、資金費率與交易所風控詳情"
                         >
-                          {/* 1. 實例 / 標的 */}
-                          <td className="py-2.5 pl-3 pr-2 max-w-[210px]">
+                          <td className={cn(rowPy, "pl-3 pr-2 max-w-[220px]")}>
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="text-muted-foreground/60 shrink-0">
                                 {isExpanded ? <ChevronDown className="size-3 text-primary" /> : <ChevronRight className="size-3" />}
@@ -263,8 +416,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                             </div>
                           </td>
 
-                          {/* 2. 部位 / 名目 */}
-                          <td className="px-2 py-2.5 font-mono">
+                          <td className={cn("px-2 font-mono", rowPy)}>
                             {hasPos && posVal ? (
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">
@@ -298,9 +450,8 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                             )}
                           </td>
 
-                          {/* 3. 均價 / 標記（卡片寬度 >= 740px 直接顯示；較窄時可點擊列展開檢視） */}
                           {showPriceCol && (
-                            <td className="px-2 py-2.5 text-right font-mono whitespace-nowrap tabular-nums">
+                            <td className={cn("px-2 text-right font-mono whitespace-nowrap tabular-nums", rowPy)}>
                               <div className="flex flex-col items-end">
                                 <span className="text-t3 font-medium text-foreground leading-tight">
                                   {hasPos ? formatDecimal(avgPx, { prefix: "$" }) : "空手"}
@@ -312,8 +463,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                             </td>
                           )}
 
-                          {/* 4. 未實現 / 權益 */}
-                          <td className="px-2 py-2.5 text-right font-mono whitespace-nowrap tabular-nums">
+                          <td className={cn("px-2 text-right font-mono whitespace-nowrap tabular-nums", rowPy)}>
                             <div className="flex flex-col items-end">
                               <span className={cn("text-t4 font-bold leading-tight", toneOf(unrealized))}>
                                 {formatDecimal(unrealized, { sign: true, prefix: "$" })}
@@ -324,9 +474,8 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                             </div>
                           </td>
 
-                          {/* 5. 風控 / P6 */}
                           {showRiskCol && (
-                            <td className="px-2 py-2.5 text-right font-mono whitespace-nowrap">
+                            <td className={cn("px-2 text-right font-mono whitespace-nowrap", rowPy)}>
                               <div className="flex flex-col items-end gap-0.5">
                                 {statusMeta ? (
                                   <span className={cn("px-1.5 py-0.5 rounded border text-t1 font-semibold leading-none whitespace-nowrap", statusMeta.className)}>
@@ -349,8 +498,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                             </td>
                           )}
 
-                          {/* 6. 操作（微型走勢只於卡片 >= 860px 顯示，任意寬度保證按鈕不切邊） */}
-                          <td className="py-2.5 pr-3 pl-2 text-right whitespace-nowrap">
+                          <td className={cn("pr-3 pl-2 text-right whitespace-nowrap", rowPy)}>
                             <div className="flex items-center justify-end gap-1.5">
                               {showSpark && spark.path && (
                                 <svg width={48} height={16} className="overflow-visible shrink-0">
@@ -408,48 +556,10 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                           </td>
                         </tr>
 
-                        {/* 原地展開：均價/標記、帳務與次要交易所風控明細 */}
                         {isExpanded && (
                           <tr className="bg-background/50">
                             <td colSpan={colSpan} className="px-4 py-2.5 border-b border-border/60">
-                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 font-mono text-t1">
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">均價 / 標記價</span>
-                                  <span className="text-foreground font-semibold tabular-nums">
-                                    {hasPos ? formatDecimal(avgPx, { prefix: "$" }) : "空手"} / {formatDecimal(markPx, { prefix: "$" })}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">已實現損益</span>
-                                  <span className={cn("font-semibold tabular-nums", toneOf(bot.realized_pnl))}>
-                                    {formatDecimal(bot.realized_pnl, { sign: true, prefix: "$" })}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">手續費累計</span>
-                                  <span className="text-rose-400 font-semibold tabular-nums">
-                                    {formatDecimal(bot.fees, { prefix: "$", digits: 4 })}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">風控期間損益</span>
-                                  <span className={cn("font-semibold tabular-nums", toneOf(botRisk?.derived.period_pnl))}>
-                                    {botRisk
-                                      ? `${formatDecimal(botRisk.derived.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(botRisk.derived.period_pnl_ratio)})`
-                                      : "不適用"}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">資金費 / 強平墊</span>
-                                  <span className="text-muted-foreground">合成 funding=0 · 無模型</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground block font-sans">帳戶來源 / run</span>
-                                  <span className="text-foreground">
-                                    {bot.account_source ? ACCOUNT_SOURCE_LABEL[bot.account_source] : "無觀測"} · {shortId(bot.current_run_id)}
-                                  </span>
-                                </div>
-                              </div>
+                              {renderExpandedGrid(bot, hasPos, avgPx, markPx, botRisk)}
                             </td>
                           </tr>
                         )}
@@ -472,10 +582,18 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
         <div className="px-3 py-1.5 border-t border-border/70 bg-secondary/25 flex items-center justify-between gap-2 text-t1 font-mono text-muted-foreground shrink-0 flex-wrap">
           <div className="flex items-center gap-2">
             <span>持倉: <strong className="text-foreground">{openCount}</strong></span>
-            <span className="text-border">|</span>
-            <span>結算: <strong className="text-foreground">{settlementLabel(summary?.invariants.settlement)}</strong></span>
-            <span className="text-border hidden xl:inline">|</span>
-            <span className="text-muted-foreground/70 hidden xl:inline font-sans">點擊任一列展開風控明細</span>
+            {dims.width >= 380 && (
+              <>
+                <span className="text-border">|</span>
+                <span>結算: <strong className="text-foreground">{settlementLabel(summary?.invariants.settlement)}</strong></span>
+              </>
+            )}
+            {dims.width >= 680 && (
+              <>
+                <span className="text-border">|</span>
+                <span className="text-muted-foreground/70 font-sans">點擊任一列展開風控明細</span>
+              </>
+            )}
           </div>
           <span>平倉出口 v1 未接線</span>
         </div>
