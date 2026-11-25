@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CatOS · 帳戶權益與損益 6 方案互動對照</title>
+<title>CatOS · 帳戶權益與損益 5 方案（零小卡片 · 日損安全墊版）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,10 +20,11 @@
   --down: oklch(0.64 0.2 22);
   --warn: oklch(0.8 0.15 75);
   --border: oklch(0.42 0.009 260 / 38%);
+  --hairline: oklch(0.42 0.009 260 / 28%);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-sans: "Work Sans", "Noto Sans TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
 
-  /* 已定案緊湊終端字級 10.5 / 11.5 / 12.5 / 13.5 */
+  /* 定案緊湊終端字級 10.5 / 11.5 / 12.5 / 13.5 */
   --t1: 10.5px;
   --t2: 11.5px;
   --t3: 12.5px;
@@ -45,7 +46,7 @@ body { padding-bottom: 78px; }
 /* 頂部控制列 */
 .topbar {
   position: sticky; top: 0; z-index: 40;
-  background: color-mix(in oklab, var(--background) 92%, black);
+  background: color-mix(in oklab, var(--background) 93%, black);
   border-bottom: 1px solid var(--border); backdrop-filter: blur(8px);
   padding: 10px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
 }
@@ -62,13 +63,13 @@ body { padding-bottom: 78px; }
 .wrap { max-width: 1540px; margin: 0 auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 22px; }
 
 .opt-box {
-  border: 1px solid var(--border); border-radius: 9px;
-  background: color-mix(in oklab, var(--surface) 34%, transparent);
+  border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in oklab, var(--surface) 32%, transparent);
   padding: 13px 15px 15px; display: flex; flex-direction: column; gap: 10px;
 }
-.opt-box.selected { border-color: color-mix(in oklab, var(--primary) 68%, transparent); background: color-mix(in oklab, var(--primary) 4.5%, var(--surface)); }
+.opt-box.selected { border-color: color-mix(in oklab, var(--primary) 70%, transparent); background: color-mix(in oklab, var(--primary) 4%, var(--surface)); }
 .opt-meta { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.opt-left { display: flex; flex-direction: column; gap: 4px; }
+.opt-left { display: flex; flex-direction: column; gap: 3px; }
 .opt-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .opt-key { font: 700 13px var(--font-mono); color: var(--primary); }
 .opt-name { font-size: 14px; font-weight: 700; }
@@ -113,98 +114,92 @@ body { padding-bottom: 78px; }
 .cat-tabs span { font-family: var(--font-mono); font-size: var(--t2); padding: 2px 7px; border-radius: 4px; color: var(--muted-foreground); }
 .cat-tabs span.active { background: color-mix(in oklab, var(--primary) 15%, transparent); border: 1px solid color-mix(in oklab, var(--primary) 45%, transparent); color: var(--primary); font-weight: 600; }
 
-/* 現行版還原 */
-.ref-body { flex: 1; min-height: 0; display: flex; }
-.ref-left { width: 244px; flex-shrink: 0; border-right: 1px solid color-mix(in oklab, var(--border) 70%, transparent); background: color-mix(in oklab, var(--background) 20%, transparent); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; }
-.ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 1px solid color-mix(in oklab, var(--border) 60%, transparent); padding-top: 10px; }
+/* ==================== 共用無框元素（零嵌套小卡） ==================== */
 .chart-col { flex: 1; min-width: 0; min-height: 0; padding: 9px 12px 8px; display: flex; flex-direction: column; position: relative; }
-
-/* 方案 A：左欄微卡片格（對齊曝險方案 B） */
-.a-left {
-  width: 258px; flex-shrink: 0; border-right: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--background) 22%, transparent);
-  padding: 9px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 7px;
-}
-.a-hero {
-  padding: 6px 9px; border-radius: 5px;
-  background: color-mix(in oklab, var(--background) 58%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
-}
-.a-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; min-height: 0; }
-.a-cell {
-  padding: 5px 8px; border-radius: 5px;
-  background: rgb(255 255 255 / 0.022); border: 1px solid rgb(255 255 255 / 0.055);
-  display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0;
-}
-.a-cell .l { font-size: var(--t1); color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.a-cell .v { font-family: var(--font-mono); font-size: var(--t3); font-weight: 700; white-space: nowrap; }
-.a-cell .s { font-family: var(--font-mono); font-size: var(--t1); color: color-mix(in oklab, var(--muted-foreground) 72%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* 方案 B：頂部全寬 KPI 帶 + 滿寬走勢圖 */
-.b-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.b-strip {
-  display: grid; grid-template-columns: 1.85fr 1fr 1fr 1fr 1fr;
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--background) 34%, transparent); flex-shrink: 0;
-}
-.b-slot { padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; border-right: 1px solid color-mix(in oklab, var(--border) 50%, transparent); }
-.b-slot:last-child { border-right: 0; }
-
-/* 方案 C：左欄緊湊 4 橫條 */
-.c-left {
-  width: 236px; flex-shrink: 0; border-right: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--background) 22%, transparent);
-  padding: 9px 10px; display: flex; flex-direction: column; justify-content: space-between; gap: 7px;
-}
-.c-rows { display: flex; flex-direction: column; gap: 4px; flex: 1; justify-content: center; }
-.c-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 4px 8px; border-radius: 4px;
-  background: rgb(255 255 255 / 0.022); border: 1px solid rgb(255 255 255 / 0.05);
-}
-.c-row .l { font-size: var(--t1); color: var(--muted-foreground); white-space: nowrap; }
-.c-row .v { font-family: var(--font-mono); font-size: var(--t2); font-weight: 600; white-space: nowrap; }
-
-/* 方案 D：圖內嵌左上大權益 HUD + 右側 4 格直排（填掉走勢圖左上死黑！） */
-.d-body { flex: 1; min-height: 0; display: flex; }
-.d-hud {
-  position: absolute; top: 10px; left: 14px; z-index: 4; pointer-events: none;
-  padding: 7px 11px; border-radius: 6px;
-  background: color-mix(in oklab, var(--background) 78%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  backdrop-filter: blur(4px);
-}
-.d-right {
-  width: 196px; flex-shrink: 0; border-left: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  background: color-mix(in oklab, var(--background) 25%, transparent);
-  padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; gap: 5px;
-}
-.d-cell {
-  flex: 1; padding: 4px 8px; border-radius: 4px;
-  background: rgb(255 255 255 / 0.022); border: 1px solid rgb(255 255 255 / 0.05);
-  display: flex; flex-direction: column; justify-content: center; gap: 1px;
-}
-
-/* 方案 E：上權益曲線 + 下水下回撤副圖 */
-.e-charts { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
-
-/* 方案 F：左欄含日損風控距離條（Soft -5% / Hard -10% 安全墊） */
-.f-meter {
-  padding: 6px 8px; border-radius: 5px;
-  background: color-mix(in oklab, var(--background) 55%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
-  display: flex; flex-direction: column; gap: 4px;
-}
-.f-track { position: relative; height: 6px; border-radius: 99px; background: rgb(255 255 255 / 0.08); overflow: hidden; }
-.f-zone-hard { position: absolute; left: 0; width: 25%; top: 0; bottom: 0; background: rgb(244 63 94 / 0.28); }
-.f-zone-soft { position: absolute; left: 25%; width: 25%; top: 0; bottom: 0; background: rgb(245 158 11 / 0.24); }
-.f-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.4); }
-.f-pin { position: absolute; left: 56.4%; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: #34d399; }
-
-/* 圖表頂部列 */
 .chart-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-shrink: 0; }
 .stat-pills { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: var(--t1); color: var(--muted-foreground); white-space: nowrap; }
 .stat-pills b { font-weight: 600; }
+
+/* 裸尺：日損風控安全墊（無外框盒，純精密刻度線） */
+.cushion-bare { display: flex; flex-direction: column; gap: 4px; }
+.cushion-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: var(--t1); }
+.cushion-track { position: relative; height: 6px; border-radius: 2px; background: rgb(255 255 255 / 0.07); overflow: visible; }
+.cushion-seg-hard { position: absolute; left: 0; width: 25%; top: 0; bottom: 0; background: rgb(244 63 94 / 0.34); border-radius: 2px 0 0 2px; }
+.cushion-seg-soft { position: absolute; left: 25%; width: 25%; top: 0; bottom: 0; background: rgb(245 158 11 / 0.28); }
+.cushion-seg-pos  { position: absolute; left: 50%; width: 6.4%; top: 0; bottom: 0; background: rgb(52 211 153 / 0.35); }
+.cushion-tick { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgb(255 255 255 / 0.22); }
+.cushion-tick.zero { background: rgb(255 255 255 / 0.55); }
+.cushion-pin { position: absolute; top: -2px; bottom: -2px; left: 56.4%; width: 3px; border-radius: 1.5px; background: #34d399; transform: translateX(-50%); }
+.cushion-scale { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 9.5px; color: var(--muted-foreground); line-height: 1; }
+
+/* 純髮絲帳本列（無圓角、無底色、僅 1px 底線） */
+.ledger-list { display: flex; flex-direction: column; }
+.ledger-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 5px 0; border-bottom: 1px solid var(--hairline);
+}
+.ledger-row:first-child { border-top: 1px solid var(--hairline); }
+.ledger-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.ledger-row .k { font-size: var(--t2); color: var(--muted-foreground); white-space: nowrap; }
+.ledger-row .v { font-family: var(--font-mono); font-size: var(--t3); font-weight: 600; white-space: nowrap; }
+.ledger-row .sub { font-family: var(--font-mono); font-size: var(--t1); color: color-mix(in oklab, var(--muted-foreground) 72%, transparent); margin-left: 5px; font-weight: 400; }
+
+/* 方案 1：雙欄髮絲帳本 */
+.v1-body { flex: 1; min-height: 0; display: flex; }
+.v1-left {
+  width: 248px; flex-shrink: 0; border-right: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+  background: color-mix(in oklab, var(--background) 22%, transparent);
+  padding: 10px 13px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+}
+
+/* 方案 2：頂部髮絲數據帶 + 滿寬走勢圖 + 底部全寬安全墊 */
+.v2-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v2-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  background: color-mix(in oklab, var(--background) 28%, transparent); flex-shrink: 0;
+}
+.v2-item {
+  padding: 5px 11px; display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0;
+  border-right: 1px solid var(--hairline);
+}
+.v2-item.hero { flex: 1.85; }
+.v2-item:last-child { border-right: 0; }
+.v2-foot {
+  padding: 5px 12px 6px; border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+  background: color-mix(in oklab, var(--background) 24%, transparent); flex-shrink: 0;
+}
+
+/* 方案 3：左欄緊湊帳本 + 右側雙圖（權益 + 水下回撤） */
+.e-charts { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; }
+
+/* 方案 4：全寬無界畫布（左上裸字印記 + 底部一體收邊安全墊） */
+.v4-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.v4-canvas { flex: 1; min-height: 0; position: relative; padding: 8px 12px 4px; display: flex; flex-direction: column; }
+.v4-stamp {
+  position: absolute; top: 8px; left: 14px; z-index: 4; pointer-events: none;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.v4-inline-kv { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: var(--t1); color: var(--muted-foreground); flex-wrap: wrap; }
+.v4-inline-kv b { font-weight: 600; }
+
+/* 方案 5：左無框帳本 + 中走勢圖 + 右側垂直日損溫度計量表 */
+.v5-body { flex: 1; min-height: 0; display: flex; }
+.v5-gauge {
+  width: 82px; flex-shrink: 0; border-left: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
+  background: color-mix(in oklab, var(--background) 24%, transparent);
+  padding: 8px 8px; display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 5px;
+}
+.vg-inner { flex: 1; min-height: 0; display: flex; align-items: stretch; justify-content: center; gap: 6px; padding: 2px 0; }
+.vg-bar {
+  position: relative; width: 9px; border-radius: 2px; background: rgb(255 255 255 / 0.07);
+}
+.vg-hard { position: absolute; left: 0; right: 0; bottom: 0; height: 25%; background: rgb(244 63 94 / 0.38); border-radius: 0 0 2px 2px; }
+.vg-soft { position: absolute; left: 0; right: 0; bottom: 25%; height: 25%; background: rgb(245 158 11 / 0.30); }
+.vg-pos  { position: absolute; left: 0; right: 0; bottom: 50%; height: 6.4%; background: rgb(52 211 153 / 0.45); }
+.vg-zero { position: absolute; left: -2px; right: -2px; bottom: 50%; height: 1px; background: rgba(255,255,255,0.55); }
+.vg-pin  { position: absolute; left: -3px; right: -3px; bottom: 56.4%; height: 3px; border-radius: 1.5px; background: #34d399; transform: translateY(50%); }
+.vg-labels { display: flex; flex-direction: column; justify-content: space-between; font-family: var(--font-mono); font-size: 9.5px; line-height: 1; }
 
 /* 右側已定案曝險額度方案 B 複製品 */
 .exp-b-body { flex: 1; min-height: 0; display: flex; align-items: stretch; gap: 14px; padding: 8px 14px; }
@@ -234,8 +229,8 @@ body { padding-bottom: 78px; }
 
 <header class="topbar">
   <div class="topbar-title">
-    <h1>帳戶權益與損益 · 6 方案互動對照</h1>
-    <span>右側並排已定案「曝險額度 方案 B」 · 走勢圖皆可懸停看點</span>
+    <h1>帳戶權益與損益 · 5 方案（零四格小卡片 · 融入日損風控安全墊）</h1>
+    <span>純髮絲線與精密刻度 · 右側並排已定案「曝險額度 方案 B」</span>
   </div>
 
   <div class="ctrl">
@@ -270,7 +265,6 @@ const CURVE_PCT = [
   0.65, 0.6, 0.52, 0.6, 0.65, 0.5, 0.9, 3.3, 2.8, 3.8, 3.6, 4.3, 3.7, 4.2, 4.0, 3.9, 4.1, 5.6,
   5.5, 6.2, 7.1, 8.6, 10.2, 10.0, 9.2, 10.1, 9.4, 9.5, 11.9, 10.8, 11.4, 10.2, 9.5, 10.6, 11.4, 11.7
 ];
-// 計算每點水下回撤 (%)
 const CURVE_DD = (() => {
   let peak = 100;
   return CURVE_PCT.map(p => {
@@ -280,11 +274,7 @@ const CURVE_DD = (() => {
   });
 })();
 
-const state = {
-  height: 265,
-  axis: "pct",
-  picked: "A",
-};
+const state = { height: 265, axis: "pct", picked: "1" };
 
 function fmtAxis(pct) {
   if (state.axis === "usd") {
@@ -295,19 +285,17 @@ function fmtAxis(pct) {
 }
 
 function buildMainSvg(opts = {}) {
-  const { brightGrid = true, showPeakCallout = false, withDrawdown = false, compactX = false } = opts;
-  const W = 460;
-  const H = withDrawdown ? 114 : 158;
-  const plotW = 406;
-  const plotH = withDrawdown ? 104 : 134;
+  const { showPeak = false, withDrawdown = false, compactX = false, flatH = false } = opts;
+  const W = flatH ? 640 : 460;
+  const H = withDrawdown ? 112 : flatH ? 104 : 158;
+  const plotW = flatH ? 584 : 406;
+  const plotH = withDrawdown ? 102 : flatH ? 84 : 134;
   const lo = -1.5, hi = 13.5;
   const gx = (i) => (i / (CURVE_PCT.length - 1)) * plotW;
   const gy = (v) => 8 + ((hi - v) / (hi - lo)) * (plotH - 14);
   const pts = CURVE_PCT.map((v, i) => `${i === 0 ? "M" : "L"}${gx(i).toFixed(1)},${gy(v).toFixed(1)}`).join("");
   const zY = gy(0).toFixed(1);
   const area = `${pts}L${plotW},${zY}L0,${zY}Z`;
-  const gridStroke = brightGrid ? "rgba(255,255,255,0.11)" : "rgba(255,255,255,0.045)";
-  const zeroStroke = brightGrid ? "rgba(232,180,94,0.38)" : "rgba(255,255,255,0.12)";
   const ticks = [0, 5, 10];
   const peakIdx = 46, lastIdx = CURVE_PCT.length - 1;
 
@@ -315,20 +303,20 @@ function buildMainSvg(opts = {}) {
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;flex:${withDrawdown ? "1.8" : "1"};min-height:0;overflow:visible">
       <defs>
         <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#e8b45e" stop-opacity="${brightGrid ? 0.24 : 0.17}"/>
+          <stop offset="0%" stop-color="#e8b45e" stop-opacity="0.23"/>
           <stop offset="100%" stop-color="#e8b45e" stop-opacity="0"/>
         </linearGradient>
       </defs>
       ${ticks.map(t => `
         <line x1="0" x2="${plotW}" y1="${gy(t).toFixed(1)}" y2="${gy(t).toFixed(1)}"
-          stroke="${t === 0 ? zeroStroke : gridStroke}" ${t === 0 ? "" : 'stroke-dasharray="3 3"'} stroke-width="${t === 0 ? 1 : 0.8}" />
+          stroke="${t === 0 ? "rgba(232,180,94,0.36)" : "rgba(255,255,255,0.10)"}" ${t === 0 ? "" : 'stroke-dasharray="3 3"'} stroke-width="${t === 0 ? 1 : 0.8}" />
         <text x="${plotW + 7}" y="${(gy(t) + 3.5).toFixed(1)}" font-family="var(--font-mono)" font-size="10.5"
           fill="${t === 0 ? "#e8b45e" : "#a1a1aa"}" font-weight="${t === 0 ? 600 : 400}">${fmtAxis(t)}</text>
       `).join("")}
       <path d="${area}" fill="url(#eqGrad)" />
       <path d="${pts}" fill="none" stroke="#e8b45e" stroke-width="1.85" stroke-linejoin="round" />
       <circle cx="${gx(lastIdx).toFixed(1)}" cy="${gy(CURVE_PCT[lastIdx]).toFixed(1)}" r="3.2" fill="#e8b45e" stroke="#18181b" stroke-width="1.5" />
-      ${showPeakCallout ? `
+      ${showPeak ? `
         <circle cx="${gx(peakIdx).toFixed(1)}" cy="${gy(CURVE_PCT[peakIdx]).toFixed(1)}" r="2.5" fill="#34d399" />
         <text x="${(gx(peakIdx) - 5).toFixed(1)}" y="${(gy(CURVE_PCT[peakIdx]) - 5).toFixed(1)}" text-anchor="end" font-family="var(--font-mono)" font-size="10" fill="#34d399" font-weight="600">高 +11.9%</text>
       ` : ""}
@@ -346,13 +334,10 @@ function buildMainSvg(opts = {}) {
 
   if (!withDrawdown) return mainSvg;
 
-  // 水下回撤副圖
-  const ddH = 54, ddPlotH = 34;
-  const ddLo = -2.6;
+  const ddH = 54, ddPlotH = 34, ddLo = -2.6;
   const ddy = (v) => 3 + ((0 - v) / (0 - ddLo)) * (ddPlotH - 5);
   const ddPts = CURVE_DD.map((v, i) => `${i === 0 ? "M" : "L"}${gx(i).toFixed(1)},${ddy(v).toFixed(1)}`).join("");
   const ddArea = `${ddPts}L${plotW},3L0,3Z`;
-
   const ddSvg = `
     <svg viewBox="0 0 ${W} ${ddH}" preserveAspectRatio="none" style="width:100%;flex:0.85;min-height:0;overflow:visible">
       <line x1="0" x2="${plotW}" y1="3" y2="3" stroke="rgba(255,255,255,0.16)" stroke-width="0.8"/>
@@ -371,6 +356,33 @@ function buildMainSvg(opts = {}) {
     </svg>
   `;
   return `<div class="e-charts">${mainSvg}${ddSvg}</div>`;
+}
+
+function cushionBarHtml(fullWidth = false) {
+  return `
+    <div class="cushion-bare">
+      <div class="cushion-top">
+        <span class="c-muted">日損風控安全墊${fullWidth ? "（R1 台北 00:00 日切 · 基準 $11,029.26）" : ""}</span>
+        <span class="mono c-up" style="font-weight:600">${fullWidth ? "目前 +1.28% · " : ""}距 Soft 6.28%</span>
+      </div>
+      <div class="cushion-track">
+        <span class="cushion-seg-hard"></span>
+        <span class="cushion-seg-soft"></span>
+        <span class="cushion-seg-pos"></span>
+        <span class="cushion-tick" style="left:25%"></span>
+        <span class="cushion-tick zero" style="left:50%"></span>
+        ${fullWidth ? `<span class="cushion-tick" style="left:75%"></span>` : ""}
+        <span class="cushion-pin" title="目前 +1.28%"></span>
+      </div>
+      <div class="cushion-scale">
+        <span class="c-down">Hard -10%</span>
+        <span class="c-warn">Soft -5%</span>
+        <span>0%</span>
+        ${fullWidth ? `<span>+5%</span>` : ""}
+        <span class="c-up">+10%</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderExposureRef() {
@@ -436,107 +448,71 @@ function getOptions() {
   const short = state.height <= 240;
   return [
     {
-      key: "REF",
-      name: "現行版（對照組 · 你剛貼的截圖 1:1）",
-      tag: "原版",
-      desc: "左欄中間浮出一塊黑洞；右圖格線太暗、右上「懸停檢視各 K 線權益」沒提供數據；無框散排與右邊「曝險額度方案 B」風格斷裂。",
-      html: `
-        <div class="cat-card">
-          ${CARD_HEAD}
-          <div class="ref-body">
-            <div class="ref-left">
-              <div>
-                <div class="c-muted" style="font-size:var(--t2)">帳戶總權益</div>
-                <div class="mono" style="font-size:24px;font-weight:700;line-height:1.15">$11,170.47</div>
-                <div class="mono c-up" style="font-size:var(--t3);font-weight:600">+$141.21 (+1.28%)</div>
-              </div>
-              <div class="ref-grid">
-                <div><div class="c-muted" style="font-size:var(--t2)">已實現損益</div><div class="mono c-up" style="font-size:var(--t3);font-weight:600">+$88.35</div>${!short ? `<div class="c-muted mono" style="font-size:var(--t1)">OKX 模擬子帳戶</div>` : ""}</div>
-                <div><div class="c-muted" style="font-size:var(--t2)">未實現損益</div><div class="mono c-up" style="font-size:var(--t3);font-weight:600">+$1,088.49</div>${!short ? `<div class="c-muted mono" style="font-size:var(--t1)">標記 $91,265.8</div>` : ""}</div>
-                <div><div class="c-muted" style="font-size:var(--t2)">風控期間基準</div><div class="mono" style="font-size:var(--t3);font-weight:600">$11,029.26</div>${!short ? `<div class="c-muted mono" style="font-size:var(--t1)">11/16 00:00</div>` : ""}</div>
-                <div><div class="c-muted" style="font-size:var(--t2)">手續費累計</div><div class="mono c-down" style="font-size:var(--t3);font-weight:600">$6.3700</div>${!short ? `<div class="c-muted mono" style="font-size:var(--t1)">上限 1.0x</div>` : ""}</div>
-              </div>
-            </div>
-            <div class="chart-col">
-              <div class="chart-bar">
-                <span class="mono c-muted" style="font-size:var(--t2)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>本次 run 權益曲線 · 138 點</span>
-                <span class="mono c-muted" style="font-size:var(--t1);opacity:.55">懸停檢視各 K 線權益</span>
-              </div>
-              ${buildMainSvg({ brightGrid: false })}
-            </div>
-          </div>
-        </div>
-      `
-    },
-    {
-      key: "A",
-      name: "方案 A：左欄微底色方格（與曝險方案 B 雙胞胎）＋右圖補區間統計",
-      tag: "最統一 · 推薦",
+      key: "1",
+      name: "方案 1：雙欄髮絲帳本（無小卡片 · 左欄裸尺安全墊＋純線明細）",
+      tag: "最耐看 · 推薦",
       rec: true,
-      desc: "左欄全部用跟右卡曝險方案 B 同款的微底色方格填滿高度，零中間黑洞；標明「日切 +1.28%」避免與未實現混淆；右圖頂部改放累計報酬／最高／回撤統計並調亮格線。",
+      desc: "徹底拿掉嵌套圓角方格！左欄只用字級對比與 1px 髮絲線：頂部總權益＋日切損益 → 中段裸尺「日損風控安全墊」→ 底部 4 行純線對齊帳本，像 Bloomberg / 銀行對帳單般冷靜俐落。",
       html: `
         <div class="cat-card">
           ${CARD_HEAD}
-          <div class="ref-body">
-            <div class="a-left">
-              <div class="a-hero">
-                <div style="display:flex;justify-content:space-between;align-items:center;font-size:var(--t1)">
-                  <span class="c-muted">帳戶總權益</span>
-                  <span class="mono c-up" style="font-weight:600">日切 +1.28%</span>
+          <div class="v1-body">
+            <div class="v1-left" style="${short ? "padding:7px 12px;gap:5px" : ""}">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+                <div>
+                  ${!short ? `<div class="c-muted" style="font-size:var(--t1)">帳戶總權益</div>` : ""}
+                  <div class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.12">$11,170.47</div>
                 </div>
-                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:2px">
-                  <span class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.1">$11,170.47</span>
-                  <span class="mono c-up" style="font-size:var(--t2);font-weight:600">+$141.21</span>
+                <div style="text-align:right">
+                  <div class="mono c-up" style="font-size:var(--t3);font-weight:700">+$141.21</div>
+                  <div class="mono c-up" style="font-size:var(--t1)">日切 +1.28%</div>
                 </div>
               </div>
-              <div class="a-grid">
-                <div class="a-cell"><span class="l">已實現損益</span><span class="v c-up">+$88.35</span>${!short ? `<span class="s">OKX 模擬子帳戶</span>` : ""}</div>
-                <div class="a-cell"><span class="l">未實現損益</span><span class="v c-up">+$1,088.49</span>${!short ? `<span class="s">標記 $91,265.8</span>` : ""}</div>
-                <div class="a-cell"><span class="l">風控基準</span><span class="v">$11,029.26</span>${!short ? `<span class="s">11/16 00:00</span>` : ""}</div>
-                <div class="a-cell"><span class="l">手續費累計</span><span class="v c-down">$6.3700</span>${!short ? `<span class="s">上限 1.0x</span>` : ""}</div>
+              ${cushionBarHtml(false)}
+              <div class="ledger-list">
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">已實現損益</span><span class="v c-up">+$88.35</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">未實現損益</span><span class="v c-up">+$1,088.49</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">風控基準</span><span class="v">$11,029.26</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">手續費累計</span><span class="v c-down">$6.3700</span></div>
               </div>
             </div>
             <div class="chart-col">
               <div class="chart-bar">
-                <span class="mono c-muted" style="font-size:var(--t2)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 曲線 · 138 點</span>
+                <span class="mono c-muted" style="font-size:var(--t2)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 權益曲線 · 138 點</span>
                 <div class="stat-pills">
                   <span>累計 <b class="c-up">+11.70%</b></span>
                   <span>最高 <b style="color:var(--foreground)">+11.9%</b></span>
                   <span>回撤 <b class="c-down">-2.1%</b></span>
                 </div>
               </div>
-              ${buildMainSvg({ brightGrid: true })}
+              ${buildMainSvg({ showPeak: false })}
             </div>
           </div>
         </div>
       `
     },
     {
-      key: "B",
-      name: "方案 B：頂部全寬 5 格 KPI 帶 ＋ 100% 滿寬走勢圖（去左欄）",
-      tag: "最寬闊 · 適合 30% 扁高",
-      desc: "取消左側直欄，把 5 組數字整齊排在卡片頂部一整排，下面 100% 寬度都給走勢圖。圖表橫向拉開不顯空曠，完全沒有左欄上下對齊困擾。",
+      key: "2",
+      name: "方案 2：三段水平分層（頂部髮絲數據帶 ＋ 滿寬曲線 ＋ 底部全寬安全墊尺）",
+      tag: "全寬駕駛艙感 · 零窄圖",
+      desc: "不用左右切割！上層用 1px 細豎線水平排開 5 組核心數據；中層 100% 滿寬走勢圖；底層橫貫全卡的「日損風控安全墊」長標尺（含 -10% / -5% / 0% / +5% / +10% 完整刻度），視覺張力與精準感最強。",
       html: `
         <div class="cat-card">
           ${CARD_HEAD}
-          <div class="b-body">
-            <div class="b-strip">
-              <div class="b-slot">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:4px">
-                  <span class="c-muted" style="font-size:var(--t1)">帳戶總權益</span>
-                  <span class="mono c-up" style="font-size:var(--t1);font-weight:600">日切 +1.28%</span>
-                </div>
-                <div class="mono" style="display:flex;align-items:baseline;justify-content:space-between;gap:6px;white-space:nowrap">
-                  <b style="font-size:15px">$11,170.47</b>
-                  <span class="c-up" style="font-size:var(--t2);font-weight:600">+$141.21</span>
+          <div class="v2-body">
+            <div class="v2-strip">
+              <div class="v2-item hero">
+                <span class="c-muted" style="font-size:var(--t1)">帳戶總權益</span>
+                <div class="mono" style="display:flex;align-items:baseline;gap:8px;white-space:nowrap">
+                  <b style="font-size:16px">$11,170.47</b>
+                  <span class="c-up" style="font-size:var(--t2);font-weight:600">+$141.21 (+1.28%)</span>
                 </div>
               </div>
-              <div class="b-slot"><span class="c-muted" style="font-size:var(--t1)">已實現損益</span><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$88.35</span></div>
-              <div class="b-slot"><span class="c-muted" style="font-size:var(--t1)">未實現損益</span><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$1,088.49</span></div>
-              <div class="b-slot"><span class="c-muted" style="font-size:var(--t1)">風控期間基準</span><span class="mono" style="font-size:var(--t3);font-weight:600">$11,029.26</span></div>
-              <div class="b-slot"><span class="c-muted" style="font-size:var(--t1)">手續費累計</span><span class="mono c-down" style="font-size:var(--t3);font-weight:600">$6.3700</span></div>
+              <div class="v2-item"><span class="c-muted" style="font-size:var(--t1)">已實現</span><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$88.35</span></div>
+              <div class="v2-item"><span class="c-muted" style="font-size:var(--t1)">未實現</span><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$1,088.49</span></div>
+              <div class="v2-item"><span class="c-muted" style="font-size:var(--t1)">手續費</span><span class="mono c-down" style="font-size:var(--t3);font-weight:600">$6.3700</span></div>
             </div>
-            <div class="chart-col" style="padding-top:6px">
+            <div class="chart-col" style="padding:6px 12px 3px">
               <div class="chart-bar">
                 <span class="mono c-muted" style="font-size:var(--t1)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 曲線 · 138 點 · 標記 $91,265.80</span>
                 <div class="stat-pills">
@@ -545,101 +521,41 @@ function getOptions() {
                   <span>回撤 <b class="c-down">-2.1%</b></span>
                 </div>
               </div>
-              ${buildMainSvg({ brightGrid: true, showPeakCallout: true })}
+              ${buildMainSvg({ showPeak: true, flatH: true })}
+            </div>
+            <div class="v2-foot">
+              ${cushionBarHtml(true)}
             </div>
           </div>
         </div>
       `
     },
     {
-      key: "C",
-      name: "方案 C：左欄緊湊 4 橫條（呼應曝險明細列節奏）＋高點標記",
-      tag: "最高資訊密度",
-      desc: "左欄改成「標籤左、數字右」的 4 條緊湊橫列，跟右邊曝險明細列視覺節奏一致，省出寬度讓曲線更舒展，完全不留任何無效黑空。",
-      html: `
-        <div class="cat-card">
-          ${CARD_HEAD}
-          <div class="ref-body">
-            <div class="c-left">
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:var(--t1)"><span class="c-muted">帳戶總權益</span><span class="mono c-up" style="font-weight:600">日切 +1.28%</span></div>
-                <div class="mono" style="font-size:${short ? "20px" : "22px"};font-weight:700;line-height:1.12;margin-top:2px">$11,170.47</div>
-                <div class="mono c-up" style="font-size:var(--t2);font-weight:600">風控期間 +$141.21</div>
-              </div>
-              <div class="c-rows">
-                <div class="c-row"><span class="l">已實現損益</span><span class="v c-up">+$88.35</span></div>
-                <div class="c-row"><span class="l">未實現損益</span><span class="v c-up">+$1,088.49</span></div>
-                <div class="c-row"><span class="l">風控基準</span><span class="v">$11,029.26</span></div>
-                <div class="c-row"><span class="l">手續費累計</span><span class="v c-down">$6.3700</span></div>
-              </div>
-            </div>
-            <div class="chart-col">
-              <div class="chart-bar">
-                <span class="mono c-muted" style="font-size:var(--t2)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 曲線 · 138 點</span>
-                <div class="stat-pills">
-                  <span>標記 <b style="color:var(--foreground)">$91,265.8</b></span>
-                  <span>累計 <b class="c-up">+11.70%</b></span>
-                  <span>回撤 <b class="c-down">-2.1%</b></span>
-                </div>
-              </div>
-              ${buildMainSvg({ brightGrid: true, showPeakCallout: true })}
-            </div>
-          </div>
-        </div>
-      `
-    },
-    {
-      key: "D",
-      name: "方案 D：圖內嵌左上大權益 HUD ＋ 右側 4 格直排（直接消滅圖表左上黑洞）",
-      tag: "TradingView 風格 · 零死黑",
-      desc: "直接把「帳戶總權益 $11,170.47」當成半透明浮動 HUD 嵌在走勢圖左上方原本最空的黑洞裡！右側縮成 196px 俐落直排 4 格 KPI，整張卡完全沒有空曠感。",
-      html: `
-        <div class="cat-card">
-          ${CARD_HEAD}
-          <div class="d-body">
-            <div class="chart-col" style="padding:8px 12px">
-              <div class="d-hud">
-                <div style="display:flex;align-items:center;gap:8px;font-size:var(--t1)">
-                  <span class="c-muted">帳戶總權益</span>
-                  <span class="mono c-up" style="font-weight:600">日切 +$141.21 (+1.28%)</span>
-                </div>
-                <div class="mono" style="font-size:22px;font-weight:700;line-height:1.12;margin-top:2px">$11,170.47</div>
-                <div class="mono c-muted" style="font-size:var(--t1);margin-top:2px">138 點 · 累計 <b class="c-up">+11.70%</b> · 回撤 <b class="c-down">-2.1%</b></div>
-              </div>
-              ${buildMainSvg({ brightGrid: true, showPeakCallout: true })}
-            </div>
-            <div class="d-right">
-              <div class="d-cell"><span class="c-muted" style="font-size:var(--t1)">已實現損益</span><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$88.35</span></div>
-              <div class="d-cell"><span class="c-muted" style="font-size:var(--t1)">未實現損益</span><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$1,088.49</span><span class="mono c-muted" style="font-size:var(--t1)">$91.3k</span></div></div>
-              <div class="d-cell"><span class="c-muted" style="font-size:var(--t1)">風控期間基準</span><span class="mono" style="font-size:var(--t3);font-weight:600">$11,029.26</span></div>
-              <div class="d-cell"><span class="c-muted" style="font-size:var(--t1)">手續費累計</span><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="mono c-down" style="font-size:var(--t3);font-weight:600">$6.3700</span><span class="mono c-muted" style="font-size:var(--t1)">1.0x</span></div></div>
-            </div>
-          </div>
-        </div>
-      `
-    },
-    {
-      key: "E",
-      name: "方案 E：方案 A 左欄 ＋ 右側「上權益曲線 / 下水下回撤圖」雙圖聯動",
+      key: "3",
+      name: "方案 3：雙欄髮絲帳本 ＋ 右側雙圖聯動（上權益曲線 / 下水下回撤圖）",
       tag: "專業量化分析味",
-      desc: "保留方案 A 整齊的微卡片左欄，把右圖拆成「上：權益曲線（70%）＋下：水下回撤副圖（30%）」，徹底補實右圖垂直空間並讓每次回撤深度一目了然。",
+      desc: "沿用方案 1 乾淨無框的左欄帳本＋日損安全墊，右側升級為「上 70% 權益曲線＋下 30% 水下回撤面積圖」，把策略回撤深度與日損安全墊放在同一個視窗裡對照。",
       html: `
         <div class="cat-card">
           ${CARD_HEAD}
-          <div class="ref-body">
-            <div class="a-left">
-              <div class="a-hero">
-                <div style="display:flex;justify-content:space-between;font-size:var(--t1)"><span class="c-muted">帳戶總權益</span><span class="mono c-up" style="font-weight:600">日切 +1.28%</span></div>
-                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:2px">
-                  <span class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.1">$11,170.47</span>
-                  <span class="mono c-up" style="font-size:var(--t2);font-weight:600">+$141.21</span>
+          <div class="v1-body">
+            <div class="v1-left" style="${short ? "padding:7px 12px;gap:5px" : ""}">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+                <div>
+                  ${!short ? `<div class="c-muted" style="font-size:var(--t1)">帳戶總權益</div>` : ""}
+                  <div class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.12">$11,170.47</div>
+                </div>
+                <div style="text-align:right">
+                  <div class="mono c-up" style="font-size:var(--t3);font-weight:700">+$141.21</div>
+                  <div class="mono c-up" style="font-size:var(--t1)">日切 +1.28%</div>
                 </div>
               </div>
-              <div class="a-grid">
-                <div class="a-cell"><span class="l">已實現損益</span><span class="v c-up">+$88.35</span></div>
-                <div class="a-cell"><span class="l">未實現損益</span><span class="v c-up">+$1,088.49</span></div>
-                <div class="a-cell"><span class="l">風控基準</span><span class="v">$11,029.26</span></div>
-                <div class="a-cell"><span class="l">手續費累計</span><span class="v c-down">$6.3700</span></div>
+              ${cushionBarHtml(false)}
+              <div class="ledger-list">
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">已實現損益</span><span class="v c-up">+$88.35</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">未實現損益</span><span class="v c-up">+$1,088.49</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">風控基準</span><span class="v">$11,029.26</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">手續費累計</span><span class="v c-down">$6.3700</span></div>
               </div>
             </div>
             <div class="chart-col">
@@ -650,67 +566,97 @@ function getOptions() {
                   <span>最大回撤 <b class="c-down">-2.14%</b></span>
                 </div>
               </div>
-              ${buildMainSvg({ brightGrid: true, withDrawdown: true })}
+              ${buildMainSvg({ withDrawdown: true })}
             </div>
           </div>
         </div>
       `
     },
     {
-      key: "F",
-      name: "方案 F：左欄加入「R1 日損安全墊刻度條」（對應右卡曝險上限）",
-      tag: "風控雙核心對稱",
-      desc: "右卡看「曝險額度距上限有多近」，左卡在總權益與 4 格中間放一條精細的「日損安全墊刻度條（Hard -10% / Soft -5% / 0% / 目前 +1.28%）」，完美填掉中間空洞又讓風控狀態秒懂。",
+      key: "4",
+      name: "方案 4：全寬無界畫布（左上純排版印記吃掉圖表黑空 ＋ 底部全寬安全墊）",
+      tag: "最開闊 · TradingView 氣質",
+      desc: "完全拆除所有內部牆壁與方框！把 `$11,170.47` 與一行內聯帳務數據直接落印在走勢圖左上方的留白處，下方由一條全寬「日損風控安全墊」精密尺穩穩收邊。",
       html: `
         <div class="cat-card">
           ${CARD_HEAD}
-          <div class="ref-body">
-            <div class="a-left" style="width:262px;gap:6px">
-              <div style="display:flex;justify-content:space-between;align-items:baseline">
-                <div>
-                  <div class="c-muted" style="font-size:var(--t1)">帳戶總權益</div>
-                  <div class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.12">$11,170.47</div>
+          <div class="v4-body">
+            <div class="v4-canvas">
+              <div class="v4-stamp">
+                <div style="display:flex;align-items:baseline;gap:10px">
+                  <span class="mono" style="font-size:${short ? "21px" : "25px"};font-weight:700;line-height:1.05">$11,170.47</span>
+                  <span class="mono c-up" style="font-size:var(--t3);font-weight:700">+$141.21 (+1.28% 日切)</span>
                 </div>
-                <div style="text-align:right">
-                  <div class="mono c-up" style="font-size:var(--t3);font-weight:700">+$141.21</div>
-                  <div class="mono c-up" style="font-size:var(--t1)">日切 +1.28%</div>
-                </div>
-              </div>
-              <div class="f-meter">
-                <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:var(--t1)">
-                  <span class="c-muted">日損風控安全墊</span>
-                  <span class="c-up" style="font-weight:600">距 Soft 6.28%</span>
-                </div>
-                <div class="f-track">
-                  <span class="f-zone-hard"></span>
-                  <span class="f-zone-soft"></span>
-                  <span class="f-zero"></span>
-                  <span class="f-pin"></span>
-                </div>
-                <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9.5px;color:var(--muted-foreground)">
-                  <span class="c-down">Hard -10%</span>
-                  <span class="c-warn">Soft -5%</span>
-                  <span>0%</span>
-                  <span class="c-up">+10%</span>
+                <div class="v4-inline-kv">
+                  <span>已實現 <b class="c-up">+$88.35</b></span>
+                  <span>未實現 <b class="c-up">+$1,088.49</b></span>
+                  <span>費 <b class="c-down">$6.37</b></span>
+                  <span>累計 <b class="c-up">+11.70%</b></span>
+                  <span>回撤 <b class="c-down">-2.1%</b></span>
                 </div>
               </div>
-              <div class="a-grid">
-                <div class="a-cell"><span class="l">已實現</span><span class="v c-up">+$88.35</span></div>
-                <div class="a-cell"><span class="l">未實現</span><span class="v c-up">+$1,088.49</span></div>
-                <div class="a-cell"><span class="l">基準</span><span class="v">$11,029.26</span></div>
-                <div class="a-cell"><span class="l">手續費</span><span class="v c-down">$6.3700</span></div>
+              ${buildMainSvg({ showPeak: true, flatH: false })}
+            </div>
+            <div class="v2-foot">
+              ${cushionBarHtml(true)}
+            </div>
+          </div>
+        </div>
+      `
+    },
+    {
+      key: "5",
+      name: "方案 5：左無框帳本 ＋ 中走勢圖 ＋ 右緣「垂直日損安全墊」溫度計量表",
+      tag: "最直覺的風險方向",
+      desc: "把「日損風控安全墊」立起來做成右緣垂直量表（跟走勢圖 Y 軸同向：往上賺、往下逼近 Soft -5% / Hard -10% 紅區），左欄只留極乾淨的無框帳本，視覺記憶點極強。",
+      html: `
+        <div class="cat-card">
+          ${CARD_HEAD}
+          <div class="v5-body">
+            <div class="v1-left" style="width:214px;${short ? "padding:7px 11px;gap:5px" : "padding:10px 12px"}">
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:var(--t1)"><span class="c-muted">帳戶總權益</span><span class="mono c-up" style="font-weight:600">日切 +1.28%</span></div>
+                <div class="mono" style="font-size:${short ? "19px" : "22px"};font-weight:700;line-height:1.15;margin-top:1px">$11,170.47</div>
+                <div class="mono c-up" style="font-size:var(--t2);font-weight:600">+$141.21</div>
+              </div>
+              <div class="ledger-list">
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">已實現</span><span class="v c-up">+$88.35</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">未實現</span><span class="v c-up">+$1,088.49</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">基準</span><span class="v">$11,029.26</span></div>
+                <div class="ledger-row" style="${short ? "padding:3px 0" : ""}"><span class="k">手續費</span><span class="v c-down">$6.3700</span></div>
               </div>
             </div>
             <div class="chart-col">
               <div class="chart-bar">
-                <span class="mono c-muted" style="font-size:var(--t2)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 曲線 · 138 點</span>
+                <span class="mono c-muted" style="font-size:var(--t1)"><span style="display:inline-block;width:10px;height:2px;background:#e8b45e;vertical-align:middle;margin-right:6px"></span>run 曲線 · 138 點</span>
                 <div class="stat-pills">
                   <span>累計 <b class="c-up">+11.70%</b></span>
-                  <span>最高 <b style="color:var(--foreground)">+11.9%</b></span>
                   <span>回撤 <b class="c-down">-2.1%</b></span>
                 </div>
               </div>
-              ${buildMainSvg({ brightGrid: true })}
+              ${buildMainSvg({ compactX: true })}
+            </div>
+            <div class="v5-gauge">
+              <div style="text-align:center">
+                <div class="c-muted" style="font-size:9.5px;line-height:1.15">距 Soft</div>
+                <div class="mono c-up" style="font-size:var(--t1);font-weight:700;margin-top:1px">6.28%</div>
+              </div>
+              <div class="vg-inner">
+                <div class="vg-bar">
+                  <span class="vg-hard"></span>
+                  <span class="vg-soft"></span>
+                  <span class="vg-pos"></span>
+                  <span class="vg-zero"></span>
+                  <span class="vg-pin" title="目前 +1.28%"></span>
+                </div>
+                <div class="vg-labels">
+                  <span class="c-up">+10%</span>
+                  <span style="color:var(--foreground)">0%</span>
+                  <span class="c-warn">-5%</span>
+                  <span class="c-down">-10%</span>
+                </div>
+              </div>
+              <div class="mono c-muted" style="font-size:9.5px;text-align:center;line-height:1">日損安全墊</div>
             </div>
           </div>
         </div>
@@ -721,7 +667,7 @@ function getOptions() {
 
 function updateBar() {
   const axisLabel = state.axis === "pct" ? "報酬 %" : "金額 $";
-  const text = `帳戶權益卡=方案 ${state.picked} · 右軸=${axisLabel}`;
+  const text = `帳戶權益卡=方案 ${state.picked}（零小卡片＋日損安全墊） · 右軸=${axisLabel}`;
   document.getElementById("decision-summary").innerHTML = `目前選擇：<b>${text}</b>`;
   document.getElementById("btn-copy").dataset.copyText = text;
 }
@@ -736,13 +682,13 @@ function render() {
         <div class="opt-meta">
           <div class="opt-left">
             <div class="opt-head">
-              <span class="opt-key">${o.key}</span>
-              <span class="opt-name">${o.name}</span>
+              <span class="opt-key">方案 ${o.key}</span>
+              <span class="opt-name">${o.name.replace(/^方案 \d+：/, "")}</span>
               <span class="opt-tag ${o.rec ? "rec" : ""}">${o.tag}</span>
             </div>
             <p class="opt-desc">${o.desc}</p>
           </div>
-          ${o.key !== "REF" ? `<button class="pick-btn" data-pick="${o.key}">${isSel ? "已選用" : "選這個方案"}</button>` : ""}
+          <button class="pick-btn" data-pick="${o.key}">${isSel ? "已選用" : "選這個方案"}</button>
         </div>
         <div class="pair-preview">
           ${o.html}
