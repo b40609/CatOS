@@ -878,6 +878,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
 
   const showKpiHeader = !isFlat && !isSuperNarrow && (isVertical ? cardH >= 340 : cardH >= 205);
   const compactKpi = cardH < 250;
+  const isDenseList = compactKpi || currentItems.length >= 4;
 
   return (
     <div ref={containerRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
@@ -915,7 +916,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
       </div>
 
       {/* 2. 主內容區（2026-11-25 定案方案 B：去上下廢帶＋右側雙格 KPI 頭＋佔比進度條） */}
-      <div className={cn("flex-1 min-h-0 flex overflow-hidden font-mono", isFlat ? "px-3 py-1.5" : "px-3.5 py-2.5")}>
+      <div className={cn("flex-1 min-h-0 flex overflow-hidden font-mono", isFlat ? "px-3 py-1.5" : isDenseList ? "px-3.5 py-2" : "px-3.5 py-2.5")}>
         <div
           className={cn(
             "flex-1 min-h-0 flex w-full overflow-hidden",
@@ -943,7 +944,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
           <div
             className={cn(
               "flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden",
-              isVertical ? "w-full gap-2" : isFlat ? "justify-center" : "justify-between gap-2"
+              isVertical ? "w-full gap-1.5" : isFlat ? "justify-center" : isDenseList ? "gap-1.5" : "gap-2"
             )}
           >
             {showKpiHeader && (
@@ -953,7 +954,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     key={kpi.label}
                     className={cn(
                       "rounded border border-border/75 bg-background/60 flex flex-col min-w-0",
-                      compactKpi ? "px-2 py-1 gap-0.5" : "px-2.5 py-1.5 gap-0.5"
+                      isDenseList ? "px-2.5 py-1 gap-0.5" : "px-2.5 py-1.5 gap-0.5"
                     )}
                   >
                     <div className="flex items-center justify-between gap-1 text-t1 text-muted-foreground min-w-0">
@@ -973,14 +974,18 @@ export function AllocationDonutCard({ className }: { className?: string }) {
               </div>
             )}
 
-            <div
-              className={cn(
-                "flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-0.5",
-                isFlat
-                  ? "grid grid-cols-2 gap-x-2.5 gap-y-1 content-center"
-                  : "flex flex-col justify-center gap-1.5"
-              )}
-            >
+            {/* 安全置中滾動區：內部用 my-auto，列數少時垂直置中、列數多時自動頂部對齊可完整捲動，不切首列 */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pr-0.5 flex flex-col">
+              <div
+                className={cn(
+                  "my-auto",
+                  isFlat
+                    ? "grid grid-cols-2 gap-x-2.5 gap-y-1"
+                    : isDenseList
+                    ? "flex flex-col gap-1"
+                    : "flex flex-col gap-1.5"
+                )}
+              >
               {currentItems.map((item, idx) => {
                 const isHovered = hoveredIndex === idx;
                 const displayLabel = isNarrow || isFlat ? (item.compactLabel || item.shortLabel) : item.shortLabel;
@@ -997,10 +1002,10 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                     onMouseEnter={() => setHoveredIndex(idx)}
                     onMouseLeave={() => setHoveredIndex(null)}
                     className={cn(
-                      "flex flex-col rounded border transition-colors cursor-pointer",
+                      "flex flex-col rounded border transition-colors cursor-pointer shrink-0",
                       isFlat
                         ? "px-2 py-1 gap-1 bg-white/[0.02] border-white/[0.05]"
-                        : compactKpi
+                        : isDenseList
                         ? "px-2 py-1 gap-1"
                         : isLarge
                         ? "px-2.5 py-1.5 gap-1.5"
@@ -1074,6 +1079,7 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         </div>
