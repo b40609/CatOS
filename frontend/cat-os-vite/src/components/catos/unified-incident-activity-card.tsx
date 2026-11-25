@@ -1,22 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import type { AnimationEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { useCatStore } from '@/state/catStore';
-import type { EventDTO, EventLevel } from '@/contracts';
+import type { EventDTO } from '@/contracts';
 import { useOverviewSignals } from '@/lib/overview-signals';
 import { useRouter } from '@/lib/router';
 import { CardHeaderTitle } from './card-header-title';
 import { CardHeaderTabs } from './card-header-tabs';
-import {
-  AlertTriangle,
-  ArrowRight,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Inbox,
-  ShieldAlert,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Copy, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatClock, formatDateTime, formatDecimal, shortId } from '@/lib/format';
 
@@ -33,7 +23,9 @@ export interface CategoryTabItem {
 }
 
 type ActionSeverity = 'p0' | 'p1' | 'p2' | 'p3';
-type MetricTone = 'default' | 'warn' | 'up' | 'down' | 'blue' | 'teal';
+type MetricTone = 'default' | 'warn' | 'up' | 'down' | 'blue' | 'teal' | 'muted';
+/** 時間軸光珠與霧底標籤的語意色（對應 incident-feed.css 的 tl-tone-*） */
+type FeedTone = 'info' | 'warn' | 'up' | 'down' | 'pri' | 'muted';
 
 interface ActionMetric {
   label: string;
@@ -44,9 +36,19 @@ interface ActionMetric {
 interface ActionQueueItem {
   id: string;
   sev: ActionSeverity;
+  /** 霧底等寬英文標籤（DEV / GATE / KILL…） */
+  code: string;
+  tone: FeedTone;
+  alert?: boolean;
+  /** 已格式化的台北時間 HH:MM:SS；沒有時間戳的項目時間欄留空 */
+  time: string | null;
   tag: string;
   title: string;
   symbol?: string;
+  /** 列標頭上的一句話摘要 */
+  brief: string;
+  /** 列標頭右側的關鍵數值 */
+  hero?: { value: string; tone?: MetricTone };
   fact: string;
   metrics?: ActionMetric[];
   primaryAction?: { label: string; route?: string; switchTab?: string; tone?: 'danger' | 'primary' };
@@ -54,29 +56,6 @@ interface ActionQueueItem {
 }
 
 const SEV_ORDER: Record<ActionSeverity, number> = { p0: 0, p1: 1, p2: 2, p3: 3 };
-
-export const INCIDENT_ACTIVITY_PARAMS = {
-  durationSec: 11,
-  photonLength: 15,
-  photonWidth: 0.5,
-  photonBrightness: 100,
-  glowSpread: 8,
-  bloomIntensity: 30,
-  glassBlur: 32,
-  cardShimmer: 0,
-  borderOpacity: 0,
-} as const;
-
-const {
-  durationSec: DURATION_SEC,
-  photonLength: PHOTON_LENGTH,
-  photonWidth: PHOTON_WIDTH,
-  photonBrightness: PHOTON_BRIGHTNESS,
-  glowSpread: GLOW_SPREAD,
-  bloomIntensity: BLOOM_INTENSITY,
-  glassBlur: GLASS_BLUR,
-  cardShimmer: CARD_SHIMMER,
-} = INCIDENT_ACTIVITY_PARAMS;
 
 const NA = '不適用';
 
@@ -120,7 +99,8 @@ interface EventRow {
   time: string;
   syntheticLabel: string | null;
   title: string;
-  rightText: string | null;
+  /** 成交或收盤訊號後的帳戶權益（列標頭右側） */
+  equity: string | null;
   side: Side;
   isAlert: boolean;
 }
@@ -246,11 +226,11 @@ function buildDetailFields(ev: EventDTO): DetailField[] | null {
 function toRow(ev: EventDTO, instLabel: string): EventRow {
   const isAlert = ev.level === 'WARN' || ev.level === 'ERROR';
   const account = asRecord(ev.payload.account);
-  const rightText =
+  const equity =
     ev.kind === 'fill'
-      ? `權益 ${money(ev.payload.equity)}`
+      ? money(ev.payload.equity)
       : ev.kind === 'signal' && asString(account?.equity)
-      ? `權益 ${money(account?.equity)}`
+      ? money(account?.equity)
       : null;
   return {
     key: String(ev.seq),
@@ -258,149 +238,69 @@ function toRow(ev: EventDTO, instLabel: string): EventRow {
     time: formatClock(ev.wall_time_ms),
     syntheticLabel: ev.synthetic_time_ms ? formatDateTime(ev.synthetic_time_ms) : null,
     title: eventTitle(ev, instLabel),
-    rightText,
+    equity,
     side: sideOf(ev),
     isAlert,
   };
 }
 
-function getBadgeMeta(ev: EventDTO, side: Side) {
-  if (ev.level === 'ERROR') {
-    return {
-      label: '錯誤',
-      tagClass: 'text-rose-300 font-semibold',
-      coreClass: 'bg-[#f43f5e] shadow-[0_0_8px_rgba(244,63,94,0.55)] ring-1 ring-rose-400/40',
-      sonarClass: 'bg-rose-500/25',
-      bloomAnimation: 'crystal-optical-bloom-rose',
-    };
-  }
-  if (ev.level === 'WARN') {
-    return {
-      label: '異常',
-      tagClass: 'text-amber-300 font-semibold',
-      coreClass: 'bg-[#f59e0b] shadow-[0_0_8px_rgba(245,158,11,0.55)] ring-1 ring-amber-400/40',
-      sonarClass: 'bg-amber-500/25',
-      bloomAnimation: 'crystal-optical-bloom-amber',
-    };
-  }
+/** 事件 → 霧底等寬英文標籤與光珠色 */
+function eventTag(ev: EventDTO, side: Side): { code: string; tone: FeedTone } {
+  if (ev.level === 'ERROR') return { code: 'ERROR', tone: 'down' };
+  if (ev.level === 'WARN') return { code: 'WARN', tone: 'warn' };
   if (ev.category === 'ORDER') {
-    const isShort = side === 'sell';
-    return {
-      label: isShort ? '賣出' : '買入',
-      tagClass: isShort ? 'text-down font-semibold' : 'text-up font-semibold',
-      coreClass: isShort
-        ? 'bg-down ring-1 ring-down/40'
-        : 'bg-up ring-1 ring-up/40',
-      sonarClass: isShort ? 'bg-down/20' : 'bg-up/20',
-      bloomAnimation: isShort ? 'crystal-optical-bloom-rose' : 'crystal-optical-bloom-emerald',
-    };
+    if (side === 'sell') return { code: 'SELL', tone: 'down' };
+    if (side === 'buy') return { code: 'BUY', tone: 'up' };
+    return { code: 'ORDER', tone: 'info' };
   }
   if (ev.category === 'WORKER') {
-    if (ev.kind === 'warmup') {
-      return {
-        label: '預熱',
-        tagClass: 'text-teal-300/90 font-semibold',
-        coreClass: 'bg-teal-400 ring-1 ring-teal-400/35',
-        sonarClass: 'bg-teal-400/20',
-        bloomAnimation: 'crystal-optical-bloom-neutral',
-      };
-    }
+    if (ev.kind === 'warmup') return { code: 'WARM', tone: 'muted' };
     const disp = (asString(ev.payload.disposition) ?? '').toUpperCase();
     const hasPos = !isZeroQty(asString(ev.payload.target));
-    if (disp && disp !== 'NO_INTENT' && disp !== 'HOLD') {
-      return {
-        label: '意圖',
-        tagClass: 'text-info font-semibold',
-        coreClass: 'bg-info ring-1 ring-info/40',
-        sonarClass: 'bg-info/20',
-        bloomAnimation: 'crystal-optical-bloom-neutral',
-      };
-    }
-    if (disp === 'HOLD' || hasPos) {
-      return {
-        label: '續抱',
-        tagClass: 'text-primary font-semibold',
-        coreClass: 'bg-primary ring-1 ring-primary/40',
-        sonarClass: 'bg-primary/20',
-        bloomAnimation: 'crystal-optical-bloom-amber',
-      };
-    }
-    return {
-      label: '觀望',
-      tagClass: 'text-info/85 font-medium',
-      coreClass: 'bg-info/80 ring-1 ring-info/35',
-      sonarClass: 'bg-info/15',
-      bloomAnimation: 'crystal-optical-bloom-neutral',
-    };
+    if (disp && disp !== 'NO_INTENT' && disp !== 'HOLD') return { code: 'SIG', tone: 'info' };
+    if (disp === 'HOLD' || hasPos) return { code: 'HOLD', tone: 'pri' };
+    return { code: 'FLAT', tone: 'muted' };
   }
-  return {
-    label: ev.category === 'RISK' ? '風控' : '資訊',
-    tagClass: ev.category === 'RISK' ? 'text-info font-semibold' : 'text-zinc-300 font-medium',
-    coreClass: 'bg-info ring-1 ring-info/40',
-    sonarClass: 'bg-info/20',
-    bloomAnimation: 'crystal-optical-bloom-neutral',
-  };
+  if (ev.category === 'RISK') return { code: 'RISK', tone: 'info' };
+  if (ev.category === 'SUPERVISOR') return { code: 'RUN', tone: 'muted' };
+  return { code: 'SYS', tone: 'muted' };
 }
-
-function levelCapsuleClass(level: EventLevel): string {
-  return level === 'ERROR'
-    ? 'text-rose-300 font-semibold'
-    : 'text-amber-300 font-semibold';
-}
-
-const SEVERITY_STYLE: Record<
-  ActionSeverity,
-  {
-    cardClass: string;
-    iconBoxClass: string;
-    tagClass: string;
-    Icon: typeof ShieldAlert;
-  }
-> = {
-  p0: {
-    cardClass: 'border-rose-500/40 bg-gradient-to-r from-rose-500/[0.08] via-secondary/45 to-secondary/35',
-    iconBoxClass: 'bg-rose-500/15 border-rose-500/35 text-rose-400',
-    tagClass: 'text-rose-400',
-    Icon: ShieldAlert,
-  },
-  p1: {
-    cardClass: 'border-border/80 bg-secondary/45 hover:border-amber-500/35',
-    iconBoxClass: 'bg-amber-500/15 border-amber-500/35 text-amber-400',
-    tagClass: 'text-amber-400',
-    Icon: AlertTriangle,
-  },
-  p2: {
-    cardClass: 'border-border/80 bg-secondary/45 hover:border-primary/45',
-    iconBoxClass: 'bg-primary/15 border-primary/35 text-primary',
-    tagClass: 'text-primary',
-    Icon: CheckCircle2,
-  },
-  p3: {
-    cardClass: 'border-border/80 bg-secondary/45 hover:border-teal-400/35',
-    iconBoxClass: 'bg-teal-400/15 border-teal-400/30 text-teal-300',
-    tagClass: 'text-teal-300',
-    Icon: Sparkles,
-  },
-};
 
 function metricToneClass(tone?: MetricTone): string {
   switch (tone) {
-    case 'warn': return 'text-amber-300';
+    case 'warn': return 'text-warn';
     case 'up': return 'text-up';
     case 'down': return 'text-down';
     case 'blue': return 'text-primary';
     case 'teal': return 'text-teal-300';
+    case 'muted': return 'text-muted-foreground';
     default: return 'text-foreground';
   }
+}
+
+function clockFromIso(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? formatClock(ms) : null;
+}
+
+function clockFromMs(ms: number | null | undefined): string | null {
+  return ms === null || ms === undefined || !Number.isFinite(ms) ? null : formatClock(ms);
 }
 
 const PREVIEW_ACTIONS: ActionQueueItem[] = [
   {
     id: 'preview-p1-rsi',
     sev: 'p1',
+    code: 'DEV',
+    tone: 'warn',
+    alert: true,
+    time: '07:59:58',
     tag: '偏差警戒',
     title: 'mean-reversion-rsi',
     symbol: 'ETH 1H',
+    brief: '模擬偏差逾 0.50% 警戒線',
+    hero: { value: '-0.61%', tone: 'warn' },
     fact: '模擬偏差 -0.61%（警戒線 0.50% / 門檻 1.00%）· 近 3 筆滑價偏高',
     metrics: [
       { label: '模擬偏差', value: '-0.61%', tone: 'warn' },
@@ -413,9 +313,14 @@ const PREVIEW_ACTIONS: ActionQueueItem[] = [
   {
     id: 'preview-p2-ens',
     sev: 'p2',
+    code: 'GATE',
+    tone: 'pri',
+    time: '06:40:12',
     tag: '待核准',
     title: 'donchian-ensemble',
     symbol: 'BTC 1D',
+    brief: '4/4 驗證通過 · 待終端機核准',
+    hero: { value: '+13.9%', tone: 'up' },
     fact: '4/4 驗證通過 · 年化 +13.9% · 最大回撤 -11.3% · PBO 22%',
     metrics: [
       { label: '驗證關卡', value: '4/4 通過', tone: 'blue' },
@@ -432,9 +337,14 @@ const PREVIEW_ACTIONS: ActionQueueItem[] = [
   {
     id: 'preview-p3-vol',
     sev: 'p3',
+    code: 'IDEA',
+    tone: 'muted',
+    time: '04:15:00',
     tag: '研究提案',
     title: 'vol-breakout',
     symbol: 'SOL 4H',
+    brief: 'strategies/ 提案 · 預設只做多',
+    hero: { value: '待回測', tone: 'muted' },
     fact: 'Agent 提交 · strategies/ 資料夾策略 · 依規則預設只做多',
     metrics: [
       { label: '來源', value: 'Agent 資料夾', tone: 'teal' },
@@ -445,14 +355,121 @@ const PREVIEW_ACTIONS: ActionQueueItem[] = [
   },
 ];
 
+/* ------------------------------------------------------------------
+ * 同軌時間軸列（架構 8）：時間 ─●─ 標籤 · 內容，展開面板沿用同一條光軌
+ * 樣式與動畫在 src/styles/incident-feed.css
+ * ------------------------------------------------------------------ */
+
+const CLOCK_RE = /^\d{2}:\d{2}:\d{2}$/;
+
+function ClockCell({ value }: { value: string | null }) {
+  // 沒有時間戳（例如資料夾策略待核准）就留空，不放 --:--:-- 佔位符
+  if (!value || !CLOCK_RE.test(value)) return <span className="tl-time" />;
+  return (
+    <span className="tl-time">
+      {value.slice(0, 5)}
+      <span className="tl-time-sec">{value.slice(5)}</span>
+    </span>
+  );
+}
+
+function FeedNode() {
+  return (
+    <span className="tl-node" aria-hidden="true">
+      <span className="tl-rail" />
+      <span className="tl-halo tl-halo-haze" />
+      <span className="tl-halo tl-halo-bloom" />
+      <span className="tl-dot" />
+    </span>
+  );
+}
+
+/** 滑過時呼吸一次：已在呼吸（點選中）或上一次還沒播完就不重播 */
+function startPulse(head: HTMLElement) {
+  if (head.dataset.pulse) return;
+  if (head.parentElement?.hasAttribute('data-active')) return;
+  head.dataset.pulse = '1';
+}
+
+function endPulse(e: AnimationEvent<HTMLDivElement>) {
+  if (e.animationName.startsWith('tl-pulse-haze')) delete e.currentTarget.dataset.pulse;
+}
+
+function pulseOnKeyboardFocus(e: FocusEvent<HTMLDivElement>) {
+  try {
+    if (e.currentTarget.matches(':focus-visible')) startPulse(e.currentTarget);
+  } catch {
+    /* 不支援 :focus-visible 的瀏覽器略過 */
+  }
+}
+
+interface FeedRowProps {
+  tone: FeedTone;
+  time: string | null;
+  alert?: boolean;
+  /** 有展開面板的列才傳；沒傳代表點擊只做導覽 */
+  expandable?: boolean;
+  open?: boolean;
+  /** 使用者點選中：光珠持續呼吸 */
+  active?: boolean;
+  onActivate: () => void;
+  children: ReactNode;
+  panel?: ReactNode;
+}
+
+function FeedRow({ tone, time, alert, expandable, open, active, onActivate, children, panel }: FeedRowProps) {
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onActivate();
+    }
+  };
+  return (
+    <div
+      className={cn('tl-row', `tl-tone-${tone}`, alert && 'is-alert', open && 'is-open')}
+      data-active={active ? '' : undefined}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expandable ? Boolean(open) : undefined}
+        className="tl-head"
+        onClick={(e: MouseEvent<HTMLDivElement>) => {
+          // 點選後由循環呼吸接手；清掉滑過的一次性標記，收合時才不會再補播一次
+          delete e.currentTarget.dataset.pulse;
+          onActivate();
+        }}
+        onKeyDown={onKeyDown}
+        onMouseEnter={(e: MouseEvent<HTMLDivElement>) => startPulse(e.currentTarget)}
+        onFocus={pulseOnKeyboardFocus}
+        onAnimationEnd={endPulse}
+      >
+        <ClockCell value={time} />
+        <FeedNode />
+        <div className="tl-main">{children}</div>
+      </div>
+      {open && panel ? (
+        <div className="tl-body">
+          <span aria-hidden="true" />
+          <span className="tl-node" aria-hidden="true">
+            <span className="tl-rail" />
+          </span>
+          <div className="tl-panel">{panel}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 interface UnifiedIncidentActivityCardProps {
   className?: string;
 }
 
 /**
- * 待處理與事件審計卡片 (3A 定案：單欄待處理佇列＋下方近期審計流水)
- * - 固定維持單欄縱向結構，不於寬卡拆為左右兩欄
- * - 窄卡 (< 450px)：待處理項目按鈕自動換行至底部，文字不被擠壓截斷
+ * 待處理與事件審計卡片（2026-11-25 定案架構 8：同軌手風琴一體流）
+ * - 待處理與下方審計流水共用同一條光軌、同一種實心光珠與霧底等寬標籤
+ * - 待處理預設展開最急的一筆；點選列展開並讓光珠持續呼吸，滑過列光珠呼吸一次
+ * - 「全部／異常／成交／風控」分頁沿用同一種列，點選展開欄位明細
  */
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
   const events = useCatStore((s) => s.events);
@@ -466,38 +483,28 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const { navigate } = useRouter();
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  /** undefined：使用者還沒點過，預設展開最急的一筆但不呼吸；null：全部收合 */
+  const [pickedActionId, setPickedActionId] = useState<string | null | undefined>(undefined);
   const [category, setCategory] = useState<string>('ACTION');
   const [showHeartbeats, setShowHeartbeats] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const userPickedTabRef = useRef(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
-  const [dimensions, setDimensions] = useState({ width: 560, height: 320 });
+  const [cardW, setCardW] = useState(560);
 
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setDimensions({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height,
-        });
-      }
+      for (const entry of entries) setCardW(entry.contentRect.width);
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  const { width: cardW } = dimensions;
   const isNarrow = cardW < 440;
-  const isStackActionBtns = cardW < 430;
   const isSuperNarrow = cardW < 360;
-
-  const [bottomUpDelays, setBottomUpDelays] = useState<Record<string, number>>({});
 
   const instById = useMemo(() => {
     const map = new Map<string, string>();
@@ -528,9 +535,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       list.push({
         id: 'p0-kill-switch',
         sev: 'p0',
+        code: 'KILL',
+        tone: 'down',
+        alert: true,
+        time: clockFromIso(killSwitch.engaged_record?.created_at),
         tag: '總開關觸發',
         title: 'Kill-Switch 已鎖存',
         symbol: 'ALL · 禁啟新 run',
+        brief: `原因：${reason}`,
+        hero: { value: '已鎖存', tone: 'down' },
         fact: `原因：${reason} · 需由使用者確認原因後人工解除`,
         metrics: [
           { label: '觸發原因', value: reason, tone: 'down' },
@@ -541,14 +554,21 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     }
 
     if (risk && (risk.derived.status === 'soft_latch' || risk.derived.status === 'hard_latch')) {
-      const label = risk.derived.status === 'hard_latch' ? 'Hard Latch' : 'Soft Latch';
+      const isHard = risk.derived.status === 'hard_latch';
+      const label = isHard ? 'Hard Latch' : 'Soft Latch';
       const reasons = risk.reasons.length > 0 ? risk.reasons.join(', ') : '風控期間損益達門檻';
       list.push({
         id: `p0-risk-${risk.derived.status}`,
         sev: 'p0',
+        code: 'LATCH',
+        tone: 'down',
+        alert: true,
+        time: null,
         tag: '風控鎖存',
         title: `帳戶 ${label} 已觸發`,
         symbol: 'ALL · 禁止增倉',
+        brief: `原因：${reasons}`,
+        hero: { value: isHard ? 'HARD' : 'SOFT', tone: 'down' },
         fact: `原因：${reasons} · 需人工檢核並於 CLI 解除`,
         metrics: [
           { label: '風控原因', value: reasons, tone: 'down' },
@@ -572,9 +592,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         list.push({
           id: `p0-demo-failed-${run.run_id}`,
           sev: 'p0',
+          code: 'FAIL',
+          tone: 'down',
+          alert: true,
+          time: clockFromMs(run.updated_at_ms),
           tag: '執行失敗',
           title: run.strategy_id ?? shortId(run.run_id),
           symbol: 'OKX Demo',
+          brief: `run ${shortId(run.run_id)} · ${run.stop_reason ?? '執行錯誤'}`,
+          hero: { value: `${run.position ?? '0'} 張` },
           fact: `run ${shortId(run.run_id)} · ${run.stop_reason ?? '執行錯誤'} · 部位 ${run.position ?? '0'} 張`,
           metrics: [
             { label: 'run', value: shortId(run.run_id) },
@@ -587,9 +613,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         list.push({
           id: `p1-demo-stale-${run.run_id}`,
           sev: 'p1',
+          code: 'STALE',
+          tone: 'warn',
+          alert: true,
+          time: clockFromMs(run.updated_at_ms),
           tag: '無回應',
           title: run.strategy_id ?? shortId(run.run_id),
           symbol: 'OKX Demo',
+          brief: `run ${shortId(run.run_id)} 逾兩根 K 線未寫入`,
+          hero: { value: '無回應', tone: 'warn' },
           fact: `run ${shortId(run.run_id)} 超過兩根 K 線未寫入紀錄 · 當前部位 ${run.position ?? '0'} 張`,
           metrics: [
             { label: 'run', value: shortId(run.run_id) },
@@ -607,9 +639,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         list.push({
           id: `p1-approval-changed-${approval.approval_id}`,
           sev: 'p1',
+          code: 'HASH',
+          tone: 'warn',
+          alert: true,
+          time: null,
           tag: '來源異動',
           title: approval.strategy_id,
           symbol: '雜湊不符',
+          brief: `核准 ${shortId(approval.approval_id)} · Bot 與 IPC 已停止解析`,
+          hero: { value: '需重審', tone: 'warn' },
           fact: `核准 ${shortId(approval.approval_id)} 雜湊不符，Bot 與 IPC 已停止解析，需重審核准`,
           metrics: [
             { label: '核准 ID', value: shortId(approval.approval_id) },
@@ -623,12 +661,19 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     const alertEvents = rows.filter((r) => r.isAlert);
     if (alertEvents.length > 0) {
       const latest = alertEvents[0];
+      const isError = latest.event.level === 'ERROR';
       list.push({
         id: `p1-event-${latest.event.seq}`,
         sev: 'p1',
-        tag: latest.event.level === 'ERROR' ? '事件錯誤' : '事件警戒',
+        code: isError ? 'ERROR' : 'WARN',
+        tone: isError ? 'down' : 'warn',
+        alert: true,
+        time: latest.time,
+        tag: isError ? '事件錯誤' : '事件警戒',
         title: latest.title,
         symbol: `seq ${latest.event.seq}`,
+        brief: `近期累計 ${alertEvents.length} 筆異常`,
+        hero: { value: `${alertEvents.length} 筆`, tone: 'warn' },
         fact: `近期累計 ${alertEvents.length} 筆異常事件 · 最新 seq ${latest.event.seq} (${latest.time})`,
         metrics: [
           { label: '累計異常', value: `${alertEvents.length} 筆`, tone: 'warn' },
@@ -649,9 +694,14 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         list.push({
           id: `p2-folder-${s.id}`,
           sev: 'p2',
+          code: 'GATE',
+          tone: 'pri',
+          time: null,
           tag: '待核准',
           title: s.name || s.id,
           symbol: `strategies/${s.id}/`,
+          brief: '資料夾策略 · 部署前須 CLI 核准',
+          hero: { value: '待核准', tone: 'blue' },
           fact: `資料夾策略尚無有效核准紀錄，僅供研究回測；部署前須由使用者於 CLI 核准`,
           metrics: [
             { label: '來源', value: '資料夾策略', tone: 'blue' },
@@ -724,26 +774,15 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     return base;
   }, [rows, currentTab, showHeartbeats, quietHeartbeatCount]);
 
-  useEffect(() => {
-    if (!containerRef.current || category === 'ACTION') return;
-    const totalH = containerRef.current.scrollHeight;
-    if (totalH <= 0) return;
-
-    const newDelays: Record<string, number> = {};
-    filteredRows.forEach((row) => {
-      const el = nodeRefs.current.get(row.key);
-      if (el) {
-        const nodeY = el.offsetTop + 8;
-        const distFromBottom = Math.max(0, totalH - nodeY);
-        const ratio = Math.max(0, Math.min(1, distFromBottom / totalH));
-        newDelays[row.key] = Number((ratio * DURATION_SEC).toFixed(3));
-      }
-    });
-    setBottomUpDelays(newDelays);
-  }, [filteredRows, expandedKey, category]);
+  const openActionId = pickedActionId === undefined ? actionItems[0]?.id ?? null : pickedActionId;
 
   const toggleRow = (key: string) => {
     setExpandedKey((prev) => (prev === key ? null : key));
+  };
+
+  /** 第一次點預設展開的那筆：保持展開並開始呼吸；再點一次才收合 */
+  const pickAction = (id: string) => {
+    setPickedActionId((prev) => (prev === id ? null : id));
   };
 
   const handleSelectTab = (tabId: string) => {
@@ -769,6 +808,98 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       : '此分類無事件';
 
   const showEmpty = connectionStatus === 'mode_not_open' || filteredRows.length === 0;
+  const showEquity = cardW >= 420;
+
+  const renderActionPanel = (item: ActionQueueItem) => {
+    const isCopied = copiedId === item.id;
+    return (
+      <>
+        <div className="flex items-center justify-between gap-2.5 flex-wrap">
+          {item.metrics && item.metrics.length > 0 ? (
+            <div className="min-w-0 flex items-center flex-wrap gap-y-1 font-mono text-t2">
+              {item.metrics.map((m, idx) => (
+                <span
+                  key={`${item.id}-m-${idx}`}
+                  className={cn(
+                    'inline-flex items-center gap-1.5',
+                    idx < item.metrics!.length - 1 && 'pr-2.5 mr-2.5 border-r border-border/45'
+                  )}
+                >
+                  <span className="text-muted-foreground/80 font-sans">{m.label}</span>
+                  <span className={cn('font-semibold tabular-nums', metricToneClass(m.tone))}>{m.value}</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="min-w-0 text-t2 text-muted-foreground leading-snug font-sans">{item.fact}</p>
+          )}
+
+          {item.primaryAction && (
+            <button
+              type="button"
+              onClick={() => {
+                if (item.primaryAction?.switchTab) {
+                  handleSelectTab(item.primaryAction.switchTab);
+                } else if (item.primaryAction?.route) {
+                  navigate(item.primaryAction.route);
+                }
+              }}
+              className={cn(
+                'shrink-0 px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-1 outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                item.primaryAction.tone === 'danger'
+                  ? 'border-down/45 bg-down/15 text-down hover:bg-down/25'
+                  : 'border-border bg-white/[0.03] text-foreground hover:border-primary/50 hover:text-primary'
+              )}
+            >
+              <span>{item.primaryAction.label}</span>
+              <ArrowRight className="size-2.5" />
+            </button>
+          )}
+        </div>
+
+        {item.copyCommand && (
+          <div className="flex items-center justify-between gap-2.5 rounded border border-border bg-background/90 px-2.5 py-1.5 font-mono text-t2 text-muted-foreground">
+            <code className="min-w-0 truncate text-foreground select-text">$ {item.copyCommand.command}</code>
+            <button
+              type="button"
+              onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
+              title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
+              className="shrink-0 px-1.5 py-0.5 rounded text-primary font-semibold hover:bg-primary/15 transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+              <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderEventPanel = (row: EventRow) => {
+    const ev = row.event;
+    const detailFields = buildDetailFields(ev);
+    return (
+      <>
+        {detailFields ? (
+          <div className={cn('grid gap-2 text-t1 font-mono', cardW < 420 ? 'grid-cols-2' : 'grid-cols-4')}>
+            {detailFields.map((field) => (
+              <div key={field.label} className="min-w-0">
+                <span className="text-muted-foreground block text-t1 uppercase tracking-wider">{field.label}</span>
+                <span className="font-semibold text-foreground break-all">{field.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <pre className="text-t1 font-mono max-h-40 overflow-auto text-zinc-300 whitespace-pre-wrap break-all custom-scrollbar select-text">
+            {JSON.stringify(ev.payload, null, 1)}
+          </pre>
+        )}
+        <div className="pt-1.5 border-t border-white/[0.05] text-t1 text-muted-foreground/80 truncate">
+          {`seq ${ev.seq} · run ${shortId(ev.run_id)} · ${row.syntheticLabel ? '合成時間 ' + row.syntheticLabel + ' · ' : ''}${ev.category}`}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div ref={cardRef} className={cn('flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 font-mono', className)}>
@@ -791,136 +922,60 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         />
       </div>
 
-      {/* 2. 主內容區：單欄待處理內嵌圖示指標卡＋下方垂直時間軸近期流水 */}
+      {/* 2. 主內容區 */}
       {category === 'ACTION' ? (
-        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
-          {/* 上半：待處理佇列（融合結構化指標條與霧藍核准分流 × 內嵌微卡槽與語意圖示方塊） */}
-          <div className="p-2.5 space-y-2 shrink-0">
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto overscroll-contain custom-scrollbar">
+          {/* 上半：待處理手風琴（與下方流水共用同一條光軌） */}
+          <div className="tl-zone shrink-0 border-b border-border/60 px-3 pt-1.5 pb-2">
             {actionItems.length === 0 ? (
-              <div className="py-5 text-center text-t2 text-muted-foreground">
-                無待處理項目
-              </div>
+              <div className="py-4 text-center text-t2 text-muted-foreground font-sans">無待處理項目</div>
             ) : (
-              actionItems.map((item) => {
-                const isCopied = copiedId === item.id;
-                const style = SEVERITY_STYLE[item.sev];
-                const IconComp = style.Icon;
-
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      'rounded-md border px-2.5 py-2 transition-colors flex flex-col gap-2',
-                      style.cardClass
-                    )}
-                  >
-                    {/* 上排：28px 語意圖示方塊 ＋ 分類／策略／標的晶片 ＋ 右側操作鈕 */}
-                    <div
-                      className={cn(
-                        'flex gap-2.5',
-                        isStackActionBtns ? 'flex-col items-stretch' : 'items-center justify-between'
-                      )}
+              <div className="tl-feed">
+                {actionItems.map((item) => {
+                  const isOpen = openActionId === item.id;
+                  return (
+                    <FeedRow
+                      key={item.id}
+                      tone={item.tone}
+                      time={item.time}
+                      alert={item.alert}
+                      expandable
+                      open={isOpen}
+                      active={pickedActionId === item.id}
+                      onActivate={() => pickAction(item.id)}
+                      panel={renderActionPanel(item)}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div
-                          className={cn(
-                            'size-7 rounded-md border grid place-items-center shrink-0',
-                            style.iconBoxClass
-                          )}
-                        >
-                          <IconComp className="size-3.5" />
-                        </div>
-
-                        <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
-                          <span className={cn('text-t1 font-mono font-bold shrink-0', style.tagClass)}>
-                            {item.tag}
-                          </span>
-                          <span className="text-t3 font-semibold text-foreground truncate font-sans">
-                            {item.title}
-                          </span>
-                          {item.symbol && (
-                            <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-t1 font-mono text-muted-foreground leading-none shrink-0 truncate max-w-[170px]" title={item.symbol}>
-                              {item.symbol}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={cn('flex items-center gap-1.5 shrink-0', isStackActionBtns && 'justify-end')}>
-                        {item.primaryAction && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (item.primaryAction?.switchTab) {
-                                handleSelectTab(item.primaryAction.switchTab);
-                              } else if (item.primaryAction?.route) {
-                                navigate(item.primaryAction.route);
-                              }
-                            }}
-                            className={cn(
-                              'px-2 py-1 rounded border text-t2 font-mono transition-colors cursor-pointer whitespace-nowrap outline-none focus:outline-none',
-                              item.primaryAction.tone === 'danger'
-                                ? 'border-rose-500/45 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
-                                : 'border-border/90 bg-background/50 text-foreground hover:border-primary/60 hover:text-primary'
-                            )}
-                          >
-                            {item.primaryAction.label}
-                          </button>
-                        )}
-
-                        {item.copyCommand && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopyCommand(item.id, item.copyCommand!.command)}
-                            title="複製 CLI 指令至剪貼簿（核准僅於終端機執行）"
-                            className="px-2 py-1 rounded border border-primary/45 bg-primary/15 text-primary hover:bg-primary hover:text-primary-foreground text-t2 font-mono font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 whitespace-nowrap outline-none focus:outline-none"
-                          >
-                            {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                            <span>{isCopied ? '已複製' : item.copyCommand.label}</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 下排：結構化指標條（免讀長句，關鍵數值一眼掃描） */}
-                    {item.metrics && item.metrics.length > 0 ? (
-                      <div className="rounded border border-border/50 bg-background/50 px-2.5 py-1 flex items-center flex-wrap gap-y-1 font-mono text-t1">
-                        {item.metrics.map((m, idx) => (
-                          <span
-                            key={`${item.id}-m-${idx}`}
-                            className={cn(
-                              'inline-flex items-center gap-1.5',
-                              idx < item.metrics!.length - 1 && 'pr-2.5 mr-2.5 border-r border-border/45'
-                            )}
-                          >
-                            <span className="text-muted-foreground/80 font-sans">{m.label}</span>
-                            <span className={cn('font-semibold tabular-nums', metricToneClass(m.tone))}>
-                              {m.value}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-t2 text-muted-foreground leading-snug truncate font-sans pl-9" title={item.fact}>
-                        {item.fact}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
+                      <span className="tl-tag">{item.code}</span>
+                      <span
+                        className="min-w-0 flex-1 truncate text-t3 font-sans text-foreground/75"
+                        title={`${item.tag} · ${item.title}${item.symbol ? ' · ' + item.symbol : ''} · ${item.brief}`}
+                      >
+                        <strong className="font-mono font-semibold text-foreground">{item.title}</strong>
+                        {item.symbol ? ` · ${item.symbol}` : ''}
+                        {item.brief ? ` · ${item.brief}` : ''}
+                      </span>
+                      {item.hero && (
+                        <span className={cn('shrink-0 font-mono text-t3 font-bold tabular-nums', metricToneClass(item.hero.tone))}>
+                          {item.hero.value}
+                        </span>
+                      )}
+                    </FeedRow>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          {/* 下半：近期審計與成交流水（垂直時間軸導軌微光節點 × 無框中文分類色字） */}
-          <div className="flex-1 min-h-0 flex flex-col border-t border-border/80 bg-background/20">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-background/40 border-b border-border/60 shrink-0">
+          {/* 下半：近期審計與成交流水 */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 shrink-0">
               <span className="text-t1 font-mono text-muted-foreground">
                 近期審計與成交流水 · {events.length} 筆
               </span>
               <button
                 type="button"
                 onClick={() => handleSelectTab('ALL')}
-                className="text-t1 font-mono text-primary/85 hover:text-primary inline-flex items-center gap-0.5 cursor-pointer shrink-0"
+                className="text-t1 font-mono text-muted-foreground hover:text-primary inline-flex items-center gap-0.5 cursor-pointer shrink-0"
               >
                 <span>展開全部</span>
                 <ArrowRight className="size-2.5" />
@@ -933,44 +988,38 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                 <span className="text-t2 font-sans">{emptyMessage}</span>
               </div>
             ) : (
-              <div className="relative px-3 py-2">
-                <div className="absolute left-[18px] top-3.5 bottom-3.5 w-[1px] bg-white/[0.10] pointer-events-none" />
-                <div className="space-y-0.5">
-                  {recentHighlights.map((row) => {
-                    const meta = getBadgeMeta(row.event, row.side);
-                    return (
-                      <div
-                        key={row.key}
-                        onClick={() => {
-                          handleSelectTab('ALL');
-                          setExpandedKey(row.key);
-                        }}
-                        className="relative flex items-center justify-between gap-2 pl-5 pr-1.5 py-1.5 rounded hover:bg-white/[0.03] transition-colors cursor-pointer text-t2"
-                      >
-                        <span
-                          className={cn(
-                            'absolute left-[3px] top-1/2 -translate-y-1/2 size-1.5 rounded-full pointer-events-none',
-                            meta.coreClass
-                          )}
-                        />
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-zinc-500 text-t1 shrink-0 tabular-nums">{row.time}</span>
-                          <span className={cn('text-t1 font-mono shrink-0 w-7', meta.tagClass)}>
-                            {meta.label}
-                          </span>
-                          <span className={cn('truncate', row.isAlert ? 'text-zinc-100 font-medium' : 'text-zinc-300')}>
-                            {row.title}
-                          </span>
-                        </div>
-                        {row.rightText && cardW >= 420 && (
-                          <span className="text-t1 text-muted-foreground shrink-0 tabular-nums">
-                            {row.rightText}
-                          </span>
+              <div className="tl-feed px-3 pt-1.5 pb-2.5">
+                {recentHighlights.map((row) => {
+                  const tag = eventTag(row.event, row.side);
+                  return (
+                    <FeedRow
+                      key={row.key}
+                      tone={tag.tone}
+                      time={row.time}
+                      alert={row.isAlert}
+                      onActivate={() => {
+                        handleSelectTab('ALL');
+                        setExpandedKey(row.key);
+                      }}
+                    >
+                      <span className="tl-tag">{tag.code}</span>
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 truncate text-t3 font-sans',
+                          row.isAlert ? 'text-foreground font-medium' : 'text-foreground/80'
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        title={row.title}
+                      >
+                        {row.title}
+                      </span>
+                      {row.equity && showEquity && (
+                        <span className="shrink-0 text-t2 font-mono text-muted-foreground tabular-nums" title="權益">
+                          {row.equity}
+                        </span>
+                      )}
+                    </FeedRow>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -998,181 +1047,62 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
               </button>
             </div>
           )}
-          <div
-            key={`timeline-${expandedKey}-${showHeartbeats}`}
-            ref={containerRef}
-            className="flex-1 min-h-0 overflow-y-auto p-3 pr-2 relative custom-scrollbar"
-            style={{
-              '--photon-duration': `${DURATION_SEC}s`,
-              '--photon-length': `${PHOTON_LENGTH}px`,
-              '--photon-width': `${PHOTON_WIDTH}px`,
-              '--photon-opacity': `${(PHOTON_BRIGHTNESS / 100).toFixed(2)}`,
-              '--bloom-intensity': `${(BLOOM_INTENSITY / 100).toFixed(2)}`,
-              '--glass-blur': `${GLASS_BLUR}px`,
-              '--card-shimmer-opacity': `${(CARD_SHIMMER / 100).toFixed(2)}`,
-            } as React.CSSProperties}
-          >
-          {showEmpty ? (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-1">
-              <Inbox className="size-6 text-zinc-500/80 mb-1" />
-              <span className="text-t2">{emptyMessage}</span>
-            </div>
-          ) : (
-            <div className="relative pl-3 space-y-1.5">
-              <div className="absolute left-[20px] -translate-x-1/2 top-2 bottom-2 w-[20px] pointer-events-none z-0 overflow-hidden">
-                <div className="absolute left-[10px] -translate-x-1/2 top-0 bottom-0 w-[1px] bg-white/[0.10]" />
-                <div className="absolute left-[2px] bottom-0 w-[20px]" style={{ display: 'none' }}>
-                  <div
-                    className="hidden"
-                    style={{
-                      width: `${GLOW_SPREAD}px`,
-                      height: `${Math.round(PHOTON_LENGTH * 1.25)}px`,
-                      opacity: PHOTON_BRIGHTNESS / 100,
-                      filter: `blur(${Math.max(2, Math.round(GLOW_SPREAD * 0.28))}px)`,
-                    }}
-                  />
-                  <div
-                    className="hidden"
-                    style={{
-                      width: `${PHOTON_WIDTH}px`,
-                      height: `${PHOTON_LENGTH}px`,
-                      opacity: 1,
-                      boxShadow: `0 0 ${Math.round(8 * (BLOOM_INTENSITY / 100))}px ${Math.round(1 * (BLOOM_INTENSITY / 100))}px rgba(255, 255, 255, 0.7)`,
-                    }}
-                  />
-                </div>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2 custom-scrollbar">
+            {showEmpty ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-1">
+                <Inbox className="size-6 text-zinc-500/80 mb-1" />
+                <span className="text-t2">{emptyMessage}</span>
               </div>
-
-              {filteredRows.map((row) => {
-                const ev = row.event;
-                const isExp = expandedKey === row.key;
-                const meta = getBadgeMeta(ev, row.side);
-                const isWarn = ev.level === 'WARN';
-                const isError = ev.level === 'ERROR';
-                const detailFields = isExp ? buildDetailFields(ev) : null;
-                const bottomDelay = bottomUpDelays[row.key] ?? 0;
-
-                return (
-                  <div
-                    key={row.key}
-                    ref={(el) => {
-                      if (el) nodeRefs.current.set(row.key, el);
-                      else nodeRefs.current.delete(row.key);
-                    }}
-                    className="relative flex items-start gap-2.5 group"
-                  >
-                    <div className="relative mt-1.5 shrink-0 z-10 flex items-center justify-center size-4 pointer-events-none">
-                      <span
-                        className={cn(
-                          'absolute inline-flex size-2 rounded-full pointer-events-none',
-                          meta.sonarClass
-                        )}
-                        style={{
-                          animation: `optical-halation-fade ${DURATION_SEC}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
-                          animationDelay: `${bottomDelay}s`,
-                        }}
-                      />
-                      <span
-                        className={cn(
-                          'relative inline-flex size-1.5 rounded-full transition-all duration-150',
-                          meta.coreClass,
-                          row.isAlert && 'crystal-breathe-subtle'
-                        )}
-                        style={{
-                          animation: `${meta.bloomAnimation} ${DURATION_SEC}s cubic-bezier(0.16, 1, 0.3, 1) infinite`,
-                          animationDelay: `${bottomDelay}s`,
-                        }}
-                      />
-                    </div>
-
-                    <div
-                      onClick={() => toggleRow(row.key)}
-                      className={cn(
-                        'flex-1 min-w-0 transition-all duration-150 cursor-pointer px-2 py-1.5 rounded-md',
-                        isExp
-                          ? 'bg-white/[0.035]'
-                          : isError
-                          ? 'bg-rose-500/[0.02] hover:bg-rose-500/[0.04]'
-                          : isWarn
-                          ? 'bg-amber-500/[0.02] hover:bg-amber-500/[0.04]'
-                          : 'hover:bg-white/[0.025]'
-                      )}
+            ) : (
+              <div className="tl-feed">
+                {filteredRows.map((row) => {
+                  const ev = row.event;
+                  const isExp = expandedKey === row.key;
+                  const tag = eventTag(ev, row.side);
+                  return (
+                    <FeedRow
+                      key={row.key}
+                      tone={tag.tone}
+                      time={row.time}
+                      alert={row.isAlert}
+                      expandable
+                      open={isExp}
+                      active={isExp}
+                      onActivate={() => toggleRow(row.key)}
+                      panel={isExp ? renderEventPanel(row) : undefined}
                     >
-                      <div className="flex items-center justify-between gap-2 text-t2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-zinc-500 text-t1 shrink-0 font-mono tabular-nums">{row.time}</span>
-                          <span className={cn('text-t1 font-mono shrink-0 w-7', meta.tagClass)}>
-                            {meta.label}
-                          </span>
-                          {cardW >= 460 && ev.bot_id && (
-                            <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 text-t1 leading-none shrink-0 font-mono">
-                              {ev.bot_id}
-                            </span>
-                          )}
-                          <span
-                            className={cn(
-                              'truncate leading-tight tracking-tight text-t2',
-                              row.isAlert ? 'text-zinc-100 font-medium' : 'text-zinc-300 font-normal'
-                            )}
-                          >
-                            {row.title}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {row.rightText && cardW >= 460 ? (
-                            <span className="text-t1 font-mono tracking-tight text-muted-foreground tabular-nums">
-                              {row.rightText}
-                            </span>
-                          ) : row.isAlert ? (
-                            <span className={cn('text-t1 font-mono', levelCapsuleClass(ev.level))}>
-                              {ev.level}
-                            </span>
-                          ) : null}
-
-                          <button
-                            type="button"
-                            className="text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-transform duration-200 outline-none focus:outline-none"
-                            aria-label={isExp ? '收合' : '展開'}
-                          >
-                            {isExp ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {isExp && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-2 pt-2 border-t border-white/[0.05] text-t1 space-y-2 text-zinc-300 snap-accordion-enter"
-                        >
-                          {detailFields ? (
-                            <div className={cn('grid gap-2 p-2 rounded-md bg-secondary/40 border border-border/60 text-t1 font-mono', cardW < 420 ? 'grid-cols-2' : 'grid-cols-4')}>
-                              {detailFields.map((field) => (
-                                <div key={field.label} className="min-w-0">
-                                  <span className="text-muted-foreground block text-t1 uppercase tracking-wider">{field.label}</span>
-                                  <span className="font-semibold text-foreground break-all">{field.value}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <pre className="text-t1 font-mono max-h-40 overflow-auto p-2 rounded-md bg-secondary/40 border border-border/60 text-zinc-300 whitespace-pre-wrap break-all custom-scrollbar">
-                              {JSON.stringify(ev.payload, null, 1)}
-                            </pre>
-                          )}
-
-                          <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-t1 text-zinc-500">
-                            <span className="truncate">
-                              {`seq ${ev.seq} · run ${shortId(ev.run_id)} · ${row.syntheticLabel ? '合成時間 ' + row.syntheticLabel + ' · ' : ''}${ev.category}`}
-                            </span>
-                          </div>
-                        </div>
+                      <span className="tl-tag">{tag.code}</span>
+                      {cardW >= 460 && ev.bot_id && (
+                        <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 text-t1 leading-none shrink-0 font-mono">
+                          {ev.bot_id}
+                        </span>
                       )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 truncate text-t3 font-sans',
+                          row.isAlert ? 'text-foreground font-medium' : 'text-foreground/80'
+                        )}
+                        title={row.title}
+                      >
+                        {row.title}
+                      </span>
+                      {row.equity && cardW >= 460 && (
+                        <span className="shrink-0 text-t2 font-mono text-muted-foreground tabular-nums" title="權益">
+                          {row.equity}
+                        </span>
+                      )}
+                      <ChevronDown
+                        className={cn(
+                          'size-3 shrink-0 text-muted-foreground/70 transition-transform duration-200',
+                          isExp && 'rotate-180'
+                        )}
+                        aria-hidden="true"
+                      />
+                    </FeedRow>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

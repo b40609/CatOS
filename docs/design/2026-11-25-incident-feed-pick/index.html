@@ -1,0 +1,1525 @@
+<!doctype html>
+<html lang="zh-Hant" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CatOS · 呼吸光暈節點精修 × 4 種待處理進階架構</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --background: oklch(0.155 0.004 260);
+  --foreground: oklch(0.94 0.004 260);
+  --surface: oklch(0.19 0.004 260);
+  --surface-raised: oklch(0.24 0.006 260);
+  --card-bg: color-mix(in oklab, var(--surface) 44%, var(--background));
+  --muted-foreground: oklch(0.65 0.009 260);
+  --faint-foreground: oklch(0.49 0.008 260);
+  --border: oklch(0.42 0.009 260 / 38%);
+  --border-soft: oklch(0.42 0.009 260 / 22%);
+  --border-strong: oklch(0.48 0.009 260 / 56%);
+
+  --primary: oklch(0.77 0.165 70);
+  --primary-fg: #000000;
+  --up: oklch(0.78 0.15 165);
+  --down: oklch(0.64 0.2 22);
+  --warn: oklch(0.78 0.16 62);
+  --info: oklch(0.72 0.1 235);
+
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --sans: "Work Sans", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: color-mix(in oklab, var(--primary) 28%, transparent);
+  color: var(--foreground);
+}
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: none; padding: 0; }
+button:focus-visible { outline: 1px solid color-mix(in oklab, var(--primary) 70%, transparent); outline-offset: 1px; }
+.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 頂部控制列 */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in oklab, var(--background) 94%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; }
+.brand-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, color-mix(in oklab, var(--primary) 40%, white), var(--primary) 70%);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 70%, transparent);
+}
+.ctrl-row { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.seg {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: color-mix(in oklab, var(--background) 85%, transparent);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px;
+}
+.seg button {
+  padding: 3px 8px; border-radius: 4px; font-size: 11px; color: var(--muted-foreground);
+  display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.seg button:hover { color: var(--foreground); background: rgba(255,255,255,.04); }
+.seg button.active {
+  background: color-mix(in oklab, var(--primary) 16%, transparent);
+  border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+  color: var(--primary); font-weight: 600;
+}
+.swatch { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* 主容器 */
+.wrap { max-width: 1640px; margin: 0 auto; padding: 18px 20px 72px; }
+.sec-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.sec-head h2 { margin: 0; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+.sec-head p { margin: 0; font-size: 11px; color: var(--muted-foreground); }
+
+.num-pill {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 4px;
+  background: color-mix(in oklab, var(--primary) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--primary) 42%, transparent);
+  color: var(--primary);
+}
+.rec-pill {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  background: color-mix(in oklab, var(--up) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--up) 36%, transparent);
+  color: var(--up);
+}
+
+/* 上方：6 種光暈與空心環精修方案（3 x 2 並排） */
+.tl-showcase { margin-bottom: 28px; }
+.tl-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1160px) { .tl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px)  { .tl-grid { grid-template-columns: 1fr; } }
+
+.tl-opt {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .14s, box-shadow .14s;
+}
+.tl-opt:hover { border-color: var(--border-strong); }
+.tl-opt.active {
+  border-color: color-mix(in oklab, var(--primary) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 28%, transparent);
+}
+.tl-opt-h {
+  padding: 7px 12px;
+  background: color-mix(in oklab, var(--surface-raised) 50%, transparent);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.tl-opt-title { font-size: 11.5px; font-weight: 700; color: var(--foreground); display: inline-flex; align-items: center; gap: 6px; }
+.tl-opt-badge {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(255,255,255,.06); color: var(--muted-foreground);
+}
+.tl-opt.active .tl-opt-badge {
+  background: color-mix(in oklab, var(--primary) 18%, transparent);
+  color: var(--primary);
+}
+.tl-opt-sub { font-size: 10px; color: var(--faint-foreground); white-space: nowrap; }
+.tl-opt.active .tl-opt-sub { color: var(--primary); font-weight: 600; }
+.tl-opt-note {
+  padding: 5.5px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 10px; color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--background) 32%, transparent);
+}
+.tl-opt .feed-eq { display: none; }
+
+/* 下方：4 種進階架構（2 x 2 並排） */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1180px) { .grid { grid-template-columns: 1fr; } }
+
+.col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.meta { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.meta-left { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.meta-title { font-size: 12.5px; font-weight: 700; }
+.meta-desc { font-size: 10.5px; color: var(--muted-foreground); }
+
+/* 卡片外殼 */
+.card {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.card-h {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 14px;
+  background: color-mix(in oklab, var(--surface-raised) 55%, transparent);
+  border-bottom: 1px solid var(--border-soft);
+  min-height: 34px;
+}
+.card-h-title { font-size: 11.5px; font-weight: 700; color: var(--foreground); white-space: nowrap; }
+.tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.tab {
+  font-family: var(--mono); font-size: 10px; color: var(--muted-foreground);
+  padding: 3px 8px; border-radius: 4px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid transparent; transition: all .12s;
+}
+.tab:hover { color: var(--foreground); background: rgba(255,255,255,.04); }
+.tab.active {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--surface-raised) 90%, transparent);
+  border-color: var(--border);
+  font-weight: 600;
+}
+.tab .mini-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); }
+
+.subbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: color-mix(in oklab, var(--background) 38%, transparent);
+  font-size: 10px; color: var(--faint-foreground);
+}
+.subbar.no-top { border-top: none; }
+.link-more { color: var(--muted-foreground); font-size: 10px; display: inline-flex; align-items: center; gap: 3px; }
+.link-more:hover { color: var(--primary); }
+
+/* =====================================================================
+   事件時間軸（GPU 合成呼吸光暈：只動畫 opacity + transform，不動畫 box-shadow/filter）
+   ===================================================================== */
+.feed { position: relative; padding: 6px 12px 10px; }
+.feed-rail {
+  position: absolute; top: 15px; bottom: 16px; width: 1px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--border-strong) 85%, transparent),
+    color-mix(in oklab, var(--border-soft) 95%, transparent) 78%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* 排法 1：時間 ─●─ 類別 */
+.feed.tl-left-time .feed-rail { left: 86px; transform: translateX(-0.5px); }
+.feed.tl-left-time .feed-row {
+  display: grid;
+  grid-template-columns: 54px 16px 44px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 4px;
+  font-size: 10.5px; cursor: pointer; transition: background .12s;
+}
+.feed.tl-left-time .feed-row.with-bot {
+  grid-template-columns: 54px 16px 44px 46px minmax(0, 1fr) auto;
+}
+.feed.tl-left-time .feed-time { text-align: right; }
+
+/* 排法 2：─●─ 類別 · 時間 */
+.feed.tl-left-rail .feed-rail { left: 26px; transform: translateX(-0.5px); }
+.feed.tl-left-rail .feed-row {
+  display: grid;
+  grid-template-columns: 16px 44px 54px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 4px;
+  font-size: 10.5px; cursor: pointer; transition: background .12s;
+}
+.feed.tl-left-rail .feed-row.with-bot {
+  grid-template-columns: 16px 44px 54px 46px minmax(0, 1fr) auto;
+}
+
+.feed-row:hover { background: rgba(255,255,255,.034); }
+.feed-row.is-alert { background: color-mix(in oklab, var(--warn) 4.5%, transparent); }
+.feed-row.is-alert:hover { background: color-mix(in oklab, var(--warn) 8%, transparent); }
+
+.feed-row.tone-info  { --tc: var(--info); }
+.feed-row.tone-warn  { --tc: var(--warn); }
+.feed-row.tone-up    { --tc: var(--up); }
+.feed-row.tone-down  { --tc: var(--down); }
+.feed-row.tone-pri   { --tc: var(--primary); }
+.feed-row.tone-muted { --tc: var(--muted-foreground); }
+
+.feed-node {
+  position: relative; z-index: 1;
+  width: 16px; height: 16px;
+  display: grid; place-items: center;
+  isolation: isolate;
+}
+
+/* 鎖定的霧底無框等寬英文標籤 */
+.feed-cat {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 600; letter-spacing: 0.04em;
+  white-space: nowrap;
+  width: 44px; height: 17px; border-radius: 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in oklab, var(--tc) 10%, transparent);
+  color: color-mix(in oklab, var(--tc) 92%, var(--foreground));
+  line-height: 1;
+}
+.feed-row.is-alert .feed-cat {
+  background: color-mix(in oklab, var(--warn) 18%, transparent);
+  color: var(--warn);
+}
+
+.feed-time {
+  font-family: var(--mono); font-size: 9.5px;
+  color: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.feed-time .t-sec { color: var(--faint-foreground); opacity: .75; }
+.feed-bot { font-family: var(--mono); font-size: 9.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-msg { color: color-mix(in oklab, var(--foreground) 84%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-msg strong { font-family: var(--mono); font-weight: 600; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.feed-row.is-alert .feed-msg { color: var(--foreground); font-weight: 500; }
+.feed-eq { font-family: var(--mono); font-size: 9.5px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* =====================================================================
+   呼吸與脈衝 Keyframes（純 GPU Composite：transform + opacity）
+   Apple Sleep LED 節奏：約 3.8~4.2s 完整周期，谷底不歸零
+   ===================================================================== */
+@keyframes haloBreatheCalm {
+  0%   { opacity: 0.34; transform: scale(0.76); }
+  100% { opacity: 0.96; transform: scale(1.18); }
+}
+@keyframes haloBreatheAlert {
+  0%   { opacity: 0.36; transform: scale(0.78); }
+  100% { opacity: 1;    transform: scale(1.32); }
+}
+@keyframes coreBreathe {
+  0%   { opacity: 0.84; transform: scale(0.95); }
+  100% { opacity: 1;    transform: scale(1.06); }
+}
+@keyframes radarPing {
+  0%   { opacity: 0.68; transform: scale(0.55); }
+  58%  { opacity: 0;    transform: scale(1.55); }
+  100% { opacity: 0;    transform: scale(1.55); }
+}
+
+/* ---- 共用：逼真光學燈芯基礎（三層物理逆平方衰減） ---- */
+.n-shape { position: relative; display: block; }
+
+/* ---- N2：空心細環（原版對照） ---- */
+.feed.node-n2 .n-shape {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--card-bg);
+  border: 1.5px solid color-mix(in oklab, var(--tc) 80%, var(--muted-foreground));
+  box-shadow: 0 0 0 2px var(--card-bg);
+  transition: border-color .14s;
+}
+.feed.node-n2 .feed-row:hover .n-shape { border-color: var(--tc); }
+.feed.node-n2 .feed-row.is-alert .n-shape {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+/* ---- N2g：微光空心細環（N2 升級：柔和外暈 ＋ WARN 呼吸） ---- */
+.feed.node-n2g .n-shape {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--card-bg);
+  border: 1.5px solid color-mix(in oklab, var(--tc) 88%, white);
+  box-shadow:
+    0 0 0 1.5px var(--card-bg),
+    0 0 6px color-mix(in oklab, var(--tc) 42%, transparent);
+}
+.feed.node-n2g .n-shape::before {
+  content: "";
+  position: absolute; inset: -7px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 38%, transparent) 0%,
+    color-mix(in oklab, var(--tc) 14%, transparent) 44%,
+    transparent 74%
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
+.feed.node-n2g .feed-row.is-alert .n-shape {
+  background: radial-gradient(circle at 35% 35%, color-mix(in oklab, var(--warn) 35%, white) 0%, var(--warn) 68%);
+  border-color: color-mix(in oklab, var(--warn) 50%, white);
+  box-shadow:
+    0 0 4px color-mix(in oklab, var(--warn) 85%, transparent),
+    0 0 11px color-mix(in oklab, var(--warn) 42%, transparent);
+}
+.feed.node-n2g .feed-row.is-alert .n-shape::before,
+.feed.node-n2g .feed-row.is-live .n-shape::before {
+  will-change: transform, opacity;
+  animation: haloBreatheAlert 2.1s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+.feed.node-n2g .feed-row.is-live .n-shape::before {
+  animation-name: haloBreatheCalm;
+  animation-duration: 3.4s;
+}
+
+/* ---- N6a：聚焦呼吸燈珠（業界最推：三層物理光暈，僅 WARN 與最新 1 筆呼吸） ---- */
+.feed.node-n6a .n-shape {
+  width: 5px; height: 5px; border-radius: 50%;
+  /* 第 1 層：立體高亮燈芯（35% 35% 頂部高光模擬 LED 透鏡） */
+  background: radial-gradient(
+    circle at 34% 34%,
+    color-mix(in oklab, var(--tc) 28%, white) 0%,
+    var(--tc) 58%,
+    color-mix(in oklab, var(--tc) 68%, black) 100%
+  );
+  /* 第 2 層：近場高密度散射光暈（靜態預渲染，不直接動畫） */
+  box-shadow:
+    inset 0 0.5px 0.8px rgba(255, 255, 255, 0.65),
+    0 0 3.5px color-mix(in oklab, var(--tc) 78%, transparent),
+    0 0 9px color-mix(in oklab, var(--tc) 34%, transparent);
+}
+/* 第 3 層：遠場逆平方衰減大氣柔暈（0% -> 32% 急降 -> 65% 極淡 -> 100% transparent） */
+.feed.node-n6a .n-shape::before {
+  content: "";
+  position: absolute; inset: -7px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 52%, transparent) 0%,
+    color-mix(in oklab, var(--tc) 20%, transparent) 34%,
+    color-mix(in oklab, var(--tc) 6%, transparent) 64%,
+    transparent 100%
+  );
+  opacity: 0.42;
+  pointer-events: none;
+}
+.feed.node-n6a .feed-row:hover .n-shape::before { opacity: 0.92; transform: scale(1.12); transition: opacity .18s, transform .18s; }
+.feed.node-n6a .feed-row.is-live .n-shape::before {
+  will-change: transform, opacity;
+  animation: haloBreatheCalm 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+.feed.node-n6a .feed-row.is-alert .n-shape {
+  width: 5.5px; height: 5.5px;
+  will-change: transform, opacity;
+  animation: coreBreathe 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+.feed.node-n6a .feed-row.is-alert .n-shape::before {
+  inset: -8.5px;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--warn) 68%, transparent) 0%,
+    color-mix(in oklab, var(--warn) 28%, transparent) 34%,
+    color-mix(in oklab, var(--warn) 8%, transparent) 66%,
+    transparent 100%
+  );
+  will-change: transform, opacity;
+  animation: haloBreatheAlert 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+/* ---- N6b：錯相微息光珠（全列緩慢深呼吸 4.2s＋依序錯相＋WARN 雙層柔波） ---- */
+.feed.node-n6b .n-shape {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    color-mix(in oklab, var(--tc) 30%, white) 0%,
+    var(--tc) 60%,
+    color-mix(in oklab, var(--tc) 68%, black) 100%
+  );
+  box-shadow:
+    inset 0 0.5px 0.8px rgba(255, 255, 255, 0.6),
+    0 0 3.5px color-mix(in oklab, var(--tc) 75%, transparent),
+    0 0 8px color-mix(in oklab, var(--tc) 30%, transparent);
+}
+.feed.node-n6b .n-shape::before {
+  content: "";
+  position: absolute; inset: -7px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 48%, transparent) 0%,
+    color-mix(in oklab, var(--tc) 18%, transparent) 36%,
+    color-mix(in oklab, var(--tc) 5%, transparent) 66%,
+    transparent 100%
+  );
+  will-change: transform, opacity;
+  animation: haloBreatheCalm 4.0s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  animation-delay: var(--stagger, 0s);
+  pointer-events: none;
+}
+.feed.node-n6b .feed-row.is-alert .n-shape {
+  width: 5.5px; height: 5.5px;
+}
+.feed.node-n6b .feed-row.is-alert .n-shape::before {
+  inset: -8.5px;
+  animation: haloBreatheAlert 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  animation-delay: 0s;
+}
+.feed.node-n6b .feed-row.is-alert .n-shape::after {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%; z-index: -1;
+  border: 1px solid color-mix(in oklab, var(--warn) 65%, transparent);
+  will-change: transform, opacity;
+  animation: radarPing 2.6s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+/* ---- N6c：環芯光暈混血（N2 細環 ＋ N6 內發光：一般為發光細環，WARN/最新為呼吸燈珠） ---- */
+.feed.node-n6c .n-shape {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: color-mix(in oklab, var(--tc) 10%, var(--card-bg));
+  border: 1.5px solid color-mix(in oklab, var(--tc) 86%, white);
+  box-shadow:
+    0 0 0 1.5px var(--card-bg),
+    0 0 6px color-mix(in oklab, var(--tc) 38%, transparent);
+}
+.feed.node-n6c .n-shape::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 30%, transparent) 0%,
+    transparent 72%
+  );
+  opacity: 0.45;
+  pointer-events: none;
+}
+.feed.node-n6c .feed-row.is-live .n-shape,
+.feed.node-n6c .feed-row.is-alert .n-shape {
+  width: 5.5px; height: 5.5px;
+  border: none;
+  background: radial-gradient(
+    circle at 34% 34%,
+    color-mix(in oklab, var(--tc) 25%, white) 0%,
+    var(--tc) 60%,
+    color-mix(in oklab, var(--tc) 68%, black) 100%
+  );
+  box-shadow:
+    inset 0 0.5px 0.8px rgba(255, 255, 255, 0.7),
+    0 0 4px color-mix(in oklab, var(--tc) 85%, transparent),
+    0 0 10px color-mix(in oklab, var(--tc) 42%, transparent);
+}
+.feed.node-n6c .feed-row.is-live .n-shape::before {
+  inset: -7.5px;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 55%, transparent) 0%,
+    color-mix(in oklab, var(--tc) 20%, transparent) 36%,
+    transparent 74%
+  );
+  will-change: transform, opacity;
+  animation: haloBreatheCalm 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+.feed.node-n6c .feed-row.is-alert .n-shape::before {
+  inset: -8.5px;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--warn) 68%, transparent) 0%,
+    color-mix(in oklab, var(--warn) 26%, transparent) 36%,
+    transparent 76%
+  );
+  will-change: transform, opacity;
+  animation: haloBreatheAlert 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+/* ---- N6d：雷達微脈衝（Linear / Vercel 風格：立體燈芯＋定時擴散柔波） ---- */
+.feed.node-n6d .n-shape {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(
+    circle at 34% 34%,
+    color-mix(in oklab, var(--tc) 28%, white) 0%,
+    var(--tc) 62%
+  );
+  box-shadow:
+    0 0 4px color-mix(in oklab, var(--tc) 72%, transparent),
+    0 0 9px color-mix(in oklab, var(--tc) 28%, transparent);
+}
+.feed.node-n6d .n-shape::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--tc) 38%, transparent) 0%,
+    color-mix(in oklab, var(--tc) 12%, transparent) 44%,
+    transparent 76%
+  );
+  opacity: 0.48;
+  pointer-events: none;
+}
+.feed.node-n6d .feed-row.is-live .n-shape::after,
+.feed.node-n6d .feed-row.is-alert .n-shape::after {
+  content: "";
+  position: absolute; inset: -4px; border-radius: 50%; z-index: -1;
+  background: radial-gradient(
+    circle in oklab,
+    transparent 42%,
+    color-mix(in oklab, var(--tc) 55%, transparent) 66%,
+    transparent 100%
+  );
+  will-change: transform, opacity;
+  animation: radarPing 2.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+.feed.node-n6d .feed-row.is-alert .n-shape::after {
+  animation-duration: 2.1s;
+}
+
+/* 無障礙降動效保護 */
+@media (prefers-reduced-motion: reduce) {
+  .n-shape, .n-shape::before, .n-shape::after,
+  .glow-pip, .glow-pip::before {
+    animation: none !important;
+  }
+}
+
+/* 待處理區共用呼吸小光點（跟隨目前選擇的風格語氣） */
+.glow-pip {
+  position: relative;
+  width: 5.5px; height: 5.5px; border-radius: 50%; flex-shrink: 0;
+  background: radial-gradient(
+    circle at 34% 34%,
+    color-mix(in oklab, var(--pip-c, var(--primary)) 28%, white) 0%,
+    var(--pip-c, var(--primary)) 62%
+  );
+  box-shadow:
+    0 0 4px color-mix(in oklab, var(--pip-c, var(--primary)) 80%, transparent),
+    0 0 9px color-mix(in oklab, var(--pip-c, var(--primary)) 34%, transparent);
+}
+.glow-pip.breathe::before {
+  content: "";
+  position: absolute; inset: -6px; border-radius: 50%;
+  background: radial-gradient(
+    circle in oklab,
+    color-mix(in oklab, var(--pip-c, var(--primary)) 58%, transparent) 0%,
+    color-mix(in oklab, var(--pip-c, var(--primary)) 18%, transparent) 42%,
+    transparent 76%
+  );
+  will-change: transform, opacity;
+  animation: haloBreatheAlert 2.1s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  pointer-events: none;
+}
+.glow-pip.ring {
+  width: 7px; height: 7px;
+  background: var(--card-bg);
+  border: 1.5px solid color-mix(in oklab, var(--pip-c, var(--primary)) 86%, white);
+  box-shadow: 0 0 5px color-mix(in oklab, var(--pip-c, var(--primary)) 35%, transparent);
+}
+
+/* 通用語意色與按鈕 */
+.t-warn  { color: var(--warn); }
+.t-up    { color: var(--up); }
+.t-down  { color: var(--down); }
+.t-info  { color: var(--info); }
+.t-pri   { color: var(--primary); }
+.t-muted { color: var(--muted-foreground); }
+
+.btn-pri {
+  padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  color: var(--primary);
+  border: 1px solid color-mix(in oklab, var(--primary) 46%, transparent);
+  background: color-mix(in oklab, var(--primary) 13%, transparent);
+  transition: all .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+}
+.btn-pri:hover { background: var(--primary); color: var(--primary-fg); }
+.btn-sec {
+  padding: 4px 9px; border-radius: 4px; font-size: 10px;
+  color: var(--foreground); border: 1px solid var(--border);
+  background: rgba(255,255,255,.03);
+  transition: all .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+}
+.btn-sec:hover { border-color: color-mix(in oklab, var(--primary) 50%, transparent); color: var(--primary); }
+
+/* 迷你偏差條 / 4格驗證條（共用） */
+.mini-bar {
+  position: relative; width: 68px; height: 4px; border-radius: 99px;
+  background: rgba(255,255,255,.08); overflow: visible; flex-shrink: 0;
+}
+.mini-bar-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--warn) 55%, var(--primary)), var(--warn));
+}
+.mini-bar-tick {
+  position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1.5px;
+  background: var(--foreground); opacity: .7;
+}
+.mini-gates { display: inline-flex; align-items: center; gap: 2.5px; }
+.mini-gates i {
+  display: block; width: 11px; height: 4px; border-radius: 1.5px;
+  background: color-mix(in oklab, var(--primary) 85%, white);
+  box-shadow: 0 0 5px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+.mini-gates.muted i { background: rgba(255,255,255,.14); box-shadow: none; }
+.mini-gates.muted i.on { background: color-mix(in oklab, var(--muted-foreground) 75%, transparent); }
+
+.cli-box {
+  margin-top: 8px; padding: 6px 10px; border-radius: 4px;
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-family: var(--mono); font-size: 9.5px; color: var(--muted-foreground);
+}
+.cli-box code { color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cli-copy { color: var(--primary); font-weight: 600; flex-shrink: 0; font-size: 10px; padding: 2px 7px; border-radius: 3px; }
+.cli-copy:hover { background: color-mix(in oklab, var(--primary) 16%, transparent); }
+
+/* =====================================================================
+   架構 5：量化數據列 ＋ 內嵌微標尺（架構 4 精進版）
+   ===================================================================== */
+.m5-list { display: flex; flex-direction: column; }
+.m5-item {
+  border-bottom: 1px solid var(--border-soft);
+  transition: background .12s;
+}
+.m5-item:last-child { border-bottom: none; }
+.m5-row {
+  display: grid;
+  grid-template-columns: 14px 44px minmax(0, 1.05fr) 74px 72px auto;
+  align-items: center; gap: 9px;
+  padding: 8.5px 14px; cursor: pointer;
+}
+.m5-row:hover { background: rgba(255,255,255,.028); }
+.m5-item.open .m5-row { background: color-mix(in oklab, var(--surface-raised) 38%, transparent); }
+.m5-tag {
+  font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .04em;
+  width: 44px; height: 17px; border-radius: 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in oklab, var(--it-c) 12%, transparent);
+  color: color-mix(in oklab, var(--it-c) 92%, var(--foreground));
+}
+.m5-name-col { min-width: 0; display: flex; align-items: baseline; gap: 6px; }
+.m5-name { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m5-sym { font-family: var(--mono); font-size: 9.5px; color: var(--faint-foreground); white-space: nowrap; }
+.m5-viz { display: flex; align-items: center; justify-content: flex-end; }
+.m5-kpi {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700; text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.m5-drawer {
+  padding: 0 14px 10px 37px;
+  font-size: 10.5px; color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--surface-raised) 38%, transparent);
+}
+.m5-drawer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+/* =====================================================================
+   架構 6：頂部三聯微卡片（3-Column Triage Strip）
+   ===================================================================== */
+.m6-strip {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px; padding: 10px 12px;
+}
+@media (max-width: 640px) { .m6-strip { grid-template-columns: 1fr; } }
+.m6-tile {
+  position: relative;
+  border-radius: 5px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in oklab, var(--background) 48%, transparent);
+  padding: 9px 10px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color .14s, background .14s;
+}
+.m6-tile:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in oklab, var(--surface-raised) 38%, transparent);
+}
+.m6-tile.active {
+  border-color: color-mix(in oklab, var(--it-c) 58%, transparent);
+  background: color-mix(in oklab, var(--it-c) 6%, var(--background));
+}
+.m6-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.m6-top-l { display: inline-flex; align-items: center; gap: 6px; }
+.m6-code { font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--it-c); letter-spacing: .04em; }
+.m6-sym { font-family: var(--mono); font-size: 9px; color: var(--faint-foreground); }
+.m6-name { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m6-mid { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m6-hero { font-family: var(--mono); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.m6-foot { font-size: 9.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m6-actionbar {
+  margin: 0 12px 10px;
+  padding: 7px 11px; border-radius: 5px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--background) 78%, transparent);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  font-size: 10.5px;
+}
+.m6-actionbar code {
+  font-family: var(--mono); font-size: 9.5px; color: var(--foreground);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+}
+
+/* =====================================================================
+   架構 7：左右主從檢視（Split Master-Detail，架構 3 進化版、固定高度零跳動）
+   ===================================================================== */
+.m7-split {
+  display: grid; grid-template-columns: 44% 56%;
+  min-height: 126px;
+}
+@media (max-width: 680px) { .m7-split { grid-template-columns: 1fr; } }
+.m7-nav {
+  border-right: 1px solid var(--border-soft);
+  display: flex; flex-direction: column;
+}
+.m7-nav-row {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 9px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 2px solid transparent;
+  transition: background .12s, border-color .12s;
+  flex: 1;
+}
+.m7-nav-row:last-child { border-bottom: none; }
+.m7-nav-row:hover { background: rgba(255,255,255,.028); }
+.m7-nav-row.active {
+  background: color-mix(in oklab, var(--it-c) 7%, transparent);
+  border-left-color: var(--it-c);
+}
+.m7-nav-name { font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m7-nav-sub { font-size: 9.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m7-nav-val { font-family: var(--mono); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+
+.m7-detail {
+  padding: 11px 14px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+  background: color-mix(in oklab, var(--background) 30%, transparent);
+}
+.m7-det-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m7-det-title { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.m7-det-name { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--foreground); }
+.m7-det-sym { font-family: var(--mono); font-size: 9.5px; color: var(--muted-foreground); }
+.m7-det-kpi { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+
+.gauge-track {
+  position: relative; height: 5px; border-radius: 99px;
+  background: rgba(255,255,255,.08); overflow: visible;
+}
+.gauge-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--warn) 50%, var(--primary)), var(--warn));
+}
+.gauge-tick { position: absolute; top: -2.5px; bottom: -2.5px; left: 50%; width: 1.5px; background: var(--foreground); opacity: .75; }
+.gauge-labels { display: flex; justify-content: space-between; margin-top: 4px; font-family: var(--mono); font-size: 9px; color: var(--faint-foreground); }
+
+.gates-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.gate-c {
+  padding: 5px 7px; border-radius: 4px;
+  background: color-mix(in oklab, var(--background) 68%, transparent);
+  border: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.gate-c span { font-size: 9px; color: var(--faint-foreground); }
+.gate-c b { font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: var(--foreground); }
+
+.m7-det-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* =====================================================================
+   架構 8：同軌手風琴一體流（待處理與審計共用同一條呼吸光軌）
+   ===================================================================== */
+.m8-zone {
+  background: color-mix(in oklab, var(--surface-raised) 22%, transparent);
+  border-bottom: 1px solid var(--border-soft);
+}
+.m8-zone .feed { padding-bottom: 8px; }
+.m8-exp {
+  margin: 2px 6px 6px 86px;
+  padding: 8px 11px; border-radius: 4px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in oklab, var(--background) 74%, transparent);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.feed.tl-left-rail .m8-exp { margin-left: 32px; }
+.m8-exp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span>CatOS · 呼吸光暈節點精修 × 4 種待處理進階架構</span>
+  </div>
+
+  <div class="ctrl-row">
+    <div class="seg" id="theme-seg" title="切換主題強調色">
+      <button data-accent="gold" class="active"><span class="swatch" style="background:oklch(0.77 0.165 70)"></span>經典金</button>
+      <button data-accent="cyan"><span class="swatch" style="background:oklch(0.78 0.15 200)"></span>賽博青</button>
+      <button data-accent="emerald"><span class="swatch" style="background:oklch(0.78 0.15 150)"></span>科技翠</button>
+      <button data-accent="violet"><span class="swatch" style="background:oklch(0.72 0.18 300)"></span>紫羅蘭</button>
+      <button data-accent="silver"><span class="swatch" style="background:oklch(0.84 0.01 260)"></span>極簡銀</button>
+    </div>
+
+    <div class="seg" id="tl-seg" title="切換時間軸排法">
+      <button data-tl="tl-left-time" class="active">時間 ─●─ 類別</button>
+      <button data-tl="tl-left-rail">─●─ 類別 · 時間</button>
+    </div>
+
+    <div class="seg" id="conv-seg" title="切換漲跌色彩慣例">
+      <button data-conv="green-up" class="active">綠漲紅跌</button>
+      <button data-conv="red-up">紅漲綠跌</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- Step 1：N2 保留對照 + N6 升級為 4 種業界光學呼吸光暈 -->
+  <div class="tl-showcase">
+    <div class="sec-head">
+      <h2>
+        <span class="num-pill">Step 1</span>
+        <span>N2 空心細環 × N6 逼真呼吸光暈精修（三層物理逆平方衰減 · 純 GPU 合成零重繪）</span>
+      </h2>
+      <p>點擊任一格立即同步套用到下方 4 張進階架構卡</p>
+    </div>
+    <div class="tl-grid" id="tl-showcase-grid"></div>
+  </div>
+
+  <!-- Step 2：4 種進階相似提案（2x2） -->
+  <div class="sec-head">
+    <h2>
+      <span class="num-pill">Step 2</span>
+      <span>待處理區進階提案：4 種相似但更有層次的終端架構（架構 5 ~ 架構 8）</span>
+    </h2>
+    <p>全數支援整列／整卡點擊互動，並同步套用 Step 1 選擇的呼吸光暈風格</p>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <div class="meta">
+        <div class="meta-left">
+          <span class="num-pill">架構 5</span>
+          <span class="rec-pill">架構 4 進化</span>
+          <span class="meta-title">量化數據列 ＋ 內嵌微標尺</span>
+        </div>
+        <span class="meta-desc">保留單行極簡，補上右對齊 KPI、3px 微進度條與全列可展開細節</span>
+      </div>
+      <div class="card" id="card-5"></div>
+    </div>
+
+    <div class="col">
+      <div class="meta">
+        <div class="meta-left">
+          <span class="num-pill">架構 6</span>
+          <span class="meta-title">頂部三聯微卡 ＋ 底部快操列</span>
+        </div>
+        <span class="meta-desc">3 筆橫向並排不佔高度，一眼掃完三項核心數值，點擊即顯示指令</span>
+      </div>
+      <div class="card" id="card-6"></div>
+    </div>
+
+    <div class="col">
+      <div class="meta">
+        <div class="meta-left">
+          <span class="num-pill">架構 7</span>
+          <span class="rec-pill">架構 3 進化</span>
+          <span class="meta-title">左右主從檢視（固定高度零跳動）</span>
+        </div>
+        <span class="meta-desc">左列 3 筆索引、右側固定顯示量尺／4 格關卡／核准指令，切換最順手</span>
+      </div>
+      <div class="card" id="card-7"></div>
+    </div>
+
+    <div class="col">
+      <div class="meta">
+        <div class="meta-left">
+          <span class="num-pill">架構 8</span>
+          <span class="meta-title">同軌手風琴一體流</span>
+        </div>
+        <span class="meta-desc">待處理與事件審計共用同一條呼吸光軌與霧底標籤，視覺最統一克制</span>
+      </div>
+      <div class="card" id="card-8"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ACCENTS = {
+  gold:    { primary: "oklch(0.77 0.165 70)", fg: "#000000" },
+  cyan:    { primary: "oklch(0.78 0.15 200)", fg: "#000000" },
+  emerald: { primary: "oklch(0.78 0.15 150)", fg: "#000000" },
+  violet:  { primary: "oklch(0.72 0.18 300)", fg: "#ffffff" },
+  silver:  { primary: "oklch(0.84 0.01 260)", fg: "#000000" },
+};
+
+const CONVS = {
+  "green-up": { up: "oklch(0.78 0.15 165)", down: "oklch(0.64 0.2 22)" },
+  "red-up":   { up: "oklch(0.66 0.20 22)",  down: "oklch(0.76 0.15 165)" },
+};
+
+const TABS = [
+  { id: "ACTION", label: "待處理", count: 3 },
+  { id: "ALL",    label: "全部",   count: 225 },
+  { id: "ALERT",  label: "異常",   count: 1, alert: true },
+  { id: "ORDER",  label: "成交",   count: 18 },
+  { id: "RISK",   label: "風控",   count: 3 },
+];
+
+const ACTIONS = [
+  {
+    id: "rsi",
+    code: "DEV",
+    tone: "warn",
+    cssVar: "var(--warn)",
+    tag: "偏差警戒",
+    name: "mean-reversion-rsi",
+    sym: "ETH 1H",
+    hero: "-0.61%",
+    heroClass: "t-warn",
+    heroSub: "模擬偏差逾 0.50% 警戒線",
+    summaryHtml: "模擬偏差 <strong class='t-warn'>-0.61%</strong>（警戒 0.50% / 硬門檻 1.00%）· 近 3 筆滑價偏高",
+    actionLabel: "檢視比對",
+    cli: null,
+    alert: true,
+    time: "07:59:58",
+  },
+  {
+    id: "ens",
+    code: "GATE",
+    tone: "pri",
+    cssVar: "var(--primary)",
+    tag: "待核准",
+    name: "donchian-ensemble",
+    sym: "BTC 1D",
+    hero: "+13.9%",
+    heroClass: "t-up",
+    heroSub: "4/4 驗證通過 · 待終端機核准",
+    summaryHtml: "<strong class='t-pri'>4/4 通過</strong> · 年化 <strong class='t-up'>+13.9%</strong> · 回撤 <strong>-11.3%</strong> · PBO 22%",
+    actionLabel: "檢視策略",
+    cli: ".venv\\Scripts\\python.exe -m catos.cli strategy approve --strategy donchian-ensemble",
+    alert: false,
+    time: "06:40:12",
+  },
+  {
+    id: "vol",
+    code: "IDEA",
+    tone: "muted",
+    cssVar: "var(--muted-foreground)",
+    tag: "研究提案",
+    name: "vol-breakout",
+    sym: "SOL 4H",
+    hero: "待回測",
+    heroClass: "t-muted",
+    heroSub: "strategies/ 提案 · 預設只做多",
+    summaryHtml: "Agent 資料夾提案 · 預設只做多 · 尚未排程回測",
+    actionLabel: "檢視策略",
+    cli: null,
+    alert: false,
+    time: "04:15:00",
+  },
+];
+
+const EVENTS = [
+  { time: "08:00:02", cat: "RISK",  label: "RISK", tone: "info", bot: "don4h", live: true,
+    html: "對帳完成，狀態切換至 <strong>running</strong>（部位與餘額一致）", eq: "" },
+  { time: "07:59:58", cat: "ALERT", label: "WARN", tone: "warn", bot: "rsi", alert: true,
+    html: "ETH 1H 模擬偏差 <strong class='t-warn'>-0.61%</strong> 逾 0.50% 警戒線（收 3,124.8）", eq: "$10,015.83" },
+  { time: "00:00:03", cat: "RISK",  label: "RISK", tone: "info", bot: "don4h",
+    html: "台北日風控基準建立 · 2024-11-16", eq: "$11,029.26" },
+  { time: "16:00:01", cat: "ORDER", label: "SELL", tone: "down", bot: "rsi",
+    html: "<strong>ETH</strong> 3 張 @ <strong>$3,128.00</strong>", eq: "$11,094.28" },
+  { time: "12:00:01", cat: "ORDER", label: "BUY",  tone: "up",   bot: "rsi",
+    html: "<strong>ETH</strong> 3 張 @ <strong>$3,052.00</strong>", eq: "$11,094.28" },
+  { time: "04:00:01", cat: "ORDER", label: "SELL", tone: "down", bot: "don4h",
+    html: "<strong>BTC</strong> 1 張 @ <strong>$91,420.00</strong>", eq: "$10,378.12" },
+  { time: "00:00:01", cat: "ORDER", label: "BUY",  tone: "up",   bot: "tsmom",
+    html: "<strong>BTC</strong> 2 張 @ <strong>$89,610.00</strong>", eq: "$10,210.40" },
+];
+
+const NODE_STYLES = [
+  {
+    id: "node-n6a",
+    code: "N6a",
+    rec: true,
+    title: "聚焦呼吸燈珠（業界最推）",
+    note: "立體白芯＋逆平方柔暈；僅最新即時與 WARN 有機呼吸，歷史保持微光餘暉零疲勞",
+  },
+  {
+    id: "node-n6b",
+    code: "N6b",
+    title: "錯相微息光珠（全列呼吸）",
+    note: "每顆燈珠以 4 秒深呼吸並依序錯開相位，像活著的儀表板；WARN 額外釋放擴散柔波",
+  },
+  {
+    id: "node-n6c",
+    code: "N6c",
+    title: "環芯光暈混血（N2 × N6）",
+    note: "一般歷史事件採輕盈發光細環，最新即時與 WARN 轉為立體呼吸燈珠，層次分明",
+  },
+  {
+    id: "node-n6d",
+    code: "N6d",
+    title: "雷達微脈衝（Linear / Vercel 風）",
+    note: "立體柔光核心，最新即時與 WARN 定時向外擴散極柔光圈，停頓後再脈衝",
+  },
+  {
+    id: "node-n2g",
+    code: "N2g",
+    title: "微光空心細環（N2 呼吸升級）",
+    note: "保留 N2 細環幾何，補上淡散射光暈與最新／WARN 柔和呼吸感",
+  },
+  {
+    id: "node-n2",
+    code: "N2",
+    title: "純淨空心細環（原版靜態對照）",
+    note: "零動畫、純粹 7px 空心細環（WARN 實心橘點），留作靜態基準對照",
+  },
+];
+
+const state = {
+  tabs: { 5: "ACTION", 6: "ACTION", 7: "ACTION", 8: "ACTION" },
+  tlMode: "tl-left-time",
+  nodeStyle: "node-n6a",
+  m5Open: "ens",
+  m6Sel: "ens",
+  m7Sel: "rsi",
+  m8Open: "rsi",
+  copiedKey: null,
+};
+
+function formatTime(t) {
+  const parts = t.split(":");
+  if (parts.length !== 3) return t;
+  return `${parts[0]}:${parts[1]}<span class="t-sec">:${parts[2]}</span>`;
+}
+
+function filterEvents(tab) {
+  if (tab === "ALERT") return EVENTS.filter(e => e.cat === "ALERT");
+  if (tab === "ORDER") return EVENTS.filter(e => e.cat === "ORDER");
+  if (tab === "RISK")  return EVENTS.filter(e => e.cat === "RISK");
+  return EVENTS;
+}
+
+function pipClass(isAlert) {
+  const isRing = state.nodeStyle === "node-n2" || state.nodeStyle === "node-n2g" || (state.nodeStyle === "node-n6c" && !isAlert);
+  const noAnim = state.nodeStyle === "node-n2";
+  return `glow-pip ${isRing ? "ring" : ""} ${!noAnim && isAlert ? "breathe" : ""}`;
+}
+
+function renderMiniViz(a) {
+  if (a.id === "rsi") {
+    return `<div class="mini-bar" title="模擬偏差 -0.61% / 硬門檻 1.00%"><div class="mini-bar-fill" style="width:61%"></div><div class="mini-bar-tick"></div></div>`;
+  }
+  if (a.id === "ens") {
+    return `<div class="mini-gates" title="4/4 驗證關卡通過"><i></i><i></i><i></i><i></i></div>`;
+  }
+  return `<div class="mini-gates muted" title="待回測提案"><i class="on"></i><i></i><i></i><i></i></div>`;
+}
+
+function renderHeader(cardNum) {
+  const cur = state.tabs[cardNum];
+  return `
+    <div class="card-h">
+      <span class="card-h-title">待處理與事件審計</span>
+      <div class="tabs">
+        ${TABS.map(t => {
+          const active = cur === t.id ? "active" : "";
+          const dot = t.alert && cur !== t.id ? `<span class="mini-dot"></span>` : "";
+          return `<button class="tab ${active}" data-card="${cardNum}" data-tab="${t.id}">${dot}${t.label}(${t.count})</button>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderFeed(list, showBot, styleOverride) {
+  const leftTime = state.tlMode === "tl-left-time";
+  const styleId = styleOverride || state.nodeStyle;
+  return `
+    <div class="feed ${state.tlMode} ${styleId}">
+      <div class="feed-rail"></div>
+      ${list.map((e, idx) => `
+        <div class="feed-row tone-${e.tone} cat-${e.cat} ${showBot ? 'with-bot' : ''} ${e.alert ? 'is-alert' : ''} ${e.live ? 'is-live' : ''}" style="--stagger:${(idx * -0.65).toFixed(2)}s">
+          ${leftTime ? `
+            <span class="feed-time">${formatTime(e.time)}</span>
+            <span class="feed-node"><span class="n-shape"></span></span>
+            <span class="feed-cat">${e.label}</span>
+          ` : `
+            <span class="feed-node"><span class="n-shape"></span></span>
+            <span class="feed-cat">${e.label}</span>
+            <span class="feed-time">${formatTime(e.time)}</span>
+          `}
+          ${showBot ? `<span class="feed-bot">${e.bot}</span>` : ""}
+          <span class="feed-msg">${e.html}</span>
+          <span class="feed-eq">${e.eq}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderAllTab(cardNum) {
+  const list = filterEvents(state.tabs[cardNum]);
+  return `
+    <div class="subbar no-top">
+      <span class="m">重點交易與審計事件 · ${list.length} 筆（已隱藏 203 筆收盤心跳）</span>
+      <button class="btn-sec" style="padding:2px 8px;font-size:9.5px">顯示 K 線心跳 (203)</button>
+    </div>
+    ${renderFeed(list, true)}
+  `;
+}
+
+function renderShowcase() {
+  const sample = EVENTS.slice(0, 6);
+  document.getElementById("tl-showcase-grid").innerHTML = NODE_STYLES.map(s => {
+    const active = state.nodeStyle === s.id ? "active" : "";
+    return `
+      <div class="tl-opt ${active}" data-node-style="${s.id}">
+        <div class="tl-opt-h">
+          <span class="tl-opt-title">
+            <span class="tl-opt-badge">${s.code}</span>
+            <span>${s.title}</span>
+            ${s.rec ? '<span class="rec-pill">推薦</span>' : ''}
+          </span>
+          <span class="tl-opt-sub">${active ? '套用中 ✓' : '點此套用'}</span>
+        </div>
+        <div class="tl-opt-note">${s.note}</div>
+        ${renderFeed(sample, false, s.id)}
+      </div>
+    `;
+  }).join("");
+}
+
+/* =====================================================================
+   架構 5：量化數據列 ＋ 內嵌微標尺（架構 4 進化）
+   ===================================================================== */
+function renderCard5() {
+  if (state.tabs[5] !== "ACTION") return renderAllTab(5);
+  return `
+    <div class="m5-list">
+      ${ACTIONS.map(a => {
+        const isOpen = state.m5Open === a.id;
+        const copied = state.copiedKey === "m5-" + a.id;
+        return `
+          <div class="m5-item ${isOpen ? 'open' : ''}" style="--it-c:${a.cssVar}">
+            <div class="m5-row" data-m5-toggle="${a.id}">
+              <span class="${pipClass(a.alert)}" style="--pip-c:${a.cssVar}"></span>
+              <span class="m5-tag">${a.code}</span>
+              <div class="m5-name-col">
+                <span class="m5-name">${a.name}</span>
+                <span class="m5-sym">${a.sym}</span>
+              </div>
+              <div class="m5-viz">${renderMiniViz(a)}</div>
+              <span class="m5-kpi ${a.heroClass}">${a.hero}</span>
+              <span class="m t-muted" style="font-size:10px">${isOpen ? '▴' : '▾'}</span>
+            </div>
+            ${isOpen ? `
+              <div class="m5-drawer">
+                <div class="m5-drawer-row">
+                  <span>${a.summaryHtml}</span>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <button class="btn-sec">${a.actionLabel} ↗</button>
+                  </div>
+                </div>
+                ${a.cli ? `
+                  <div class="cli-box" data-stop="1">
+                    <code>$ ${a.cli}</code>
+                    <button class="cli-copy" data-copy="m5-${a.id}" data-cmd="${a.cli}">${copied ? '已複製 ✓' : '複製核准指令'}</button>
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <div class="subbar">
+      <span class="m">近期審計與成交流水 · 225 筆</span>
+      <button class="link-more" data-card="5" data-tab="ALL">展開全部 →</button>
+    </div>
+    ${renderFeed(EVENTS.slice(0, 6), false)}
+  `;
+}
+
+/* =====================================================================
+   架構 6：頂部三聯微卡 ＋ 底部快操列
+   ===================================================================== */
+function renderCard6() {
+  if (state.tabs[6] !== "ACTION") return renderAllTab(6);
+  const sel = ACTIONS.find(a => a.id === state.m6Sel) || ACTIONS[0];
+  const copied = state.copiedKey === "m6-" + sel.id;
+  return `
+    <div class="m6-strip">
+      ${ACTIONS.map(a => `
+        <div class="m6-tile ${state.m6Sel === a.id ? 'active' : ''}" style="--it-c:${a.cssVar}" data-m6-sel="${a.id}">
+          <div class="m6-top">
+            <span class="m6-top-l">
+              <span class="${pipClass(a.alert)}" style="--pip-c:${a.cssVar}"></span>
+              <span class="m6-code">${a.tag}</span>
+            </span>
+            <span class="m6-sym">${a.sym}</span>
+          </div>
+          <div class="m6-name">${a.name}</div>
+          <div class="m6-mid">
+            <span class="m6-hero ${a.heroClass}">${a.hero}</span>
+            ${renderMiniViz(a)}
+          </div>
+          <div class="m6-foot">${a.heroSub}</div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="m6-actionbar">
+      ${sel.cli
+        ? `<code>$ ${sel.cli}</code>
+           <div style="display:flex;gap:6px;flex-shrink:0">
+             <button class="btn-sec">${sel.actionLabel}</button>
+             <button class="btn-pri" data-copy="m6-${sel.id}" data-cmd="${sel.cli}">${copied ? '已複製 ✓' : '複製核准指令'}</button>
+           </div>`
+        : `<span class="t-muted">${sel.summaryHtml}</span>
+           <button class="btn-sec" style="flex-shrink:0">${sel.actionLabel} →</button>`
+      }
+    </div>
+    <div class="subbar">
+      <span class="m">近期審計與成交流水 · 225 筆</span>
+      <button class="link-more" data-card="6" data-tab="ALL">展開全部 →</button>
+    </div>
+    ${renderFeed(EVENTS.slice(0, 6), false)}
+  `;
+}
+
+/* =====================================================================
+   架構 7：左右主從檢視（架構 3 進化版，固定高度零跳動）
+   ===================================================================== */
+function renderCard7() {
+  if (state.tabs[7] !== "ACTION") return renderAllTab(7);
+  const sel = ACTIONS.find(a => a.id === state.m7Sel) || ACTIONS[0];
+  const copied = state.copiedKey === "m7-" + sel.id;
+
+  let bodyHtml = "";
+  if (sel.id === "rsi") {
+    bodyHtml = `
+      <div>
+        <div class="gauge-track">
+          <div class="gauge-fill" style="width:61%"></div>
+          <div class="gauge-tick"></div>
+        </div>
+        <div class="gauge-labels">
+          <span>0.00%</span>
+          <span class="t-warn">警戒 0.50%</span>
+          <span>硬門檻 1.00%</span>
+        </div>
+      </div>
+    `;
+  } else if (sel.id === "ens") {
+    bodyHtml = `
+      <div class="gates-4">
+        <div class="gate-c"><span>驗證關卡</span><b class="t-pri">4/4 過</b></div>
+        <div class="gate-c"><span>年化報酬</span><b class="t-up">+13.9%</b></div>
+        <div class="gate-c"><span>最大回撤</span><b>-11.3%</b></div>
+        <div class="gate-c"><span>PBO</span><b>22%</b></div>
+      </div>
+    `;
+  } else {
+    bodyHtml = `
+      <div class="gates-4" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="gate-c"><span>來源</span><b>strategies/</b></div>
+        <div class="gate-c"><span>方向</span><b>只做多</b></div>
+        <div class="gate-c"><span>狀態</span><b>待回測</b></div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="m7-split">
+      <div class="m7-nav">
+        ${ACTIONS.map(a => `
+          <div class="m7-nav-row ${state.m7Sel === a.id ? 'active' : ''}" style="--it-c:${a.cssVar}" data-m7-sel="${a.id}">
+            <span class="${pipClass(a.alert)}" style="--pip-c:${a.cssVar}"></span>
+            <div style="min-width:0">
+              <div class="m7-nav-name">${a.name}</div>
+              <div class="m7-nav-sub">${a.tag} · ${a.sym}</div>
+            </div>
+            <span class="m7-nav-val ${a.heroClass}">${a.hero}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="m7-detail">
+        <div class="m7-det-h">
+          <div class="m7-det-title">
+            <span class="m7-det-name">${sel.name}</span>
+            <span class="m7-det-sym">${sel.sym}</span>
+          </div>
+          <span class="m7-det-kpi ${sel.heroClass}">${sel.hero}</span>
+        </div>
+        ${bodyHtml}
+        <div class="m7-det-foot">
+          <span style="font-size:10px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sel.heroSub}</span>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${sel.cli
+              ? `<button class="btn-sec">${sel.actionLabel}</button><button class="btn-pri" data-copy="m7-${sel.id}" data-cmd="${sel.cli}">${copied ? '已複製 ✓' : '複製核准指令'}</button>`
+              : `<button class="btn-sec">${sel.actionLabel} →</button>`
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="subbar">
+      <span class="m">近期審計與成交流水 · 225 筆</span>
+      <button class="link-more" data-card="7" data-tab="ALL">展開全部 →</button>
+    </div>
+    ${renderFeed(EVENTS.slice(0, 6), false)}
+  `;
+}
+
+/* =====================================================================
+   架構 8：同軌手風琴一體流（待處理與審計共用同一條呼吸光軌）
+   ===================================================================== */
+function renderCard8() {
+  if (state.tabs[8] !== "ACTION") return renderAllTab(8);
+  const leftTime = state.tlMode === "tl-left-time";
+  return `
+    <div class="m8-zone">
+      <div class="feed ${state.tlMode} ${state.nodeStyle}">
+        <div class="feed-rail"></div>
+        ${ACTIONS.map((a, idx) => {
+          const isOpen = state.m8Open === a.id;
+          const copied = state.copiedKey === "m8-" + a.id;
+          return `
+            <div class="feed-row tone-${a.tone} ${a.alert ? 'is-alert' : ''} ${idx === 0 ? 'is-live' : ''}" data-m8-toggle="${a.id}" style="--stagger:${(idx * -0.65).toFixed(2)}s">
+              ${leftTime ? `
+                <span class="feed-time">${formatTime(a.time)}</span>
+                <span class="feed-node"><span class="n-shape"></span></span>
+                <span class="feed-cat">${a.code}</span>
+              ` : `
+                <span class="feed-node"><span class="n-shape"></span></span>
+                <span class="feed-cat">${a.code}</span>
+                <span class="feed-time">${formatTime(a.time)}</span>
+              `}
+              <span class="feed-msg"><strong>${a.name}</strong> · ${a.sym} · ${a.heroSub}</span>
+              <span class="feed-eq ${a.heroClass}" style="font-weight:700">${a.hero}</span>
+            </div>
+            ${isOpen ? `
+              <div class="m8-exp">
+                <div class="m8-exp-row">
+                  <span style="font-size:10.5px;color:var(--muted-foreground)">${a.summaryHtml}</span>
+                  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                    ${renderMiniViz(a)}
+                    <button class="btn-sec">${a.actionLabel} →</button>
+                  </div>
+                </div>
+                ${a.cli ? `
+                  <div class="cli-box" style="margin-top:0" data-stop="1">
+                    <code>$ ${a.cli}</code>
+                    <button class="cli-copy" data-copy="m8-${a.id}" data-cmd="${a.cli}">${copied ? '已複製 ✓' : '複製核准指令'}</button>
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
+          `;
+        }).join("")}
+      </div>
+    </div>
+    <div class="subbar no-top">
+      <span class="m">近期審計與成交流水 · 225 筆</span>
+      <button class="link-more" data-card="8" data-tab="ALL">展開全部 →</button>
+    </div>
+    ${renderFeed(EVENTS.slice(0, 6), false)}
+  `;
+}
+
+function renderAll() {
+  renderShowcase();
+  document.getElementById("card-5").innerHTML = renderHeader(5) + renderCard5();
+  document.getElementById("card-6").innerHTML = renderHeader(6) + renderCard6();
+  document.getElementById("card-7").innerHTML = renderHeader(7) + renderCard7();
+  document.getElementById("card-8").innerHTML = renderHeader(8) + renderCard8();
+}
+
+document.addEventListener("click", (ev) => {
+  const copyBtn = ev.target.closest("[data-copy]");
+  if (copyBtn) {
+    const cmd = copyBtn.dataset.cmd;
+    if (navigator.clipboard && cmd) navigator.clipboard.writeText(cmd).catch(() => {});
+    state.copiedKey = copyBtn.dataset.copy;
+    renderAll();
+    setTimeout(() => {
+      if (state.copiedKey === copyBtn.dataset.copy) {
+        state.copiedKey = null;
+        renderAll();
+      }
+    }, 1800);
+    return;
+  }
+  if (ev.target.closest("[data-stop]")) return;
+
+  const nodeEl = ev.target.closest("[data-node-style]");
+  if (nodeEl) {
+    state.nodeStyle = nodeEl.dataset.nodeStyle;
+    renderAll();
+    return;
+  }
+  const tabBtn = ev.target.closest("[data-card][data-tab]");
+  if (tabBtn) {
+    state.tabs[Number(tabBtn.dataset.card)] = tabBtn.dataset.tab;
+    renderAll();
+    return;
+  }
+  const m5Btn = ev.target.closest("[data-m5-toggle]");
+  if (m5Btn) {
+    const id = m5Btn.dataset.m5Toggle;
+    state.m5Open = state.m5Open === id ? null : id;
+    renderAll();
+    return;
+  }
+  const m6Btn = ev.target.closest("[data-m6-sel]");
+  if (m6Btn) {
+    state.m6Sel = m6Btn.dataset.m6Sel;
+    renderAll();
+    return;
+  }
+  const m7Btn = ev.target.closest("[data-m7-sel]");
+  if (m7Btn) {
+    state.m7Sel = m7Btn.dataset.m7Sel;
+    renderAll();
+    return;
+  }
+  const m8Btn = ev.target.closest("[data-m8-toggle]");
+  if (m8Btn) {
+    const id = m8Btn.dataset.m8Toggle;
+    state.m8Open = state.m8Open === id ? null : id;
+    renderAll();
+    return;
+  }
+  const accentBtn = ev.target.closest("#theme-seg button[data-accent]");
+  if (accentBtn) {
+    document.querySelectorAll("#theme-seg button").forEach(b => b.classList.remove("active"));
+    accentBtn.classList.add("active");
+    const a = ACCENTS[accentBtn.dataset.accent];
+    document.documentElement.style.setProperty("--primary", a.primary);
+    document.documentElement.style.setProperty("--primary-fg", a.fg);
+    return;
+  }
+  const tlBtn = ev.target.closest("#tl-seg button[data-tl]");
+  if (tlBtn) {
+    document.querySelectorAll("#tl-seg button").forEach(b => b.classList.remove("active"));
+    tlBtn.classList.add("active");
+    state.tlMode = tlBtn.dataset.tl;
+    renderAll();
+    return;
+  }
+  const convBtn = ev.target.closest("#conv-seg button[data-conv]");
+  if (convBtn) {
+    document.querySelectorAll("#conv-seg button").forEach(b => b.classList.remove("active"));
+    convBtn.classList.add("active");
+    const c = CONVS[convBtn.dataset.conv];
+    document.documentElement.style.setProperty("--up", c.up);
+    document.documentElement.style.setProperty("--down", c.down);
+  }
+});
+
+renderAll();
+</script>
+</body>
+</html>
