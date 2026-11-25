@@ -1,15 +1,13 @@
 /*
  * 待處理與事件審計：同軌時間軸（2026-11-25 定案架構 8）
  *
- * 對齊：光軌與光珠畫在同一個 15px 節點欄裡（光軌 left 7px、寬 1px；光珠 left 4px、寬 7px），
- * 兩者中心都在 7.5px，不靠外層絕對定位的 left 計算，所以欄寬怎麼變都不會歪。
- * 列標頭固定 27px，光珠 top 10px，中心 13.5px = 標頭一半。
+ * 光點（2026-11-25 使用者定案「刻線實心點」）：7px 純色實心，不加漸層、不加常駐光暈，不做任何動畫。
+ * 對照稿：docs/design/2026-11-25-incident-dot-pick/index.html 的方案 A。
  *
- * 動畫只在互動時出現（使用者定案）：
- *   - 滑鼠移入列標頭：對應光珠呼吸一次（JS 設 data-pulse，animationend 後移除，移開滑鼠也會播完）
- *   - 點選列：該列 data-active，光珠持續呼吸，再點一次收合就停
- * 只動畫 opacity 與 transform（光暈是預先畫好的漸層層，不動畫 box-shadow 或 filter）。
- * prefers-reduced-motion: reduce 時（Windows「動畫效果」關閉就會觸發）改成只有亮度明暗的呼吸，不縮放。
+ * 對齊：光軌與光點畫在同一個 15px 節點欄裡（光軌 left 7px、寬 1px；光點 left 4px、寬 7px），
+ * 兩者中心都在 7.5px，不靠外層絕對定位的 left 計算，所以欄寬怎麼變都不會歪。
+ * 列標頭固定 27px，光點 top 10px，中心 13.5px = 標頭一半。
+ * 標頭裡的光軌拆成上下兩段，在光點上下各留 3px 切口（上段到 7px、下段從 20px 起）。
  */
 
 .tl-feed {
@@ -66,11 +64,10 @@
 }
 .tl-time-sec { color: var(--muted-foreground); opacity: 0.55; }
 
-/* 節點欄：光軌、光暈、光珠疊在同一格 */
+/* 節點欄：光軌與光點疊在同一格 */
 .tl-node {
   position: relative;
   align-self: stretch;
-  isolation: isolate;
 }
 .tl-rail {
   position: absolute;
@@ -78,15 +75,16 @@
   width: 1px;
   top: 0;
   bottom: 0;
-  z-index: 0;
   background: color-mix(in oklab, var(--foreground) 13%, transparent);
   pointer-events: none;
 }
-.tl-feed > .tl-row:first-child > .tl-head .tl-rail { top: 50%; }
-.tl-feed > .tl-row:last-child > .tl-head .tl-rail { bottom: 50%; }
+.tl-rail-t { bottom: auto; height: 7px; }
+.tl-rail-b { top: 20px; }
+.tl-feed > .tl-row:first-child > .tl-head .tl-rail-t { display: none; }
+.tl-feed > .tl-row:last-child > .tl-head .tl-rail-b { display: none; }
 .tl-feed > .tl-row:last-child > .tl-body .tl-rail { display: none; }
 
-/* 實心光珠：左上高光 + 飽和球體 + 右下暗部 + 1px 暗緣 + 靜態柔光 */
+/* 實心點：純色、無漸層、無外光 */
 .tl-dot {
   position: absolute;
   left: 4px;
@@ -94,126 +92,10 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 33% 29%, rgb(255 255 255 / 0.95) 0%, rgb(255 255 255 / 0.42) 24%, transparent 46%),
-    radial-gradient(
-      circle at 42% 38%,
-      color-mix(in oklab, var(--tc) 66%, white) 0%,
-      var(--tc) 46%,
-      color-mix(in oklab, var(--tc) 52%, black) 100%
-    );
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--tc) 24%, rgb(0 0 0 / 0.6)),
-    0 0 5px 1px color-mix(in oklab, var(--tc) 38%, transparent),
-    0 0 12px 2px color-mix(in oklab, var(--tc) 13%, transparent);
-}
-/* 呼吸時燈芯變亮（白色熱點，只動畫 opacity） */
-.tl-dot::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 38%, rgb(255 255 255 / 0.75) 0%, rgb(255 255 255 / 0.2) 55%, transparent 80%);
-  opacity: 0;
-}
-
-/* 光暈兩層：近場 bloom（15px）與遠場 haze（27px），平常完全透明 */
-.tl-halo {
-  position: absolute;
-  border-radius: 50%;
-  z-index: 1;
-  opacity: 0;
+  background: var(--tc);
   pointer-events: none;
 }
-.tl-halo-bloom {
-  left: 0;
-  top: 6px;
-  width: 15px;
-  height: 15px;
-  background: radial-gradient(
-    circle closest-side,
-    color-mix(in oklab, var(--tc) 80%, white) 0%,
-    color-mix(in oklab, var(--tc) 58%, transparent) 30%,
-    color-mix(in oklab, var(--tc) 20%, transparent) 64%,
-    transparent 100%
-  );
-}
-.tl-halo-haze {
-  left: -6px;
-  top: 0;
-  width: 27px;
-  height: 27px;
-  background: radial-gradient(
-    circle closest-side,
-    color-mix(in oklab, var(--tc) 42%, transparent) 0%,
-    color-mix(in oklab, var(--tc) 17%, transparent) 38%,
-    color-mix(in oklab, var(--tc) 6%, transparent) 70%,
-    transparent 100%
-  );
-}
-
-/* 滑過：呼吸一次（吸氣 0.6s、吐氣散開） */
-.tl-head[data-pulse] .tl-halo-bloom { animation: tl-pulse-bloom 1.5s cubic-bezier(0.37, 0, 0.63, 1) 1 both; }
-.tl-head[data-pulse] .tl-halo-haze { animation: tl-pulse-haze 1.7s cubic-bezier(0.37, 0, 0.63, 1) 1 both; }
-.tl-head[data-pulse] .tl-dot::after { animation: tl-pulse-core 1.5s cubic-bezier(0.37, 0, 0.63, 1) 1 both; }
-
-/* 點選：持續呼吸（3.6s 一個週期，遠場晚 0.15s 跟上，像光往外擴散） */
-.tl-row[data-active] > .tl-head .tl-halo.tl-halo-bloom { animation: tl-breathe-bloom 3.6s cubic-bezier(0.37, 0, 0.63, 1) infinite; }
-.tl-row[data-active] > .tl-head .tl-halo.tl-halo-haze { animation: tl-breathe-haze 3.6s cubic-bezier(0.37, 0, 0.63, 1) 0.15s infinite; }
-.tl-row[data-active] > .tl-head .tl-dot.tl-dot::after { animation: tl-breathe-core 3.6s cubic-bezier(0.37, 0, 0.63, 1) infinite; }
-
-@keyframes tl-breathe-bloom {
-  0%, 100% { opacity: 0.2; transform: scale(0.72); }
-  50% { opacity: 1; transform: scale(1.08); }
-}
-@keyframes tl-breathe-haze {
-  0%, 100% { opacity: 0; transform: scale(0.55); }
-  50% { opacity: 0.9; transform: scale(1.14); }
-}
-@keyframes tl-breathe-core {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.55; }
-}
-@keyframes tl-pulse-bloom {
-  0% { opacity: 0; transform: scale(0.6); }
-  40% { opacity: 1; transform: scale(1.08); }
-  100% { opacity: 0; transform: scale(1.22); }
-}
-@keyframes tl-pulse-haze {
-  0% { opacity: 0; transform: scale(0.5); }
-  42% { opacity: 0.85; transform: scale(1.06); }
-  100% { opacity: 0; transform: scale(1.32); }
-}
-@keyframes tl-pulse-core {
-  0%, 100% { opacity: 0; }
-  40% { opacity: 0.5; }
-}
-
-/* 減少動態：保留明暗呼吸，不縮放 */
-@media (prefers-reduced-motion: reduce) {
-  .tl-head[data-pulse] .tl-halo-bloom { animation-name: tl-pulse-bloom-rm; }
-  .tl-head[data-pulse] .tl-halo-haze { animation-name: tl-pulse-haze-rm; }
-  .tl-row[data-active] > .tl-head .tl-halo.tl-halo-bloom { animation-name: tl-breathe-bloom-rm; }
-  .tl-row[data-active] > .tl-head .tl-halo.tl-halo-haze { animation-name: tl-breathe-haze-rm; }
-}
-@keyframes tl-breathe-bloom-rm {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
-}
-@keyframes tl-breathe-haze-rm {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.85; }
-}
-@keyframes tl-pulse-bloom-rm {
-  0%, 100% { opacity: 0; }
-  40% { opacity: 1; }
-}
-@keyframes tl-pulse-haze-rm {
-  0%, 100% { opacity: 0; }
-  42% { opacity: 0.8; }
-}
+.tl-tone-muted .tl-dot { background: color-mix(in oklab, var(--tc) 75%, transparent); }
 
 /* 列標頭內容 */
 .tl-main {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import type { AnimationEvent, FocusEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { useCatStore } from '@/state/catStore';
 import type { EventDTO } from '@/contracts';
 import { useOverviewSignals } from '@/lib/overview-signals';
@@ -373,34 +373,15 @@ function ClockCell({ value }: { value: string | null }) {
   );
 }
 
+/** 光軌在列標頭拆成上下兩段，在實心點上下各留 3px 切口 */
 function FeedNode() {
   return (
     <span className="tl-node" aria-hidden="true">
-      <span className="tl-rail" />
-      <span className="tl-halo tl-halo-haze" />
-      <span className="tl-halo tl-halo-bloom" />
+      <span className="tl-rail tl-rail-t" />
+      <span className="tl-rail tl-rail-b" />
       <span className="tl-dot" />
     </span>
   );
-}
-
-/** 滑過時呼吸一次：已在呼吸（點選中）或上一次還沒播完就不重播 */
-function startPulse(head: HTMLElement) {
-  if (head.dataset.pulse) return;
-  if (head.parentElement?.hasAttribute('data-active')) return;
-  head.dataset.pulse = '1';
-}
-
-function endPulse(e: AnimationEvent<HTMLDivElement>) {
-  if (e.animationName.startsWith('tl-pulse-haze')) delete e.currentTarget.dataset.pulse;
-}
-
-function pulseOnKeyboardFocus(e: FocusEvent<HTMLDivElement>) {
-  try {
-    if (e.currentTarget.matches(':focus-visible')) startPulse(e.currentTarget);
-  } catch {
-    /* 不支援 :focus-visible 的瀏覽器略過 */
-  }
 }
 
 interface FeedRowProps {
@@ -410,14 +391,12 @@ interface FeedRowProps {
   /** 有展開面板的列才傳；沒傳代表點擊只做導覽 */
   expandable?: boolean;
   open?: boolean;
-  /** 使用者點選中：光珠持續呼吸 */
-  active?: boolean;
   onActivate: () => void;
   children: ReactNode;
   panel?: ReactNode;
 }
 
-function FeedRow({ tone, time, alert, expandable, open, active, onActivate, children, panel }: FeedRowProps) {
+function FeedRow({ tone, time, alert, expandable, open, onActivate, children, panel }: FeedRowProps) {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -425,24 +404,14 @@ function FeedRow({ tone, time, alert, expandable, open, active, onActivate, chil
     }
   };
   return (
-    <div
-      className={cn('tl-row', `tl-tone-${tone}`, alert && 'is-alert', open && 'is-open')}
-      data-active={active ? '' : undefined}
-    >
+    <div className={cn('tl-row', `tl-tone-${tone}`, alert && 'is-alert', open && 'is-open')}>
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expandable ? Boolean(open) : undefined}
         className="tl-head"
-        onClick={(e: MouseEvent<HTMLDivElement>) => {
-          // 點選後由循環呼吸接手；清掉滑過的一次性標記，收合時才不會再補播一次
-          delete e.currentTarget.dataset.pulse;
-          onActivate();
-        }}
+        onClick={onActivate}
         onKeyDown={onKeyDown}
-        onMouseEnter={(e: MouseEvent<HTMLDivElement>) => startPulse(e.currentTarget)}
-        onFocus={pulseOnKeyboardFocus}
-        onAnimationEnd={endPulse}
       >
         <ClockCell value={time} />
         <FeedNode />
@@ -468,7 +437,7 @@ interface UnifiedIncidentActivityCardProps {
 /**
  * 待處理與事件審計卡片（2026-11-25 定案架構 8：同軌手風琴一體流）
  * - 待處理與下方審計流水共用同一條光軌、同一種實心光珠與霧底等寬標籤
- * - 待處理預設展開最急的一筆；點選列展開並讓光珠持續呼吸，滑過列光珠呼吸一次
+ * - 待處理預設展開最急的一筆；點選列展開或收合。光點是靜態實心點，不做動畫（2026-11-25 使用者定案）
  * - 「全部／異常／成交／風控」分頁沿用同一種列，點選展開欄位明細
  */
 export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivityCardProps) {
@@ -483,7 +452,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
   const { navigate } = useRouter();
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  /** undefined：使用者還沒點過，預設展開最急的一筆但不呼吸；null：全部收合 */
+  /** undefined：使用者還沒點過，預設展開最急的一筆；null：全部收合 */
   const [pickedActionId, setPickedActionId] = useState<string | null | undefined>(undefined);
   const [category, setCategory] = useState<string>('ACTION');
   const [showHeartbeats, setShowHeartbeats] = useState(false);
@@ -780,9 +749,9 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
     setExpandedKey((prev) => (prev === key ? null : key));
   };
 
-  /** 第一次點預設展開的那筆：保持展開並開始呼吸；再點一次才收合 */
+  /** 點已展開的那筆就收合（含預設展開的第一筆），點其他筆就換展開 */
   const pickAction = (id: string) => {
-    setPickedActionId((prev) => (prev === id ? null : id));
+    setPickedActionId(openActionId === id ? null : id);
   };
 
   const handleSelectTab = (tabId: string) => {
@@ -941,7 +910,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       alert={item.alert}
                       expandable
                       open={isOpen}
-                      active={pickedActionId === item.id}
                       onActivate={() => pickAction(item.id)}
                       panel={renderActionPanel(item)}
                     >
@@ -1067,7 +1035,6 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
                       alert={row.isAlert}
                       expandable
                       open={isExp}
-                      active={isExp}
                       onActivate={() => toggleRow(row.key)}
                       panel={isExp ? renderEventPanel(row) : undefined}
                     >

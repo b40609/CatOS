@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-Hant" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>光點方案對照</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* 2026-11-25 光點對照稿留存：使用者定案方案 A（刻線實心點），並決定不做動畫 */
+:root {
+  --background: oklch(0.155 0.004 260);
+  --foreground: oklch(0.94 0.004 260);
+  --surface: oklch(0.19 0.004 260);
+  --surface-raised: oklch(0.24 0.006 260);
+  --card: var(--surface);
+  --gold: oklch(0.78 0.15 75);
+  --primary: var(--gold);
+  --muted-foreground: oklch(0.65 0.009 260);
+  --up: oklch(0.78 0.15 165);
+  --down: oklch(0.64 0.2 22);
+  --warn: oklch(0.8 0.15 75);
+  --info: oklch(0.72 0.1 235);
+  --border: oklch(0.42 0.009 260 / 38%);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+  --ease: cubic-bezier(0.37, 0, 0.63, 1);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+  padding: 20px 24px 60px;
+}
+
+/* ---------- 頁首 ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 28px; margin-bottom: 18px; }
+.top h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.top p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.ctrls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-left: auto; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button {
+  font: 500 11px var(--font-mono); color: var(--muted-foreground); background: transparent;
+  border: 0; padding: 6px 10px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: color-mix(in oklab, var(--primary) 16%, transparent); color: var(--primary); }
+.sys { font: 11px var(--font-mono); color: var(--muted-foreground); }
+
+/* ---------- 方案格 ---------- */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 1180px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.opt { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 14px; background: color-mix(in oklab, var(--surface) 45%, transparent); }
+.opt > header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.opt-key { font: 600 13px var(--font-mono); color: var(--primary); }
+.opt-name { font-size: 13px; font-weight: 600; }
+.opt-desc { color: var(--muted-foreground); font-size: 11.5px; line-height: 1.55; flex-basis: 100%; }
+.opt-body { display: flex; gap: 14px; align-items: flex-start; }
+.opt-body .card { flex: 1 1 auto; min-width: 0; }
+.zoom-wrap { flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.zoom-wrap small { font: 10px var(--font-mono); color: var(--muted-foreground); }
+.zoom { zoom: 3; background: var(--card); border: 1px solid var(--border); border-radius: 3px; padding: 3px 0; }
+.zoom .tl-head { grid-template-columns: 15px 44px; padding: 0 5px; }
+@media (max-width: 720px) { .opt-body { flex-direction: column; } .zoom { zoom: 2; } }
+
+/* ---------- 卡片複製品 ---------- */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.card-h { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; }
+.card-h b { font-size: 12px; font-weight: 600; }
+.pill { font: 500 10px var(--font-mono); color: var(--primary); border: 1px solid color-mix(in oklab, var(--primary) 55%, transparent); background: color-mix(in oklab, var(--primary) 12%, transparent); border-radius: 4px; padding: 2px 8px; }
+.zone { background: color-mix(in oklab, var(--surface-raised) 22%, transparent); padding: 4px 6px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.divider { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 10px; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+.stream { padding: 4px 6px 6px; }
+
+.tl-row { --tc: var(--muted-foreground); position: relative; }
+.t-info { --tc: var(--info); } .t-warn { --tc: var(--warn); } .t-up { --tc: var(--up); }
+.t-down { --tc: var(--down); } .t-pri { --tc: var(--primary); } .t-muted { --tc: var(--muted-foreground); }
+
+.tl-head {
+  display: grid; grid-template-columns: 52px 15px minmax(0, 1fr); column-gap: 8px;
+  padding: 0 6px; height: 27px; align-items: center; border-radius: 4px; cursor: pointer;
+  transition: background-color .12s ease; outline: none;
+}
+.tl-head:hover { background-color: rgb(255 255 255 / .034); }
+.tl-row.is-alert > .tl-head { background-color: color-mix(in oklab, var(--tc) 4.5%, transparent); }
+.tl-row.is-alert > .tl-head:hover { background-color: color-mix(in oklab, var(--tc) 8%, transparent); }
+.tl-row[data-active] > .tl-head { background-color: rgb(255 255 255 / .045); }
+.tl-row[data-active].is-alert > .tl-head { background-color: color-mix(in oklab, var(--tc) 9%, transparent); }
+
+.tl-time { font: 10px var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: color-mix(in oklab, var(--muted-foreground) 85%, transparent); }
+.tl-time i { font-style: normal; opacity: .55; }
+.tl-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tag {
+  flex-shrink: 0; width: 44px; height: 17px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center;
+  font: 600 9px var(--font-mono); letter-spacing: .04em; line-height: 1;
+  background: color-mix(in oklab, var(--tc) 10%, transparent); color: color-mix(in oklab, var(--tc) 92%, var(--foreground));
+}
+.is-alert .tag { background: color-mix(in oklab, var(--tc) 18%, transparent); color: var(--tc); }
+.ttl { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: color-mix(in oklab, var(--foreground) 72%, transparent); }
+.ttl b { font-weight: 600; color: var(--foreground); }
+.rt { flex-shrink: 0; font: 600 11px var(--font-mono); color: var(--tc); }
+.rt.plain { color: color-mix(in oklab, var(--foreground) 70%, transparent); font-weight: 500; }
+
+/* ---------- 節點欄：光軌（上下兩段，中間留切口）＋光暈＋光點 ---------- */
+.tl-node { position: relative; align-self: stretch; isolation: isolate; }
+.opt { --gap: 0px; --s: 7px; --h1: 15px; --h2: 27px; --rot: 0deg; --core-peak: .55; }
+.rail { position: absolute; left: 7px; width: 1px; z-index: 0; pointer-events: none; background: color-mix(in oklab, var(--foreground) 13%, transparent); }
+.rail-t { top: 0; height: calc(13.5px - var(--gap)); }
+.rail-b { top: calc(13.5px + var(--gap)); bottom: 0; }
+.feed > .tl-row:first-child .rail-t { display: none; }
+.feed > .tl-row:last-child .rail-b { display: none; }
+
+.dot {
+  position: absolute; z-index: 2; pointer-events: none;
+  width: var(--s); height: var(--s);
+  left: calc(7.5px - var(--s) / 2); top: calc(13.5px - var(--s) / 2);
+  border-radius: 50%;
+}
+.dot > i { position: absolute; inset: 0; border-radius: inherit; opacity: 0; z-index: 3;
+  background: radial-gradient(circle at 42% 38%, rgb(255 255 255 / .8) 0%, rgb(255 255 255 / .2) 55%, transparent 80%); }
+.halo { position: absolute; z-index: 1; pointer-events: none; opacity: 0; border-radius: 50%; transform: rotate(var(--rot)); }
+.h1 { width: var(--h1); height: var(--h1); left: calc(7.5px - var(--h1) / 2); top: calc(13.5px - var(--h1) / 2); }
+.h2 { width: var(--h2); height: var(--h2); left: calc(7.5px - var(--h2) / 2); top: calc(13.5px - var(--h2) / 2); }
+
+/* 光暈型（glow）：近場 + 遠場兩層漸層 */
+.fx-glow .h1 { background: radial-gradient(circle closest-side, color-mix(in oklab, var(--tc) 80%, white) 0%, color-mix(in oklab, var(--tc) 55%, transparent) 32%, color-mix(in oklab, var(--tc) 16%, transparent) 68%, transparent 100%); }
+.fx-glow .h2 { background: radial-gradient(circle closest-side, color-mix(in oklab, var(--tc) 38%, transparent) 0%, color-mix(in oklab, var(--tc) 15%, transparent) 40%, color-mix(in oklab, var(--tc) 5%, transparent) 72%, transparent 100%); }
+/* 漣漪型（ripple）：細環往外擴 */
+.fx-ripple .halo { background: none; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tc) 85%, transparent); }
+
+/* 觸發：滑過一次、點選循環 */
+.fx-glow .tl-head[data-pulse] .h1 { animation: g-pulse-1 1.5s var(--ease) 1 both; }
+.fx-glow .tl-head[data-pulse] .h2 { animation: g-pulse-2 1.7s var(--ease) 1 both; }
+.fx-glow .tl-row[data-active] > .tl-head .h1 { animation: g-breathe-1 3.6s var(--ease) infinite; }
+.fx-glow .tl-row[data-active] > .tl-head .h2 { animation: g-breathe-2 3.6s var(--ease) .15s infinite; }
+.fx-ripple .tl-head[data-pulse] .h1 { animation: r-pulse 1.3s cubic-bezier(.2,.6,.35,1) 1 both; }
+.fx-ripple .tl-head[data-pulse] .h2 { animation: r-pulse 1.3s cubic-bezier(.2,.6,.35,1) .28s 1 both; }
+.fx-ripple .tl-row[data-active] > .tl-head .h1 { animation: r-loop 2.4s cubic-bezier(.2,.6,.35,1) infinite; }
+.fx-ripple .tl-row[data-active] > .tl-head .h2 { animation: r-loop 2.4s cubic-bezier(.2,.6,.35,1) 1.2s infinite; }
+.tl-head[data-pulse] .dot > i { animation: core-pulse 1.5s var(--ease) 1 both; }
+.tl-row[data-active] > .tl-head .dot > i { animation: core-breathe 3.6s var(--ease) infinite; }
+.fx-ripple .tl-row[data-active] > .tl-head .dot > i { animation-duration: 2.4s; }
+
+@keyframes g-pulse-1 { 0% { opacity: 0; transform: rotate(var(--rot)) scale(.6); } 40% { opacity: 1; transform: rotate(var(--rot)) scale(1.06); } 100% { opacity: 0; transform: rotate(var(--rot)) scale(1.2); } }
+@keyframes g-pulse-2 { 0% { opacity: 0; transform: rotate(var(--rot)) scale(.5); } 42% { opacity: .85; transform: rotate(var(--rot)) scale(1.06); } 100% { opacity: 0; transform: rotate(var(--rot)) scale(1.3); } }
+@keyframes g-breathe-1 { 0%, 100% { opacity: .15; transform: rotate(var(--rot)) scale(.72); } 50% { opacity: 1; transform: rotate(var(--rot)) scale(1.06); } }
+@keyframes g-breathe-2 { 0%, 100% { opacity: 0; transform: rotate(var(--rot)) scale(.55); } 50% { opacity: .9; transform: rotate(var(--rot)) scale(1.14); } }
+@keyframes r-pulse { 0% { opacity: 0; transform: rotate(var(--rot)) scale(.4); } 12% { opacity: .95; } 100% { opacity: 0; transform: rotate(var(--rot)) scale(1); } }
+@keyframes r-loop { 0% { opacity: 0; transform: rotate(var(--rot)) scale(.4); } 10% { opacity: .9; } 70%, 100% { opacity: 0; transform: rotate(var(--rot)) scale(1); } }
+@keyframes core-pulse { 0%, 100% { opacity: 0; } 40% { opacity: var(--core-peak); } }
+@keyframes core-breathe { 0%, 100% { opacity: 0; } 50% { opacity: var(--core-peak); } }
+
+/* 減少動態版：只有明暗，不縮放 */
+body.rm .fx-glow .tl-head[data-pulse] .h1 { animation-name: o-pulse-1; }
+body.rm .fx-glow .tl-head[data-pulse] .h2 { animation-name: o-pulse-2; }
+body.rm .fx-glow .tl-row[data-active] > .tl-head .h1 { animation-name: o-breathe-1; }
+body.rm .fx-glow .tl-row[data-active] > .tl-head .h2 { animation-name: o-breathe-2; }
+body.rm .fx-ripple .tl-head[data-pulse] .halo { animation-name: o-ring-pulse; }
+body.rm .fx-ripple .tl-row[data-active] > .tl-head .halo { animation-name: o-ring-loop; }
+@keyframes o-pulse-1 { 0%, 100% { opacity: 0; } 40% { opacity: 1; } }
+@keyframes o-pulse-2 { 0%, 100% { opacity: 0; } 42% { opacity: .8; } }
+@keyframes o-breathe-1 { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+@keyframes o-breathe-2 { 0%, 100% { opacity: 0; } 50% { opacity: .85; } }
+@keyframes o-ring-pulse { 0% { opacity: 0; transform: rotate(var(--rot)) scale(.7); } 30% { opacity: .9; transform: rotate(var(--rot)) scale(.7); } 100% { opacity: 0; transform: rotate(var(--rot)) scale(.7); } }
+@keyframes o-ring-loop { 0%, 100% { opacity: 0; transform: rotate(var(--rot)) scale(.7); } 40% { opacity: .9; transform: rotate(var(--rot)) scale(.7); } }
+
+/* ================= 各方案 ================= */
+
+/* 現況（對照）：7px 立體珠＋常駐柔光，光軌從珠後穿過 */
+.v-ref { --s: 7px; --gap: 0px; --h1: 15px; --h2: 27px; }
+.v-ref .dot {
+  background:
+    radial-gradient(circle at 33% 29%, rgb(255 255 255 / .95) 0%, rgb(255 255 255 / .42) 24%, transparent 46%),
+    radial-gradient(circle at 42% 38%, color-mix(in oklab, var(--tc) 66%, white) 0%, var(--tc) 46%, color-mix(in oklab, var(--tc) 52%, black) 100%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--tc) 24%, rgb(0 0 0 / .6)),
+    0 0 5px 1px color-mix(in oklab, var(--tc) 38%, transparent),
+    0 0 12px 2px color-mix(in oklab, var(--tc) 13%, transparent);
+}
+
+/* A 刻線實心點：7px 純色實心、無常駐光，光軌在點上下各留 3px 切口；動畫是細環往外擴 */
+.v-a { --s: 7px; --gap: 6.5px; --h1: 21px; --h2: 21px; --core-peak: .45; }
+.v-a .dot { background: var(--tc); }
+.v-a .t-muted .dot { background: color-mix(in oklab, var(--tc) 75%, transparent); }
+
+/* B 同心環：11px 細外環＋5px 實心核，像部署狀態燈 */
+.v-b { --s: 11px; --gap: 7.5px; --h1: 19px; --h2: 31px; --core-peak: .5; }
+.v-b .dot { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tc) 55%, transparent); transition: box-shadow .2s ease; }
+.v-b .dot::before { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--tc); }
+.v-b .dot > i { inset: 3px; }
+.v-b .is-alert .dot,
+.v-b .tl-head:hover .dot,
+.v-b .tl-row[data-active] .dot { box-shadow: inset 0 0 0 1px var(--tc); }
+
+/* C 玻璃珠：11px，頂部一道清楚的鏡面反光、底部透光、細暗邊與落影，不靠模糊外光撐質感 */
+.v-c { --s: 11px; --gap: 7.5px; --h1: 21px; --h2: 33px; --core-peak: .4; }
+.v-c .dot {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 100%, color-mix(in oklab, var(--tc) 55%, white) 0%, transparent 100%),
+    radial-gradient(circle at 50% 42%, var(--tc) 35%, color-mix(in oklab, var(--tc) 58%, black) 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, color-mix(in oklab, var(--tc) 45%, black) 75%, transparent),
+    0 1px 2px rgb(0 0 0 / .6);
+}
+.v-c .dot::before {
+  content: ""; position: absolute; left: 2.5px; top: 1px; width: 6px; height: 4px; border-radius: 50%;
+  background: linear-gradient(to bottom, rgb(255 255 255 / .88), rgb(255 255 255 / .1));
+}
+
+/* D LED 指示燈：11px 深色燈座＋5px 發光燈芯，燈芯邊緣有一點溢光 */
+.v-d { --s: 11px; --gap: 6.5px; --h1: 19px; --h2: 31px; --core-peak: .6; }
+.v-d .dot {
+  background: radial-gradient(circle at 50% 30%, oklch(0.3 0.005 260) 0%, oklch(0.12 0.004 260) 78%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .55), inset 0 1px 0 rgb(255 255 255 / .1);
+}
+.v-d .dot::before {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, color-mix(in oklab, var(--tc) 35%, white) 0%, var(--tc) 50%, color-mix(in oklab, var(--tc) 70%, black) 100%);
+  box-shadow: 0 0 2px color-mix(in oklab, var(--tc) 85%, transparent), 0 0 5px 1px color-mix(in oklab, var(--tc) 35%, transparent);
+}
+.v-d .dot > i { inset: 3px; }
+
+/* E 方晶：7px 方塊轉 45 度（視覺約 10px），上亮下暗；動畫是菱形細框往外擴 */
+.v-e { --s: 7px; --gap: 7.5px; --h1: 17px; --h2: 17px; --rot: 45deg; --core-peak: .45; }
+.v-e .dot {
+  border-radius: 1.5px; transform: rotate(45deg);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--tc) 72%, white) 0%, var(--tc) 45%, color-mix(in oklab, var(--tc) 68%, black) 100%);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--tc) 30%, rgb(0 0 0 / .65));
+}
+.v-e .halo { border-radius: 2px; }
+
+/* F 空心／實心分級：9px，一般事件是空心環，需要處理的（警示、待處理）是實心；滑過或點選時填滿 */
+.v-f { --s: 9px; --gap: 6.5px; --h1: 19px; --h2: 29px; --core-peak: .45; }
+.v-f .dot { box-shadow: inset 0 0 0 2px var(--tc); background: transparent; transition: background-color .18s ease; }
+.v-f .is-alert .dot,
+.v-f .tl-head:hover .dot,
+.v-f .tl-row[data-active] .dot { background-color: var(--tc); }
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <h1>光點方案對照（待處理與事件審計）</h1>
+    <p>每格是同一份假資料、實際尺寸；右邊是 3 倍特寫。滑鼠移過一列＝光點呼吸一次；點一列＝持續呼吸，再點一次停。<br>
+    「示範呼吸」開著時，每格第一列先自動持續呼吸，方便直接比；正式版只在互動時呼吸。</p>
+  </div>
+  <div class="ctrls">
+    <span class="sys" id="sys"></span>
+    <div class="seg" id="seg-motion">
+      <button data-v="full" aria-pressed="true">完整動畫</button>
+      <button data-v="rm" aria-pressed="false">減少動態版</button>
+    </div>
+    <div class="seg" id="seg-demo">
+      <button data-v="on" aria-pressed="true">示範呼吸：開</button>
+      <button data-v="off" aria-pressed="false">關</button>
+    </div>
+  </div>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+const OPTIONS = [
+  { key: '現況', cls: 'v-ref fx-glow', name: '目前上線的版本（對照用）', desc: '7px 立體珠加常駐柔光，光軌從珠子後面穿過。小尺寸下高光和外光糊在一起，這就是你說沒質感的那顆。' },
+  { key: 'A', cls: 'v-a fx-ripple', name: '刻線實心點', desc: '7px 純色實心，不加漸層、不加常駐外光，光軌在點的上下各斷開 3px。乾淨銳利，像 Linear、GitHub 的時間軸。呼吸是一圈細環往外擴散。' },
+  { key: 'B', cls: 'v-b fx-glow', name: '同心環', desc: '11px 細外環加 5px 實心核，中間留一圈空隙，像 Vercel 的部署狀態燈。警示列外環全亮，一般列外環半透明；呼吸是核心發光加外圍光暈。' },
+  { key: 'C', cls: 'v-c fx-glow', name: '玻璃珠', desc: '11px 實心珠，頂部一道清楚的鏡面反光、底部透光、細暗邊加一點落影，類似 macOS 視窗左上角的紅黃綠按鈕。質感靠清楚的反光，不靠模糊外光。最接近你給的參考圖。' },
+  { key: 'D', cls: 'v-d fx-glow', name: 'LED 指示燈', desc: '11px 深色燈座加 5px 發光燈芯，燈芯邊緣溢出一點光，像機櫃或交易終端面板上的指示燈。呼吸是燈芯變亮加光暈。' },
+  { key: 'E', cls: 'v-e fx-ripple', name: '方晶', desc: '7px 方塊轉 45 度（看起來約 10px 寬），上亮下暗，和右邊等寬標籤的硬邊比較搭。呼吸是菱形細框往外擴散。' },
+  { key: 'F', cls: 'v-f fx-glow', name: '空心／實心分級', desc: '9px，一般事件（訊號、成交、系統）是空心環，需要你處理的（警示、待處理）是實心，一眼分得出輕重。滑過或點選時填滿再呼吸。' },
+];
+
+const PENDING = [
+  { tone: 'warn', alert: true, t: '07:59', s: ':58', tag: 'DEV', b: 'donchian-breakout', rest: ' · OKX Demo 模擬盤與回測偏離 -0.61%', rt: '偏離' },
+  { tone: 'pri', alert: true, t: '06:40', s: ':12', tag: 'GATE', b: '範例：均線交叉（多／空）', rest: ' · strategies/example-sma-cross/ · 部署前須 CLI 核准', rt: '待核准' },
+  { tone: 'muted', alert: false, t: '04:15', s: ':00', tag: 'IDEA', b: '資金費率反轉', rest: ' · 新想法，還沒回測', rt: '待回測' },
+];
+const STREAM = [
+  { tone: 'down', alert: false, t: '11:42', s: ':07', tag: 'SELL', b: 'donchian-breakout', rest: ' · 平多 1 張 @ 97,412.5', rt: '+128.40', plain: true },
+  { tone: 'info', alert: false, t: '11:30', s: ':00', tag: 'SIG', b: '突破 192 根高點', rest: ' · 4H 收盤確認', rt: '' },
+  { tone: 'up', alert: false, t: '10:15', s: ':22', tag: 'BUY', b: 'donchian-breakout', rest: ' · 開多 1 張 @ 96,980.0', rt: '-3.10', plain: true },
+  { tone: 'warn', alert: false, t: '09:00', s: ':00', tag: 'RISK', b: 'Soft 檢查', rest: ' · 風控期間損益 -1.2%，未達 5%', rt: '' },
+  { tone: 'down', alert: true, t: '08:12', s: ':45', tag: 'ERROR', b: 'OKX 50011', rest: ' · 請求過於頻繁，已退避重試', rt: '' },
+  { tone: 'muted', alert: false, t: '08:00', s: ':00', tag: 'SYS', b: 'Bot 啟動', rest: ' · run d7a712eb', rt: '' },
+];
+const ZOOM = [PENDING[0], STREAM[1], STREAM[2], STREAM[4]];
+
+function rowHTML(r, compact) {
+  const node = '<span class="tl-node"><span class="rail rail-t"></span><span class="rail rail-b"></span>' +
+    '<span class="halo h2"></span><span class="halo h1"></span><span class="dot"><i></i></span></span>';
+  const cls = 'tl-row t-' + r.tone + (r.alert ? ' is-alert' : '');
+  if (compact) {
+    return '<div class="' + cls + '"><div class="tl-head">' + node + '<span class="tag">' + r.tag + '</span></div></div>';
+  }
+  return '<div class="' + cls + '"><div class="tl-head" tabindex="0">' +
+    '<span class="tl-time">' + r.t + '<i>' + r.s + '</i></span>' + node +
+    '<span class="tl-main"><span class="tag">' + r.tag + '</span><span class="ttl"><b>' + r.b + '</b>' + r.rest + '</span>' +
+    (r.rt ? '<span class="rt' + (r.plain ? ' plain' : '') + '">' + r.rt + '</span>' : '') +
+    '</span></div></div>';
+}
+
+const grid = document.getElementById('grid');
+grid.innerHTML = OPTIONS.map(o =>
+  '<section class="opt ' + o.cls + '"><header><span class="opt-key">' + o.key + '</span><span class="opt-name">' + o.name + '</span>' +
+  '<span class="opt-desc">' + o.desc + '</span></header><div class="opt-body"><div class="card">' +
+  '<div class="card-h"><b>待處理與事件審計</b><span class="pill">待處理(3)</span></div>' +
+  '<div class="zone"><div class="feed demo-first">' + PENDING.map(r => rowHTML(r)).join('') + '</div></div>' +
+  '<div class="divider"><span>近期審計與成交流水 · 6 筆</span><span>展開全部 →</span></div>' +
+  '<div class="stream"><div class="feed">' + STREAM.map(r => rowHTML(r)).join('') + '</div></div>' +
+  '</div><div class="zoom-wrap"><div class="zoom"><div class="feed">' + ZOOM.map(r => rowHTML(r, true)).join('') + '</div></div><small>3 倍特寫</small></div></div></section>'
+).join('');
+
+const timers = new WeakMap();
+grid.addEventListener('mouseover', e => {
+  const head = e.target.closest('.tl-head');
+  if (!head || head.contains(e.relatedTarget)) return;
+  if (head.parentElement.hasAttribute('data-active')) return;
+  delete head.dataset.pulse; void head.offsetWidth; head.dataset.pulse = '';
+  clearTimeout(timers.get(head));
+  timers.set(head, setTimeout(() => { delete head.dataset.pulse; }, 1900));
+});
+grid.addEventListener('click', e => {
+  const head = e.target.closest('.tl-head');
+  if (!head) return;
+  const row = head.parentElement;
+  delete head.dataset.pulse;
+  const card = row.closest('.card, .zoom');
+  const was = row.hasAttribute('data-active');
+  card.querySelectorAll('.tl-row[data-active]').forEach(r => r.removeAttribute('data-active'));
+  if (!was) row.setAttribute('data-active', '');
+});
+
+function setSeg(id, v) {
+  document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+}
+function setDemo(on) {
+  document.querySelectorAll('.feed.demo-first').forEach(f => {
+    const first = f.querySelector('.tl-row');
+    const card = f.closest('.card');
+    card.querySelectorAll('.tl-row[data-active]').forEach(r => r.removeAttribute('data-active'));
+    if (on) first.setAttribute('data-active', '');
+  });
+  setSeg('seg-demo', on ? 'on' : 'off');
+}
+document.getElementById('seg-motion').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return;
+  document.body.classList.toggle('rm', v === 'rm'); setSeg('seg-motion', v);
+});
+document.getElementById('seg-demo').addEventListener('click', e => {
+  const v = e.target.dataset && e.target.dataset.v; if (!v) return; setDemo(v === 'on');
+});
+const sysRm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.getElementById('sys').textContent = '你的系統：' + (sysRm ? '減少動態（正式版會播明暗版）' : '完整動畫');
+setDemo(true);
+</script>
+</body>
+</html>
