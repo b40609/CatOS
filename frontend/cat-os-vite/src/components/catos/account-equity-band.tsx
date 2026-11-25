@@ -3,7 +3,15 @@ import { cn } from "@/lib/utils";
 import { CardHeaderTitle } from "./card-header-title";
 import { useCatStore } from "@/state/catStore";
 import { StateAdapter } from "@/state/stateAdapter";
-import { formatClock, formatDateTime, formatDecimal, formatRatioPct, toPlotNumber, toneOf, shortId } from "@/lib/format";
+import {
+  formatClock,
+  formatDateTime,
+  formatDecimal,
+  formatRatioPct,
+  toPlotNumber,
+  toneOf,
+  shortId,
+} from "@/lib/format";
 
 interface AccountEquityBandProps {
   className?: string;
@@ -11,8 +19,13 @@ interface AccountEquityBandProps {
 }
 
 const STATE_LABEL: Record<string, string> = {
-  starting: "啟動中", running: "運行中", stopping: "停止中", completed: "已完成",
-  stopped: "已停止", failed: "失敗", recovery_required: "待恢復",
+  starting: "啟動中",
+  running: "運行中",
+  stopping: "停止中",
+  completed: "已完成",
+  stopped: "已停止",
+  failed: "失敗",
+  recovery_required: "待恢復",
 };
 
 function formatShortAxisDate(ms: number | null | undefined, multiDay: boolean): string {
@@ -22,16 +35,37 @@ function formatShortAxisDate(ms: number | null | undefined, multiDay: boolean): 
   return full.split(" ")[0] || full;
 }
 
+function formatLimitPctLabel(pct: number): string {
+  const rounded = Math.round(pct * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+}
+
+function fmtSignedPct(v: number, digits = 2): string {
+  if (!Number.isFinite(v)) return "不適用";
+  const rounded = Number(v.toFixed(digits));
+  if (rounded === 0) return `${(0).toFixed(digits)}%`;
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}%`;
+}
+
+function fmtDrawdownNum(v: number, digits = 1): string {
+  if (!Number.isFinite(v)) return "不適用";
+  const rounded = Number(v.toFixed(digits));
+  if (rounded === 0) return `${(0).toFixed(digits)}%`;
+  return `${rounded.toFixed(digits)}%`;
+}
+
 /**
  * 帳戶權益與損益 (AccountEquityBand)
- * 依卡片寬高比自動切換三種形態：
- * - 直式/窄卡 (width < 480 && height >= 260)：上下堆疊（上 KPI 摘要、下滿寬曲線）
- * - 超扁橫卡 (height < 210)：緊湊單欄主 KPI＋全高走勢圖
- * - 標準／寬卡：左側自適應寬度 KPI 欄＋右側走勢圖
+ * 採用定案「方案 1：雙欄髮絲帳本」：
+ * - 左欄無嵌套小方盒、無光暈動畫，純 1px 髮絲線排版：
+ *   頂部總權益＋右對齊日切損益 → 中段裸尺日損風控安全墊 → 底部 4 行純線帳本
+ * - 右欄走勢圖：調亮水平格線與 0% 基準線，頂部顯示真實區間統計（累計／最高／回撤），懸停切回該點明細
+ * - 依卡片寬高比自動切換直式堆疊／矮卡緊湊／標準與寬卡雙欄
  */
 export function AccountEquityBand({ className, showHeader = true }: AccountEquityBandProps) {
   const summary = useCatStore((s) => s.summary);
   const risk = useCatStore((s) => s.risk);
+  const killSwitch = useCatStore((s) => s.killSwitch);
   const bots = useCatStore((s) => s.bots);
   const events = useCatStore((s) => s.events);
   const connection = useCatStore((s) => s.connection);
@@ -60,10 +94,10 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, []);
 
   const { width: cardW, height: cardH } = bandDimensions;
-  const isStacked = (cardW < 480 && cardH >= 260) || (cardH > 340 && cardH / Math.max(1, cardW) >= 0.78);
-  const isShort = !isStacked && cardH < 228;
-  const hideKpiSub = isShort || isStacked || cardH < 276;
-  const isNarrow = cardW < 540;
+  const isStacked =
+    (cardW < 480 && cardH >= 260) || (cardH > 340 && cardH / Math.max(1, cardW) >= 0.78);
+  const isShort = !isStacked && cardH < 248;
+  const isNarrow = !isStacked && cardW < 560;
   const isWide = !isStacked && cardW >= 780;
 
   useEffect(() => {
@@ -122,13 +156,17 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, [points, plotH]);
 
   const getX = (k: number) => (n > 1 ? (k / (n - 1)) * plotW : plotW / 2);
-  const getY = (v: number) => 8 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * Math.max(10, plotH - 18);
+  const getY = (v: number) =>
+    8 + ((yBounds.hi - v) / (yBounds.hi - yBounds.lo)) * Math.max(10, plotH - 18);
 
   const line = useMemo(() => {
     let d = "";
     let pen = false;
     points.forEach((v, k) => {
-      if (Number.isNaN(v)) { pen = false; return; }
+      if (Number.isNaN(v)) {
+        pen = false;
+        return;
+      }
       d += `${pen ? "L" : "M"}${getX(k).toFixed(1)},${getY(v).toFixed(1)}`;
       pen = true;
     });
@@ -154,39 +192,174 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     if (!chartContainerRef.current || n === 0) return;
     const rect = chartContainerRef.current.getBoundingClientRect();
     const px = e.clientX - rect.left;
-    if (px > plotW || px < 0) { setHoverIdx(null); return; }
+    if (px > plotW || px < 0) {
+      setHoverIdx(null);
+      return;
+    }
     setHoverIdx(Math.max(0, Math.min(n - 1, Math.round((px / plotW) * (n - 1)))));
   };
 
   const hover = hoverIdx !== null && curve[hoverIdx] ? curve[hoverIdx] : null;
   const hoverPct = hoverIdx !== null ? points[hoverIdx] : Number.NaN;
+
   const lastValidIdx = useMemo(() => {
     for (let i = points.length - 1; i >= 0; i--) {
       if (!Number.isNaN(points[i])) return i;
     }
     return -1;
   }, [points]);
-  const fmtPctNumber = (v: number) => (Number.isNaN(v) ? "不適用" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`);
+
+  // 由真實 curve / points 計算的區間統計（累計 / 最高 / 最大回撤）
+  const curveStats = useMemo(() => {
+    if (lastValidIdx < 0) return null;
+    let peakPct = -Infinity;
+    let runningPeakEq = -Infinity;
+    let maxDrawdownPct = 0;
+    for (let i = 0; i < curve.length; i++) {
+      const pct = points[i];
+      const eq = toPlotNumber(curve[i]?.equity);
+      if (Number.isNaN(pct) || Number.isNaN(eq)) continue;
+      if (pct > peakPct) peakPct = pct;
+      if (eq > runningPeakEq) runningPeakEq = eq;
+      if (runningPeakEq > 0) {
+        const dd = ((eq - runningPeakEq) / runningPeakEq) * 100;
+        if (dd < maxDrawdownPct) maxDrawdownPct = dd;
+      }
+    }
+    const totalPct = points[lastValidIdx];
+    if (!Number.isFinite(totalPct) || !Number.isFinite(peakPct)) return null;
+    return { totalPct, peakPct, maxDrawdownPct };
+  }, [curve, points, lastValidIdx]);
+
+  // 日損風控安全墊：讀真實 summary.period_pnl_ratio 與 risk.limits / killSwitch.default_limits
+  const cushion = useMemo(() => {
+    const limits = risk?.limits ?? killSwitch?.default_limits ?? null;
+    const softRaw = toPlotNumber(limits?.soft_loss);
+    const hardRaw = toPlotNumber(limits?.hard_loss);
+    const softPct = Number.isFinite(softRaw) && softRaw > 0 ? softRaw * 100 : null;
+    const hardPct = Number.isFinite(hardRaw) && hardRaw > 0 ? hardRaw * 100 : null;
+
+    const ratioStr = summary?.period_pnl_ratio ?? risk?.derived.period_pnl_ratio ?? null;
+    const ratioRaw = toPlotNumber(ratioStr);
+    const currentPct = Number.isFinite(ratioRaw) ? ratioRaw * 100 : null;
+
+    const maxAbs = hardPct ?? (softPct ? softPct * 2 : 10);
+    const toPos = (v: number) => Math.max(0, Math.min(100, ((v + maxAbs) / (2 * maxAbs)) * 100));
+
+    const softTickPos = softPct !== null ? toPos(-softPct) : 25;
+    const zeroPos = 50;
+    const pinPos = currentPct !== null ? toPos(currentPct) : null;
+
+    let statusText = "不適用";
+    let statusTone = "text-muted-foreground";
+    let pinTone = "bg-emerald-400";
+    let fillTone = "bg-emerald-400/35";
+
+    if (currentPct !== null && softPct !== null) {
+      const distToSoft = currentPct + softPct;
+      if (hardPct !== null && currentPct <= -hardPct) {
+        statusText = "已達 Hard";
+        statusTone = "text-rose-400";
+        pinTone = "bg-rose-400";
+        fillTone = "bg-rose-500/45";
+      } else if (distToSoft <= 0) {
+        statusText = "已達 Soft";
+        statusTone = "text-rose-400";
+        pinTone = "bg-rose-400";
+        fillTone = "bg-rose-500/40";
+      } else {
+        statusText = `距 Soft ${distToSoft.toFixed(2)}%`;
+        if (currentPct < 0) {
+          statusTone = distToSoft <= softPct * 0.4 ? "text-rose-400" : "text-amber-400";
+          pinTone = distToSoft <= softPct * 0.4 ? "bg-rose-400" : "bg-amber-400";
+          fillTone = "bg-amber-400/35";
+        } else {
+          statusTone = "text-emerald-400";
+          pinTone = "bg-emerald-400";
+          fillTone = "bg-emerald-400/35";
+        }
+      }
+    }
+
+    const hardLabel = hardPct !== null ? formatLimitPctLabel(hardPct) : null;
+    const softLabel = softPct !== null ? formatLimitPctLabel(softPct) : null;
+    const currentLabel = ratioStr !== null ? formatRatioPct(ratioStr) : "不適用";
+
+    const tooltip =
+      currentPct !== null && softLabel && hardLabel
+        ? `目前日切 ${currentLabel} · Soft -${softLabel} / Hard -${hardLabel}`
+        : "尚無日損風控安全墊資料";
+
+    return {
+      currentPct,
+      softTickPos,
+      zeroPos,
+      pinPos,
+      statusText,
+      statusTone,
+      pinTone,
+      fillTone,
+      hardLabel,
+      softLabel,
+      tooltip,
+    };
+  }, [risk, killSwitch, summary]);
 
   const emptyReason =
-    connection.status === "mode_not_open" ? "此模式未開放（demo/live 不在 v1 範圍）"
-    : connection.status === "unavailable" ? `模擬服務不可用：${connection.detail ?? "unknown"}`
-    : connection.status === "error" ? `無法連線：${connection.detail ?? "network_error"}`
-    : !bot ? "等待模擬服務…"
-    : !runId ? "尚未啟動模擬 run"
-    : curve.length === 0 ? "本次 run 尚無已收盤 K 線觀測"
-    : null;
+    connection.status === "mode_not_open"
+      ? "此模式未開放（demo/live 不在 v1 範圍）"
+      : connection.status === "unavailable"
+      ? `模擬服務不可用：${connection.detail ?? "unknown"}`
+      : connection.status === "error"
+      ? `無法連線：${connection.detail ?? "network_error"}`
+      : !bot
+      ? "等待模擬服務…"
+      : !runId
+      ? "尚未啟動模擬 run"
+      : curve.length === 0
+      ? "本次 run 尚無已收盤 K 線觀測"
+      : null;
 
-  const Kpi = ({ label, value, sub, tone, hideSub }: { label: string; value: string; sub?: string; tone?: string; hideSub?: boolean }) => (
-    <div className="flex flex-col gap-0.5 min-w-0">
-      <span className="text-t2 text-muted-foreground font-sans truncate">{label}</span>
-      <span className={cn("font-semibold leading-tight tabular-nums truncate", isWide ? "text-sm" : "text-xs", tone ?? "text-foreground")}>{value}</span>
-      {!hideSub && sub && <span className="text-t1 text-muted-foreground/75 truncate leading-tight" title={sub}>{sub}</span>}
-    </div>
-  );
+  const periodRatioStr = summary?.period_pnl_ratio ?? null;
+  const ledgerRows = [
+    {
+      label: "已實現損益",
+      value: formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動"),
+      tone: summary ? toneOf(summary.realized_pnl) : "text-muted-foreground",
+      title: "OKX 模擬子帳戶已實現損益",
+    },
+    {
+      label: "未實現損益",
+      value: formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動"),
+      tone: summary ? toneOf(summary.unrealized_pnl) : "text-muted-foreground",
+      title: risk?.snapshot ? `標記價 $${formatDecimal(risk.snapshot.mark)}` : "尚無標記價",
+    },
+    {
+      label: "風控基準",
+      value: summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用",
+      tone: summary?.basis_equity ? "text-foreground font-semibold" : "text-muted-foreground",
+      title: summary?.period_start_ms
+        ? `${formatDateTime(summary.period_start_ms)} 起算`
+        : "尚無風控期間基準",
+    },
+    {
+      label: "手續費累計",
+      value: formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動"),
+      tone: summary ? "text-rose-400 font-semibold" : "text-muted-foreground",
+      title: summary
+        ? `有效槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x`
+        : "尚未啟動",
+    },
+  ];
 
   return (
-    <div ref={bandRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40", className)}>
+    <div
+      ref={bandRef}
+      className={cn(
+        "flex flex-col h-full w-full select-none overflow-hidden bg-surface/40",
+        className
+      )}
+    >
       {showHeader && (
         <div className="flex items-center justify-between px-3 h-9 bg-secondary/50 border-b border-border/80 shrink-0 gap-2">
           <CardHeaderTitle
@@ -194,13 +367,20 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
             title="帳戶權益與損益"
             subtext={
               cardW >= 380 ? (
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap inline-flex items-center gap-1",
-                  connection.status === "ok"
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                    : "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                )}>
-                  <span className={cn("size-1.5 rounded-full", connection.status === "ok" ? "bg-emerald-400" : "bg-amber-400")} />
+                <span
+                  className={cn(
+                    "px-1.5 py-0.5 rounded border text-t1 font-mono font-semibold leading-none shrink-0 whitespace-nowrap inline-flex items-center gap-1",
+                    connection.status === "ok"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      connection.status === "ok" ? "bg-emerald-400" : "bg-amber-400"
+                    )}
+                  />
                   {connection.status === "ok" ? "local-sim" : connection.status}
                 </span>
               ) : undefined
@@ -212,7 +392,9 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
               <>
                 <span className="text-border">·</span>
                 <span className="text-muted-foreground whitespace-nowrap">
-                  {runId ? `${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}` : "無 run"}
+                  {runId
+                    ? `${shortId(runId)} · ${STATE_LABEL[bot?.state ?? ""] ?? bot?.state}`
+                    : "無 run"}
                 </span>
               </>
             )}
@@ -220,95 +402,264 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
         </div>
       )}
 
-      {/* 依寬高比自動切換：直式上下堆疊 vs 橫式左右並排 */}
-      <div className={cn("flex flex-1 min-h-0 overflow-hidden relative", isStacked ? "flex-col" : "flex-row")}>
-        {/* KPI 區塊 */}
-        <div className={cn(
-          "shrink-0 bg-background/20 overflow-y-auto custom-scrollbar",
-          isStacked
-            ? "w-full border-b border-border/70 px-3 py-2.5 flex flex-col gap-2"
-            : isShort
-            ? "w-[228px] border-r border-border/70 px-3 py-2 flex flex-col justify-between gap-1.5"
-            : isWide
-            ? "w-[268px] border-r border-border/70 px-3.5 py-3 flex flex-col justify-between gap-2.5"
-            : isNarrow
-            ? "w-[186px] border-r border-border/70 px-2.5 py-2.5 flex flex-col justify-between gap-2"
-            : "w-[244px] border-r border-border/70 px-3 py-3 flex flex-col justify-between gap-2.5"
-        )}>
-          <div className={cn("flex", isStacked ? "items-baseline justify-between gap-2 flex-wrap" : "flex-col gap-0.5")}>
-            <div className="flex flex-col gap-0.5 min-w-0">
-              {!isShort && <span className="text-t2 text-muted-foreground font-sans">帳戶總權益</span>}
-              <div className={cn(
-                "font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight",
-                isShort ? "text-xl" : isWide ? "text-3xl" : isNarrow ? "text-xl" : "text-2xl"
-              )}>
-                {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
+      {/* 方案 1：雙欄髮絲帳本（直式窄卡自動切換上下堆疊） */}
+      <div
+        className={cn(
+          "flex flex-1 min-h-0 overflow-hidden relative",
+          isStacked ? "flex-col" : "flex-row"
+        )}
+      >
+        {/* 左欄：純 1px 髮絲線排版（零嵌套小方盒、無光暈動畫） */}
+        <div
+          className={cn(
+            "shrink-0 bg-background/20 overflow-y-auto custom-scrollbar flex flex-col justify-between",
+            isStacked
+              ? "w-full border-b border-border/75 px-3 py-2 gap-1.5"
+              : isShort
+              ? "w-[236px] border-r border-border/75 px-3 py-1.5 gap-1"
+              : isWide
+              ? "w-[264px] border-r border-border/75 px-3.5 py-2 gap-1.5"
+              : isNarrow
+              ? "w-[200px] border-r border-border/75 px-2.5 py-1.5 gap-1"
+              : "w-[248px] border-r border-border/75 px-3 py-2 gap-1.5"
+          )}
+        >
+          {/* 頂部：帳戶總權益大字 ＋ 右對齊日切損益與百分比 */}
+          <div className="flex items-baseline justify-between gap-2 min-w-0">
+            <div className="min-w-0">
+              {!isShort && (
+                <div className="text-t1 text-muted-foreground font-sans leading-tight">
+                  帳戶總權益
+                </div>
+              )}
+              <div
+                className={cn(
+                  "font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight truncate",
+                  isShort
+                    ? "text-lg"
+                    : isWide
+                    ? "text-2xl"
+                    : isNarrow
+                    ? "text-lg"
+                    : "text-xl"
+                )}
+              >
+                {summary ? (
+                  formatDecimal(summary.equity, { prefix: "$" })
+                ) : (
+                  <span className="text-muted-foreground text-t3 font-medium">未啟動</span>
+                )}
               </div>
             </div>
-            <div className={cn("font-mono font-semibold tabular-nums", isShort ? "text-t2" : "text-t3", toneOf(summary?.period_pnl))}>
-              {summary?.period_pnl != null
-                ? `${formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })} (${formatRatioPct(summary.period_pnl_ratio)})`
-                : "風控期間損益 不適用"}
+            <div className="text-right shrink-0">
+              <div
+                className={cn(
+                  "font-mono text-t3 font-bold tabular-nums leading-tight",
+                  summary?.period_pnl != null
+                    ? toneOf(summary.period_pnl)
+                    : "text-muted-foreground font-normal"
+                )}
+              >
+                {summary?.period_pnl != null
+                  ? formatDecimal(summary.period_pnl, { sign: true, prefix: "$" })
+                  : "不適用"}
+              </div>
+              <div
+                className={cn(
+                  "font-mono text-t1 tabular-nums leading-tight",
+                  periodRatioStr != null ? toneOf(periodRatioStr) : "text-muted-foreground"
+                )}
+              >
+                {periodRatioStr != null ? `日切 ${formatRatioPct(periodRatioStr)}` : "日切 不適用"}
+              </div>
             </div>
           </div>
 
-          <div className={cn(
-            "grid font-mono border-t border-border/60",
-            isStacked
-              ? (cardW >= 360 ? "grid-cols-4 gap-2 pt-2" : "grid-cols-2 gap-2 pt-2")
-              : isShort
-              ? "grid-cols-2 gap-x-2.5 gap-y-1.5 pt-1.5"
-              : "grid-cols-2 gap-x-2.5 gap-y-2.5 pt-2.5"
-          )}>
-            <Kpi
-              label="已實現損益"
-              value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
-              tone={summary ? toneOf(summary.realized_pnl) : undefined}
-              sub="OKX 模擬子帳戶"
-              hideSub={hideKpiSub}
-            />
-            <Kpi
-              label="未實現損益"
-              value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
-              tone={summary ? toneOf(summary.unrealized_pnl) : undefined}
-              sub={risk?.snapshot ? `標記 $${formatDecimal(risk.snapshot.mark)}` : "尚無標記價"}
-              hideSub={hideKpiSub}
-            />
-            <Kpi
-              label="風控期間基準"
-              value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
-              sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
-              hideSub={hideKpiSub}
-            />
-            <Kpi
-              label="手續費累計"
-              value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
-              tone={summary ? "text-rose-400" : undefined}
-              sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
-              hideSub={hideKpiSub}
-            />
+          {/* 中段：裸尺「日損風控安全墊」 */}
+          <div className="flex flex-col gap-1" title={cushion.tooltip}>
+            <div className="flex items-baseline justify-between gap-1.5 text-t1 leading-tight">
+              <span className="text-muted-foreground font-sans truncate">日損風控安全墊</span>
+              <span
+                className={cn(
+                  "font-mono font-semibold tabular-nums whitespace-nowrap shrink-0",
+                  cushion.statusTone
+                )}
+              >
+                {cushion.statusText}
+              </span>
+            </div>
+            <div className="relative h-1.5 rounded-xs bg-foreground/10 overflow-visible">
+              {/* Hard 區間（左端至 Soft 刻度） */}
+              <span
+                className="absolute left-0 top-0 bottom-0 bg-rose-500/35 rounded-l-xs"
+                style={{ width: `${cushion.softTickPos}%` }}
+              />
+              {/* Soft 區間（Soft 刻度至 0% 軸） */}
+              <span
+                className="absolute top-0 bottom-0 bg-amber-500/30"
+                style={{
+                  left: `${cushion.softTickPos}%`,
+                  width: `${Math.max(0, cushion.zeroPos - cushion.softTickPos)}%`,
+                }}
+              />
+              {/* 目前日切損益區段填色 */}
+              {cushion.pinPos !== null && cushion.currentPct !== null && (
+                <span
+                  className={cn("absolute top-0 bottom-0", cushion.fillTone)}
+                  style={
+                    cushion.currentPct >= 0
+                      ? {
+                          left: `${cushion.zeroPos}%`,
+                          width: `${Math.max(0, cushion.pinPos - cushion.zeroPos)}%`,
+                        }
+                      : {
+                          left: `${cushion.pinPos}%`,
+                          width: `${Math.max(0, cushion.zeroPos - cushion.pinPos)}%`,
+                        }
+                  }
+                />
+              )}
+              {/* Soft 刻度線 */}
+              <span
+                className="absolute -top-0.5 -bottom-0.5 w-px bg-foreground/25"
+                style={{ left: `${cushion.softTickPos}%` }}
+              />
+              {/* 0% 中線 */}
+              <span
+                className="absolute -top-0.5 -bottom-0.5 w-px bg-foreground/55"
+                style={{ left: `${cushion.zeroPos}%` }}
+              />
+              {/* 目前位置指針 */}
+              {cushion.pinPos !== null && (
+                <span
+                  className={cn(
+                    "absolute -top-0.5 -bottom-0.5 w-[3px] rounded-xs -translate-x-1/2",
+                    cushion.pinTone
+                  )}
+                  style={{ left: `${cushion.pinPos}%` }}
+                />
+              )}
+            </div>
+            <div className="flex items-center justify-between font-mono text-t1 leading-none text-muted-foreground tabular-nums">
+              <span className="text-rose-400">
+                {cushion.hardLabel ? (isNarrow ? `-${cushion.hardLabel}` : `Hard -${cushion.hardLabel}`) : "Hard 不適用"}
+              </span>
+              {cushion.softLabel && (
+                <span className="text-amber-400">
+                  {isNarrow ? `-${cushion.softLabel}` : `Soft -${cushion.softLabel}`}
+                </span>
+              )}
+              <span>0%</span>
+              <span className="text-emerald-400">
+                {cushion.hardLabel ? `+${cushion.hardLabel}` : "不適用"}
+              </span>
+            </div>
+          </div>
+
+          {/* 底部：4 行純 1px 細線對齊帳本 */}
+          <div
+            className={cn(
+              "border-t border-border/60",
+              isStacked && cardW >= 400
+                ? "grid grid-cols-2 gap-x-4"
+                : "flex flex-col"
+            )}
+          >
+            {ledgerRows.map((row, idx) => (
+              <div
+                key={row.label}
+                title={row.title}
+                className={cn(
+                  "flex items-baseline justify-between gap-2 min-w-0 leading-tight",
+                  isShort ? "py-[2.5px]" : "py-[3.5px]",
+                  isStacked && cardW >= 400
+                    ? idx < 2
+                      ? "border-b border-border/45"
+                      : ""
+                    : idx < ledgerRows.length - 1
+                    ? "border-b border-border/45"
+                    : "pb-0"
+                )}
+              >
+                <span className="text-t2 text-muted-foreground font-sans whitespace-nowrap truncate leading-tight">
+                  {row.label}
+                </span>
+                <span
+                  className={cn(
+                    "font-mono text-t3 tabular-nums whitespace-nowrap shrink-0 leading-tight",
+                    row.tone
+                  )}
+                >
+                  {row.value}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* SVG 走勢圖（移除硬性 min-h 死鎖，完美貼合任何高度比例） */}
-        <div className={cn("flex-1 flex flex-col min-w-0 min-h-0", isShort ? "px-2.5 py-1.5" : "px-3 py-2.5")}>
+        {/* 右欄：走勢圖（調亮格線與 0% 基準線，頂部真實區間統計） */}
+        <div
+          className={cn(
+            "flex-1 flex flex-col min-w-0 min-h-0",
+            isShort ? "px-2.5 py-1.5" : "px-3 py-2"
+          )}
+        >
           <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground h-4 shrink-0 min-w-0">
             <div className="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
               <span className="w-2.5 h-[2px] bg-primary inline-block rounded-full" />
-              <span>{chartWidth < 300 ? `權益 · ${curve.length} 點` : `本次 run 權益曲線 · ${curve.length} 點`}</span>
+              <span>
+                {chartWidth < 360 ? `權益 · ${curve.length} 點` : `run 權益曲線 · ${curve.length} 點`}
+              </span>
             </div>
             <div className="min-w-0 truncate text-right">
               {hover ? (
                 <span className="text-foreground font-mono text-t2 whitespace-nowrap tabular-nums">
                   {formatDateTime(hover.time_ms)} · {formatDecimal(hover.equity, { prefix: "$" })} ·{" "}
-                  <span className="text-primary font-bold">{fmtPctNumber(hoverPct)}</span>
+                  <span className="text-primary font-bold">{fmtSignedPct(hoverPct)}</span>
+                </span>
+              ) : curveStats ? (
+                <span className="inline-flex items-center gap-2 text-t1 font-mono whitespace-nowrap tabular-nums">
+                  <span>
+                    累計{" "}
+                    <strong
+                      className={cn(
+                        "font-semibold",
+                        Number(curveStats.totalPct.toFixed(2)) > 0
+                          ? "text-emerald-400"
+                          : Number(curveStats.totalPct.toFixed(2)) < 0
+                          ? "text-rose-400"
+                          : "text-foreground"
+                      )}
+                    >
+                      {fmtSignedPct(curveStats.totalPct)}
+                    </strong>
+                  </span>
+                  {chartWidth >= 285 && (
+                    <span>
+                      最高{" "}
+                      <strong className="font-semibold text-foreground">
+                        {fmtSignedPct(curveStats.peakPct, 1)}
+                      </strong>
+                    </span>
+                  )}
+                  {chartWidth >= 230 && (
+                    <span>
+                      回撤{" "}
+                      <strong
+                        className={cn(
+                          "font-semibold",
+                          Number(curveStats.maxDrawdownPct.toFixed(1)) < 0
+                            ? "text-rose-400"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {fmtDrawdownNum(curveStats.maxDrawdownPct, 1)}
+                      </strong>
+                    </span>
+                  )}
                 </span>
               ) : (
-                chartWidth >= 360 && (
-                  <span className="text-muted-foreground/55 text-t1 whitespace-nowrap">
-                    懸停檢視各 K 線權益
-                  </span>
-                )
+                <span className="text-muted-foreground text-t1 whitespace-nowrap">不適用</span>
               )}
             </div>
           </div>
@@ -323,87 +674,106 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
               <div className="absolute inset-0 flex items-center justify-center text-t3 font-mono text-muted-foreground">
                 {emptyReason}
               </div>
-            ) : chartWidth > 0 && chartHeight > 0 && (
-              <svg width={chartWidth} height={height} className="w-full h-full overflow-visible">
-                <defs>
-                  <linearGradient id="v0EqGradReact2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.20} />
-                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
+            ) : (
+              chartWidth > 0 &&
+              chartHeight > 0 && (
+                <svg width={chartWidth} height={height} className="w-full h-full overflow-visible">
+                  <defs>
+                    <linearGradient id="v0EqGradReact2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
 
-                {yBounds.ticks.map((t) => (
-                  <g key={t}>
-                    <line
-                      x1={0}
-                      x2={plotW}
-                      y1={getY(t)}
-                      y2={getY(t)}
-                      stroke="currentColor"
-                      className={t === 0 ? "text-border/75" : "text-border/35"}
-                      strokeDasharray={t === 0 ? undefined : "3 3"}
-                      strokeWidth={t === 0 ? 1 : 0.75}
-                    />
+                  {yBounds.ticks.map((t) => (
+                    <g key={t}>
+                      <line
+                        x1={0}
+                        x2={plotW}
+                        y1={getY(t)}
+                        y2={getY(t)}
+                        stroke={t === 0 ? "var(--primary)" : "currentColor"}
+                        strokeOpacity={t === 0 ? 0.42 : undefined}
+                        className={t === 0 ? undefined : "text-foreground/15"}
+                        strokeDasharray={t === 0 ? undefined : "3 3"}
+                        strokeWidth={t === 0 ? 1 : 0.85}
+                      />
+                      <text
+                        x={plotW + 5}
+                        y={getY(t) + 3}
+                        fill="currentColor"
+                        className={cn(
+                          "text-t1 font-mono",
+                          t === 0 ? "text-primary font-semibold" : "text-muted-foreground/90"
+                        )}
+                      >
+                        {Math.abs(t) < 0.05
+                          ? "0.0%"
+                          : t > 0
+                          ? `+${t.toFixed(1)}%`
+                          : `${t.toFixed(1)}%`}
+                      </text>
+                    </g>
+                  ))}
+
+                  {xTicks.map((idx) => (
                     <text
-                      x={plotW + 5}
-                      y={getY(t) + 3}
+                      key={idx}
+                      x={getX(idx)}
+                      y={plotH + (xAxisH - 5)}
+                      textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
                       fill="currentColor"
-                      className={cn("text-t1 font-mono", t === 0 ? "text-primary font-semibold" : "text-muted-foreground/65")}
+                      className="text-t1 font-mono text-muted-foreground/85"
                     >
-                      {t > 0 ? `+${t.toFixed(1)}%` : `${t.toFixed(1)}%`}
+                      {formatShortAxisDate(curve[idx]?.time_ms, isMultiDay)}
                     </text>
-                  </g>
-                ))}
+                  ))}
 
-                {xTicks.map((idx) => (
-                  <text
-                    key={idx}
-                    x={getX(idx)}
-                    y={plotH + (xAxisH - 5)}
-                    textAnchor={idx === 0 ? "start" : idx === n - 1 ? "end" : "middle"}
-                    fill="currentColor"
-                    className="text-t1 font-mono text-muted-foreground/65"
-                  >
-                    {formatShortAxisDate(curve[idx]?.time_ms, isMultiDay)}
-                  </text>
-                ))}
-
-                {areaPath && <path d={areaPath} fill="url(#v0EqGradReact2)" />}
-                {line && <path d={line} fill="none" stroke="var(--primary)" strokeWidth={1.75} strokeLinejoin="round" />}
-                {lastValidIdx >= 0 && hoverIdx === null && (
-                  <circle
-                    cx={getX(lastValidIdx)}
-                    cy={getY(points[lastValidIdx])}
-                    r={3}
-                    fill="var(--primary)"
-                    stroke="var(--background)"
-                    strokeWidth={1.5}
-                  />
-                )}
-
-                {hoverIdx !== null && (
-                  <g>
-                    <line
-                      x1={getX(hoverIdx)}
-                      x2={getX(hoverIdx)}
-                      y1={6}
-                      y2={plotH}
+                  {areaPath && <path d={areaPath} fill="url(#v0EqGradReact2)" />}
+                  {line && (
+                    <path
+                      d={line}
+                      fill="none"
                       stroke="var(--primary)"
-                      strokeWidth={1}
-                      strokeDasharray="2 2"
-                      opacity={0.75}
+                      strokeWidth={1.85}
+                      strokeLinejoin="round"
                     />
+                  )}
+                  {lastValidIdx >= 0 && hoverIdx === null && (
                     <circle
-                      cx={getX(hoverIdx)}
-                      cy={getY(points[hoverIdx] ?? 0)}
-                      r={3.5}
+                      cx={getX(lastValidIdx)}
+                      cy={getY(points[lastValidIdx])}
+                      r={3.2}
                       fill="var(--primary)"
                       stroke="var(--background)"
                       strokeWidth={1.5}
                     />
-                  </g>
-                )}
-              </svg>
+                  )}
+
+                  {hoverIdx !== null && (
+                    <g>
+                      <line
+                        x1={getX(hoverIdx)}
+                        x2={getX(hoverIdx)}
+                        y1={6}
+                        y2={plotH}
+                        stroke="var(--primary)"
+                        strokeWidth={1}
+                        strokeDasharray="2 2"
+                        opacity={0.75}
+                      />
+                      <circle
+                        cx={getX(hoverIdx)}
+                        cy={getY(points[hoverIdx] ?? 0)}
+                        r={3.5}
+                        fill="var(--primary)"
+                        stroke="var(--background)"
+                        strokeWidth={1.5}
+                      />
+                    </g>
+                  )}
+                </svg>
+              )
             )}
           </div>
         </div>
