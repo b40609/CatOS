@@ -21,9 +21,9 @@ export function cloneTree(node: LayoutNode): LayoutNode {
 
 /**
  * 系統預設排版：使用者拍板 5 卡總覽定案 (Overview 5-Card T-Split)
- * - 頂層 (34% 高度，50:50 左右橫幅)：[帳戶權益 (equity)] ｜ [曝險額度 (allocation)]
- * - 底層 (66% 高度，左 57% / 右 43%)：
- *   - 左半部 (上下 52:48)：[策略實例與持倉 (bots)] / [策略管線 (pipeline)]
+ * - 頂層 (30% 高度，50:50 左右橫幅)：[帳戶權益 (equity)] ｜ [曝險額度 (allocation)]
+ * - 底層 (70% 高度，左 57% / 右 43%)：
+ *   - 左半部 (上下 45:55)：[策略實例與持倉 (bots)] / [策略管線 (pipeline)]
  *   - 右半部 (縱向全高)：[待處理與事件審計 (activity_deck)]
  */
 export function createDefaultTree(): LayoutNode {
@@ -31,7 +31,7 @@ export function createDefaultTree(): LayoutNode {
     type: "split",
     id: "split-root",
     direction: "col",
-    ratio: 0.34,
+    ratio: 0.30,
     first: {
       type: "split",
       id: "split-top-tier",
@@ -604,7 +604,7 @@ export function buildStableTreeFromCardIds(
     return n && n.type === "split" ? n.ratio : defaultRatio;
   };
 
-  const rootRatio = getNodeRatio("split-root", 0.34);
+  const rootRatio = getNodeRatio("split-root", 0.30);
   const topTierRatio = getNodeRatio("split-top-tier", 0.5);
   const bottomTierRatio = getNodeRatio("split-bottom-tier", 0.57);
   const bottomLeftRatio = getNodeRatio("split-bottom-left", 0.45);

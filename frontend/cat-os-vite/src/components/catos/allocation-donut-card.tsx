@@ -93,6 +93,36 @@ const NO_OBSERVATION_CHIP = { label: "尚無觀測", className: "bg-zinc-500/15 
 
 const TEXT_UNAVAILABLE = "不適用";
 
+const DECIMAL_STR_RE = /^[+-]?(\d+)(?:\.(\d*))?$/;
+
+/** 純字串 BigInt 計算 max(0, cap - |used|)，維持 Decimal 精確度、不經 float */
+function subtractDecimalNonNegative(
+  cap: DecimalString | null | undefined,
+  used: DecimalString | null | undefined,
+): DecimalString | null {
+  if (!cap) return null;
+  const parsePart = (v: string) => {
+    const t = v.trim();
+    const m = DECIMAL_STR_RE.exec(t);
+    if (!m) {
+      if (/^[+-]?0(?:\.0*)?E[+-]?\d+$/i.test(t)) return { neg: false, int: "0", frac: "" };
+      return null;
+    }
+    return { neg: t.startsWith("-"), int: m[1], frac: m[2] ?? "" };
+  };
+  const a = parsePart(cap);
+  if (!a) return null;
+  const b = used ? parsePart(used) : { neg: false, int: "0", frac: "" };
+  if (!b) return null;
+  const scale = Math.max(a.frac.length, b.frac.length);
+  const aBig = BigInt(a.int + a.frac.padEnd(scale, "0"));
+  const bBig = BigInt(b.int + b.frac.padEnd(scale, "0"));
+  const diff = aBig > bBig ? aBig - bBig : 0n;
+  if (scale === 0) return diff.toString();
+  const raw = diff.toString().padStart(scale + 1, "0");
+  return `${raw.slice(0, raw.length - scale)}.${raw.slice(raw.length - scale)}`;
+}
+
 function shareOf(part: DecimalString | null | undefined, whole: DecimalString | null | undefined): number {
   return sharePlot(toPlotNumber(part), toPlotNumber(whole));
 }
@@ -160,17 +190,17 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   const isSuperNarrow = cardW < 340;
   const isLarge = !isVertical && !isFlat && cardW >= 740 && cardH >= 280;
 
-  // 圓環動態直徑（跟隨容器寬高自由縮放，完全告別尺寸寫死）
+  // 圓環動態直徑（方案 B：拿掉上下廢帶，讓圓環吃滿卡片垂直空間）
   const donutSizePx = useMemo(() => {
     if (isVertical) {
-      return Math.round(Math.max(116, Math.min(240, cardW * 0.56, (cardH - 120) * 0.48)));
+      return Math.round(Math.max(118, Math.min(220, cardW * 0.54, (cardH - 110) * 0.46)));
     }
     if (isFlat) {
-      return Math.round(Math.max(88, Math.min(132, cardH - 52, cardW * 0.28)));
+      return Math.round(Math.max(92, Math.min(138, cardH - 46, cardW * 0.28)));
     }
-    const availH = cardH - 104;
-    const availW = cardW * 0.36;
-    return Math.round(Math.max(118, Math.min(268, availH, availW)));
+    const availH = cardH - 76;
+    const availW = cardW * 0.34;
+    return Math.round(Math.max(120, Math.min(248, availH, availW)));
   }, [isVertical, isFlat, cardW, cardH]);
 
   const risk = useCatStore((s) => s.risk);
@@ -246,19 +276,24 @@ export function AllocationDonutCard({ className }: { className?: string }) {
     },
   ], [leverageLimitText, symbolShareText, softLossText, hardLossText]);
 
+  const remainingBudget = useMemo(
+    () => subtractDecimalNonNegative(capBudget, notional),
+    [capBudget, notional],
+  );
+
   const remainingItem: DonutItem = useMemo(() => ({
     key: "remaining",
     shortLabel: "剩餘可用額度",
-    compactLabel: "未用額度",
+    compactLabel: "剩餘額度",
     sub: symbolBudget ? "距單幣上限" : "距總預算",
-    amount: null,
-    amountStr: "未配置",
+    amount: remainingBudget,
+    amountStr: remainingBudget !== null ? formatDecimal(remainingBudget, { prefix: "$" }) : TEXT_UNAVAILABLE,
     pct_share: Math.max(0, 100 - capShare),
     color: COLORS.rem,
     badgeStr: symbolBudget ? "單幣緩衝" : "緩衝",
     compactBadge: "緩衝",
     isMuted: true,
-  }), [symbolBudget, capShare]);
+  }), [symbolBudget, capShare, remainingBudget]);
 
   const botItems: DonutItem[] = useMemo(() => {
     if (!risk) return unavailableItems;
@@ -710,10 +745,10 @@ export function AllocationDonutCard({ className }: { className?: string }) {
             <g className="pointer-events-none select-none">
               <text
                 x={CX}
-                y={compactHud ? CY + 8 : CY + 2}
+                y={compactHud ? CY + 8 : CY + 1}
                 textAnchor="middle"
                 fill={hudValueColor}
-                fontSize={hudFontSize(hudValue, compactHud ? 28 : 30)}
+                fontSize={hudFontSize(hudValue, compactHud ? 30 : 33)}
                 fontWeight="700"
                 className="hud-mono"
               >
@@ -722,10 +757,10 @@ export function AllocationDonutCard({ className }: { className?: string }) {
               {!compactHud && (
                 <text
                   x={CX}
-                  y={CY + 21}
+                  y={CY + 22}
                   textAnchor="middle"
                   fill="#94a3b8"
-                  fontSize={hudFontSize(hudSub, 10)}
+                  fontSize={hudFontSize(hudSub, 11.5)}
                   fontWeight="500"
                   className="hud-mono"
                 >
@@ -733,12 +768,12 @@ export function AllocationDonutCard({ className }: { className?: string }) {
                 </text>
               )}
               {canToggleUnit && !hudUnavailable && !compactHud && (
-                <g transform={`translate(${CX}, ${CY + 39})`}>
-                  <text x={-16} y={0} textAnchor="middle" fill={hudUnit === "pct" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "pct" ? "700" : "500"} className="hud-mono">%</text>
-                  <text x={-8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
-                  <text x={0} y={0} textAnchor="middle" fill={hudUnit === "leverage" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "leverage" ? "700" : "500"} className="hud-mono">x</text>
-                  <text x={8} y={0} textAnchor="middle" fill="#3f3f46" fontSize="8" className="hud-mono">·</text>
-                  <text x={16} y={0} textAnchor="middle" fill={hudUnit === "money" ? "#e8b45e" : "#52525b"} fontSize="9" fontWeight={hudUnit === "money" ? "700" : "500"} className="hud-mono">$</text>
+                <g transform={`translate(${CX}, ${CY + 41})`}>
+                  <text x={-18} y={0} textAnchor="middle" fill={hudUnit === "pct" ? "#e8b45e" : "#52525b"} fontSize="10.5" fontWeight={hudUnit === "pct" ? "700" : "500"} className="hud-mono">%</text>
+                  <text x={-9} y={0} textAnchor="middle" fill="#3f3f46" fontSize="9.5" className="hud-mono">·</text>
+                  <text x={0} y={0} textAnchor="middle" fill={hudUnit === "leverage" ? "#e8b45e" : "#52525b"} fontSize="10.5" fontWeight={hudUnit === "leverage" ? "700" : "500"} className="hud-mono">x</text>
+                  <text x={9} y={0} textAnchor="middle" fill="#3f3f46" fontSize="9.5" className="hud-mono">·</text>
+                  <text x={18} y={0} textAnchor="middle" fill={hudUnit === "money" ? "#e8b45e" : "#52525b"} fontSize="10.5" fontWeight={hudUnit === "money" ? "700" : "500"} className="hud-mono">$</text>
                 </g>
               )}
             </g>
@@ -749,15 +784,100 @@ export function AllocationDonutCard({ className }: { className?: string }) {
   };
 
   const riskEquity = risk?.snapshot?.risk_equity ?? risk?.snapshot?.equity ?? summary?.equity ?? null;
-  const formulaLine = !isFlat
-    ? !risk
-      ? `啟動模擬 run 後即時監控部位曝險 · 預設單幣上限為總預算 ${symbolShareText}`
-      : viewMode === "pnl"
-      ? `已實現 ${formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" })} · 未實現 ${formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" })} · 手續費 ${formatDecimal(summary?.fees, { prefix: "$" })}`
-      : viewMode === "margin"
-      ? "v1 local-sim 無保證金模型 · 僅驗證 margin_ok 布林事實"
-      : `已用 ${formatDecimal(notional, { prefix: "$" })} / 單幣上限 ${formatDecimal(symbolBudget, { prefix: "$" })}（權益 ${formatDecimal(riskEquity, { prefix: "$" })} × ${leverageLimitText} × ${symbolShareText}）`
-    : null;
+
+  const donutFootCaption = useMemo(() => {
+    if (!risk && viewMode !== "pnl") return `上限 ${leverageLimitText} · 單幣 ${symbolShareText}`;
+    if (viewMode === "pnl") {
+      return summary?.basis_equity
+        ? `基準 ${formatDecimal(summary.basis_equity, { prefix: "$" })}`
+        : "尚無風控基準";
+    }
+    if (viewMode === "margin") return "local-sim 無保證金模型";
+    return `上限 ${formatDecimal(capBudget, { prefix: "$" })} · ${topRightSummary}`;
+  }, [risk, viewMode, leverageLimitText, symbolShareText, summary, capBudget, topRightSummary]);
+
+  const kpiPair = useMemo(() => {
+    if (viewMode === "pnl") {
+      const periodPnl = summary?.period_pnl ?? null;
+      const periodTone =
+        signOf(periodPnl) === "positive"
+          ? "text-emerald-400"
+          : signOf(periodPnl) === "negative"
+          ? "text-rose-400"
+          : "text-foreground";
+      return {
+        left: {
+          label: "風控期間損益",
+          meta: summary?.period_pnl_ratio ? formatRatioPct(summary.period_pnl_ratio) : TEXT_UNAVAILABLE,
+          value: formatDecimal(periodPnl, { sign: true, prefix: "$" }),
+          sub: summary?.fees ? `手續費 ${formatDecimal(summary.fees, { prefix: "$" })}` : "尚未啟動",
+          valueTone: periodTone,
+        },
+        right: {
+          label: "已實現 / 未實現",
+          meta: "帳本累計",
+          value: formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }),
+          sub: `浮動 ${formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" })}`,
+          valueTone: "text-foreground",
+        },
+      };
+    }
+    if (viewMode === "margin") {
+      const marginOk = risk?.snapshot?.margin_ok;
+      const verdict = marginOk === undefined ? TEXT_UNAVAILABLE : marginOk ? "通過" : "未通過";
+      return {
+        left: {
+          label: "保證金檢查",
+          meta: "margin_ok",
+          value: verdict,
+          sub: "布林事實檢核",
+          valueTone: marginOk === false ? "text-rose-400" : "text-foreground",
+        },
+        right: {
+          label: "帳戶結算模型",
+          meta: "v1 規格",
+          value: "cross + net",
+          sub: `槓桿上限 ${leverageLimitText}`,
+          valueTone: "text-foreground",
+        },
+      };
+    }
+    const remPct = Math.max(0, Math.round(100 - capShare));
+    return {
+      left: {
+        label: viewMode === "delta" ? "淨方向曝險" : "已用曝險",
+        meta: topRightSummary,
+        value: risk ? formatDecimal(notional, { prefix: "$" }) : TEXT_UNAVAILABLE,
+        sub: riskEquity ? `權益 ${formatDecimal(riskEquity, { prefix: "$", digits: 0 })}` : unavailableSub,
+        valueTone: "text-foreground",
+      },
+      right: {
+        label: "剩餘緩衝",
+        meta: symbolBudget ? `單幣 ${symbolShareText} 上限` : `總上限 ${leverageLimitText}`,
+        value: remainingBudget !== null ? formatDecimal(remainingBudget, { prefix: "$" }) : TEXT_UNAVAILABLE,
+        sub: risk ? `${remPct}% 可用` : `Soft ${softLossText} / Hard ${hardLossText}`,
+        valueTone: "text-foreground",
+      },
+    };
+  }, [
+    viewMode,
+    summary,
+    risk,
+    leverageLimitText,
+    capShare,
+    topRightSummary,
+    notional,
+    riskEquity,
+    unavailableSub,
+    symbolBudget,
+    symbolShareText,
+    remainingBudget,
+    softLossText,
+    hardLossText,
+  ]);
+
+  const showKpiHeader = !isFlat && !isSuperNarrow && (isVertical ? cardH >= 340 : cardH >= 205);
+  const compactKpi = cardH < 250;
 
   return (
     <div ref={containerRef} className={cn("flex flex-col h-full w-full select-none overflow-hidden bg-surface/40 relative", className)}>
@@ -794,114 +914,169 @@ export function AllocationDonutCard({ className }: { className?: string }) {
         />
       </div>
 
-      {/* 2. 主內容區：依寬高比自動切換 Y 版直式上下 / 超扁 2 欄 / 標準橫排 */}
-      <div className={cn("flex-1 min-h-0 flex flex-col overflow-hidden", isFlat ? "px-3 py-1.5" : "px-3.5 py-2.5")}>
-        {!isFlat && (
-          <div className="flex items-center justify-between gap-2 text-t2 font-mono text-muted-foreground mb-1.5 shrink-0">
-            <span className="truncate font-sans">{VIEW_CAPTION[viewMode]}</span>
-            <span className="font-semibold text-foreground shrink-0 tabular-nums">{topRightSummary}</span>
-          </div>
-        )}
-
+      {/* 2. 主內容區（2026-11-25 定案方案 B：去上下廢帶＋右側雙格 KPI 頭＋佔比進度條） */}
+      <div className={cn("flex-1 min-h-0 flex overflow-hidden font-mono", isFlat ? "px-3 py-1.5" : "px-3.5 py-2.5")}>
         <div
           className={cn(
-            "flex-1 min-h-0 flex items-center justify-center overflow-hidden font-mono w-full mx-auto",
+            "flex-1 min-h-0 flex w-full overflow-hidden",
             isVertical
-              ? "flex-col gap-3"
+              ? "flex-col items-center gap-2.5"
               : isFlat
-              ? "flex-row gap-3"
-              : "flex-row gap-5 sm:gap-7"
+              ? "flex-row items-center gap-3"
+              : "flex-row items-stretch gap-4"
           )}
         >
-          {renderDonut()}
+          {/* 左側圓環＋底部精簡參數 */}
+          <div className="flex flex-col items-center justify-center gap-1 shrink-0">
+            {renderDonut()}
+            {!isFlat && (
+              <span
+                className="text-t1 font-mono text-muted-foreground text-center leading-tight max-w-[230px] truncate"
+                title={`${VIEW_CAPTION[viewMode]} · ${donutFootCaption}`}
+              >
+                {donutFootCaption}
+              </span>
+            )}
+          </div>
 
-          {/* 明細清單：扁卡自動切 2 欄網格；直卡滿寬；大卡自動放大間距與字級 */}
+          {/* 右側：頂部雙格 KPI 頭 ＋ 帶進度條的明細清單 */}
           <div
             className={cn(
-              "min-w-0 overflow-y-auto custom-scrollbar pr-0.5",
-              isVertical
-                ? "w-full flex-1 flex flex-col justify-start divide-y divide-white/[0.05]"
-                : isFlat
-                ? "flex-1 grid grid-cols-2 gap-x-3 gap-y-1 content-center"
-                : "flex-1 max-w-[520px] h-full flex flex-col justify-center divide-y divide-white/[0.05]"
+              "flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden",
+              isVertical ? "w-full gap-2" : isFlat ? "justify-center" : "justify-between gap-2"
             )}
           >
-            {currentItems.map((item, idx) => {
-              const isHovered = hoveredIndex === idx;
-              const displayLabel = isNarrow || isFlat ? (item.compactLabel || item.shortLabel) : item.shortLabel;
-              const displayBadge = isSuperNarrow || isFlat
-                ? undefined
-                : isNarrow
-                ? (item.compactBadge || item.badgeStr)
-                : item.badgeStr;
-
-              return (
-                <div
-                  key={item.key}
-                  onMouseEnter={() => setHoveredIndex(idx)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  className={cn(
-                    "flex items-center justify-between gap-2 rounded transition-colors cursor-pointer",
-                    isFlat ? "px-1.5 py-1 bg-white/[0.02]" : isLarge ? "px-2.5 py-2" : "px-2 py-1.5",
-                    isHovered ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                    <span
-                      className={cn(
-                        "truncate font-sans",
-                        isLarge ? "text-t4" : "text-t3",
-                        item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
-                      )}
-                    >
-                      {displayLabel}
-                    </span>
-                    {displayBadge && (
-                      <span
-                        className={cn(
-                          "text-t1 font-mono shrink-0 whitespace-nowrap",
-                          item.nearLimit ? "text-amber-400 font-semibold" : "text-muted-foreground/75"
-                        )}
-                      >
-                        {displayBadge}
-                      </span>
+            {showKpiHeader && (
+              <div className="grid grid-cols-2 gap-2 shrink-0">
+                {[kpiPair.left, kpiPair.right].map((kpi) => (
+                  <div
+                    key={kpi.label}
+                    className={cn(
+                      "rounded border border-border/75 bg-background/60 flex flex-col min-w-0",
+                      compactKpi ? "px-2 py-1 gap-0.5" : "px-2.5 py-1.5 gap-0.5"
                     )}
+                  >
+                    <div className="flex items-center justify-between gap-1 text-t1 text-muted-foreground min-w-0">
+                      <span className="font-sans truncate">{kpi.label}</span>
+                      <span className="font-mono text-primary/90 shrink-0 tabular-nums truncate">{kpi.meta}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-1.5 min-w-0">
+                      <span className={cn("font-mono font-bold tabular-nums leading-tight truncate", compactKpi ? "text-t4" : "text-sm", kpi.valueTone)}>
+                        {kpi.value}
+                      </span>
+                      <span className="text-t1 font-mono text-muted-foreground/85 shrink-0 tabular-nums truncate">
+                        {kpi.sub}
+                      </span>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )}
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={cn(
-                        "tabular-nums",
-                        isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
-                        item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-medium"
-                      )}
-                    >
-                      {item.amountStr}
-                    </span>
+            <div
+              className={cn(
+                "flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-0.5",
+                isFlat
+                  ? "grid grid-cols-2 gap-x-2.5 gap-y-1 content-center"
+                  : "flex flex-col justify-center gap-1.5"
+              )}
+            >
+              {currentItems.map((item, idx) => {
+                const isHovered = hoveredIndex === idx;
+                const displayLabel = isNarrow || isFlat ? (item.compactLabel || item.shortLabel) : item.shortLabel;
+                const displayBadge = isSuperNarrow || isFlat
+                  ? undefined
+                  : isNarrow
+                  ? (item.compactBadge || item.badgeStr)
+                  : item.badgeStr;
+                const barWidth = Math.max(0, Math.min(100, item.pct_share));
+
+                return (
+                  <div
+                    key={item.key}
+                    onMouseEnter={() => setHoveredIndex(idx)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    className={cn(
+                      "flex flex-col rounded border transition-colors cursor-pointer",
+                      isFlat
+                        ? "px-2 py-1 gap-1 bg-white/[0.02] border-white/[0.05]"
+                        : compactKpi
+                        ? "px-2 py-1 gap-1"
+                        : isLarge
+                        ? "px-2.5 py-1.5 gap-1.5"
+                        : "px-2.5 py-1.5 gap-1",
+                      item.isMuted
+                        ? "bg-transparent border-white/[0.04]"
+                        : "bg-white/[0.025] border-white/[0.06]",
+                      isHovered ? "bg-white/[0.06] border-white/[0.12]" : "hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                        <span
+                          className={cn(
+                            "truncate font-sans leading-tight",
+                            isLarge ? "text-t4" : "text-t3",
+                            item.isMuted ? "text-muted-foreground" : "text-foreground font-semibold"
+                          )}
+                        >
+                          {displayLabel}
+                        </span>
+                        {displayBadge && (
+                          <span
+                            className={cn(
+                              "text-t1 font-mono shrink-0 whitespace-nowrap leading-tight",
+                              item.nearLimit ? "text-amber-400 font-semibold" : "text-muted-foreground/80"
+                            )}
+                          >
+                            {displayBadge}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={cn(
+                            "tabular-nums leading-tight",
+                            isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
+                            item.isLoss ? "text-rose-400 font-semibold" : item.isMuted ? "text-muted-foreground/85" : "text-foreground font-medium"
+                          )}
+                        >
+                          {item.amountStr}
+                        </span>
+                        {!item.hidePct && (
+                          <span
+                            className={cn(
+                              "tabular-nums min-w-[34px] text-right leading-tight",
+                              isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
+                              item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground/85" : "text-foreground font-semibold"
+                            )}
+                          >
+                            {Math.round(item.pct_share)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     {!item.hidePct && (
-                      <span
-                        className={cn(
-                          "tabular-nums min-w-[32px] text-right",
-                          isLarge ? "text-t4" : isFlat ? "text-t2" : "text-t3",
-                          item.nearLimit ? "text-amber-400 font-bold" : item.isMuted ? "text-muted-foreground/80" : "text-foreground font-semibold"
-                        )}
-                      >
-                        {Math.round(item.pct_share)}%
-                      </span>
+                      <div className="h-1 w-full rounded-full bg-white/[0.07] overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-200"
+                          style={{
+                            width: `${barWidth}%`,
+                            backgroundColor: item.color,
+                            opacity: item.isMuted ? 0.55 : 0.95,
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {formulaLine && (
-          <div className="mt-1.5 pt-1.5 border-t border-border/60 text-t1 font-mono text-muted-foreground/75 truncate shrink-0">
-            {formulaLine}
-          </div>
-        )}
       </div>
     </div>
   );

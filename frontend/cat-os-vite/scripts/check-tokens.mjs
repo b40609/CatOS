@@ -31,7 +31,7 @@ for (const target of TARGETS) {
 }
 
 if (hits.length) {
-  console.error(`check:tokens FAILED - ${hits.length} arbitrary font size(s); use text-t1..t4 (9/10/11/12px) or a named size:`);
+  console.error(`check:tokens FAILED - ${hits.length} arbitrary font size(s); use text-t1..t4 (10.5/11.5/12.5/13.5px) or a named size:`);
   for (const hit of hits) console.error('  ' + hit);
   process.exit(1);
 }

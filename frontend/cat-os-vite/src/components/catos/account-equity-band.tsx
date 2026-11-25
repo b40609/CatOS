@@ -61,8 +61,9 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
 
   const { width: cardW, height: cardH } = bandDimensions;
   const isStacked = (cardW < 480 && cardH >= 260) || (cardH > 340 && cardH / Math.max(1, cardW) >= 0.78);
-  const isShort = !isStacked && cardH < 210;
-  const isNarrow = cardW < 520;
+  const isShort = !isStacked && cardH < 228;
+  const hideKpiSub = isShort || isStacked || cardH < 276;
+  const isNarrow = cardW < 540;
   const isWide = !isStacked && cardW >= 780;
 
   useEffect(() => {
@@ -80,8 +81,8 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
   }, [isStacked, isShort]);
 
   const height = Math.max(68, chartHeight);
-  const axisW = chartWidth < 260 ? 38 : isNarrow ? 44 : 52;
-  const xAxisH = height < 100 ? 15 : 20;
+  const axisW = chartWidth < 260 ? 42 : isNarrow ? 50 : 58;
+  const xAxisH = height < 100 ? 16 : 22;
   const plotW = Math.max(1, chartWidth - axisW);
   const plotH = Math.max(1, height - xAxisH);
 
@@ -227,19 +228,19 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
           isStacked
             ? "w-full border-b border-border/70 px-3 py-2.5 flex flex-col gap-2"
             : isShort
-            ? "w-[178px] border-r border-border/70 px-2.5 py-2 flex flex-col justify-center gap-1.5"
+            ? "w-[228px] border-r border-border/70 px-3 py-2 flex flex-col justify-between gap-1.5"
             : isWide
-            ? "w-[252px] border-r border-border/70 px-3.5 py-3 flex flex-col justify-between gap-2.5"
+            ? "w-[268px] border-r border-border/70 px-3.5 py-3 flex flex-col justify-between gap-2.5"
             : isNarrow
-            ? "w-[168px] border-r border-border/70 px-2.5 py-2.5 flex flex-col justify-between gap-2"
-            : "w-[216px] border-r border-border/70 px-3 py-3 flex flex-col justify-between gap-2.5"
+            ? "w-[186px] border-r border-border/70 px-2.5 py-2.5 flex flex-col justify-between gap-2"
+            : "w-[244px] border-r border-border/70 px-3 py-3 flex flex-col justify-between gap-2.5"
         )}>
           <div className={cn("flex", isStacked ? "items-baseline justify-between gap-2 flex-wrap" : "flex-col gap-0.5")}>
             <div className="flex flex-col gap-0.5 min-w-0">
               {!isShort && <span className="text-t2 text-muted-foreground font-sans">帳戶總權益</span>}
               <div className={cn(
                 "font-mono font-bold text-foreground tracking-tight tabular-nums leading-tight",
-                isShort ? "text-lg" : isWide ? "text-3xl" : isNarrow ? "text-xl" : "text-2xl"
+                isShort ? "text-xl" : isWide ? "text-3xl" : isNarrow ? "text-xl" : "text-2xl"
               )}>
                 {summary ? formatDecimal(summary.equity, { prefix: "$" }) : <span className="text-muted-foreground text-sm">未啟動</span>}
               </div>
@@ -256,7 +257,7 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
             isStacked
               ? (cardW >= 360 ? "grid-cols-4 gap-2 pt-2" : "grid-cols-2 gap-2 pt-2")
               : isShort
-              ? "grid-cols-2 gap-x-2 gap-y-1 pt-1.5"
+              ? "grid-cols-2 gap-x-2.5 gap-y-1.5 pt-1.5"
               : "grid-cols-2 gap-x-2.5 gap-y-2.5 pt-2.5"
           )}>
             <Kpi
@@ -264,32 +265,28 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
               value={formatDecimal(summary?.realized_pnl, { sign: true, prefix: "$" }, "未啟動")}
               tone={summary ? toneOf(summary.realized_pnl) : undefined}
               sub="OKX 模擬子帳戶"
-              hideSub={isShort || isStacked}
+              hideSub={hideKpiSub}
             />
             <Kpi
               label="未實現損益"
               value={formatDecimal(summary?.unrealized_pnl, { sign: true, prefix: "$" }, "未啟動")}
               tone={summary ? toneOf(summary.unrealized_pnl) : undefined}
               sub={risk?.snapshot ? `標記 $${formatDecimal(risk.snapshot.mark)}` : "尚無標記價"}
-              hideSub={isShort || isStacked}
+              hideSub={hideKpiSub}
             />
-            {!isShort && (
-              <>
-                <Kpi
-                  label="風控期間基準"
-                  value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
-                  sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
-                  hideSub={isStacked}
-                />
-                <Kpi
-                  label="手續費累計"
-                  value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
-                  tone={summary ? "text-rose-400" : undefined}
-                  sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
-                  hideSub={isStacked}
-                />
-              </>
-            )}
+            <Kpi
+              label="風控期間基準"
+              value={summary?.basis_equity ? formatDecimal(summary.basis_equity, { prefix: "$" }) : "不適用"}
+              sub={summary?.period_start_ms ? `${formatDateTime(summary.period_start_ms)} 起算` : "尚無基準"}
+              hideSub={hideKpiSub}
+            />
+            <Kpi
+              label="手續費累計"
+              value={formatDecimal(summary?.fees, { prefix: "$", digits: 4 }, "未啟動")}
+              tone={summary ? "text-rose-400" : undefined}
+              sub={summary ? `槓桿上限 ${formatDecimal(summary.leverage_limit, { digits: 1 })}x` : undefined}
+              hideSub={hideKpiSub}
+            />
           </div>
         </div>
 

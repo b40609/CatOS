@@ -24,21 +24,19 @@
   --font-display: "Work Sans", ui-sans-serif, system-ui, sans-serif;
 
   /*
-   * Terminal type scale (t = terminal density). The only font sizes allowed
-   * below Tailwind's text-xs (12px) in app code; arbitrary text-[Npx] values
-   * are rejected by `npm run check:tokens`.
-   *   text-t1  9px  micro labels, badges, axis ticks
-   *   text-t2 10px  dense table cells, secondary meta
-   *   text-t3 11px  default terminal body / row text
-   *   text-t4 12px  emphasised row text, section labels
-   * No line-height is attached on purpose: the arbitrary values these
-   * replace set font-size only, so leading keeps inheriting (preflight 1.5
-   * or an explicit `leading-*`) and the layout is unchanged.
+   * Terminal type scale (t = terminal density · 2026-11-25 使用者定案緊湊終端刻度).
+   * The only font sizes allowed below Tailwind's text-xs/sm in app code;
+   * arbitrary text-[Npx] values are rejected by `npm run check:tokens`.
+   *   text-t1 10.5px  micro labels, badges, axis ticks
+   *   text-t2 11.5px  dense table cells, secondary meta, tabs
+   *   text-t3 12.5px  default terminal body / row text
+   *   text-t4 13.5px  emphasised row text, card titles
+   * Scales proportionally with --ui-content-scale from personalOsStore.
    */
-  --text-t1: 9px;
-  --text-t2: 10px;
-  --text-t3: 11px;
-  --text-t4: 12px;
+  --text-t1: calc(10.5px * var(--ui-content-scale, 1));
+  --text-t2: calc(11.5px * var(--ui-content-scale, 1));
+  --text-t3: calc(12.5px * var(--ui-content-scale, 1));
+  --text-t4: calc(13.5px * var(--ui-content-scale, 1));
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -173,6 +171,10 @@
 :root {
   --ui-font-scale: 1;
   --ui-content-scale: 1;
+  --text-t1: calc(10.5px * var(--ui-content-scale, 1));
+  --text-t2: calc(11.5px * var(--ui-content-scale, 1));
+  --text-t3: calc(12.5px * var(--ui-content-scale, 1));
+  --text-t4: calc(13.5px * var(--ui-content-scale, 1));
 }
 
 /* 精準接管 Tailwind 任意像素類別，讓數據內容隨全域縮放等比例放大縮小 */

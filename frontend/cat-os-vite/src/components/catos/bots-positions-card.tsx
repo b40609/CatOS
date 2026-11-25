@@ -56,7 +56,8 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
   const controls = useBotControls();
 
   const [filter, setFilter] = useState<BotsPositionsFilter>("all");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  /** undefined：使用者未手動切換，預設展開首列詳情（2026-11-25 定案）；null：全部收合 */
+  const [expandedId, setExpandedId] = useState<string | null | undefined>(undefined);
   const cardRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ width: 760, height: 280 });
 
@@ -95,6 +96,10 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
 
   const openCount = bots.filter(isOpenPos).length;
   const rows = filter === "open" ? bots.filter(isOpenPos) : bots;
+  const activeExpandedId = expandedId === undefined ? rows[0]?.bot_id ?? null : expandedId;
+  const toggleExpanded = (botId: string) => {
+    setExpandedId(activeExpandedId === botId ? null : botId);
+  };
 
   const sparkFor = useMemo(() => {
     const cache = new Map<string, { path: string; isGain: boolean }>();
@@ -224,7 +229,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                   const hasPos = posSign === "positive" || posSign === "negative";
                   const isShort = posSign === "negative";
                   const isActive = ACTIVE_STATES.has(bot.state);
-                  const isExpanded = expandedId === bot.bot_id;
+                  const isExpanded = activeExpandedId === bot.bot_id;
                   const botRisk = risk && risk.bot_id === bot.bot_id ? risk : null;
                   const avgPx = pos?.average_entry ?? bot.average_entry;
                   const markPx = pos?.mark ?? bot.mark;
@@ -238,7 +243,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                       <div
                         onClick={() => {
                           selectBot(bot.bot_id);
-                          setExpandedId((prev) => (prev === bot.bot_id ? null : bot.bot_id));
+                          toggleExpanded(bot.bot_id);
                         }}
                         className="px-3 py-2 cursor-pointer hover:bg-white/[0.03] flex flex-col gap-1.5"
                       >
@@ -344,7 +349,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                     const isShort = posSign === "negative";
                     const isActive = ACTIVE_STATES.has(bot.state);
                     const isSelected = selectedBotId === bot.bot_id;
-                    const isExpanded = expandedId === bot.bot_id;
+                    const isExpanded = activeExpandedId === bot.bot_id;
                     const botRisk = risk && risk.bot_id === bot.bot_id ? risk : null;
                     const statusMeta = botRisk ? RISK_STATUS_META[botRisk.derived.status] : null;
                     const spark = sparkFor(bot);
@@ -361,7 +366,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                         <tr
                           onClick={() => {
                             selectBot(bot.bot_id);
-                            setExpandedId((prev) => (prev === bot.bot_id ? null : bot.bot_id));
+                            toggleExpanded(bot.bot_id);
                           }}
                           className={cn(
                             "hover:bg-white/[0.03] transition-colors group cursor-pointer",
@@ -379,7 +384,7 @@ export function BotsPositionsCard({ className, showHeader = true }: BotsPosition
                                 className={cn(
                                   "size-2 rounded-full shrink-0",
                                   isActive
-                                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                                    ? "bg-emerald-400"
                                     : bot.state === "failed" || bot.state === "recovery_required"
                                     ? "bg-rose-400"
                                     : "bg-muted-foreground/50"

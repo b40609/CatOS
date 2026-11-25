@@ -90,14 +90,14 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
 
   const isNarrow = dims.width < 460;
   const isSuperNarrow = dims.width < 340;
-  const isUltraWide = dims.width >= 820;
-  const isWide = dims.width >= 660;
+  const isUltraWide = dims.width >= 680;
+  const isWide = dims.width >= 580;
   const isFlat = dims.height < 200;
 
   const gridColsClass = isUltraWide
-    ? "grid-cols-[204px_minmax(0,1fr)_210px_14px]"
+    ? "grid-cols-[192px_minmax(0,1fr)_172px_14px]"
     : isWide
-    ? "grid-cols-[192px_minmax(0,1fr)_14px]"
+    ? "grid-cols-[184px_minmax(0,1fr)_14px]"
     : "grid-cols-[156px_minmax(0,1fr)_14px]";
 
   const allRows = useMemo<PipelineRow[]>(() => {
@@ -304,14 +304,11 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
                           <span
                             className={cn(
                               "size-2.5 rounded-full border-2",
-                              isDone && "border-transparent",
-                              isCurrent && row.tone === "gold" && "shadow-[0_0_0_3px_rgba(232,180,94,0.22)]",
-                              isCurrent && row.tone === "warn" && "shadow-[0_0_0_3px_rgba(245,158,11,0.22)]",
-                              isCurrent && row.tone === "fail" && "shadow-[0_0_0_3px_rgba(244,63,94,0.22)]"
+                              isDone && "border-transparent"
                             )}
                             style={{
                               borderColor: isDone || isCurrent ? row.color : "rgba(255,255,255,0.18)",
-                              backgroundColor: isDone || (isCurrent && (row.tone === "gold" || row.tone === "warn" || row.tone === "fail"))
+                              backgroundColor: isDone || isCurrent
                                 ? row.color
                                 : "var(--surface)",
                             }}

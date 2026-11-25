@@ -6,8 +6,8 @@
  *
  * 對齊：光軌與光點畫在同一個 15px 節點欄裡（光軌 left 7px、寬 1px；光點 left 4px、寬 7px），
  * 兩者中心都在 7.5px，不靠外層絕對定位的 left 計算，所以欄寬怎麼變都不會歪。
- * 列標頭固定 27px，光點 top 10px，中心 13.5px = 標頭一半。
- * 標頭裡的光軌拆成上下兩段，在光點上下各留 3px 切口（上段到 7px、下段從 20px 起）。
+ * 配合 10.5/11.5/12.5/13.5px 緊湊終端字級：列標頭固定 30px，光點 top 11.5px，中心 15px = 標頭一半。
+ * 標頭裡的光軌拆成上下兩段，在光點上下各留 3px 切口（上段到 8.5px、下段從 21.5px 起）。
  */
 
 .tl-feed {
@@ -28,13 +28,13 @@
 .tl-head,
 .tl-body {
   display: grid;
-  grid-template-columns: 52px 15px minmax(0, 1fr);
+  grid-template-columns: 58px 15px minmax(0, 1fr);
   column-gap: 8px;
   padding: 0 6px;
 }
 
 .tl-head {
-  height: 27px;
+  height: 30px;
   align-items: center;
   border-radius: 4px;
   cursor: pointer;
@@ -78,8 +78,8 @@
   background: color-mix(in oklab, var(--foreground) 13%, transparent);
   pointer-events: none;
 }
-.tl-rail-t { bottom: auto; height: 7px; }
-.tl-rail-b { top: 20px; }
+.tl-rail-t { bottom: auto; height: 8.5px; }
+.tl-rail-b { top: 21.5px; }
 .tl-feed > .tl-row:first-child > .tl-head .tl-rail-t { display: none; }
 .tl-feed > .tl-row:last-child > .tl-head .tl-rail-b { display: none; }
 .tl-feed > .tl-row:last-child > .tl-body .tl-rail { display: none; }
@@ -88,7 +88,7 @@
 .tl-dot {
   position: absolute;
   left: 4px;
-  top: 10px;
+  top: 11.5px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -108,8 +108,8 @@
 /* 霧底無框等寬標籤（RISK / WARN / SELL / BUY…） */
 .tl-tag {
   flex-shrink: 0;
-  width: 44px;
-  height: 17px;
+  width: 48px;
+  height: 19px;
   border-radius: 3px;
   display: inline-flex;
   align-items: center;
