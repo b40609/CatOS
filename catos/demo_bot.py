@@ -62,6 +62,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import sys
@@ -69,6 +70,7 @@ import time
 import uuid
 
 from catos import ipc, kill_switch, protection, research, risk, strategy_approvals, strategy_registry
+from catos.demo_bot_liveness import HEARTBEAT_FILE
 from catos.kill_switch import KillSwitchError, terminal_confirm
 from catos.journal import Reconciliation
 from catos.local_sim_r4 import atomic_json, durable_view
@@ -87,8 +89,9 @@ BAR_GRACE_MS = 3_000
 BAR_WAIT_MS = 90_000
 SETTLE_TRIES = 30
 FLATTEN_ROUNDS = 5
-READ_TRIES = 4            # about 14 s of backoff before an ordinary read stops the run
-FLATTEN_READ_TRIES = 12   # about two minutes while flattening
+READ_RETRY_MS = 600_000    # ten minutes of backoff before an ordinary read stops the run
+FLATTEN_READ_MS = 120_000  # about two minutes while flattening
+HEARTBEAT_S = 60
 INTRABAR_CHECK_MS = 60_000
 AUTHORIZED_INSTRUMENTS = frozenset({"BTC-USDT-SWAP"})  # M1 agent decision: one contract only
 RESUME_CANDLES = 299      # one OKX market/candles page: the longest gap a resume bridges
@@ -259,16 +262,47 @@ class AccountGuard:
                                           updated_at=_now_text()))
 
 
+def last_disaster_stop(manifest):
+    """The disaster-stop ratio recorded last in a run's manifest, or None when unreadable."""
+    if type(manifest) is not dict:
+        return None
+    resumes = manifest.get("resumes")
+    if resumes is not None:
+        if type(resumes) is not list:
+            return None
+        raw = resumes[-1].get("disaster_stop") if resumes and type(resumes[-1]) is dict else (
+            manifest.get("disaster_stop") if resumes == [] else None)
+    else:
+        raw = manifest.get("disaster_stop")
+    if type(raw) is not str:
+        return None
+    try:
+        value = D(raw)
+    except ArithmeticError:
+        return None
+    if not value.is_finite() or not 0 <= value < D("0.5"):
+        return None
+    return value
+
+
 class DemoBot:
     def __init__(self, *, client: DemoClient, record: dict, output_dir: Path, limits: risk.Limits | None = None,
                  stop: asyncio.Event | None = None, echo=print, wall_ms=_wall_ms, sleep=asyncio.sleep,
-                 kill_path=None, accounts_dir=None, disaster_stop=D("0"), new_run=False):
+                 kill_path=None, accounts_dir=None, disaster_stop=None, new_run=False):
         self.client = client
         # P6 (2026-11-17): exchange-side disaster stop as a fraction of the average entry price; 0 = off.
-        if type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5"):
+        # None = not given on the command line (0 on a new run; inherited from the manifest on a resume).
+        if disaster_stop is not None and (
+                type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5")):
             raise BotStopped("disaster_stop_out_of_range")
-        self.disaster_stop = disaster_stop
+        self._explicit_disaster_stop = disaster_stop
+        self.disaster_stop = D("0") if disaster_stop is None else disaster_stop
+        self.disaster_stop_source = "default" if disaster_stop is None else "explicit"
+        self._previous_disaster_stop = None
         self.protection_configured = False
+        self.heartbeat_s = HEARTBEAT_S
+        self._last_heartbeat_ms = None
+        self._in_main_loop = False
         self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
         self.record = record
         self.profile = record["profile"]
@@ -314,20 +348,41 @@ class DemoBot:
                     pending=len(pending), others=others, mark=mark, avg_px=rows[0]["avg_px"] if rows else None,
                     algos=[row for row in algos if row["inst_id"] == self.inst_id])
 
-    async def _call(self, fn, *args, tries=READ_TRIES):
-        """An OKX read, retried with backoff; still failing, the run stops with the reason."""
+    async def _sleep_interruptibly(self, seconds, *, flattening=False):
+        end_ms = self.wall_ms() + int(seconds * 1000)
+        while self.wall_ms() < end_ms:
+            self._maybe_heartbeat()
+            if not flattening:
+                if self.stop is not None and self.stop.is_set():
+                    raise BotStopped("operator_stop")
+                if self.output_dir.exists() and (self.output_dir / "stop.request").exists():
+                    raise BotStopped("operator_stop_file")
+                if self._in_main_loop:
+                    await self._kill_check()
+            await self.sleep(min(1.0, max(0.05, (end_ms - self.wall_ms()) / 1000)))
+
+    async def _call(self, fn, *args, budget_ms=READ_RETRY_MS, flattening=False):
+        """An OKX read, retried with backoff up to ``budget_ms``; still failing, the run stops with the reason."""
+        deadline = None
         delay = 2
-        for attempt in range(tries):
+        attempt = 0
+        while True:
             try:
                 return await asyncio.to_thread(fn, *args)
             except DemoError as exc:
                 code = getattr(exc, "code", None) or type(exc).__name__
-                if attempt == tries - 1:
+                now = self.wall_ms()
+                if deadline is None:
+                    deadline = now + budget_ms
+                if now >= deadline:
                     raise BotStopped(f"okx_read_failed:{code}") from None
+                attempt += 1
+                wait_s = min(delay, max(1, (deadline - now + 999) // 1000))
                 if self.log is not None:
-                    self.log.event("read_retry", f"讀 OKX 失敗（{code}），{delay} 秒後重試", attempt=attempt + 1, code=code)
-                await self.sleep(delay)
-                delay = min(delay * 2, 15)
+                    self.log.event("read_retry", f"讀 OKX 失敗（{code}），{wait_s} 秒後重試",
+                                   attempt=attempt, code=code)
+                await self._sleep_interruptibly(wait_s, flattening=flattening)
+                delay = min(delay * 2, 30)
 
     async def _owned_position(self):
         row = await self.supervisor._io(lambda: self.supervisor._journal.connection.execute(
@@ -394,9 +449,22 @@ class DemoBot:
         except SupervisorUnavailable as exc:
             raise BotStopped(f"protection_config_failed:{exc}") from None
         self.protection_configured = True
-        if self.disaster_stop:
-            self.log.event("protection_config", f"保底停損：價格從進場均價反向 {self.disaster_stop * 100:g}% 時，"
-                           "由 OKX 以市價整倉平倉（標記價格觸發）", ratio=str(self.disaster_stop))
+        prev = self._previous_disaster_stop
+        if self.resumed is not None and prev is not None and prev != self.disaster_stop:
+            note = ("未啟用保底停損（已由這次啟動指令撤銷）" if not self.disaster_stop
+                    else f"價格從進場均價反向 {self.disaster_stop * 100:g}% 時，由 OKX 以市價整倉平倉（標記價格觸發）")
+            self.log.event("protection_config_changed",
+                           f"保底停損比例變更：{prev * 100:g}% -> {self.disaster_stop * 100:g}%；{note}",
+                           previous=str(prev), ratio=str(self.disaster_stop), source=self.disaster_stop_source)
+        elif self.disaster_stop:
+            prefix = "保底停損（沿用上一次 run 的設定）：" if self.disaster_stop_source == "inherited" else "保底停損："
+            self.log.event("protection_config", f"{prefix}價格從進場均價反向 {self.disaster_stop * 100:g}% 時，"
+                           "由 OKX 以市價整倉平倉（標記價格觸發）",
+                           ratio=str(self.disaster_stop), source=self.disaster_stop_source)
+        else:
+            suffix = "（沿用上一次 run 的設定）" if self.disaster_stop_source == "inherited" else ""
+            self.log.event("protection_config", f"注意：未啟用保底停損{suffix}（電腦當機或斷線時 OKX 端沒有條件停損單）",
+                           ratio="0", source=self.disaster_stop_source)
 
     ALERTS = {
         "protection_unconfirmed": "保底停損單還沒確認（OKX 沒回應或還查不到）：確認前不加倉，Bot 會繼續查",
@@ -601,7 +669,7 @@ class DemoBot:
 
     async def _flatten_rounds(self):
         for attempt in range(FLATTEN_ROUNDS):
-            facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
+            facts = await self._call(self._account, budget_ms=FLATTEN_READ_MS, flattening=True)
             if facts["position"] == 0 and not await self.supervisor._io(self.supervisor._journal.execution.unresolved):
                 await self._reconcile(facts, f"flat-{attempt}", flattening=True)
                 self.log.event("flatten_done", "清倉完成：模擬盤部位 0")
@@ -615,7 +683,7 @@ class DemoBot:
                 row = await self._settle(row)
                 if D(row["filled"]) != 0:  # also partly filled; the next round closes the rest (acceptance O1)
                     await self._record_fill(row, "清倉" if row["state"] == "FILLED" else "清倉（部分成交）")
-        facts = await self._call(self._account, tries=FLATTEN_READ_TRIES)
+        facts = await self._call(self._account, budget_ms=FLATTEN_READ_MS, flattening=True)
         raise BotStopped(f"flatten_incomplete:okx_position={facts['position']}")
 
     async def _remove_stop_after_flat(self, facts):
@@ -669,6 +737,7 @@ class DemoBot:
         next_check = self.wall_ms() + INTRABAR_CHECK_MS
         while self.wall_ms() < close_ms + BAR_GRACE_MS:
             await self._stop_checks()
+            self._maybe_heartbeat()
             if self.wall_ms() >= next_check:
                 await self._intrabar_check()
                 next_check = self.wall_ms() + INTRABAR_CHECK_MS
@@ -676,6 +745,7 @@ class DemoBot:
         deadline = self.wall_ms() + BAR_WAIT_MS
         while True:
             await self._stop_checks()
+            self._maybe_heartbeat()
             bars = await self._call(self.client.closed_candles, self.inst_id, self.tf, 5)
             newer = [b for b in bars if b["open_time_ms"] >= open_ms]
             if newer and newer[0]["open_time_ms"] != open_ms:
@@ -825,6 +895,9 @@ class DemoBot:
         if (manifest.get("worker_config") != json.loads(json.dumps(self.worker.to_wire(), default=str))
                 or manifest.get("risk_limits") != json.loads(json.dumps(self.limits.to_wire(), default=str))):
             raise BotStopped("resume_config_changed")
+        previous_stop = last_disaster_stop(manifest)
+        if self._explicit_disaster_stop is None and previous_stop is None:
+            raise BotStopped("resume_disaster_stop_unreadable")
         try:
             connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
             try:
@@ -849,12 +922,28 @@ class DemoBot:
             raise BotStopped(f"resume_run_unreadable:{directory / 'fills.json'}") from None
         if type(fills) is not list:
             raise BotStopped(f"resume_run_unreadable:{directory / 'fills.json'}")
-        return dict(dir=directory, manifest=manifest, budget=budget, fills=fills)
+        return dict(dir=directory, manifest=manifest, budget=budget, fills=fills, previous_disaster_stop=previous_stop)
+
+    def _retire_previous_running_status(self):
+        """Holding the account lock proves no earlier run on this account is alive: fix a stale running status."""
+        pointer = (self.account_state or {}).get("run")
+        if pointer is None:
+            return
+        status_path = Path(pointer["dir"]) / "status.json"
+        try:
+            old = json.loads(status_path.read_text(encoding="utf-8"))
+            if type(old) is dict and old.get("state") in ("running", "starting"):
+                now = _now_text()
+                atomic_json(status_path, dict(old, state="stopped", stop_reason="process_lost",
+                                              finished_at=now, updated_at=now))
+        except (OSError, ValueError, TypeError):
+            pass
 
     def _open_run(self, facts, contract):
         """Run folder, log, manifest and Supervisor (not started yet)."""
         if self.resumed is not None:
             return self._reopen_run(facts)
+        self._retire_previous_running_status()
         profile = self.profile
         self.log = _Log(self.output_dir, self.echo)
         account_id = "okxdemo-" + uuid.uuid4().hex[:24]
@@ -871,6 +960,7 @@ class DemoBot:
                         notice=("帳本沿用 local-sim 的結構與標籤（不改資料庫結構）；實際交易所是 OKX 模擬盤。"
                                 "外部資金流在模擬盤階段不分類（2026-11-16 使用者決定）。"))
         atomic_json(self.output_dir / "manifest.json", manifest)
+        self._write_heartbeat()
         # The account remembers its last run, so a restart with a position can resume it.
         self.account_state = dict(self.account_state, run=dict(dir=str(self.output_dir.resolve()),
                                                                account_id=account_id))
@@ -888,11 +978,19 @@ class DemoBot:
         if stop_file.exists():  # the request that stopped the old run is used up, not obeyed again
             stop_file.replace(self.output_dir / f"stop.request.used-{_wall_ms()}")
         self.log = _Log(self.output_dir, self.echo)
+        self._previous_disaster_stop = resumed["previous_disaster_stop"]
+        if self._explicit_disaster_stop is None:
+            self.disaster_stop = self._previous_disaster_stop
+            self.disaster_stop_source = "inherited"
+        else:
+            self.disaster_stop = self._explicit_disaster_stop
+            self.disaster_stop_source = "explicit"
         manifest = resumed["manifest"]
         manifest = dict(manifest, resumes=[*manifest.get("resumes", []), dict(
             at=_now_text(), equity=str(facts["equity"]), okx_position=str(facts["position"]),
-            disaster_stop=str(self.disaster_stop))])
+            disaster_stop=str(self.disaster_stop), disaster_stop_source=self.disaster_stop_source)])
         atomic_json(self.output_dir / "manifest.json", manifest)
+        self._write_heartbeat()
         self.fills = list(resumed["fills"])
         self.status.update(fills=len(self.fills), resumed=True)
         exchange = self.exchange = OkxDemoExchange(self.client, manifest["account_id"], self.inst_id)
@@ -907,6 +1005,7 @@ class DemoBot:
             seq, last_open = await self._warm_up(facts)
         else:
             seq, last_open = await self._resume()
+        self._in_main_loop = True
         while True:
             bars = await self._wait_for_bar(last_open + self.tf)
             for row in bars:
@@ -915,6 +1014,7 @@ class DemoBot:
                 last_open = row["open_time_ms"]
                 self.status.update(bars=seq, last_bar_open_ms=last_open)
                 self._write_status()
+                self._write_heartbeat()
 
     async def _warm_up(self, facts):
         profile = self.profile
@@ -935,6 +1035,7 @@ class DemoBot:
         last_open = history[-1]["open_time_ms"]
         self.status.update(state="running", bars=seq, last_bar_open_ms=last_open)
         self._write_status()
+        self._write_heartbeat()
         self.log.event("started", f"Bot 啟動：{profile['strategy_id']} {profile['parameters']}，"
                        f"{self.inst_id} {self.tf // 60000} 分鐘，{profile['quantity']} 張；"
                        f"預熱 {seq} 根完成，權益 {facts['equity']} USDT", manifest=self.manifest)
@@ -1034,6 +1135,7 @@ class DemoBot:
             last_open = missed[-1]["open_time_ms"]
         self.status.update(state="running", bars=seq, last_bar_open_ms=last_open)
         self._write_status()
+        self._write_heartbeat()
         self.log.event("started", f"Bot 接續：補上停下期間的 {len(missed)} 根 K 線；"
                        f"部位 {self.status['position']}，權益 {facts['equity']} USDT", resumed=True,
                        missed=len(missed), manifest=self.manifest)
@@ -1108,8 +1210,26 @@ class DemoBot:
         return dict(why, mode=state.mode, health=state.health, supervisor_health=self.supervisor.health,
                     basis_day=state.basis and state.basis.day, today=risk.taipei_day(now_ms))
 
+    def _write_heartbeat(self):
+        if not self.output_dir.exists():
+            return
+        self._last_heartbeat_ms = self.wall_ms()
+        try:
+            atomic_json(self.output_dir / HEARTBEAT_FILE, dict(time=_now_text(), pid=os.getpid()))
+        except OSError:
+            pass
+
+    def _maybe_heartbeat(self):
+        if self._last_heartbeat_ms is None or self.wall_ms() - self._last_heartbeat_ms >= self.heartbeat_s * 1000:
+            self._write_heartbeat()
+
     def _write_status(self):
-        atomic_json(self.output_dir / "status.json", dict(self.status, updated_at=_now_text()))
+        try:
+            atomic_json(self.output_dir / "status.json", dict(self.status, updated_at=_now_text()))
+        except OSError as exc:
+            if self.log is not None:
+                self.log.event("status_write_failed", f"寫入 status.json 失敗（{exc}），交易迴圈繼續執行",
+                               error=f"{type(exc).__name__}: {str(exc)[:200]}")
 
     async def _close(self):
         try:
@@ -1125,7 +1245,12 @@ class DemoBot:
             self.status["finished_at"] = _now_text()
             if self.output_dir.exists():
                 self._write_status()
-                atomic_json(self.output_dir / "fills.json", self.fills)
+                self._write_heartbeat()
+                try:
+                    atomic_json(self.output_dir / "fills.json", self.fills)
+                except OSError as exc:
+                    if self.log is not None:
+                        self.log.event("fills_write_failed", None, error=f"{type(exc).__name__}: {str(exc)[:200]}")
         finally:
             if self.guard is not None:
                 self.guard.release()
@@ -1155,6 +1280,8 @@ START_HINTS = {
     "resume_unresolved_orders": "上一次 run 留下結果不明的委託，查了幾次還是查不到，不能接續。請到 OKX 網頁確認部位與委託，平倉後再啟動；"
                                 "OKX 已經空倉時，啟動指令加 --new-run 開新的 run（舊 run 的帳本保留、不結清）。",
     "resume_gap_too_long": "停下太久（超過 299 根 K 線，15 分鐘線約 3 天），補不回中間的 K 線，不能接續。先到 OKX 網頁平倉再啟動。",
+    "resume_disaster_stop_unreadable": "要接續上一次的 run，但讀不到它記錄的保底停損比例。請在啟動指令明確加上 --disaster-stop（例如 10%，或明寫 0% 不掛）。",
+    "process_lost": "這個 run 沒有正常結束（例如電腦重開機或程序被強制終止）；之後啟動新的 run 時已標記為停止。",
     "disaster_stop_triggered": "OKX 的保底停損已觸發並平倉（模擬盤）。Bot 已停下；到 OKX 網頁確認部位是 0、沒有剩下的條件單之後，用同一個指令重開會從空倉開始。",
     "disaster_stop_incomplete": "OKX 的保底停損觸發了，但 OKX 上還有部位（停損單沒有完全成交）。帳本已經對不上，Bot 不能替你處理：請到 OKX 網頁手動平倉，再用同一個指令重開。",
     "foreign_algo_orders_on_contract": "模擬盤上 BTC-USDT-SWAP 有不是 Bot 掛的條件單（停損、止盈、計畫或追蹤委託），先到 OKX 網頁撤掉再啟動。",
@@ -1187,17 +1314,21 @@ def _hint(reason):
     return next((text for prefix, text in START_HINTS.items() if str(reason).startswith(prefix)), None)
 
 
-def cli_main(argv):
+def _parser():
     parser = argparse.ArgumentParser(prog="catos.cli demo bot", description="核准過的策略在 OKX 模擬盤上跑（前景執行，Ctrl+C 停止）")
     parser.add_argument("--profile", required=True, help="部署設定 JSON（要先由使用者核准）")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT))
-    parser.add_argument("--disaster-stop", type=_percent, default=Decimal("0"), metavar="10%",
+    parser.add_argument("--disaster-stop", type=_percent, default=None, metavar="10%",
                         help="保底停損：價格從進場均價反向這麼多時，由 OKX 以市價整倉平倉（電腦當機、斷線時的最後保險）。"
-                             "預設 0（不掛）")
+                             "新 run 預設 0%%（不掛，會明示提醒）；接續時不寫會沿用上一次的比例，要撤掉請明寫 0%%")
     parser.add_argument("--new-run", action="store_true",
                         help="OKX 空倉時一定開新的 run，不接續上一次有委託沒結清的 run（舊帳本保留、不結清）。"
                              "新 run 只沿用帳戶紀錄裡的 Soft 鎖住，不讀舊帳本")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def cli_main(argv):
+    args = _parser().parse_args(argv)
     try:
         profile = strategy_approvals.load_profile(args.profile)
         record = find_demo_approval(profile)

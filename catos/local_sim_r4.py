@@ -40,13 +40,23 @@ def wall_text():
     return datetime.now(TAIPEI).isoformat()
 
 
+REPLACE_TRIES = 8
+
+
 def atomic_json(path, value):
     pending = path.with_suffix(".pending")
     with pending.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(json_text(value) + "\n")
         handle.flush()
         os.fsync(handle.fileno())
-    pending.replace(path)
+    for attempt in range(REPLACE_TRIES):
+        try:
+            pending.replace(path)
+            return
+        except PermissionError:
+            if attempt == REPLACE_TRIES - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 class Evidence:
