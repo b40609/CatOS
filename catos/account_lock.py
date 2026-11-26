@@ -8,7 +8,8 @@ import sys
 from catos import ipc
 from catos.ipc import token
 
-LOCK_DIRECTORY = None  # Resolved lazily; tests replace only this internal constant.
+LOCK_DIRECTORY = None  # Resolved lazily; tests replace this constant or set CATOS_LOCK_DIRECTORY.
+ENV_LOCK_DIRECTORY = "CATOS_LOCK_DIRECTORY"
 ENVIRONMENT = "local-sim"
 
 
@@ -26,7 +27,10 @@ class AccountLock:
         if environment != ENVIRONMENT:
             raise ValueError("only local-sim is supported")
         digest = hashlib.sha256(f"{environment}:{account_id}".encode("ascii")).hexdigest()
-        directory = LOCK_DIRECTORY if LOCK_DIRECTORY is not None else Path.home() / ".catos" / "local-simulation-locks"
+        env_dir = os.environ.get(ENV_LOCK_DIRECTORY)
+        directory = (LOCK_DIRECTORY if LOCK_DIRECTORY is not None
+                     else Path(env_dir) if env_dir
+                     else Path.home() / ".catos" / "local-simulation-locks")
         self.path = directory / f"{digest}.lock"
         self._file = None
 

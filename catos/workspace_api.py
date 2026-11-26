@@ -43,7 +43,7 @@ npm run build</pre>
 
 def workspace_build():
     digest = hashlib.sha256()
-    for path in (Path(__file__), ROOT / "catos" / "workspace_snapshot.py", ROOT / "catos" / "demo_bot_view.py"):
+    for path in sorted((ROOT / "catos").glob("*.py")):
         digest.update(path.name.encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()
