@@ -7,6 +7,7 @@ import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { researchApi, type ResearchVersion } from "@/adapters/research-api-adapter";
 import { useCatStore } from "@/state/catStore";
 import { formatDecimal, formatRatioPct } from "@/lib/format";
+import { backendSyncText } from "@/lib/status-truth";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -45,12 +46,16 @@ function SettingsPage() {
         if (wsRes.ok) {
           const wsData = await wsRes.json();
           setWorkspaceVer(wsData);
+        } else {
+          setWorkspaceVer(null);
         }
       } catch {
-        // Workspace check optional
+        setWorkspaceVer(null);
       }
     } catch {
       setOnline(false);
+      setResearchVer(null);
+      setWorkspaceVer(null);
     } finally {
       setChecking(false);
     }
@@ -108,25 +113,25 @@ function SettingsPage() {
             <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">
               <span className="text-t2 text-muted-foreground block">研究核心模式</span>
               <span className="text-xs font-bold text-foreground block">
-                {researchVer?.mode || "local_research_synthetic"}
+                {online && researchVer ? researchVer.mode : "未連線（不適用）"}
               </span>
               <span className="text-t1 text-muted-foreground">單合約 · Decimal 核心</span>
             </div>
 
             <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">
               <span className="text-t2 text-muted-foreground block">目前執行 Build ID</span>
-              <span className="text-xs font-bold text-primary block truncate" title={researchVer?.build_id}>
-                {researchVer?.build_id ? `${researchVer.build_id.slice(0, 16)}...` : "--"}
+              <span className="text-xs font-bold text-primary block truncate" title={online ? researchVer?.build_id : undefined}>
+                {online && researchVer?.build_id ? `${researchVer.build_id.slice(0, 16)}...` : "不適用"}
               </span>
-              <span className="text-t1 text-muted-foreground">
-                {researchVer?.restart_required ? "源碼已異動 (需重啟)" : "最新版本同步中"}
+              <span className={researchVer?.restart_required || workspaceVer?.restart_required ? "text-t1 text-amber-400 font-semibold" : "text-t1 text-muted-foreground"}>
+                {backendSyncText(online, researchVer, workspaceVer)}
               </span>
             </div>
 
             <div className="rounded-lg border border-border/60 bg-background/40 p-2.5 space-y-1">
               <span className="text-t2 text-muted-foreground block">工作區契約合約</span>
               <span className="text-xs font-bold text-foreground block">
-                {workspaceVer?.contract || "catos.workspace.v1"}
+                {online && workspaceVer ? workspaceVer.contract : "未連線（不適用）"}
               </span>
               <span className="text-t1 text-muted-foreground">Localhost Only</span>
             </div>
@@ -141,9 +146,9 @@ function SettingsPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-border/60 bg-background/40 p-3.5 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">OKX 官方專用合作通道</span>
-                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-t2 font-mono text-emerald-400">
-                  ● 靜默注入啟用中
+                <span className="text-xs font-semibold text-foreground">OKX 委託標籤注入契約</span>
+                <span className="rounded bg-secondary border border-border px-2 py-0.5 text-t2 font-mono text-muted-foreground">
+                  Supervisor 固定注入（契約）
                 </span>
               </div>
               <p className="font-mono text-xs font-semibold text-muted-foreground tracking-wider">

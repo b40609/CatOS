@@ -4,7 +4,6 @@ import { Activity, Bot, Radio, LayoutDashboard, ScrollText, ShieldCheck, FlaskCo
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
-import { PulseBeacon } from "@/components/catos/pulse-beacon";
 import { ModeSelector } from "@/components/catos/mode-selector";
 import { CardManagerDropdown } from "@/components/catos/card-manager-dropdown";
 import { CommandPalette } from "@/components/catos/command-palette";
@@ -18,7 +17,6 @@ interface NavigationItem {
   name: string;
   sub: string;
   icon: LucideIcon;
-  hasPulse?: boolean;
 }
 
 interface NavigationGroup {
@@ -58,7 +56,7 @@ const GROUPS: NavigationGroup[] = [
     titleEn: "EXECUTION & RISK",
     titleMono: "EXECUTION",
     items: [
-      { to: "/bots", name: "實例監控", sub: "FLEET MONITOR", icon: Bot, hasPulse: true },
+      { to: "/bots", name: "實例監控", sub: "FLEET MONITOR", icon: Bot },
       { to: "/demo-bot", name: "模擬盤 Bot", sub: "OKX DEMO", icon: Radio },
       { to: "/risk", name: "風控中心", sub: "RISK CONTROL", icon: ShieldCheck },
     ],
@@ -252,7 +250,7 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
                 </p>
               )}
               <div className="space-y-0.5">
-                {group.items.map(({ to, name, sub, icon: Icon, hasPulse }) => (
+                {group.items.map(({ to, name, sub, icon: Icon }) => (
                   <Link
                     key={to}
                     to={to}
@@ -269,13 +267,6 @@ export function AppShell({ children, dashboardTools }: { children: ReactNode; da
                   >
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
                       <Icon className="size-4 shrink-0 transition-transform group-hover:scale-110" strokeWidth={1.8} />
-                      {hasPulse && (
-                        <PulseBeacon
-                          size={5}
-                          className="absolute -top-[1.5px] -right-[1.5px]"
-                          title="狀態正常運行中"
-                        />
-                      )}
                     </span>
                     {!collapsed && (
                       <div className="flex flex-col min-w-0 flex-1 leading-tight">

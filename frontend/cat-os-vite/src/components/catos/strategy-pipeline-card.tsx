@@ -4,6 +4,7 @@ import { CardHeaderTitle } from "./card-header-title";
 import { CardHeaderTabs } from "./card-header-tabs";
 import { useCatStore } from "@/state/catStore";
 import { useOverviewSignals } from "@/lib/overview-signals";
+import { isOperatorStop } from "@/lib/status-truth";
 import { useRouter } from "@/lib/router";
 import { cn } from "@/lib/utils";
 import { formatTimeframe } from "@/lib/format";
@@ -132,18 +133,21 @@ export function StrategyPipelineCard({ className }: { className?: string }) {
         const isStale = demo.state === "running" && demo.stale;
         const isFailed = demo.state === "failed";
         const isRunning = demo.state === "running" && !demo.stale;
+        const isAbnormalStop = demo.state === "stopped" && !isOperatorStop(demo.stop_reason);
         result.push({
           id: item.id,
           name: item.name,
           meta: `${sym} · ${tf} · OKX Demo`,
           stage: 3,
-          stageLabel: isStale ? "無回應" : isFailed ? "錯誤停止" : isRunning ? "模擬盤" : "已停止",
-          progress: isStale ? "無回應" : `${demo.bars} bars`,
-          detail: `OKX 模擬盤 · ${demo.bars} 根 K 線 · ${demo.fills} 筆成交`,
-          color: isFailed ? "#f43f5e" : isStale ? "#f59e0b" : "#e8b45e",
-          tone: isFailed ? "fail" : isStale ? "warn" : "ok",
+          stageLabel: isStale ? "無回應" : isFailed ? "錯誤停止" : isRunning ? "模擬盤" : isAbnormalStop ? "異常停止" : "已停止",
+          progress: isStale ? "無回應" : isAbnormalStop ? (demo.stop_reason?.split(":")[0] ?? "異常停止") : `${demo.bars} bars`,
+          detail: isAbnormalStop
+            ? `OKX 模擬盤異常停止（${demo.stop_reason ?? "未知"}）· ${demo.bars} 根 K 線`
+            : `OKX 模擬盤 · ${demo.bars} 根 K 線 · ${demo.fills} 筆成交`,
+          color: isFailed ? "#f43f5e" : isStale || isAbnormalStop ? "#f59e0b" : isRunning ? "#e8b45e" : "#a1a1aa",
+          tone: isFailed ? "fail" : isStale || isAbnormalStop ? "warn" : isRunning ? "ok" : "muted",
           route: "/demo-bot",
-          active: true,
+          active: isRunning || isStale || isFailed || isAbnormalStop,
         });
       } else if (activeApproval) {
         const changed = activeApproval.source === "changed";

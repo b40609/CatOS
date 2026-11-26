@@ -17,6 +17,9 @@ export interface OverviewSignals {
   catalog: ResearchCatalog | null;
   replay: ReplayOverviewDTO | null;
   demoBot: DemoBotOverviewDTO | null;
+  catalogError: string | null;
+  replayError: string | null;
+  demoBotError: string | null;
 }
 
 const EMPTY_SIGNALS: OverviewSignals = {
@@ -25,6 +28,9 @@ const EMPTY_SIGNALS: OverviewSignals = {
   catalog: null,
   replay: null,
   demoBot: null,
+  catalogError: null,
+  replayError: null,
+  demoBotError: null,
 };
 
 const POLL_MS = 30_000;
@@ -39,25 +45,25 @@ function publish(next: OverviewSignals) {
   for (const fn of listeners) fn(next);
 }
 
-async function fetchCatalogSafe(signal?: AbortSignal): Promise<ResearchCatalog | null> {
+async function fetchCatalogSafe(signal?: AbortSignal): Promise<{ data: ResearchCatalog | null; error: string | null }> {
   try {
     const res = await fetch('/api/research/catalog', { headers: { Accept: 'application/json' }, signal });
-    if (!res.ok) return null;
-    return (await res.json()) as ResearchCatalog;
+    if (!res.ok) return { data: null, error: `http_${res.status}` };
+    return { data: (await res.json()) as ResearchCatalog, error: null };
   } catch {
-    return null;
+    return { data: null, error: 'network_error' };
   }
 }
 
 async function refreshSignals(): Promise<OverviewSignals> {
   if (isPreviewPickMode()) {
-    const next: OverviewSignals = { previewPick: true, loaded: true, catalog: null, replay: null, demoBot: null };
+    const next: OverviewSignals = { ...EMPTY_SIGNALS, previewPick: true, loaded: true };
     publish(next);
     return next;
   }
   if (inflight) return inflight;
   inflight = (async () => {
-    const [catalog, replayRes, demoRes] = await Promise.all([
+    const [catalogRes, replayRes, demoRes] = await Promise.all([
       fetchCatalogSafe(),
       fetchReplayOverview(),
       fetchDemoBotOverview(),
@@ -65,9 +71,12 @@ async function refreshSignals(): Promise<OverviewSignals> {
     const next: OverviewSignals = {
       previewPick: false,
       loaded: true,
-      catalog,
+      catalog: catalogRes.data,
       replay: replayRes.ok ? replayRes.data : null,
       demoBot: demoRes.ok ? demoRes.data : null,
+      catalogError: catalogRes.error,
+      replayError: replayRes.ok || replayRes.error === 'aborted' ? null : replayRes.error,
+      demoBotError: demoRes.ok || demoRes.error === 'aborted' ? null : demoRes.error,
     };
     publish(next);
     return next;
@@ -100,7 +109,7 @@ export function useOverviewSignals(): OverviewSignals {
 
   useEffect(() => {
     if (isPreviewPickMode()) {
-      setState({ previewPick: true, loaded: true, catalog: null, replay: null, demoBot: null });
+      setState({ ...EMPTY_SIGNALS, previewPick: true, loaded: true });
       return;
     }
     listeners.add(setState);

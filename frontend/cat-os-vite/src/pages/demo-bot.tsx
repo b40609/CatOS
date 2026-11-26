@@ -4,6 +4,7 @@ import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { fetchDemoBotOverview, fetchDemoBotRun } from "@/adapters/demo-bot-api-adapter";
 import type { DemoBotEventDTO, DemoBotOverviewDTO, DemoBotRunDetailDTO, DemoBotRunSummaryDTO } from "@/contracts/demo-bot";
 import { formatDateTime, formatDecimal, formatRatioPct, formatTimeframe, shortId } from "@/lib/format";
+import { isOperatorStop } from "@/lib/status-truth";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/demo-bot")({
@@ -19,6 +20,7 @@ function health(run: DemoBotRunSummaryDTO): Health {
   if (run.state === "running" && run.stale) return { label: "無回應", tone: "text-down" };
   if (run.state === "running") return { label: "運行中", tone: "text-up" };
   if (run.state === "failed") return { label: "錯誤停止", tone: "text-down" };
+  if (run.state === "stopped" && !isOperatorStop(run.stop_reason)) return { label: "異常停止", tone: "text-warn" };
   if (run.state === "stopped") return { label: "已停止", tone: "text-muted-foreground" };
   return { label: run.state, tone: "text-muted-foreground" };
 }

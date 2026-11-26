@@ -12,6 +12,7 @@ import {
   toneOf,
   shortId,
 } from "@/lib/format";
+import { deriveCushionStatus } from "@/lib/status-truth";
 
 interface AccountEquityBandProps {
   className?: string;
@@ -250,36 +251,14 @@ export function AccountEquityBand({ className, showHeader = true }: AccountEquit
     const zeroPos = 50;
     const pinPos = currentPct !== null ? toPos(currentPct) : null;
 
-    let statusText = "不適用";
-    let statusTone = "text-muted-foreground";
-    let pinTone = "bg-emerald-400";
-    let fillTone = "bg-emerald-400/35";
-
-    if (currentPct !== null && softPct !== null) {
-      const distToSoft = currentPct + softPct;
-      if (hardPct !== null && currentPct <= -hardPct) {
-        statusText = "已達 Hard";
-        statusTone = "text-rose-400";
-        pinTone = "bg-rose-400";
-        fillTone = "bg-rose-500/45";
-      } else if (distToSoft <= 0) {
-        statusText = "已達 Soft";
-        statusTone = "text-rose-400";
-        pinTone = "bg-rose-400";
-        fillTone = "bg-rose-500/40";
-      } else {
-        statusText = `距 Soft ${distToSoft.toFixed(2)}%`;
-        if (currentPct < 0) {
-          statusTone = distToSoft <= softPct * 0.4 ? "text-rose-400" : "text-amber-400";
-          pinTone = distToSoft <= softPct * 0.4 ? "bg-rose-400" : "bg-amber-400";
-          fillTone = "bg-amber-400/35";
-        } else {
-          statusTone = "text-emerald-400";
-          pinTone = "bg-emerald-400";
-          fillTone = "bg-emerald-400/35";
-        }
-      }
-    }
+    const { statusText, statusTone, pinTone, fillTone } = deriveCushionStatus({
+      currentPct,
+      softPct,
+      hardPct,
+      riskStatus: risk?.derived.status ?? null,
+      riskMode: risk?.mode ?? null,
+      killEngaged: Boolean(killSwitch?.engaged),
+    });
 
     const hardLabel = hardPct !== null ? formatLimitPctLabel(hardPct) : null;
     const softLabel = softPct !== null ? formatLimitPctLabel(softPct) : null;

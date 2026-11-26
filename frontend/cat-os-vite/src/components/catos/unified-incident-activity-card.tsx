@@ -3,6 +3,7 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { useCatStore } from '@/state/catStore';
 import type { EventDTO } from '@/contracts';
 import { useOverviewSignals } from '@/lib/overview-signals';
+import { buildDemoBotActionItems } from '@/lib/status-truth';
 import { useRouter } from '@/lib/router';
 import { CardHeaderTitle } from './card-header-title';
 import { CardHeaderTabs } from './card-header-tabs';
@@ -284,10 +285,6 @@ function clockFromIso(value: string | null | undefined): string | null {
   return Number.isFinite(ms) ? formatClock(ms) : null;
 }
 
-function clockFromMs(ms: number | null | undefined): string | null {
-  return ms === null || ms === undefined || !Number.isFinite(ms) ? null : formatClock(ms);
-}
-
 const PREVIEW_ACTIONS: ActionQueueItem[] = [
   {
     id: 'preview-p1-rsi',
@@ -541,64 +538,19 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
         fact: `原因：${reasons} · 需人工檢核並於 CLI 解除`,
         metrics: [
           { label: '風控原因', value: reasons, tone: 'down' },
-          { label: '解除方式', value: 'CLI demo rearm' },
+          { label: '解除方式', value: 'local-sim 重開新 run（模擬盤用 CLI demo rearm）' },
         ],
         primaryAction: { label: '前往風控', route: '/risk', tone: 'danger' },
       });
     }
 
-    const demoRuns = signals.demoBot?.runs ?? [];
-    const latestDemoByStrat = new Map<string, typeof demoRuns[number]>();
-    for (const run of demoRuns) {
-      const key = run.strategy_id ?? run.run_id;
-      const prev = latestDemoByStrat.get(key);
-      if (!prev || (run.created_at_ms ?? 0) > (prev.created_at_ms ?? 0)) {
-        latestDemoByStrat.set(key, run);
-      }
-    }
-    for (const run of latestDemoByStrat.values()) {
-      if (run.state === 'failed') {
-        list.push({
-          id: `p0-demo-failed-${run.run_id}`,
-          sev: 'p0',
-          code: 'FAIL',
-          tone: 'down',
-          alert: true,
-          time: clockFromMs(run.updated_at_ms),
-          tag: '執行失敗',
-          title: run.strategy_id ?? shortId(run.run_id),
-          symbol: 'OKX Demo',
-          brief: `run ${shortId(run.run_id)} · ${run.stop_reason ?? '執行錯誤'}`,
-          hero: { value: `${run.position ?? '0'} 張` },
-          fact: `run ${shortId(run.run_id)} · ${run.stop_reason ?? '執行錯誤'} · 部位 ${run.position ?? '0'} 張`,
-          metrics: [
-            { label: 'run', value: shortId(run.run_id) },
-            { label: '原因', value: run.stop_reason ?? '執行錯誤', tone: 'down' },
-            { label: '部位', value: `${run.position ?? '0'} 張` },
-          ],
-          primaryAction: { label: '檢視 Bot', route: '/demo-bot', tone: 'danger' },
-        });
-      } else if (run.state === 'running' && run.stale) {
-        list.push({
-          id: `p1-demo-stale-${run.run_id}`,
-          sev: 'p1',
-          code: 'STALE',
-          tone: 'warn',
-          alert: true,
-          time: clockFromMs(run.updated_at_ms),
-          tag: '無回應',
-          title: run.strategy_id ?? shortId(run.run_id),
-          symbol: 'OKX Demo',
-          brief: `run ${shortId(run.run_id)} 逾兩根 K 線未寫入`,
-          hero: { value: '無回應', tone: 'warn' },
-          fact: `run ${shortId(run.run_id)} 超過兩根 K 線未寫入紀錄 · 當前部位 ${run.position ?? '0'} 張`,
-          metrics: [
-            { label: 'run', value: shortId(run.run_id) },
-            { label: '狀態', value: '逾兩根 K 線未寫入', tone: 'warn' },
-            { label: '部位', value: `${run.position ?? '0'} 張` },
-          ],
-          primaryAction: { label: '檢視 Bot', route: '/demo-bot' },
-        });
+    if (signals.loaded) {
+      const demoItems = buildDemoBotActionItems({
+        runs: signals.demoBot?.runs ?? [],
+        demoBotError: signals.demoBotError,
+      });
+      for (const item of demoItems) {
+        list.push(item);
       }
     }
 

@@ -11,6 +11,9 @@ interface PulseBeaconProps {
   title?: string;
 }
 
+/**
+ * 靜態實心狀態指示點（全站一致不做無限循環呼吸或漣漪動畫，CAT-B-24）。
+ */
 export function PulseBeacon({
   size = 5,
   variant = "up",
@@ -27,39 +30,18 @@ export function PulseBeacon({
       ? "bg-down"
       : "bg-gold";
 
-  const colorPing =
-    variant === "up"
-      ? "bg-up/60"
-      : variant === "warn"
-      ? "bg-warn/60"
-      : variant === "down"
-      ? "bg-down/60"
-      : "bg-gold/60";
-
-  const breatheClass =
-    variant === "warn" || variant === "gold"
-      ? "status-breathe-warn"
-      : "status-breathe";
-
   return (
     <span
       style={{ width: `${size}px`, height: `${size}px` }}
-      className={cn("relative inline-flex shrink-0 items-center justify-center pointer-events-none", className)}
+      className={cn("relative inline-flex shrink-0 items-center justify-center", className)}
       title={title}
     >
-      {/* 外層緩慢擴散漣漪微波 */}
-      <span
-        style={{ width: `${size}px`, height: `${size}px` }}
-        className={cn("absolute inline-flex rounded-full animate-ping duration-1000", colorPing)}
-      />
-      {/* 內層核心微晶片點 + 自然呼吸光暈 */}
       <span
         style={{ width: `${size}px`, height: `${size}px` }}
         className={cn(
           "relative inline-flex rounded-full",
           colorBg,
-          ring && "ring-[1.5px] ring-sidebar",
-          breatheClass
+          ring && "ring-[1.5px] ring-sidebar"
         )}
       />
     </span>

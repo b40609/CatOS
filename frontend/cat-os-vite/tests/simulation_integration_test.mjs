@@ -34,6 +34,8 @@ const chrome = process.argv[3] ?? process.env.CATOS_CHROME ?? headlessShell()
 // Short default dir: Chrome cannot write a screenshot path over the 260-char Windows limit.
 const screens = process.env.CATOS_SCREENS ?? path.join(os.tmpdir(), 'catos-screens');
 const evidence = await fs.mkdtemp(path.join(os.tmpdir(), 'catos-sim-integration-'));
+const homeLocksDir = path.join(os.homedir(), '.catos', 'local-simulation-locks');
+const locksBefore = existsSync(homeLocksDir) ? new Set(readdirSync(homeLocksDir)) : new Set();
 const origin = 'http://127.0.0.1:18890';
 const passed = [];
 let backend, vite;
@@ -294,6 +296,37 @@ try {
       assert.ok(text.includes(pnl), `window ${window.number} net PnL ${pnl} missing`);
     }
     console.log(`screenshot ${shot}`);
+  });
+  await check('demo-bot and settings pages reflect real fixture state with no hardcoded lies or home-lock leaks', async () => {
+    const staleRunId = 'f'.repeat(32);
+    const runDir = path.join(evidence, 'demo-bot', staleRunId);
+    await fs.mkdir(runDir, { recursive: true });
+    const oldIso = new Date(Date.now() - 4 * 3600_000).toISOString();
+    await fs.writeFile(path.join(runDir, 'manifest.json'), JSON.stringify({
+      run_id: staleRunId, created_at: oldIso, mode: 'okx-demo-bot', approval_id: 'a'.repeat(32),
+      disaster_stop: '0.1', starting_equity: '5000', resumes: [],
+      profile: { strategy_id: 'donchian-breakout', version: 'donchian-parameters-v1',
+                 parameters: { entry_bars: 192, exit_bars: 48 }, timeframe_ms: 900_000,
+                 quantity: '1', inst_id: 'BTC-USDT-SWAP' },
+    }));
+    await fs.writeFile(path.join(runDir, 'status.json'), JSON.stringify({
+      state: 'running', bars: 192, fills: 0, position: '0', stop_reason: null, updated_at: oldIso,
+    }));
+    await fs.writeFile(path.join(runDir, 'events.jsonl'), '');
+
+    const demoPage = await page('/demo-bot', 'demo-bot');
+    for (const bad of FORBIDDEN) assert.ok(!demoPage.text.includes(bad), `demo-bot page contains "${bad}"`);
+    assert.ok(demoPage.text.includes('無回應'), 'demo-bot page did not flag stale running run as 無回應');
+    assert.ok(demoPage.text.includes('donchian-breakout'), 'demo-bot strategy id missing');
+
+    const settingsPage = await page('/settings', 'settings');
+    for (const bad of [...FORBIDDEN, '靜默注入啟用中']) assert.ok(!settingsPage.text.includes(bad), `settings page contains "${bad}"`);
+    assert.ok(settingsPage.text.includes('ONLINE (已連接)'), 'settings page did not show ONLINE');
+    assert.ok(settingsPage.text.includes('與磁碟源碼一致'), 'settings page did not show real sync state');
+
+    const locksAfter = existsSync(homeLocksDir) ? readdirSync(homeLocksDir) : [];
+    const leaked = locksAfter.filter(name => !locksBefore.has(name));
+    assert.deepEqual(leaked, [], `integration test leaked lock files into ~/.catos/local-simulation-locks: ${leaked.join(', ')}`);
   });
   await fs.writeFile(path.join(evidence, 'result.json'), JSON.stringify({ passed, backendLog, ports: [18870, 18890] }, null, 2));
   console.log(`Evidence: ${evidence}`);
