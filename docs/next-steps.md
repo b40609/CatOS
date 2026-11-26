@@ -1,6 +1,6 @@
 # 下一步
 
-更新：2026-11-25。2026-11-17 前的完整沿革（研究線、工作包 A～F、v1 驗收、repo 重建、兩台機器分工）在 `docs/archive/next-steps-20261117.md`，本頁只寫現況。
+更新：2026-11-27。2026-11-17 前的完整沿革（研究線、工作包 A～F、v1 驗收、repo 重建、兩台機器分工）在 `docs/archive/next-steps-20261117.md`，本頁只寫現況。
 
 ## 現況
 
@@ -16,9 +16,9 @@
 
 ## 正式 Bot（2026-11-17 起）
 
-- **2026-11-25 查到已停**：run `d7a712eb` 的 `status.json` 仍寫 running，但最後一根 K 線是 11-20 10:00 台北，之後沒有更新，也找不到 Bot 程序（電腦 11-20 14:22 重開過機）。帳本空倉、0 筆成交。重開要使用者同意（連 OKX 模擬盤），指令見本節最後一條。
+- **2026-11-27 04:22 台北已重開**：新 run `outputs/okx-demo-bot/16330199a3cc4766adaf18e39726a5f1`，沿用正式設定（15m、Donchian 192／48、1 張、`--disaster-stop 10%`），預熱 192 根完成、空倉運行中，每分鐘更新 `heartbeat.json`。重開前已以 `demo status` 唯讀確認模擬盤空倉、0 掛單、0 條件單。
+- **前一個 run `d7a712eb…` 停擺紀錄**：2026-11-19 14:46 台北啟動，於 **2026-11-20 10:14** 台北因手動重開機（系統事件 1074；同日 14:20、14:22 又重開兩次）中斷，最後一根 K 線為 11-20 10:00（第 269 根，帳本空倉、0 筆成交）；11-27 新 run 啟動時已自動將其 `status.json` 標記為 `stopped`（`process_lost`）。測試 run `5ff76d05`（11-19 換回正式設定前以固定 tag 只減倉市價單平倉）帳本少記最後一筆平倉，不會再接續。
 - 使用者本人核准：`approval_id=10d7846fe1adfef05a5e25825c7d884d`（15m、Donchian 192／48、1 張、本金 5000）。
-- 現在的 run：`outputs/okx-demo-bot/d7a712eb…`，2026-11-19 14:46 台北由代理照 Ryan「全照建議」換回正式設定（15m、Donchian 192／48、`--disaster-stop 10%`），空倉、預熱完成。換之前測試 Bot 一直在反手、等不到空倉，Ryan 同意後先停測試 Bot（持多 1 張），再用一張只減倉市價單（固定 tag）平掉，OKX 平倉後自動撤掉停損，確認部位 0、無條件單、無掛單才重開。測試 run `5ff76d05` 的帳本少記這最後一筆平倉（不會再接續）。
 - 第一筆成交是 P6 條件單在模擬盤的第一次實測：看 `events.jsonl` 的 `protection`／`protection_alert` 事件，並在 OKX 網頁核對條件單（觸發價、方向、整倉）。
 - P6 模擬盤實測（2026-11-18 13:33，`python -m catos.cli demo protection-check`，紀錄 `reports/okx-demo-protection-check/1794979993705.json`）：等 Donchian 成交太慢，改成一次性實測。Bot 以 stop.request 停下（空倉），用 Bot 同一個轉接層開最小張數 0.01 張，均價 64820。結果：
   - 掛單：`order-algo` 回的欄位和程式照 SDK 寫的一致（`state`、`side`、`slTriggerPx`、`slTriggerPxType=mark`、`slOrdPx=-1`、`closeFraction=1`、`reduceOnly="true"`、`sz` 空字串、`tag` 保留），轉接層判定 LIVE、價格 58338 相符。
@@ -26,17 +26,17 @@
   - 平倉後 OKX 自動撤掉整倉停損（第一次查就是 canceled）；`order-algo` 仍回這張單（code 0，不是 51603），`orders-algo-history` 的 canceled 也有；轉接層判定 CANCELED。結束時空倉、沒有條件單。
   - 觸發（2026-11-18，`demo protection-check --trigger`，紀錄 `reports/okx-demo-protection-check/1794980390196.json`）：把觸發價設在現價附近讓 OKX 觸發。`order-algo` 回 `effective`，`orders-algo-history` 的 effective 也有，轉接層判定 TRIGGERED，觸發後部位 0。觸發後 OKX 會把 `sz` 填上成交張數，所以「被改成部分張數」只看 `slOrdPx` 與 `closeFraction`。
   - 沒測到：觸發失敗、幾小時後的查詢結果、改單被拒。
-- 唯讀核對工具：`.venv/Scripts/python.exe tools/demo_bot_watch.py`（只讀 run 資料夾，依成交重算均價與停損價，對照 Bot 寫的 `protection` 事件）。2026-11-18 起 T3 排程「模擬盤 Bot 保底停損核對」每小時跑一次，狀態檔在 `outputs/demo-bot-watch/state.json`；11-18 改用主動實測後已暫停這個排程。
+- 獨立存活監看（Guardian）與唯讀核對（2026-11-27）：共用存活規則在 `catos/demo_bot_liveness.py`（`status.json` 逾兩根 K 線未更新判 `bars_stalled`、`heartbeat.json` 逾 5 分鐘未更新判 `process_lost`）。Windows 工作排程器 `CatOS-DemoBot-Guardian-5m` 以使用者帳號每 5 分鐘執行 `tools/demo_bot_guardian.py`，逾時或非人工停止就跳 Windows 本機通知並寫入 `outputs/demo-bot-guardian/alerts.jsonl` 與 `last_check.json`。另有 `.venv/Scripts/python.exe tools/demo_bot_watch.py`（依成交重算均價與停損價，已納入 `stalled` 判定與 `bars` 指紋；舊的每小時 T3 排程於 11-20 17:55 最後一次執行後已清空停用，不再由 AI 對話輪詢）。
 - 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11-17 11:21 新建，之後的 run 沿用。
-- 看狀態：讀 run 資料夾的 `status.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
-- 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json --disaster-stop 10%`。有部位時會接續同一個 run（限制見「已知缺口」）；核准仍有效就不用重做。
+- 看狀態：讀 run 資料夾的 `status.json`、`heartbeat.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
+- 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json --disaster-stop 10%`。有部位時會接續同一個 run（限制見「已知缺口」）；接續時若未指定 `--disaster-stop` 會自動沿用 manifest 的比例，要撤掉須明示 `--disaster-stop 0%`；核准仍有效就不用重做。
 
 ## 模擬盤測試 Bot（2026-11-18）
 
 - 使用者 11-18 要求不要等 192 根突破，改用測試設定 `catos/deployment_profiles/donchian-breakout-5m-4-2-test.json`（5m、Donchian 4／2、1 張；使用者核准 `fb96d4c18d067e102efcc88a57c3aed7`），`--disaster-stop 10%`。測試期間正式 Bot 停著。
 - 實測通過的完整流程：開倉 → Bot 掛保底停損 → 出場 → OKX 自動撤停損、帳本清空（run `7a08ab81`）；反手：平空 → 開多 → 新停損 56440.26（賣出、mark），舊停損已撤，OKX 部位 1、均價 62711.4 與帳本一致（run `5ff76d05`，11-19 01:00 台北）。
 - 測出並修好的問題：Futures 模式保證金率讀錯讓反手只平倉（見已知缺口「保證金率」）；出場成交的腿名稱標錯（`51ec30b3`）；反手只平倉時加記被哪道閘門擋（`3520f4b4`）。
-- 11-19 已換回正式設定（見上節）。測試 run `5ff76d05` 共 23 筆成交、反手多次都正常。測試設定的核准待 Ryan 自己撤銷（代理不能撤）。
+- 11-19 已換回正式設定（見上節）。測試 run `5ff76d05` 共 23 筆成交、反手多次都正常。測試設定的核准 `fb96d4c1…` 已於 2026-11-23 由使用者撤銷（紀錄 `b3f5500f…`）。
 
 ## M1 獨立驗收（2026-11-17）
 
@@ -76,7 +76,7 @@
 ## 已知缺口
 
 - 接續 run 的限制：帳戶紀錄只記最後一個 run，11-17 之前開的 run 沒有這筆紀錄，帶部位停下時仍要先平倉；接續的前置步驟（查舊委託、等舊委託期限）最壞約 2 分鐘不檢查 Kill-Switch，期間不送新單；Bot 停著時按 Kill 不會平倉；接續只比對張數，停機時手動平倉再開同樣張數分辨不出來；補進策略的 K 線上的反手或出場訊號不補做，部位要等下一個訊號才回到和策略一致；程序被直接殺掉後再接續，`fills.json` 會少算（帳本完整）；部位為 0 時若寫 Soft 到帳戶紀錄失敗，重開是新的 run，Soft 鎖住會遺失（同一天虧損仍超過 5% 時下一根會再鎖；重驗觀察 O1）；查不到結果的舊委託（OKX 回「不存在」）會讓接續停下，要手動處理；OKX 已空倉時可加 `--new-run` 開新 run（舊帳本保留、不結清）。
-- 跨家第二意見（2026-11-18，Gemini 4 Hydrogen xhigh，P6 與反手只平倉各一份唯讀審查）：主控逐條核對後，有 3 條成立並已修（`tests/test_demo_bot.py` 的 `ReviewFixTests`）。獨立驗收（Claude Opus，`reports/gemini-review-fixes-acceptance-20261118/acceptance.md`）PASS，找到 D1（撤單後查一次查不到就停止輪詢）與觀察 O1、O2；Gemini 同時做的第二意見也找到 D1、O1，另外還有「對帳時第一次出現的告警沒寫事件」。這四項都已修，窄範圍重驗 PASS、沒有新發現（`recheck.md`）。正式 Bot 已於 11-18 13:24 重開、用上這些修正：
+- 跨家第二意見（2026-11-18，Gemini 4 Hydrogen xhigh，P6 與反手只平倉各一份唯讀審查）：主控逐條核對後，有 3 條成立並已修（`tests/test_demo_bot.py` 的 `ReviewFixTests`）。獨立驗收（Claude Opus，`reports/gemini-review-fixes-acceptance-20261118/acceptance.md`）PASS，找到 D1（撤單後查一次查不到就停止輪詢）與觀察 O1、O2；Gemini 同時做的第二意見也找到 D1、O1，另外還有「對帳時第一次出現的告警沒寫事件」。這四項都已修，窄範圍重驗 PASS、沒有新發現（`recheck.md`）。當時正式 Bot 已於 11-18 13:24 重開用上這些修正：
   - 已結束的保底停損用 `order-algo` 查不到（51603）時，帳本會一直「待確認」、之後不能開倉。現在撤單與查詢時改查 `orders-algo-history`（使用者 11-18 授權）。只查每種狀態最近 100 筆。11-18 模擬盤實測（見下方「P6 模擬盤實測」）：平倉後 OKX 會自動撤掉條件單，已結束的條件單幾秒內 `order-algo` 仍查得到（code 0、state canceled），history 也查得到；幾小時後 `order-algo` 是否改回 51603 仍待驗證。
   - 部分成交後被撤：以前會直接停下、不記成交、不掛停損。現在記帳、對帳、掛停損之後才停下（`order_partially_filled:canceled`），重開會接續。
   - 改條件單被 OKX 拒絕（51xxx）時，以前會被當成「沒回應」，提示來回跳；現在單子還在就記成「被拒」、下次檢查重試。撤條件單遇到 51xxx（例如剛好已撤）改成接著查結果。
@@ -93,8 +93,8 @@
     - 重驗觀察 O7：已實測（11-18 17:00，`reports/okx-demo-protection-check/1794992422997.json`）。`orders-algo-pending` 列表裡整倉停損是 `sz` 空、`slOrdPx -1`、`closeFraction 1`，`altered_stop` 判定沒被改，不會誤報。protection-check 之後每次都記這份列表。
 - 保底停損（P6）的限制：掛、改價、平倉後自動撤單、觸發（effective）已在模擬盤實測（上方「正式 Bot」的 P6 模擬盤實測）；觸發失敗沒有實測；OKX 觸發後 Bot 只停下，不把那筆平倉補記進帳本（使用者 11-17 選「停下並提示」）；陌生委託只查 SWAP 的四種條件類委託（conditional／oco／trigger／move_order_stop），冰山與時間加權委託沒查。
 - 保底停損的其他限制：建立或撤單請求沒送到 OKX 時，帳本一直「不確定」，這個 run 之後都不加倉（出場與清倉不受影響），要等空倉重開，提示裡的「會繼續查」不會有結果；停損觸發但沒完全成交時 Bot 只停下說明、要使用者手動平倉（帳本已對不上，不判斷 Hard）；查詢故障期間觸發，停下原因會是 `position_mismatch`；條件單方向在 OKX 上被改時每次檢查都送改單（OKX 介面不能改方向，實際難遇到）；revision 用牆鐘，重啟時系統時鐘若倒退，run 會以錯誤結束（不多送東西）。
-- 測試衛生：2026-11-18 起整套後端測試不再寫進真的 `~/.catos`（最後兩個漏網的是 `test_strategy_folder` 的重播、`test_kill_switch` 的控制面與重播；以暫存家目錄跑整套後檢查為空）。`~/.catos/local-simulation-locks` 的舊鎖檔已整理（11-18，使用者同意）：綁定的資料庫已不存在的 799 個移到 `~/.catos/local-simulation-locks-archive-20261118/`（沒刪，可搬回），資料庫還在的 59 個（含正式 Bot 各 run）留著。正式 Bot 的鎖在同一個資料夾，不要整個刪。
-- 介面沒有 Bot 畫面，等前端定案再接。
+- 測試衛生：整套後端測試與前端整合測試均不再寫進真的 `~/.catos` 或 `outputs/`（2026-11-27 補齊 `integration_http_fixture.py` 的 `CATOS_LOCK_DIRECTORY`、`CATOS_STRATEGY_APPROVALS`、`CATOS_STRATEGY_HOME`、`replay_root` 與 `demo_bot_root` 暫存隔離，並將 `test_simulation_ui_w6/w8_fixture.py` 改用暫存目錄）。`~/.catos/local-simulation-locks` 在 11-18 整理後留 59 個、11-23 至 11-26 修復前整合測試另留下 36 個（共 95 個，舊歸檔在 `~/.catos/local-simulation-locks-archive-20261118/`）；正式 Bot 的鎖在同一個資料夾，不要整個刪。
+- 唯讀的「模擬盤 Bot」頁（`#/demo-bot`，`956a9abb`，2026-11-23）已上線；啟停等控制操作待其餘頁面視覺定案後再接。
 - 正式對帳的核心（`okx_readonly`、`okx_collection`、`account_report`、`reconciliation_gate`、`risk_period`）保留給實盤前的手續費與資金費分類，目前沒有接到執行中的路徑。
 - 驗收觀察，沒有處理：
   - 送單請求最壞的耗時會超過 Supervisor 的 5 秒等待。超過時記成不確定，再查詢結清，結果仍正確。
@@ -124,7 +124,7 @@
 
 ## 工作順序（2026-11-17 使用者「按照你建議執行」）
 
-1. 接續 run：Bot 停下時有部位，重開能接著跑。完成（2026-11-17）：獨立驗收 FAIL（E1：帳戶紀錄寫入失敗時接續會自動解除 Soft），修正後窄範圍重驗 PASS；報告 `reports/okx-demo-m1-acceptance-20261117/resume-acceptance.md`、`resume-recheck-e1.md`。只用假 OKX 測過，沒有在模擬盤實測接續（正式 Bot 在跑）。驗證：後端 `Ran 1005 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 項通過、build 成功；整合測試 13 項 PASS。
+1. 接續 run：Bot 停下時有部位，重開能接著跑。完成（2026-11-17）：獨立驗收 FAIL（E1：帳戶紀錄寫入失敗時接續會自動解除 Soft），修正後窄範圍重驗 PASS；報告 `reports/okx-demo-m1-acceptance-20261117/resume-acceptance.md`、`resume-recheck-e1.md`。只用假 OKX 測過，當時沒有在模擬盤實測接續（當時正式 Bot 在跑）。驗證：後端 `Ran 1005 tests`、`OK (skipped=11)`；前端 typecheck 0 錯誤、21 項通過、build 成功；整合測試 13 項 PASS。
 2. 讓 Agent 提交策略：使用者 2026-11-17 回覆「完全同意你的所有建議」。完成（2026-11-17）。實作見 `docs/agent-strategy-submission-proposal.md` 末節「實作紀錄」，Agent 用法見 `strategies/README.md`。
    - 獨立驗收：第一次 FAIL，缺陷有三個：
      - D1：改已核准的資料夾，整份核准紀錄跟著失效。
@@ -135,8 +135,8 @@
    - 報告都在 `reports/agent-strategy-acceptance-20261117/`。
    - 使用者還沒核准任何資料夾策略：核准、重播或上模擬盤由使用者本人做，步驟在 `strategies/README.md`。
    - 驗證（commit 6c2d2b8c）：後端 `Ran 1016 tests`、`OK`；前端 typecheck 0 錯誤、22 項通過、build 成功；整合測試 13 項 PASS。
-   - 正式 Bot 已由使用者在 11-17 23:27 用 a5ee0b0c 重開，接續 run、新的核准檢查與 P6 都在用。
-3. P6 交易所端保底停損：2026-11-17 使用者要求現在做，三題選建議（10%、觸發後停下並提示、啟動指令加 `--disaster-stop`）。程式與假 OKX 測試完成（`DisasterStopTests` 11 項）。獨立驗收第一次 FAIL（D1：停損沒確認時 Kill／Hard 不清倉），修正後窄範圍重驗 PASS（有觀察），重驗提出的兩則訊息問題（N1、N2）由開發者修好、只有自測；報告 `reports/p6-cleanup-acceptance-20261117/acceptance.md`、`recheck.md`。同一份驗收也驗了第 5 項的清理：通過。沒有在模擬盤實測。帳本的保護狀態機原本在保護「暫時不一致」的瞬間把待送的加倉意圖永久作廢，會讓反手的開倉腿消失；改成只在決策與送單時檢查（兩處原本就有），屬帳本改動，列入驗收。
+   - 當時正式 Bot 已由使用者在 11-17 23:27 用 a5ee0b0c 重開，接續 run、新的核准檢查與 P6 都在用。
+3. P6 交易所端保底停損：2026-11-17 使用者要求現在做，三題選建議（10%、觸發後停下並提示、啟動指令加 `--disaster-stop`）。程式與假 OKX 測試完成（`DisasterStopTests` 11 項）。獨立驗收第一次 FAIL（D1：停損沒確認時 Kill／Hard 不清倉），修正後窄範圍重驗 PASS（有觀察），重驗提出的兩則訊息問題（N1、N2）由開發者修好、只有自測；報告 `reports/p6-cleanup-acceptance-20261117/acceptance.md`、`recheck.md`。同一份驗收也驗了第 5 項的清理：通過。11-17 交付當下尚未在模擬盤實測，之後已於 2026-11-18 完成掛單、改價、撤單與觸發的模擬盤實測（見上方「正式 Bot」）；2026-11-27 另補上接續時未指定 `--disaster-stop` 自動沿用 manifest 比例的防呆（要撤須明示 `0%`）。帳本的保護狀態機原本在保護「暫時不一致」的瞬間把待送的加倉意圖永久作廢，會讓反手的開倉腿消失；改成只在決策與送單時檢查（兩處原本就有），屬帳本改動，列入驗收。
    - 2026-11-17 使用者對驗收觀察回覆「改」：反手被加倉閘門擋下時照樣平掉原部位，只拒絕反向開倉（`reversal_close_only`，改在 `risk.py`、`journal.py`、`execution.py`）。獨立驗收：風控核心正確（新舊版約 216 萬組輸入比對，沒有任何組合會加倉或穿越零點），但 FAIL 在 local-sim 重播不認得新判定（D1）；修好後窄範圍重驗 PASS（有觀察），重驗提出的「最後一根只平倉時一致性誤報通過」（N1）由開發者修好、只有自測。報告在 `reports/reversal-close-only-acceptance-20261117/`。使用者 rearm 之後下一根才開反向倉，開倉價和研究回測不同（驗收觀察 O3）。
-4. Bot 的介面：等前端定案。
+4. Bot 的介面：唯讀頁已於 2026-11-23 上線（`956a9abb`）；啟停等控制操作等其餘頁面視覺定案後再接。
 5. 拆掉九月模組：2026-11-17 使用者要求做。刪掉 Demo 連線（`okx_http`、`demo_collection`）、帳本綁定（`demo_ledger_*`）、E0 對帳流程（`demo_reconciliation`、`demo_production_inputs`）、一次性交易授權（`trade_authorization` 與 Supervisor／execution 裡的授權碼）、兩個 tools 與對應測試，約 6,600 行；正式對帳核心保留（見已知缺口）。資料庫結構不變。
