@@ -9,20 +9,31 @@ recomputes the stop the way ``catos.protection.stop_price`` does (mark trigger, 
 tick rounded towards triggering earlier), then compares it with the next ``protection``
 event the Bot wrote after querying OKX.
 
+The verdict is ``stalled`` when the run says running but is not believed (no new bar for over
+two bars, or its heartbeat stopped): the rule in ``catos.demo_bot_liveness``, shared with the UI
+view and the Guardian. Until 2026-11-27 a run that died without fills stayed ``no_fill_yet``.
+
     .venv/Scripts/python.exe tools/demo_bot_watch.py [--run <run_id>] [--state <file>]
 """
 
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 import hashlib
 import json
 from pathlib import Path
 import sys
 
+REPO = Path(__file__).resolve().parents[1]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from catos.demo_bot_liveness import read_heartbeat, running_problem  # noqa: E402
+
 D = Decimal
-ROOT = Path(__file__).resolve().parents[1] / "outputs" / "okx-demo-bot"
+ROOT = REPO / "outputs" / "okx-demo-bot"
 
 
 def expected_stop(average, position, tick, ratio):
@@ -33,7 +44,9 @@ def expected_stop(average, position, tick, ratio):
     return (raw / tick).to_integral_value(rounding=rounding) * tick
 
 
-def check(run_dir):
+def check(run_dir, now_ms=None):
+    if now_ms is None:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     status = json.loads((run_dir / "status.json").read_text(encoding="utf-8"))
     events = [json.loads(line) for line in (run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines() if line]
@@ -75,7 +88,11 @@ def check(run_dir):
             notable.append({k: v for k, v in event.items() if k not in ("basis", "bar")})
     if waiting is not None:
         checks.append(dict(waiting, result="stop_not_reported_yet"))
-    if status["fills"] == 0:
+    liveness = running_problem(status, read_heartbeat(run_dir), (manifest.get("profile") or {}).get("timeframe_ms"),
+                               now_ms)
+    if liveness is not None:
+        verdict = "stalled"  # says running, is not: checked before anything else
+    elif status["fills"] == 0:
         verdict = "no_fill_yet"
     elif any(c["result"] in ("MISMATCH", "stop_not_reported_yet") for c in checks) or any(
             e["kind"] in ("protection_alert", "protection_request_failed", "protection_mismatch",
@@ -84,7 +101,7 @@ def check(run_dir):
     else:
         verdict = "ok"
     return dict(run_id=manifest["run_id"], created_at=manifest["created_at"], disaster_stop=str(ratio),
-                status=status, verdict=verdict, stop_checks=checks, event_count=len(notable), events=notable[-30:])
+                status=status, verdict=verdict, liveness=liveness, stop_checks=checks, event_count=len(notable), events=notable[-30:])
 
 
 def main(argv=None):
@@ -95,10 +112,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
     runs = sorted((p for p in args.root.iterdir() if (p / "manifest.json").is_file()),
                   key=lambda p: json.loads((p / "manifest.json").read_text(encoding="utf-8"))["created_at"])
+    if not runs and not args.run:
+        json.dump(dict(verdict="no_run", root=str(args.root)), sys.stdout, ensure_ascii=False, indent=1)
+        print()
+        return
     run_dir = args.root / args.run if args.run else runs[-1]
     summary = check(run_dir)
+    # bars and the liveness verdict are part of the fingerprint: a run that stops producing bars
+    # or goes stale is a change (before 2026-11-27 a dead run was "unchanged" for ever).
     fingerprint = hashlib.sha256(json.dumps(
         dict(run=summary["run_id"], state=summary["status"]["state"], fills=summary["status"]["fills"],
+             bars=summary["status"].get("bars"), liveness=summary["liveness"], verdict=summary["verdict"],
              stop=summary["status"]["stop_reason"], checks=summary["stop_checks"], events=summary["event_count"]),
         sort_keys=True).encode()).hexdigest()
     if args.state is not None:

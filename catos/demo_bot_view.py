@@ -15,6 +15,8 @@ import re
 
 from fastapi import HTTPException
 
+from catos.demo_bot_liveness import read_heartbeat, running_problem
+
 CONTRACT = "catos.demo-bot.v1"
 RUN_ID = re.compile(r"^[0-9a-f]{32}$")
 MAX_RUNS = 30
@@ -24,11 +26,12 @@ MAX_EVENTS = 60
 EVENT_FIELDS = {
     "started": ("resumed", "missed"), "stopped": ("reason",), "fill": ("leg",),
     "order": (), "protection": ("price", "side", "algo_id"), "protection_alert": ("alert",),
-    "protection_altered": ("algo_id",), "protection_config": ("ratio",), "protection_left": (),
+    "protection_altered": ("algo_id",), "protection_config": ("ratio", "source"),
+    "protection_config_changed": ("previous", "ratio", "source"), "protection_left": (),
     "protection_wait": ("reason",), "kill_switch": (), "hard_kill_switch": (), "flatten": (),
     "flatten_done": (), "flatten_failed": (), "soft_latched": (), "soft_rearmed": (),
     "soft_rearm_refused": (), "risk": ("reasons", "mode"), "day_basis": (), "read_retry": ("code", "attempt"),
-    "resume_input": ("disposition",), "resume_intent": (), "previous_run_unsettled": (),
+    "status_write_failed": ("error",), "resume_input": ("disposition",), "resume_intent": (), "previous_run_unsettled": (),
 }
 
 
@@ -70,12 +73,13 @@ def _summary(run_dir, now_ms):
     profile = manifest.get("profile") or {}
     tf = profile.get("timeframe_ms")
     updated = _iso_ms(status.get("updated_at"))
-    # Running but silent for over two bars: the process probably died without writing its stop.
-    stale = (status.get("state") == "running" and updated is not None and isinstance(tf, int)
-             and now_ms - updated > 2 * tf + 120_000)
+    # Running but not believed (no new bar for over two bars, or the heartbeat stopped): the
+    # rule is shared with the watch tool and the Guardian (catos.demo_bot_liveness).
+    liveness = running_problem(status, read_heartbeat(run_dir), tf, now_ms)
     return dict(
         run_id=run_dir.name, created_at_ms=_iso_ms(manifest.get("created_at")),
-        state=status.get("state", "unknown"), stale=stale, stop_reason=status.get("stop_reason"),
+        state=status.get("state", "unknown"), stale=liveness is not None, liveness=liveness,
+        stop_reason=status.get("stop_reason"),
         bars=status.get("bars", 0), fills=status.get("fills", 0), position=status.get("position"),
         updated_at_ms=updated, finished_at_ms=_iso_ms(status.get("finished_at")),
         strategy_id=profile.get("strategy_id"), version=profile.get("version"),
