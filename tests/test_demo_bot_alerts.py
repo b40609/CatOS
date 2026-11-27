@@ -108,6 +108,31 @@ class UnprotectedPositionTests(_Guardian):
                 events(run, *rows)
                 self.assertEqual(self.check()["problem"], expected)
 
+    def test_an_old_bot_that_enters_again_after_closing_gets_the_grace_again(self):
+        """R4: the stop removed when the first position closed made a new entry hours later look
+        unprotected since then, skipping the three minutes the new stop needs."""
+        run = write_run(self.runs, A, updated=ago(minutes=5), heartbeat=ago(seconds=20), position="1")
+        config = {"time": ago(hours=6), "kind": "protection_config", "ratio": "0.10", "source": "explicit"}
+        first = [config, {"time": ago(hours=5), "kind": "fill"},
+                 {"time": ago(hours=5), "kind": "protection", "price": "94.5", "side": "sell"},
+                 {"time": ago(hours=4), "kind": "fill"}, {"time": ago(hours=4), "kind": "protection"}]
+        events(run, *first, {"time": ago(seconds=30), "kind": "fill"})
+        self.assertIsNone(self.check()["problem"])  # just entered again: the stop is on its way
+        events(run, *first, {"time": ago(minutes=10), "kind": "fill"})
+        result = self.check()
+        self.assertEqual(result["problem"], "position_unprotected")
+        self.assertIn("紀錄裡沒有掛上條件單", self.sent[-1])
+
+    def test_an_old_bot_whose_stop_was_changed_on_okx_is_unprotected(self):
+        """R4: ``protection_altered`` (the stop made a limit order on the OKX page) was not read."""
+        run = write_run(self.runs, A, updated=ago(minutes=5), heartbeat=ago(seconds=20), position="1")
+        events(run, {"time": ago(hours=5), "kind": "protection_config", "ratio": "0.10", "source": "explicit"},
+               {"time": ago(minutes=40), "kind": "fill"},
+               {"time": ago(minutes=40), "kind": "protection", "price": "94.5", "side": "sell"},
+               {"time": ago(minutes=9), "kind": "protection_altered", "algo_id": "1"})
+        self.assertEqual(self.check()["problem"], "position_unprotected")
+        self.assertIn("條件單還沒確認或被 OKX 拒絕", self.sent[-1])
+
     def test_a_flat_old_bot_is_never_unprotected(self):
         run = write_run(self.runs, A, updated=ago(minutes=5), heartbeat=ago(seconds=20), position="0")
         events(run, {"time": ago(hours=5), "kind": "protection_config", "ratio": "0", "source": "default"})
@@ -321,6 +346,36 @@ class PageSaysWhenNobodyWatchesTests(unittest.TestCase):
                          (True, "unconfirmed", False))
         beat(run, position="1", confirmed=True, time=self.real_ago(seconds=10))
         self.assertFalse(self.overview()["current"]["unprotected"])
+
+
+class ToastTests(unittest.TestCase):
+    """R1: Windows tools answer in the console code page (Big5 here). In UTF-8 mode the reader
+    failed, stdout came back None, and toast() raised, so a notice already shown was sent again."""
+
+    def test_an_unreadable_answer_still_counts_as_shown(self):
+        calls = []
+
+        def run(arguments, **options):
+            calls.append((arguments[0], options))
+            return subprocess.CompletedProcess(arguments, 0, stdout=None, stderr=None)
+
+        with mock.patch.object(notifier.sys, "platform", "win32"), mock.patch.object(notifier.subprocess, "run", run):
+            self.assertEqual(notifier.toast("t", "b"), {"ok": True, "detail": "toast:"})
+        self.assertEqual([options.get("errors") for _, options in calls], ["replace"])
+
+    def test_the_message_box_fallback_reads_its_answer_the_same_way(self):
+        calls = []
+
+        def run(arguments, **options):
+            calls.append((arguments[0], options))
+            return subprocess.CompletedProcess(arguments, 1 if arguments[0] == "powershell.exe" else 0,
+                                               stdout=None, stderr=None)
+
+        with mock.patch.object(notifier.sys, "platform", "win32"), mock.patch.object(notifier.subprocess, "run", run):
+            answer = notifier.toast("t", "b")
+        self.assertEqual(answer, {"ok": True, "detail": "toast_failed:; msg:0"})
+        self.assertEqual([(name, options.get("errors")) for name, options in calls],
+                         [("powershell.exe", "replace"), ("msg.exe", "replace")])
 
 
 class OmniKeepCallTests(unittest.TestCase):

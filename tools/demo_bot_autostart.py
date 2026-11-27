@@ -136,8 +136,8 @@ def decide(*, root=ROOT, state_dir=STATE_DIR, now_ms=None, kill_path=None, profi
 
     Reads files only. Anything it cannot read or does not recognise is a refusal, never a start.
     """
-    from catos import kill_switch
     from catos.demo_bot_liveness import _read, claimed_running, judge, newest_run
+    from catos.kill_switch import status as kill_switch_status
 
     now_ms = _now_ms() if now_ms is None else now_ms
     root, state_dir = Path(root), Path(state_dir)
@@ -154,7 +154,10 @@ def decide(*, root=ROOT, state_dir=STATE_DIR, now_ms=None, kill_path=None, profi
         return answer("skip", "no_previous_run")
     judged = judge(run_dir, now_ms)
     for other in claimed_running(root, besides=run_dir):
-        if judge(other, now_ms)["verdict"] == "alive":  # another run folder holds the live Bot
+        seen = judge(other, now_ms)
+        # Another run folder holds the live Bot: the same "its process is there" answers as for the
+        # newest one below, a live Bot without a confirmed stop or waiting for a bar included (review R3).
+        if seen["verdict"] == "alive" or seen["problem"] in ("position_unprotected", "bars_stalled"):
             return answer("skip", "already_running", judged)
     verdict, problem = judged["verdict"], judged["problem"]
     if verdict == "alive" or problem == "position_unprotected":
@@ -178,7 +181,7 @@ def decide(*, root=ROOT, state_dir=STATE_DIR, now_ms=None, kill_path=None, profi
         return answer("refuse", "run_failed", judged)
     else:
         return answer("refuse", "status_unreadable", judged)
-    kill = kill_switch.status(kill_path)
+    kill = kill_switch_status(kill_path)
     if kill["engaged"]:
         return answer("refuse", "kill_switch_unreadable" if kill["error"] else "kill_switch_engaged", judged)
     manifest, _ = _read(run_dir / "manifest.json")
@@ -218,27 +221,48 @@ def describe(decision):
 def launch():
     """Ask Task Scheduler to run the Bot's own task; the Bot never becomes a child of this process."""
     try:
-        done = subprocess.run(["schtasks.exe", "/Run", "/TN", RUN_TASK], capture_output=True, text=True, timeout=60,
+        done = subprocess.run(["schtasks.exe", "/Run", "/TN", RUN_TASK], capture_output=True, text=True,
+                              errors="replace", timeout=60,  # schtasks answers in the console code page
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "detail": f"{type(exc).__name__}"}
     return {"ok": done.returncode == 0, "detail": f"schtasks:{done.returncode}"}
 
 
+def _not_the_real_folders():
+    return {"ok": False, "detail": "not_the_real_run_folders"}
+
+
+def _same_path(a, b):
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except OSError:
+        return False
+
+
 def gate_once(*, root=ROOT, state_dir=STATE_DIR, now_ms=None, kill_path=None, profile=PROFILE, notify=None,
-              external=None, start=launch, dry_run=False):
-    """One five-minute check: decide, act, announce, and leave a trace the Guardian can watch."""
+              external=None, start=None, dry_run=False):
+    """One five-minute check: decide, act, announce, and leave a trace the Guardian can watch.
+
+    ``start`` defaults to the real task only for the real run folders and state folder: the task
+    decides on those, and an isolated check that forgot ``start`` must never run it (review R3).
+    """
     now_ms = _now_ms() if now_ms is None else now_ms
     notify = notifier.toast if notify is None else notify
     state_dir = Path(state_dir)
+    if start is None:
+        start = launch if _same_path(root, ROOT) and _same_path(state_dir, STATE_DIR) else _not_the_real_folders
     state_dir.mkdir(parents=True, exist_ok=True)
     decision = decide(root=root, state_dir=state_dir, now_ms=now_ms, kill_path=kill_path, profile=profile)
     active = set()
     if decision["action"] == "start" and not dry_run:
-        record(state_dir, now_ms, action="start", reason=decision["reason"], run_id=decision["run_id"],
-               stop_reason=decision["stop_reason"])
         started = start()
         decision["launch"] = started
+        # Only a launch Task Scheduler accepted is a start (cooling down and the daily limit count
+        # these). A failed one is retried next time and stays one alert while it lasts (review R2).
+        record(state_dir, now_ms, action="start" if started.get("ok") else "launch_failed",
+               reason=decision["reason"], run_id=decision["run_id"], stop_reason=decision["stop_reason"],
+               launch_detail=started.get("detail"))
         if started.get("ok"):
             message = describe(decision)
             sent = [notifier._safely(channel, TITLE, message) for channel in (notify, external or notifier._nowhere)]
@@ -266,7 +290,7 @@ def gate_once(*, root=ROOT, state_dir=STATE_DIR, now_ms=None, kill_path=None, pr
                              remote=external, state_file=STATE_FILE, log_file=HISTORY_FILE,
                              fields={"action": "guardian_silent"})
     if not dry_run:
-        notifier.settle(state_dir, active, now_ms, state_file=STATE_FILE, log_file=HISTORY_FILE)
+        notifier.settle(state_dir, active, now_ms, remote=external, state_file=STATE_FILE, log_file=HISTORY_FILE)
         notifier.save(state_dir / CHECK_FILE, dict(decision, checked_at=_text(now_ms), guardian_silent=silent is not None))
     return dict(decision, guardian_silent=silent is not None)
 

@@ -68,17 +68,21 @@ def toast(title, body):
         return {"ok": False, "detail": "not_windows"}
     env = dict(os.environ, CATOS_TOAST_TITLE=title, CATOS_TOAST_BODY=body)
     hidden = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    # Windows tools answer in the console code page (Big5 here): in UTF-8 mode (PYTHONUTF8=1) a strict
+    # decode fails in the reader and leaves stdout None, so read leniently and never trust it is a str.
     try:
         done = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-File", str(TOAST_SCRIPT)],
-                              env=env, capture_output=True, text=True, timeout=45, creationflags=hidden, check=False)
-        detail = (done.stdout.strip() or done.stderr.strip())[-300:]
+                              env=env, capture_output=True, text=True, errors="replace", timeout=45,
+                              creationflags=hidden, check=False)
+        detail = ((done.stdout or "").strip() or (done.stderr or "").strip())[-300:]
         if done.returncode == 0:
             return {"ok": True, "detail": "toast:" + detail}
     except (OSError, subprocess.SubprocessError) as exc:
         detail = f"{type(exc).__name__}: {exc}"[:300]
     try:
         boxed = subprocess.run(["msg.exe", os.environ.get("USERNAME", "*"), "/TIME:0", f"{title}\n{body}"],
-                               capture_output=True, text=True, timeout=20, creationflags=hidden, check=False)
+                               capture_output=True, text=True, errors="replace", timeout=20, creationflags=hidden,
+                               check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "detail": f"toast_failed:{detail}; msg_failed:{type(exc).__name__}"}
     return {"ok": boxed.returncode == 0, "detail": f"toast_failed:{detail}; msg:{boxed.returncode}"}

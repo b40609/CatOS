@@ -132,10 +132,12 @@ def protection_gap(run_dir, status, heartbeat):
             ratio = row.get("ratio")
         elif kind == "fill":
             last_fill = iso_ms(row.get("time"))
+            if why == "stop_removed":  # the stop went with the closed position; this fill opens a new
+                since, why = None, "no_stop_recorded"  # one, timed from the fill (review R4)
         elif kind == "protection":
             placed = row.get("price") is not None
             since, why = (None, None) if placed else (iso_ms(row.get("time")), "stop_removed")
-        elif kind == "protection_alert":
+        elif kind in ("protection_alert", "protection_altered"):  # altered: changed on the OKX page (R4)
             placed, since, why = False, iso_ms(row.get("time")), "unconfirmed"
     try:
         zero = ratio is not None and Decimal(str(ratio)) == 0

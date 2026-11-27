@@ -128,7 +128,8 @@
   - 重開機後沒人登入就不會接續也不會告警：三個排程都是「登入後才執行」。要改成未登入也跑（S4U，不存密碼）得用系統管理員權限註冊，代理在非提權下被拒（`存取被拒`）。要做的話由你在系統管理員 PowerShell 對三個排程各執行一次 `Set-ScheduledTask -TaskName <名稱> -Principal (New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U)`；S4U 下 Windows 通知跳不出來，只剩手機那條。
   - INVARIANTS P6 條文仍寫「預設 0% 表示不啟用」。程式現在是「開新的 run 沒寫比例就不啟動，0 要明寫」。建議把條文改成「每個 Bot 可獨立設定災難停損比例，0% 表示不啟用；開新的 run 必須明寫比例，沒寫不啟動」，要你拍板。
   - 要不要演練一次真的手機告警（會發一則測試訊息到你的 Telegram／Web Push）。
-  - 沒做的審查項目：F6（讀取延遲 9 分鐘後仍照舊訊號下單；要區分「晚到的減倉照送、加倉不送」，動到下單路徑，需要方案與獨立驗收）、F9（接續與預熱階段的讀取退避不查 Kill-Switch）、F10 前半（帶倉接續當下可能多一次「超過兩根 K 線沒更新」的告警）、F12 的 `git gc --prune=now`（清掉 `.git` 裡 cdp-profile 的殘留物件，屬刪除類）、F13（三處 `animate-pulse`）。
+  - 2026-11-27 二次修補後的跨家複審 P2（R1–R5）與 F9 已修：接續與預熱階段的讀取退避也查 Kill-Switch（查到走既有 Kill 清倉）；Windows 工具輸出用 `errors="replace"` 讀；排程啟動失敗不再算成一次接續、只告警一次；`guardian_silent` 解除會通知手機；舊資料夾裡活著但沒停損或等 K 線的 Bot 不會被重複啟動；`gate_once` 不指定 `start` 時只對正式資料夾跑真的排程；舊 Bot 事件推導處理平倉後再進場與 `protection_altered`。F9 屬執行路徑，未經獨立驗收。
+  - 沒做的審查項目：F6（讀取延遲 9 分鐘後仍照舊訊號下單；要區分「晚到的減倉照送、加倉不送」，動到下單路徑，需要方案與獨立驗收）、F10 前半（帶倉接續當下可能多一次「超過兩根 K 線沒更新」的告警）、F12 的 `git gc --prune=now`（清掉 `.git` 裡 cdp-profile 的殘留物件，屬刪除類）、F13（三處 `animate-pulse`）。
 - 前端：方向 Ryan 11-17 已定（舊版專業終端風格當底、字要少、不放解說句與「一句話結論」橫幅、不用裝飾性顏色；個人化照 Z 但精簡）。候選稿在 `docs/design/2026-11-16-redesign-pick/`；待答：X、Y、Z 各保留哪些元素。
   - 總覽「待處理與事件審計」卡 2026-11-25 定案架構 8（待處理手風琴與審計流水共用一條光軌），已寫進 `unified-incident-activity-card.tsx`，樣式在 `src/styles/incident-feed.css`。光點同日定案「刻線實心點」（7px 純色、光軌在點上下各留 3px 切口），不做動畫（使用者：動畫先不要）。對照稿留在 `docs/design/2026-11-25-incident-feed-pick/` 與 `docs/design/2026-11-25-incident-dot-pick/`。未經獨立驗收（純介面）。
 - 第 6 步（同幣種多策略）的做法草案，見封存檔。

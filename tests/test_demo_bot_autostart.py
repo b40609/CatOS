@@ -328,5 +328,78 @@ class EachWatchesTheOtherTests(_Base):
         self.assertIn("RuntimeError", (self.state_dir / "errors.log").read_text(encoding="utf-8"))
 
 
+class SecondReviewTests(_Base):
+    """Cross review of 2026-11-27 (R1 R2 R3): edges of the gate found after the first fixes."""
+
+    def test_a_launch_that_keeps_failing_is_said_once_and_never_counted_as_a_restart(self):
+        """R2: the start was recorded before the launch, so a failed launch cooled down, cleared its
+        alert, alerted again and after three tries claimed three restarts that never happened."""
+        self.lost()
+        self.launch_answer = {"ok": False, "detail": "schtasks:1"}
+        seen = [self.gate(now_ms=NOW_MS + step * 300_000)["reason"] for step in range(8)]
+        self.assertEqual(set(seen), {"launch_failed"}, seen)
+        self.assertEqual(len(self.sent), 1, self.sent)
+        self.assertNotIn("start", [row.get("action") for row in self.history()])
+        self.assertIn("launch_failed", [row.get("action") for row in self.history()])
+        self.launch_answer = {"ok": True, "detail": "schtasks:0"}  # Task Scheduler works again
+        self.assertEqual(self.gate(now_ms=NOW_MS + 8 * 300_000)["action"], "start")
+        self.assertEqual([row.get("action") for row in self.history()].count("start"), 1)
+
+    def test_the_phone_hears_when_the_guardian_is_back(self):
+        """R2: the gate's settle() was not given the phone, so the all-clear never reached it."""
+        self.run_folder(updated=ago(minutes=4), heartbeat=ago(seconds=20))
+        self.state_dir.mkdir()
+        last = self.state_dir / "last_check.json"
+        last.write_text(json.dumps({"checked_at": ago(minutes=40)}), encoding="utf-8")
+        self.assertTrue(self.gate()["guardian_silent"])
+        last.write_text(json.dumps({"checked_at": ago(minutes=1)}), encoding="utf-8")
+        self.assertFalse(self.gate(now_ms=NOW_MS + 60_000)["guardian_silent"])
+        self.assertEqual([title for title, _ in self.phone], [guardian.SELF_TITLE, autostart.notifier.CLEARED_TITLE])
+        self.assertEqual(len(self.sent), 1)
+
+    def test_an_older_live_run_that_is_stalled_or_unprotected_is_not_started_twice(self):
+        """R3: only ``alive`` counted for an older folder; a live Bot holding without a confirmed stop,
+        or waiting for a bar, made the gate start a second one into the account lock."""
+        for case in ("bars_stalled", "position_unprotected"):
+            with self.subTest(case=case):
+                self.setUp()
+                if case == "bars_stalled":
+                    self.run_folder(A, updated=ago(minutes=50), heartbeat=ago(seconds=20), created=ago(days=1))
+                else:
+                    older = self.run_folder(A, updated=ago(minutes=4), position="1", created=ago(days=1))
+                    (older / "heartbeat.json").write_text(json.dumps({
+                        "time": ago(seconds=20), "pid": 1, "position": "1", "protection": {
+                            "ratio": "0.1", "confirmed": False, "price": None, "alert": None,
+                            "unprotected_since": ago(minutes=20), "checked_at": ago(seconds=30)}}), encoding="utf-8")
+                self.run_folder(B, status=False, created=ago(minutes=30))  # newest: a start that never got going
+                result = self.gate()
+                self.assertEqual((result["action"], result["reason"]), ("skip", "already_running"), result)
+                self.assertEqual(self.launched, [])
+
+    def test_the_gate_never_runs_the_real_task_for_other_folders(self):
+        """R3: ``start`` defaulted to the real launcher, so a test that forgot it ran schtasks.exe."""
+        self.lost()
+        never = mock.Mock(side_effect=AssertionError("schtasks.exe must not run from a test"))
+        with mock.patch.object(autostart.subprocess, "run", never):
+            result = autostart.gate_once(root=self.runs, state_dir=self.state_dir, now_ms=NOW_MS,
+                                         kill_path=self.kill, notify=lambda t, b: {"ok": True},
+                                         external=lambda t, b: {"ok": True})
+        never.assert_not_called()
+        self.assertEqual((result["action"], result["reason"]), ("refuse", "launch_failed"))
+        self.assertEqual(result["launch"]["detail"], "not_the_real_run_folders")
+
+    def test_launch_reads_a_big5_answer_without_failing(self):
+        """R1: schtasks answers in the console code page; in UTF-8 mode that raised in the reader."""
+        calls = []
+
+        def run(arguments, **options):
+            calls.append(options)
+            return autostart.subprocess.CompletedProcess(arguments, 0, stdout=None, stderr=None)
+
+        with mock.patch.object(autostart.subprocess, "run", run):
+            self.assertEqual(autostart.launch(), {"ok": True, "detail": "schtasks:0"})
+        self.assertEqual(calls[0].get("errors"), "replace")
+
+
 if __name__ == "__main__":
     unittest.main()
