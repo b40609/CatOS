@@ -13,6 +13,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
+from catos.demo_bot_view import mount_demo_bot
+
 try:  # "discover -s tests" imports test modules top-level; "-m unittest tests.x" as a package
     import test_demo_bot_guardian as base
 except ImportError:
@@ -284,8 +286,6 @@ class PageSaysWhenNobodyWatchesTests(unittest.TestCase):
     def overview(self):
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-
-        from catos.demo_bot_view import mount_demo_bot
 
         app = FastAPI()
         mount_demo_bot(app, root=self.runs)

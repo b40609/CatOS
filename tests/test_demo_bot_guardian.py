@@ -13,9 +13,6 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from catos import demo_bot_liveness as liveness
 from catos.demo_bot_view import mount_demo_bot
 
@@ -83,6 +80,9 @@ class ViewUsesTheSharedRuleTests(unittest.TestCase):
         real_now = datetime.now(UTC)
         write_run(root, "a" * 32, updated=(real_now - timedelta(minutes=3)).isoformat(),
                   heartbeat=(real_now - timedelta(minutes=10)).isoformat())
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
         app = FastAPI()
         mount_demo_bot(app, root=root)
         data = TestClient(app).get("/api/workspace/demo-bot").json()
