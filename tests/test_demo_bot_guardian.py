@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from catos import demo_bot_liveness as liveness
-from catos.demo_bot_view import mount_demo_bot
+from catos import demo_bot_view
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import demo_bot_guardian as guardian
@@ -84,7 +84,7 @@ class ViewUsesTheSharedRuleTests(unittest.TestCase):
         from fastapi.testclient import TestClient
 
         app = FastAPI()
-        mount_demo_bot(app, root=root)
+        demo_bot_view.mount_demo_bot(app, root=root)
         data = TestClient(app).get("/api/workspace/demo-bot").json()
         self.assertTrue(data["current"]["stale"])
         self.assertEqual(data["current"]["liveness"], "process_lost")

@@ -13,9 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
-from catos import demo_bot, kill_switch, local_sim_r4
-from catos.demo_bot import BotStopped
-from catos.demo_bot_liveness import iso_ms
+from catos import demo_bot, demo_bot_liveness, kill_switch, local_sim_r4
 
 try:  # "discover -s tests" imports test modules top-level; "-m unittest tests.x" as a package
     import test_demo_bot as base
@@ -23,6 +21,7 @@ except ImportError:
     from tests import test_demo_bot as base
 
 BASE, Clock, FakeOkx = base.BASE, base.Clock, base.FakeOkx
+BotStopped, iso_ms = demo_bot.BotStopped, demo_bot_liveness.iso_ms
 
 D = Decimal
 
