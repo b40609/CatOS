@@ -210,6 +210,8 @@ class GuardianTests(unittest.TestCase):
     def test_recovery_is_logged_and_a_later_problem_notifies_again(self):
         write_run(self.runs, "a" * 32, updated=ago(days=6))
         self.check()
+        # A new run starts: the Bot marks the orphan it replaces as stopped (process_lost) when it opens.
+        write_run(self.runs, "a" * 32, state="stopped", stop_reason="process_lost")
         write_run(self.runs, "b" * 32, updated=ago(minutes=2), heartbeat=ago(seconds=10), created=ago(minutes=20))
         self.assertEqual(self.check()["verdict"], "alive")
         write_run(self.runs, "b" * 32, updated=ago(minutes=2), heartbeat=ago(minutes=30), created=ago(minutes=20))

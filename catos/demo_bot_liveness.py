@@ -11,6 +11,12 @@ nothing wrong). Readers therefore judge by time, never by the word in the file:
   heartbeat older than five minutes: ``process_lost``. Runs written before the heartbeat
   existed have no such file; for them only the bar rule applies.
 
+A live run can still be in trouble: holding a position with no confirmed disaster stop on OKX
+(``position_unprotected``, review F2 of 2026-11-27). Newer Bots say so in the heartbeat
+(``protection.unprotected_since``); for a Bot started before that, the rule is read out of
+``events.jsonl``. A short gap is normal (the stop is placed right after the fill, and moved
+when the average changes), so only a gap longer than three minutes counts.
+
 Standard library only and read-only: nothing here connects to OKX or writes anywhere.
 """
 
@@ -18,11 +24,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 STALE_BARS = 2
 STALE_SLACK_MS = 120_000
 HEARTBEAT_MAX_MS = 300_000
 START_GRACE_MS = 600_000
+UNPROTECTED_GRACE_MS = 180_000
+EVENTS_TAIL_BYTES = 2_000_000
 HEARTBEAT_FILE = "heartbeat.json"
 # Stops the user asked for; every other stop reason is something to look at.
 OPERATOR_STOPS = ("operator_stop", "operator_stop_file", "interrupted")
@@ -34,6 +43,14 @@ MESSAGES = {
     "abnormal_stop": "Bot 自己停下了，不是你要它停的",
     "failed": "Bot 因為程式錯誤結束",
     "never_started": "run 資料夾建立超過 10 分鐘，Bot 沒有跑起來",
+    "position_unprotected": "有部位，但 OKX 上沒有已確認的保底停損條件單",
+    "stopped_with_position": "Bot 已照你的要求停下，但部位還留在 OKX 上，沒有人在看",
+}
+GAP_REASONS = {
+    "ratio_zero": "這個 run 的保底停損比例是 0%",
+    "unconfirmed": "條件單還沒確認或被 OKX 拒絕",
+    "no_stop_recorded": "紀錄裡沒有掛上條件單",
+    "stop_removed": "條件單已撤銷",
 }
 
 
@@ -61,6 +78,74 @@ def running_problem(status, heartbeat, timeframe_ms, now_ms):
     if now_ms - updated > STALE_BARS * timeframe_ms + STALE_SLACK_MS:
         return "bars_stalled"
     return None
+
+
+def holds_position(value):
+    """True for a readable non-zero position; None, "0" and anything unreadable are False."""
+    try:
+        return Decimal(str(value)) != 0
+    except (InvalidOperation, ValueError):
+        return False
+
+
+def _events_tail(run_dir):
+    try:
+        with (run_dir / "events.jsonl").open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            handle.seek(max(0, size - EVENTS_TAIL_BYTES))
+            raw = handle.read()
+    except OSError:
+        return []
+    rows = []
+    for line in raw.decode("utf-8", errors="replace").splitlines()[1 if size > EVENTS_TAIL_BYTES else 0:]:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if type(row) is dict:
+            rows.append(row)
+    return rows
+
+
+def protection_gap(run_dir, status, heartbeat):
+    """``(since_ms, why)`` while the run holds a position with no confirmed stop on OKX, else None.
+
+    ``why`` is a key of ``GAP_REASONS``. ``since_ms`` may be None when the time is unknown.
+    """
+    summary = (heartbeat or {}).get("protection")
+    if type(summary) is dict:  # written by the Bot from its ledger and what OKX answered
+        if not holds_position((heartbeat or {}).get("position")) or summary.get("confirmed") is True:
+            return None
+        try:
+            zero = Decimal(str(summary.get("ratio"))) == 0
+        except (InvalidOperation, ValueError):
+            zero = False
+        return iso_ms(summary.get("unprotected_since")), "ratio_zero" if zero else "unconfirmed"
+    if not holds_position(status.get("position")):
+        return None
+    # A Bot started before the heartbeat carried this: the same answer out of its event log.
+    ratio, placed, last_fill, since, why = None, None, None, None, "no_stop_recorded"
+    for row in _events_tail(run_dir):
+        kind = row.get("kind")
+        if kind in ("protection_config", "protection_config_changed"):
+            ratio = row.get("ratio")
+        elif kind == "fill":
+            last_fill = iso_ms(row.get("time"))
+        elif kind == "protection":
+            placed = row.get("price") is not None
+            since, why = (None, None) if placed else (iso_ms(row.get("time")), "stop_removed")
+        elif kind == "protection_alert":
+            placed, since, why = False, iso_ms(row.get("time")), "unconfirmed"
+    try:
+        zero = ratio is not None and Decimal(str(ratio)) == 0
+    except (InvalidOperation, ValueError):
+        zero = False
+    if zero:
+        return last_fill, "ratio_zero"
+    if placed:
+        return None
+    return (since if since is not None else last_fill), (why or "no_stop_recorded")
 
 
 def _read(path):
@@ -103,16 +188,48 @@ def judge(run_dir, now_ms):
     result.update(state=status.get("state"), stop_reason=status.get("stop_reason"), position=status.get("position"),
                   bars=status.get("bars"), updated_at=status.get("updated_at"))
     state = status.get("state")
+    gap = protection_gap(run_dir, status, heartbeat)
+    if gap is not None:
+        result.update(unprotected_since_ms=gap[0], unprotected_why=gap[1])
     if state == "running":
         problem = running_problem(status, heartbeat, timeframe, now_ms)
+        if problem is None and gap is not None and (gap[0] is None or now_ms - gap[0] > UNPROTECTED_GRACE_MS):
+            problem = "position_unprotected"
         return dict(result, verdict="alive") if problem is None else dict(result, verdict="problem", problem=problem)
     if state == "stopped" and str(status.get("stop_reason")) in OPERATOR_STOPS:
-        return dict(result, verdict="stopped_by_operator")
+        # Asked for, so not a problem; with a position left behind it is still worth one reminder
+        # (review F8): ``reminder`` is for the caller that knows this is the run that matters.
+        reminder = "stopped_with_position" if holds_position(status.get("position")) else None
+        return dict(result, verdict="stopped_by_operator", reminder=reminder)
     if state == "stopped":
         return dict(result, verdict="problem", problem="abnormal_stop")
     if state == "starting":
         return dict(result, verdict="starting")
     return dict(result, verdict="problem", problem="failed" if state == "failed" else "status_unreadable")
+
+
+def claimed_running(root, *, besides=None):
+    """Run folders whose status says ``running``, oldest first, without ``besides``.
+
+    The newest folder is not always the run that matters: a start that died right after writing
+    its manifest leaves an empty newest folder while the real run (and its position) is the one
+    before it (review F7, 2026-11-27).
+    """
+    found = []
+    try:
+        folders = list(root.iterdir())
+    except OSError:
+        return found
+    for path in folders:
+        if besides is not None and path == besides:
+            continue
+        manifest, _ = _read(path / "manifest.json")
+        if manifest is None or manifest.get("mode") not in (None, "okx-demo-bot"):
+            continue
+        status, _ = _read(path / "status.json")
+        if status is not None and status.get("state") == "running":
+            found.append((str(manifest.get("created_at") or ""), path))
+    return [path for _, path in sorted(found, key=lambda item: (item[0], item[1].name))]
 
 
 def newest_run(root):

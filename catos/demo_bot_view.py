@@ -3,6 +3,10 @@
 Reads the run folders the Bot writes (manifest.json, status.json, events.jsonl). It never
 connects to OKX, never reads credentials, and has no control endpoints: starting and
 stopping the Bot stay in the terminal (CLI).
+
+It also reads what the two scheduled tasks last wrote (``outputs/demo-bot-guardian``), so the
+page can say when nobody is watching the Bot: a Guardian that stopped running is otherwise
+invisible (review F3, 2026-11-27).
 """
 
 from __future__ import annotations
@@ -15,12 +19,13 @@ import re
 
 from fastapi import HTTPException
 
-from catos.demo_bot_liveness import read_heartbeat, running_problem
+from catos.demo_bot_liveness import UNPROTECTED_GRACE_MS, protection_gap, read_heartbeat, running_problem
 
 CONTRACT = "catos.demo-bot.v1"
 RUN_ID = re.compile(r"^[0-9a-f]{32}$")
 MAX_RUNS = 30
 MAX_EVENTS = 60
+WATCHER_MAX_MS = 900_000  # three missed five-minute runs of a scheduled task
 # Events kept for the UI and the fields each may show; anything else is left out (the manifest
 # copy in "started" carries the approval record, which the UI does not need).
 EVENT_FIELDS = {
@@ -75,10 +80,15 @@ def _summary(run_dir, now_ms):
     updated = _iso_ms(status.get("updated_at"))
     # Running but not believed (no new bar for over two bars, or the heartbeat stopped): the
     # rule is shared with the watch tool and the Guardian (catos.demo_bot_liveness).
-    liveness = running_problem(status, read_heartbeat(run_dir), tf, now_ms)
+    heartbeat = read_heartbeat(run_dir)
+    liveness = running_problem(status, heartbeat, tf, now_ms)
+    # Holding a position with no confirmed disaster stop on OKX for over the grace (review F2).
+    gap = protection_gap(run_dir, status, heartbeat) if status.get("state") == "running" else None
+    unprotected = gap is not None and (gap[0] is None or now_ms - gap[0] > UNPROTECTED_GRACE_MS)
     return dict(
         run_id=run_dir.name, created_at_ms=_iso_ms(manifest.get("created_at")),
         state=status.get("state", "unknown"), stale=liveness is not None, liveness=liveness,
+        unprotected=unprotected, unprotected_why=gap[1] if unprotected else None,
         stop_reason=status.get("stop_reason"),
         bars=status.get("bars", 0), fills=status.get("fills", 0), position=status.get("position"),
         updated_at_ms=updated, finished_at_ms=_iso_ms(status.get("finished_at")),
@@ -131,12 +141,37 @@ def _detail(run_dir, now_ms):
                 stop_hint=_hint(summary["stop_reason"]) if summary["stop_reason"] else None)
 
 
+def _task(path, now_ms, fields):
+    """What a scheduled task last wrote: never ran here, or when, and whether that is too long ago."""
+    try:
+        seen = _read_json(path)
+        checked = _iso_ms(seen.get("checked_at"))
+    except (OSError, ValueError, AttributeError):
+        return dict(checked_at_ms=None, stale=True)
+    return dict(checked_at_ms=checked, stale=checked is None or now_ms - checked > WATCHER_MAX_MS,
+                **{name: seen.get(name) for name in fields})
+
+
+def _watch(watch_dir, now_ms):
+    guardian = _task(watch_dir / "last_check.json", now_ms, ("verdict",))
+    try:
+        findings = _read_json(watch_dir / "last_check.json").get("findings") or []
+        guardian["findings"] = [dict(problem=item.get("problem"), message=item.get("message"))
+                                for item in findings if isinstance(item, dict)][:10]
+    except (OSError, ValueError, AttributeError):
+        guardian["findings"] = []
+    autostart = _task(watch_dir / "autostart_check.json", now_ms, ("action", "reason"))
+    autostart["disabled"] = (watch_dir / "autostart.disabled").exists()
+    return dict(guardian=guardian, autostart=autostart)
+
+
 def _now_ms():
     return int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
-def mount_demo_bot(app, *, root):
+def mount_demo_bot(app, *, root, watch_dir=None):
     root = Path(root)
+    watch_dir = root.parent / "demo-bot-guardian" if watch_dir is None else Path(watch_dir)
 
     def run_dirs():
         if not root.is_dir():
@@ -164,7 +199,7 @@ def mount_demo_bot(app, *, root):
                 current = _detail(root / runs[0]["run_id"], now)
             except (OSError, ValueError, TypeError, AttributeError):
                 current = None
-        return dict(contract=CONTRACT, runs=runs, current=current, observed_at_ms=now)
+        return dict(contract=CONTRACT, runs=runs, current=current, watch=_watch(watch_dir, now), observed_at_ms=now)
 
     @app.get("/api/workspace/demo-bot/runs/{run_id}")
     def run(run_id: str):
