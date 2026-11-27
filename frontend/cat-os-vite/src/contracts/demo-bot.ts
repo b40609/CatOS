@@ -10,6 +10,9 @@ export interface DemoBotRunSummaryDTO {
   state: 'starting' | 'running' | 'stopped' | 'failed' | 'unknown' | string;
   /** Status says running, but nothing was written for over two bars: the process likely died. */
   stale: boolean;
+  /** Running and holding a position with no confirmed disaster stop on OKX for over three minutes. */
+  unprotected?: boolean;
+  unprotected_why?: 'ratio_zero' | 'unconfirmed' | 'no_stop_recorded' | 'stop_removed' | string | null;
   stop_reason: string | null;
   bars: number;
   fills: number;
@@ -64,9 +67,23 @@ export interface DemoBotRunDetailDTO extends DemoBotRunSummaryDTO {
   stop_hint: string | null;
 }
 
+/** What a scheduled task last wrote; `stale` when it never ran here or has been silent for over 15 minutes. */
+export interface DemoBotTaskDTO {
+  checked_at_ms: number | null;
+  stale: boolean;
+}
+
+export interface DemoBotWatchDTO {
+  /** The Guardian: the outside check that tells the owner when the Bot stops or a position has no stop. */
+  guardian: DemoBotTaskDTO & { verdict?: string | null; findings: { problem: string | null; message: string | null }[] };
+  /** The autostart gate: continues the Bot after an interruption, never after a risk stop. */
+  autostart: DemoBotTaskDTO & { action?: string | null; reason?: string | null; disabled: boolean };
+}
+
 export interface DemoBotOverviewDTO {
   contract: 'catos.demo-bot.v1';
   runs: DemoBotRunSummaryDTO[];
   current: DemoBotRunDetailDTO | null;
+  watch?: DemoBotWatchDTO;
   observed_at_ms: number;
 }

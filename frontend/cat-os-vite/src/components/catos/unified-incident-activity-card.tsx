@@ -548,6 +548,7 @@ export function UnifiedIncidentActivityCard({ className }: UnifiedIncidentActivi
       const demoItems = buildDemoBotActionItems({
         runs: signals.demoBot?.runs ?? [],
         demoBotError: signals.demoBotError,
+        watch: signals.demoBot?.watch ?? null,
       });
       for (const item of demoItems) {
         list.push(item);

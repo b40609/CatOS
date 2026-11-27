@@ -4,7 +4,7 @@ import { AppShell, PageHead, Panel } from "@/components/catos/shell";
 import { fetchDemoBotOverview, fetchDemoBotRun } from "@/adapters/demo-bot-api-adapter";
 import type { DemoBotEventDTO, DemoBotOverviewDTO, DemoBotRunDetailDTO, DemoBotRunSummaryDTO } from "@/contracts/demo-bot";
 import { formatDateTime, formatDecimal, formatRatioPct, formatTimeframe, shortId } from "@/lib/format";
-import { isOperatorStop } from "@/lib/status-truth";
+import { guardianSilent, isOperatorStop, unprotectedText } from "@/lib/status-truth";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/demo-bot")({
@@ -18,6 +18,7 @@ type Health = { label: string; tone: string };
 
 function health(run: DemoBotRunSummaryDTO): Health {
   if (run.state === "running" && run.stale) return { label: "無回應", tone: "text-down" };
+  if (run.state === "running" && run.unprotected) return { label: "帶倉無停損", tone: "text-down" };
   if (run.state === "running") return { label: "運行中", tone: "text-up" };
   if (run.state === "failed") return { label: "錯誤停止", tone: "text-down" };
   if (run.state === "stopped" && !isOperatorStop(run.stop_reason)) return { label: "異常停止", tone: "text-warn" };
@@ -118,6 +119,13 @@ function DemoBotPage() {
                 right={h && <span className={cn("font-mono text-t2 font-bold", h.tone)}>{h.label}</span>} />
 
       {error && <div className="mb-2 rounded border border-down/40 px-3 py-1.5 text-t2 font-mono text-down">讀取失敗：{error}</div>}
+      {overview && guardianSilent(overview.runs, overview.watch) && (
+        <div className="mb-2 rounded border border-warn/40 bg-warn/5 px-3 py-1.5 text-t2 font-mono text-warn">
+          監看沒在跑：{overview.watch?.guardian.checked_at_ms
+            ? `監看程式最後一次檢查是 ${formatDateTime(overview.watch.guardian.checked_at_ms)}`
+            : "監看程式在這台電腦沒有跑過"}。Bot 停下或部位沒有停損時不會有人通知你
+        </div>
+      )}
       {!run && !error && <div className="px-3 py-8 text-center text-t2 text-muted-foreground font-mono">
         {overview ? "還沒有模擬盤 Bot 的 run" : "讀取中…"}</div>}
 
@@ -126,6 +134,11 @@ function DemoBotPage() {
           {run.stale && (
             <div className="mb-2 rounded border border-down/40 bg-down/5 px-3 py-1.5 text-t2 font-mono text-down">
               {formatDateTime(run.updated_at_ms)} 之後沒有更新，程序可能已結束
+            </div>
+          )}
+          {run.unprotected && (
+            <div className="mb-2 rounded border border-down/40 bg-down/5 px-3 py-1.5 text-t2 font-mono text-down">
+              有部位，但 OKX 上沒有已確認的保底停損條件單（{unprotectedText(run.unprotected_why)}）；電腦當機或斷線時這個部位沒有停損
             </div>
           )}
           {run.stop_reason && (

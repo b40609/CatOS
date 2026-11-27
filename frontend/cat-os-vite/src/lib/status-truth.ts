@@ -2,7 +2,7 @@
  * Shared authoritative status derivation helpers so UI surfaces never lie about
  * latched risk, abnormal stops, silent read failures, or offline sync (2026-11-27).
  */
-import type { DemoBotRunSummaryDTO } from '@/contracts/demo-bot';
+import type { DemoBotRunSummaryDTO, DemoBotWatchDTO } from '@/contracts/demo-bot';
 import type { RiskStatus } from '@/contracts/risk';
 import { formatClock, shortId } from '@/lib/format';
 
@@ -167,11 +167,31 @@ function clockFromMs(ms: number | null | undefined): string | null {
   return formatClock(ms);
 }
 
+const UNPROTECTED_WHY: Record<string, string> = {
+  ratio_zero: '這個 run 的保底停損比例是 0%',
+  unconfirmed: '條件單還沒確認或被 OKX 拒絕',
+  no_stop_recorded: '紀錄裡沒有掛上條件單',
+  stop_removed: '條件單已撤銷',
+};
+
+export function unprotectedText(why: string | null | undefined): string {
+  return UNPROTECTED_WHY[why ?? ''] ?? 'OKX 上沒有已確認的條件單';
+}
+
+/** Nobody is watching a Bot that is running: the Guardian never ran here or went silent (review F3). */
+export function guardianSilent(
+  runs: DemoBotRunSummaryDTO[],
+  watch: DemoBotWatchDTO | null | undefined
+): boolean {
+  return Boolean(watch?.guardian.stale) && runs.some((run) => run.state === 'running');
+}
+
 export function buildDemoBotActionItems(params: {
   runs: DemoBotRunSummaryDTO[];
   demoBotError: string | null;
+  watch?: DemoBotWatchDTO | null;
 }): DemoBotActionItemSpec[] {
-  const { runs, demoBotError } = params;
+  const { runs, demoBotError, watch } = params;
   const list: DemoBotActionItemSpec[] = [];
 
   if (demoBotError) {
@@ -195,6 +215,29 @@ export function buildDemoBotActionItems(params: {
       primaryAction: { label: '檢視 Bot', route: '/demo-bot' },
     });
     return list;
+  }
+
+  if (guardianSilent(runs, watch)) {
+    const last = clockFromMs(watch?.guardian.checked_at_ms);
+    list.push({
+      id: 'p1-demo-guardian-silent',
+      sev: 'p1',
+      code: 'WATCH',
+      tone: 'warn',
+      alert: true,
+      time: last,
+      tag: '監看沒在跑',
+      title: '模擬盤 Bot 沒有人監看',
+      symbol: 'OKX Demo',
+      brief: last ? `監看程式最後一次檢查 ${last}` : '監看程式在這台電腦沒有跑過',
+      hero: { value: '監看沒在跑', tone: 'warn' },
+      fact: 'Bot 停下或部位沒有停損時不會有人通知你；請到工作排程器確認 CatOS-DemoBot-Guardian-5m 還在',
+      metrics: [
+        { label: '最後檢查', value: last ?? '沒有紀錄', tone: 'warn' },
+        { label: '排程', value: 'CatOS-DemoBot-Guardian-5m' },
+      ],
+      primaryAction: { label: '檢視 Bot', route: '/demo-bot' },
+    });
   }
 
   const latestDemoByStrat = new Map<string, DemoBotRunSummaryDTO>();
@@ -251,6 +294,28 @@ export function buildDemoBotActionItems(params: {
           { label: '部位', value: `${run.position ?? '0'} 張`, tone: openPos ? 'down' : undefined },
         ],
         primaryAction: { label: '檢視 Bot', route: '/demo-bot', tone: openPos ? 'danger' : undefined },
+      });
+    } else if (run.state === 'running' && run.unprotected) {
+      const why = unprotectedText(run.unprotected_why);
+      list.push({
+        id: `p0-demo-unprotected-${run.run_id}`,
+        sev: 'p0',
+        code: 'STOP',
+        tone: 'down',
+        alert: true,
+        time: clockFromMs(run.updated_at_ms),
+        tag: '帶倉無停損',
+        title: run.strategy_id ?? shortId(run.run_id),
+        symbol: 'OKX Demo',
+        brief: `run ${shortId(run.run_id)} · 部位 ${run.position ?? '0'} 張 · ${why}`,
+        hero: { value: '無停損', tone: 'down' },
+        fact: `run ${shortId(run.run_id)} 有部位，但 OKX 上沒有已確認的保底停損條件單（${why}）`,
+        metrics: [
+          { label: 'run', value: shortId(run.run_id) },
+          { label: '部位', value: `${run.position ?? '0'} 張`, tone: 'down' },
+          { label: '保底停損', value: why, tone: 'down' },
+        ],
+        primaryAction: { label: '檢視 Bot', route: '/demo-bot', tone: 'danger' },
       });
     } else if (run.state === 'stopped' && !isOperatorStop(run.stop_reason)) {
       const critical =

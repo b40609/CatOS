@@ -130,3 +130,40 @@ test('CAT-BX-04: abnormal stopped runs, read failures, and stale runs with posit
   assert.equal(errItems.length, 1);
   assert.equal(errItems[0].title, '讀不到模擬盤 Bot');
 });
+
+test('Review F2/F3 (2026-11-27): a position with no stop and a silent Guardian are action items', async () => {
+  const truth = await server.ssrLoadModule('/src/lib/status-truth.ts');
+  const running = {
+    run_id: '3'.repeat(32),
+    created_at_ms: 400,
+    state: 'running',
+    stale: false,
+    unprotected: true,
+    unprotected_why: 'unconfirmed',
+    stop_reason: null,
+    bars: 20,
+    fills: 1,
+    position: '1',
+    updated_at_ms: 400,
+    strategy_id: 'donchian-breakout',
+  };
+  const fresh = { guardian: { checked_at_ms: 1000, stale: false, findings: [] }, autostart: { checked_at_ms: 1000, stale: false, disabled: false } };
+  const silent = { guardian: { checked_at_ms: null, stale: true, findings: [] }, autostart: { checked_at_ms: null, stale: true, disabled: false } };
+
+  const unprotected = truth.buildDemoBotActionItems({ runs: [running], demoBotError: null, watch: fresh });
+  assert.deepEqual(unprotected.map((x) => [x.sev, x.tag]), [['p0', '帶倉無停損']]);
+  assert.match(unprotected[0].fact, /還沒確認或被 OKX 拒絕/);
+
+  const covered = truth.buildDemoBotActionItems({ runs: [{ ...running, unprotected: false }], demoBotError: null, watch: fresh });
+  assert.deepEqual(covered, []);
+
+  const unwatched = truth.buildDemoBotActionItems({ runs: [{ ...running, unprotected: false }], demoBotError: null, watch: silent });
+  assert.deepEqual(unwatched.map((x) => [x.sev, x.tag]), [['p1', '監看沒在跑']]);
+
+  // Nothing is running: a silent Guardian has nothing to miss. An older API without `watch` stays quiet too.
+  const stopped = { ...running, state: 'stopped', stop_reason: 'operator_stop', unprotected: false };
+  assert.deepEqual(truth.buildDemoBotActionItems({ runs: [stopped], demoBotError: null, watch: silent }), []);
+  assert.deepEqual(truth.buildDemoBotActionItems({ runs: [{ ...running, unprotected: false }], demoBotError: null }), []);
+  assert.equal(truth.guardianSilent([running], silent), true);
+  assert.equal(truth.guardianSilent([running], fresh), false);
+});
