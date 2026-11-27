@@ -83,6 +83,7 @@ class FakeOkx:
         self.drop_posts = 0                # the next N orders never reach OKX (connection error / 503)
         self.server_skew = 0               # OKX server time minus local time, ms
         self.time_failures = 0             # next N public/time reads fail
+        self.candle_failures = 0           # next N market/candles reads answer HTTP 503
         self.exp_times = []                # expTime header of every order POST (None when absent)
         self.time_lag = 0                  # public/time answers this much behind OKX's real clock
         self.hide_until = 0                # order queries answer "does not exist" until this local time
@@ -142,6 +143,9 @@ class FakeOkx:
             return ok([{"instId": "BTC-USDT-SWAP", "ordId": str(9000 + i), "side": "buy", "sz": "1", "state": "live"}
                        for i in range(self.pending)])
         if path == "/api/v5/market/candles":
+            if self.candle_failures:
+                self.candle_failures -= 1
+                return 503, b'{"code":"50001","msg":"Service temporarily unavailable","data":[]}'
             rows = []
             for i in range(len(BARS)):
                 t = self.bar_time(i)

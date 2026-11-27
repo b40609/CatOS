@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
-from catos import demo_bot, local_sim_r4
+from catos import demo_bot, kill_switch, local_sim_r4
 from catos.demo_bot import BotStopped
 from catos.demo_bot_liveness import iso_ms
 
@@ -351,6 +351,50 @@ class KillReentryTests(_Base):
         self.assertEqual((kinds.count("kill_switch"), kinds.count("flatten")), (1, 1), kinds)
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
         self.assertEqual((status["position"], fake.position), ("0", 0))
+
+
+class KillDuringStartupBackoffTests(_Base):
+    """Review F9 (2026-11-27): the read backoff of the warm-up and of a resume checked stop.request
+    but not the Kill-Switch, so an outage right after an automatic resume ignored Kill for ~10 minutes."""
+
+    @staticmethod
+    def kill_once_after(started_ms, delay_ms, engaged):
+        def on_sleep(now):
+            if not engaged and now > started_ms + delay_ms:
+                kill_switch.engage(reason="startup outage", actor="cli")
+                engaged.append(now)
+        return on_sleep
+
+    def test_kill_during_the_warm_up_backoff_stops_the_start(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        fake.candle_failures = 10**9  # the warm-up history never arrives
+        engaged = []
+        bot = self.make_bot(fake, clock, on_sleep=self.kill_once_after(clock.ms, 60_000, engaged),
+                            disaster_stop=self.TEN)
+        status = self.run_bot(bot)
+        self.assertTrue(engaged)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertLess(clock.ms - engaged[0], 30_000)  # not the ten-minute read budget
+        self.assertEqual((fake.posts, fake.position), ([], 0))
+        kinds = [e["kind"] for e in self.events()]
+        self.assertEqual(kinds.count("kill_switch"), 1, kinds)
+
+    def test_kill_during_the_resume_backoff_flattens_the_resumed_position(self):
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        self.stop_with_a_long_position(fake, clock, self.TEN)
+        clock.ms = fake.bar_time(6) + 1_000
+        fake.candle_failures = 10**9  # the resume's candles read fails (after the ledger is reconciled)
+        engaged = []
+        bot = self.make_bot(fake, clock, on_sleep=self.kill_once_after(clock.ms, 60_000, engaged), run="run2")
+        status = self.run_bot(bot)
+        self.assertTrue(engaged)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertLess(clock.ms - engaged[0], 180_000)
+        self.assertEqual((status["position"], fake.position), ("0", 0))
+        kinds = [e["kind"] for e in self.events()]
+        self.assertEqual((kinds.count("kill_switch"), kinds.count("flatten_done")), (1, 1), kinds)
 
 
 if __name__ == "__main__":

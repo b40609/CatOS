@@ -26,8 +26,10 @@ Soft latch stays until the user runs ``demo rearm``. A Hard loss also engages th
 Kill-Switch record (actor ``demo-bot``), which only the user can clear.
 
 Reads from OKX are retried with backoff before the run stops; while flattening they are
-retried for about two minutes. Between bars, with a position open, the account is
-observed every minute so Hard/Soft and foreign changes do not wait for the bar close.
+retried for about two minutes. Every wait in that backoff (warm-up and resume included)
+answers stop requests and the Kill-Switch within a second. Between bars, with a position
+open, the account is observed every minute so Hard/Soft and foreign changes do not wait
+for the bar close.
 
 Resuming (2026-11-17, user "按照你建議執行"): when OKX shows a position at start, the
 run the account file points to is reopened instead of refusing, but only if that run's
@@ -303,7 +305,9 @@ class DemoBot:
         self.protection_configured = False
         self.heartbeat_s = HEARTBEAT_S
         self._last_heartbeat_ms = None
-        self._in_main_loop = False
+        # The Supervisor is running: from here every read backoff also answers the Kill-Switch,
+        # the warm-up and a resume included (review F9 2026-11-27; it used to start with the main loop).
+        self._kill_armed = False
         self._killing = False  # the Kill flatten is under way: its own waits never start it again
         self._guard_summary = None  # position and disaster stop as last seen, for the heartbeat
         self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
@@ -360,7 +364,7 @@ class DemoBot:
                     raise BotStopped("operator_stop")
                 if self.output_dir.exists() and (self.output_dir / "stop.request").exists():
                     raise BotStopped("operator_stop_file")
-                if self._in_main_loop and not self._killing:
+                if self._kill_armed and not self._killing:
                     await self._kill_check()
             await self.sleep(min(1.0, max(0.05, (end_ms - self.wall_ms()) / 1000)))
 
@@ -842,6 +846,7 @@ class DemoBot:
             self.log.event("previous_run_unsettled", message, **fields)
         try:
             await self.supervisor.start()
+            self._kill_armed = True
             # A resumed ledger that already latched Hard engaged the Kill-Switch back then.
             self.hard_engaged = "hard_loss" in self.supervisor.risk_state.reasons
             if self.account_state["soft_latched"]:
@@ -1039,7 +1044,6 @@ class DemoBot:
             seq, last_open = await self._warm_up(facts)
         else:
             seq, last_open = await self._resume()
-        self._in_main_loop = True
         while True:
             bars = await self._wait_for_bar(last_open + self.tf)
             for row in bars:
