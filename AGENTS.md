@@ -105,6 +105,7 @@
 - 2026-11-17 使用者對 P6 驗收觀察「反手被風控擋下時要不要至少平倉」回覆「改」：核准部署（Bot）的反手被加倉閘門擋下時（Soft／Hard 鎖存模式、風控健康、當日基準缺漏、曝險額度、保底停損未確認），仍以只減倉單平掉原部位，只拒絕反向開倉（`risk.evaluate` 的 `reversal_close_only`）；不是反手的加倉照舊整筆拒絕。這是「合法減倉始終允許」的延伸，不改 INVARIANTS 條文。
 - 2026-11-17 使用者對「讓 Agent 提交策略」方案（`docs/agent-strategy-submission-proposal.md`）3 題回覆「完全同意你的所有建議」：1 研究階段不用核准，`strategies/` 資料夾裡的策略 Agent 可直接回測、優化、滾動驗證，只有上 Bot 要使用者核准，並改寫 P1 對應的一句；2 策略資料夾加進 git 忽略，只追蹤範例策略與說明；3 刪掉從沒接上的上傳合約 `catos/python_strategy.py` 與 skip 的測試（同一組未接通的 `strategy_library.py`、`strategy_mcp.py` 與兩個證據腳本一併刪，git 有歷史）。不含新的資料採集、Demo／Live 範圍變更或代理代為核准。
 - 2026-11-18 使用者對 Gemini 第二意見審查的修法選「授權查歷史（建議）」：模擬盤 Bot 可以多呼叫一個唯讀端點 `GET /api/v5/trade/orders-algo-history`，只在 `order-algo` 查不到自己的保底停損時，用來補查已結束（effective／canceled／order_failed）的條件單；不能下單或撤單，同一個模擬盤主機。Live 仍未授權。
+- 2026-11-27 使用者對全專案優化檢視的決策題 3 回覆「3.同意建議」「3A（推薦）：告警直接接 OmniKeep 現有通知」。當時列給使用者的 3A 內容：告警直接接 OmniKeep 現有通知（Telegram／Web Push），跨家審查抓到的 4 個 P1 派回修；並授權模擬盤開機後自動接續（固定帶 10% 保底停損，觸發風控或 Kill-Switch 就停機告警）。範圍：只限 OKX 模擬盤與核准的正式部署設定（`catos/deployment_profiles/donchian-breakout-15m-192-48.json`），由 `tools/demo_bot_autostart.py` 與兩個排程執行；風控停機、Kill-Switch 與其他要人看過的停止原因不自動重開，只告警。代理決定、可推翻：(1) 因讀不到 OKX 或 K 線沒到而停下（`okx_read_failed`、`bar_not_published`、`bar_gap`）也算可接續；(2) 24 小時最多自動接續 3 次、間隔至少 10 分鐘；(3) 開新的 run 沒寫 `--disaster-stop` 就拒絕啟動，要 0 必須明寫 `0%`（審查 F4 的建議。INVARIANTS P6「預設 0% 表示不啟用」的條文沒有改，要不要改寫由使用者定案）；(4) 告警以子行程呼叫 OmniKeep 的 `app.owner_alert.send`，CatOS 不讀 OmniKeep 的設定與金鑰。代理不得解除 Kill-Switch、不得執行 `demo rearm` 的紅線不變；Live 仍未授權。
 
 ## INVARIANTS
 

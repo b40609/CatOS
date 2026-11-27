@@ -172,9 +172,22 @@ FastAPI 只綁定 `127.0.0.1`。介面尚未建置時，8770 的首頁會回 503
 - 部位對不上、帳戶出現別的部位或掛單、委託狀態不明、K 線斷掉都會停下並寫明原因，不重送、不接管。讀 OKX 短暫失敗會先退避重試幾次。
 - Ctrl+C 或在紀錄資料夾建立 `stop.request`：停止，**部位留著不平**；用同一個指令重開會接續。
 - 紀錄在 `outputs/okx-demo-bot/<run_id>/`：`events.jsonl`（每根 K 線、成交、風控）、`status.json`、`fills.json`、帳本 `state.sqlite3`；接續的 run 寫在同一個資料夾，`manifest.json` 的 `resumes` 記每次接續。
-- `--disaster-stop 10%`（保底停損，P6；新 run 不寫預設是 0、不掛，啟動時會明示提醒）：每次有部位，Bot 都在 OKX 掛一張條件單，價格從進場均價反向 10% 時（標記價格觸發），由 OKX 以市價把整個部位平掉。電腦當機、斷線時它照樣有效。加倉、反手、平倉時跟著改價或撤掉；OKX 確認掛上之前不加倉。OKX 觸發之後 Bot 停下並寫明原因；通常 OKX 那時已經空倉，用同一個指令重開是新的 run。停損單沒有完全成交、OKX 還有部位時，Bot 會說明，要你到 OKX 網頁手動平倉（帳本已對不上，Bot 不替你下單）。確認前停損狀態不明時只擋加倉，出場與 Kill／Hard 清倉照常。接續時若沒寫 `--disaster-stop` 會自動沿用上一次 run 記錄的比例，要撤掉必須明寫 `--disaster-stop 0%`。
+- `--disaster-stop 10%`（保底停損，P6；開新的 run 一定要寫，沒寫不啟動，確定不掛就明寫 `0%`；沒有 `%` 的小數如 `0.1` 會被拒絕，避免把 10% 寫成 0.1%）：每次有部位，Bot 都在 OKX 掛一張條件單，價格從進場均價反向 10% 時（標記價格觸發），由 OKX 以市價把整個部位平掉。電腦當機、斷線時它照樣有效。加倉、反手、平倉時跟著改價或撤掉；OKX 確認掛上之前不加倉。OKX 觸發之後 Bot 停下並寫明原因；通常 OKX 那時已經空倉，用同一個指令重開是新的 run。停損單沒有完全成交、OKX 還有部位時，Bot 會說明，要你到 OKX 網頁手動平倉（帳本已對不上，Bot 不替你下單）。確認前停損狀態不明時只擋加倉，出場與 Kill／Hard 清倉照常。接續時若沒寫 `--disaster-stop` 會自動沿用上一次 run 記錄的比例，要撤掉必須明寫 `--disaster-stop 0%`。
 - 帳戶裡有不是 Bot 掛的條件單、止盈止損、計畫或追蹤委託，一律當成陌生委託：不啟動，或在跑的 Bot 停下。
 - 還沒做：介面上的啟動按鈕。
+
+**沒人看著的時候：監看、告警、自動接續**（Windows 工作排程器，三個排程都用你的帳號、登入後才會跑）
+
+| 排程 | 做什麼 |
+| --- | --- |
+| `CatOS-DemoBot-Guardian-5m` | 每 5 分鐘執行 `tools/demo_bot_guardian.py`，只讀 run 資料夾，不連 OKX、不啟動也不停止 Bot。回報：寫 running 但超過兩根 K 線沒更新或心跳停了；不是你要它停的停止；有部位但 OKX 上沒有已確認的保底停損超過 3 分鐘；你要它停但部位還留著（提醒一次）；自動接續的排程超過 15 分鐘沒跑 |
+| `CatOS-DemoBot-Autostart-5m` | 每 5 分鐘執行 `tools/demo_bot_autostart.py`（閘門），只讀 run 資料夾與 Kill-Switch 紀錄。程序不見（重開機、當機）、啟動沒跑起來、或因讀不到 OKX／K 線沒到而停下 → 啟動下面那個排程。風控停機（`risk_flat`、`manual_kill`、清倉失敗）、其他任何停止原因、程式錯誤、Kill-Switch 觸發或讀不到、上一次不是正式設定、24 小時超過 3 次 → 不重開，只告警。你要它停的、還活著的 → 不動。也監看 Guardian 有沒有在跑 |
+| `CatOS-DemoBot-Run` | 沒有觸發器，由閘門（或你手動 `schtasks /Run /TN CatOS-DemoBot-Run`）啟動。再判一次，然後執行 `demo bot --profile catos/deployment_profiles/donchian-breakout-15m-192-48.json --disaster-stop 10%`（設定檔與 10% 寫死在工具裡），輸出逐行寫進 `outputs/demo-bot-guardian/bot-output.log` |
+
+- 告警先跳這台電腦的 Windows 通知；`~/.catos/owner-alert.json` 存在時再經 OmniKeep 發到手機（Telegram／Web Push／LINE，看你在 OmniKeep 設了哪些）。內容是 `{"omnikeep_root": "<OmniKeep 資料夾>", "python": "<OmniKeep 用的 python.exe>"}`。CatOS 用那個 Python 在子行程呼叫 OmniKeep 的 `app.owner_alert.send`，只取回各管道送達幾則，不讀 OmniKeep 的設定或金鑰。OmniKeep 不在、失敗或沒有任何管道送達：記下原因，本機通知照發，之後每 5 分鐘補送（約一小時後改等 6 小時重發）。同一個問題 6 小時重發一次，解除時手機收到一則「狀況解除」。
+- 紀錄在 `outputs/demo-bot-guardian/`：`last_check.json`、`alerts.jsonl`（Guardian）、`autostart_check.json`、`autostart.jsonl`（閘門與每次啟動）、`errors.log`（兩支工具自己出錯；出錯也會告警）。模擬盤頁在監看超過 15 分鐘沒跑、或帶倉無停損時會標出來。
+- 關掉自動接續：建立 `outputs/demo-bot-guardian/autostart.disabled`（內容不拘）。
+- 限制：排程是「登入後才執行」，電腦重開機後要有人登入 Windows 才會接續與告警（不存密碼的 S4U 排程要系統管理員權限才能註冊，見 `docs/next-steps.md`）；電腦關機或兩個排程同時被移除時沒有任何東西會通知你；勿擾模式與鎖定畫面下 Windows 通知不一定看得到，所以才接手機。
 
 ## 研究資料
 

@@ -27,6 +27,12 @@
   - 觸發（2026-11-18，`demo protection-check --trigger`，紀錄 `reports/okx-demo-protection-check/1794980390196.json`）：把觸發價設在現價附近讓 OKX 觸發。`order-algo` 回 `effective`，`orders-algo-history` 的 effective 也有，轉接層判定 TRIGGERED，觸發後部位 0。觸發後 OKX 會把 `sz` 填上成交張數，所以「被改成部分張數」只看 `slOrdPx` 與 `closeFraction`。
   - 沒測到：觸發失敗、幾小時後的查詢結果、改單被拒。
 - 獨立存活監看（Guardian）與唯讀核對（2026-11-27）：共用存活規則在 `catos/demo_bot_liveness.py`（`status.json` 逾兩根 K 線未更新判 `bars_stalled`、`heartbeat.json` 逾 5 分鐘未更新判 `process_lost`）。Windows 工作排程器 `CatOS-DemoBot-Guardian-5m` 以使用者帳號每 5 分鐘執行 `tools/demo_bot_guardian.py`，逾時或非人工停止就跳 Windows 本機通知並寫入 `outputs/demo-bot-guardian/alerts.jsonl` 與 `last_check.json`。另有 `.venv/Scripts/python.exe tools/demo_bot_watch.py`（依成交重算均價與停損價，已納入 `stalled` 判定與 `bars` 指紋；舊的每小時 T3 排程於 11-20 17:55 最後一次執行後已清空停用，不再由 AI 對話輪詢）。
+- **告警接手機、自動接續、審查 P1 修補（2026-11-27，使用者核准 3A）**：用法與限制寫在 README「沒人看著的時候」。
+  - Guardian 多看四件事：有部位但 OKX 上沒有已確認的保底停損超過 3 分鐘（新 Bot 看心跳裡的 `protection`，11-27 04:22 啟動的這個舊程序從 `events.jsonl` 推導）、人工停止但留倉（提醒一次）、不是最新資料夾但仍寫 running 的 run、自動接續排程超過 15 分鐘沒跑。Guardian 自己出錯（含 `catos` 匯入失敗）也會告警。
+  - 告警管道：本機 Windows 通知＋OmniKeep（`tools/demo_bot_notify.py`，設定在 `~/.catos/owner-alert.json`）。**還沒有實際發過一則到手機**（禁止未經確認對外發送）：呼叫契約用假的 OmniKeep 在子行程實測過，真的 OmniKeep 只做了匯入檢查。第一次真的告警發生時才知道手機收不收得到，建議找個時間由使用者同意後演練一次。
+  - 自動接續：`CatOS-DemoBot-Autostart-5m`（閘門）＋`CatOS-DemoBot-Run`（Bot 自己的排程）。只有程序不見、啟動沒跑起來、讀不到 OKX／K 線沒到這幾種才啟動，固定 `--disaster-stop 10%`；風控停機、Kill-Switch 與其他原因只告警。**實際由排程把 Bot 帶起來這條路還沒走過**（現場 Bot 一直活著，不能為了測試把它停掉）；走過的是閘門對現場判定「已在跑」、Bot 排程被手動觸發時同樣判定不啟動。
+  - 開新的 run 沒寫 `--disaster-stop` 會拒絕啟動（`disaster_stop_required`），要 0 明寫 `0%`。
+  - 現場 Bot（PID 44708，11-27 04:22 啟動）跑的是修補前的程式，這輪沒有重開它；心跳帶停損狀態、Kill 清倉不重入要等它下次重開才生效。
 - 帳戶紀錄 `~/.catos/okx-demo-accounts/dfa73b44….json` 在 11-17 11:21 新建，之後的 run 沿用。
 - 看狀態：讀 run 資料夾的 `status.json`、`heartbeat.json`、`events.jsonl`。停止：Ctrl+C（部位保留）、run 資料夾建 `stop.request`，或 `kill engage`（會平倉，之後要使用者解除）。
 - 重新啟動：`.venv\Scripts\python.exe -m catos.cli demo bot --profile catos\deployment_profiles\donchian-breakout-15m-192-48.json --disaster-stop 10%`。有部位時會接續同一個 run（限制見「已知缺口」）；接續時若未指定 `--disaster-stop` 會自動沿用 manifest 的比例，要撤掉須明示 `--disaster-stop 0%`；核准仍有效就不用重做。
@@ -118,6 +124,11 @@
 
 ## 等使用者決定
 
+- 模擬盤無人看守（2026-11-27）：
+  - 重開機後沒人登入就不會接續也不會告警：三個排程都是「登入後才執行」。要改成未登入也跑（S4U，不存密碼）得用系統管理員權限註冊，代理在非提權下被拒（`存取被拒`）。要做的話由你在系統管理員 PowerShell 對三個排程各執行一次 `Set-ScheduledTask -TaskName <名稱> -Principal (New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType S4U)`；S4U 下 Windows 通知跳不出來，只剩手機那條。
+  - INVARIANTS P6 條文仍寫「預設 0% 表示不啟用」。程式現在是「開新的 run 沒寫比例就不啟動，0 要明寫」。建議把條文改成「每個 Bot 可獨立設定災難停損比例，0% 表示不啟用；開新的 run 必須明寫比例，沒寫不啟動」，要你拍板。
+  - 要不要演練一次真的手機告警（會發一則測試訊息到你的 Telegram／Web Push）。
+  - 沒做的審查項目：F6（讀取延遲 9 分鐘後仍照舊訊號下單；要區分「晚到的減倉照送、加倉不送」，動到下單路徑，需要方案與獨立驗收）、F9（接續與預熱階段的讀取退避不查 Kill-Switch）、F10 前半（帶倉接續當下可能多一次「超過兩根 K 線沒更新」的告警）、F12 的 `git gc --prune=now`（清掉 `.git` 裡 cdp-profile 的殘留物件，屬刪除類）、F13（三處 `animate-pulse`）。
 - 前端：方向 Ryan 11-17 已定（舊版專業終端風格當底、字要少、不放解說句與「一句話結論」橫幅、不用裝飾性顏色；個人化照 Z 但精簡）。候選稿在 `docs/design/2026-11-16-redesign-pick/`；待答：X、Y、Z 各保留哪些元素。
   - 總覽「待處理與事件審計」卡 2026-11-25 定案架構 8（待處理手風琴與審計流水共用一條光軌），已寫進 `unified-incident-activity-card.tsx`，樣式在 `src/styles/incident-feed.css`。光點同日定案「刻線實心點」（7px 純色、光軌在點上下各留 3px 切口），不做動畫（使用者：動畫先不要）。對照稿留在 `docs/design/2026-11-25-incident-feed-pick/` 與 `docs/design/2026-11-25-incident-dot-pick/`。未經獨立驗收（純介面）。
 - 第 6 步（同幣種多策略）的做法草案，見封存檔。
