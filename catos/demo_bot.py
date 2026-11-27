@@ -291,7 +291,8 @@ class DemoBot:
                  kill_path=None, accounts_dir=None, disaster_stop=None, new_run=False):
         self.client = client
         # P6 (2026-11-17): exchange-side disaster stop as a fraction of the average entry price; 0 = off.
-        # None = not given on the command line (0 on a new run; inherited from the manifest on a resume).
+        # None = not given on the command line: a resume inherits the manifest's ratio; a new run refuses
+        # to start (disaster_stop_required, review F4 2026-11-27). 0 has to be written to mean "no stop".
         if disaster_stop is not None and (
                 type(disaster_stop) is not Decimal or not disaster_stop.is_finite() or not 0 <= disaster_stop < D("0.5")):
             raise BotStopped("disaster_stop_out_of_range")
@@ -303,6 +304,8 @@ class DemoBot:
         self.heartbeat_s = HEARTBEAT_S
         self._last_heartbeat_ms = None
         self._in_main_loop = False
+        self._killing = False  # the Kill flatten is under way: its own waits never start it again
+        self._guard_summary = None  # position and disaster stop as last seen, for the heartbeat
         self.accounts_dir = accounts_directory() if accounts_dir is None else Path(accounts_dir)
         self.record = record
         self.profile = record["profile"]
@@ -357,7 +360,7 @@ class DemoBot:
                     raise BotStopped("operator_stop")
                 if self.output_dir.exists() and (self.output_dir / "stop.request").exists():
                     raise BotStopped("operator_stop_file")
-                if self._in_main_loop:
+                if self._in_main_loop and not self._killing:
                     await self._kill_check()
             await self.sleep(min(1.0, max(0.05, (end_ms - self.wall_ms()) / 1000)))
 
@@ -473,6 +476,33 @@ class DemoBot:
     }
 
     async def _protect(self, facts, *, flattening=False):
+        try:
+            return await self._protect_step(facts, flattening=flattening)
+        finally:
+            await self._note_protection()
+
+    async def _note_protection(self):
+        """Remember the position and whether OKX holds a confirmed stop for it; the heartbeat carries
+        this so the Guardian can see "holding with no stop" from outside (review F2, 2026-11-27)."""
+        try:
+            state = await self.supervisor.protection_state()
+            owned = await self._owned_position()
+        except Exception:  # noqa: BLE001 - a summary for readers, never a reason to stop
+            return
+        active = state["active"]
+        confirmed = active is not None and not (state["pending"] or state["uncertain"] or state["triggered"])
+        previous = self._guard_summary or {}
+        since = None
+        if owned != 0 and not confirmed:
+            since = previous.get("unprotected_since") or _now_text()
+        self._guard_summary = dict(
+            position=str(owned), ratio=str(self.disaster_stop), confirmed=confirmed,
+            price=active["price"] if confirmed else None, alert=state["alert"], unprotected_since=since,
+            checked_at=_now_text())
+        if (previous.get("position"), previous.get("confirmed")) != (str(owned), confirmed):
+            self._write_heartbeat()  # a change is on disk at once, not a minute later
+
+    async def _protect_step(self, facts, *, flattening=False):
         """One disaster-stop step after a fresh observation: create, move or cancel the OKX stop.
 
         A step that cannot run now leaves increases blocked by the journal and is retried
@@ -515,7 +545,7 @@ class DemoBot:
         """Confirm against OKX before going on when a protection change marked the ledger."""
         if self.supervisor.health != "RECONCILING":
             return facts
-        facts = await self._call(self._account)
+        facts = await self._call(self._account, flattening=flattening)
         await self._reconcile(facts, "protection", flattening=flattening)
         return facts
 
@@ -702,8 +732,9 @@ class DemoBot:
 
     async def _kill_check(self):
         fired = self.watch.check()
-        if fired is None:
+        if fired is None or self._killing:  # check() keeps answering once fired (review F5, 2026-11-27)
             return
+        self._killing = True
         self.log.event("kill_switch", f"Kill-Switch 已觸發（{fired}）", evidence=fired)
         await self.supervisor.manual_kill(actor=self.watch.actor, evidence_id=fired)
         await self._flatten("Kill-Switch")
@@ -788,6 +819,9 @@ class DemoBot:
             if facts["others"]:
                 raise BotStopped("foreign_positions_or_orders_in_account:" + ",".join(facts["others"]))
             if self.resumed is None:
+                if self._explicit_disaster_stop is None:
+                    # Nothing to inherit and nothing written: never start with 0 by silence (review F4).
+                    raise BotStopped("disaster_stop_required")
                 self.output_dir.mkdir(parents=True, exist_ok=False)
         except BaseException:
             guard.release()
@@ -1215,7 +1249,13 @@ class DemoBot:
             return
         self._last_heartbeat_ms = self.wall_ms()
         try:
-            atomic_json(self.output_dir / HEARTBEAT_FILE, dict(time=_now_text(), pid=os.getpid()))
+            beat = dict(time=_now_text(), pid=os.getpid())
+            if self._guard_summary is not None:
+                summary = self._guard_summary
+                beat.update(position=summary["position"],
+                            protection={k: summary[k] for k in ("ratio", "confirmed", "price", "alert",
+                                                                "unprotected_since", "checked_at")})
+            atomic_json(self.output_dir / HEARTBEAT_FILE, beat)
         except OSError:
             pass
 
@@ -1290,16 +1330,22 @@ START_HINTS = {
     "risk_flat": "Hard 日損或 Kill-Switch 鎖住，Bot 已經把部位平掉並停下（模擬盤）。Kill-Switch 紀錄（Hard 也會寫進去）只有你能解除；"
                  "解除後用同一個指令重開。",
     "disaster_stop_out_of_range": "--disaster-stop 要在 0% 到 50% 之間（0 表示不掛保底停損）。",
+    "disaster_stop_required": "開新的 run 一定要寫 --disaster-stop：要保底停損就寫比例（例如 --disaster-stop 10%），"
+                              "確定不掛就明寫 --disaster-stop 0%。沒寫不會啟動，也不會連帶下任何單。",
 }
 
 
 def _percent(text):
     """'10%', '10' or '0' -> Decimal fraction (0.1); argparse reports anything else."""
-    raw = str(text).strip().removesuffix("%")
+    stripped = str(text).strip()
+    raw = stripped.removesuffix("%")
     try:
         value = Decimal(raw)
     except ArithmeticError:
         raise argparse.ArgumentTypeError("要寫成百分比，例如 10%") from None
+    if value.is_finite() and 0 < value < 1 and not stripped.endswith("%"):
+        # "0.1" is read as 0.1%, not 10%: make the writer say which one (review F11, 2026-11-27).
+        raise argparse.ArgumentTypeError(f"{stripped} 會被當成 {stripped}%。要 10% 請寫 10%；真的要 {stripped}% 請加上 % 符號")
     if not value.is_finite() or not 0 <= value < 50:
         raise argparse.ArgumentTypeError("要在 0% 到 50% 之間（0 表示不掛保底停損）")
     return value / 100
@@ -1320,7 +1366,7 @@ def _parser():
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--disaster-stop", type=_percent, default=None, metavar="10%",
                         help="保底停損：價格從進場均價反向這麼多時，由 OKX 以市價整倉平倉（電腦當機、斷線時的最後保險）。"
-                             "新 run 預設 0%%（不掛，會明示提醒）；接續時不寫會沿用上一次的比例，要撤掉請明寫 0%%")
+                             "開新的 run 一定要寫（不掛就明寫 0%%），沒寫不會啟動；接續時不寫會沿用上一次的比例，要撤掉請明寫 0%%")
     parser.add_argument("--new-run", action="store_true",
                         help="OKX 空倉時一定開新的 run，不接續上一次有委託沒結清的 run（舊帳本保留、不結清）。"
                              "新 run 只沿用帳戶紀錄裡的 Soft 鎖住，不讀舊帳本")

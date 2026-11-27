@@ -4,6 +4,8 @@ ratio across a resume, long read backoff, and a status file that cannot stop the
 Same stateful fake OKX and isolation as tests/test_demo_bot.py (no network).
 """
 
+import contextlib
+import io
 import json
 import os
 import unittest
@@ -113,16 +115,28 @@ class DisasterStopInheritanceTests(_Base):
         self.assertEqual([a["state"] for a in fake.algos.values()], ["live"])  # nothing on OKX was touched
         self.assertIsNotNone(demo_bot._hint("resume_disaster_stop_unreadable"))
 
-    def test_new_run_without_the_option_says_there_is_no_disaster_stop(self):
+    def test_new_run_without_the_option_refuses_to_start(self):
+        """Review F4 (2026-11-27): a new run never gets 0% silently; started in the background nobody sees a warning."""
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        with self.assertRaises(BotStopped) as caught:
+            self.run_bot(self.make_bot(fake, clock, disaster_stop=None))
+        self.assertEqual(caught.exception.reason, "disaster_stop_required")
+        self.assertFalse((self.root / "run").exists())  # no run folder, nothing for a reader to mistake for a run
+        self.assertEqual((fake.posts, fake.algo_posts), ([], []))
+        self.assertIn("0%", demo_bot._hint("disaster_stop_required"))
+        # The account was released: the same account starts once the ratio is written.
+        self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 4), disaster_stop=self.TEN))
+
+    def test_new_run_with_an_explicit_zero_starts_and_says_there_is_no_disaster_stop(self):
         clock = Clock(BASE + 1_000)
         fake = FakeOkx(clock, start_index=3)
         lines = []
-        self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 4), disaster_stop=None))
-        config = self.config_events()
-        self.assertEqual([(e["ratio"], e["source"]) for e in config], [("0", "default")])
+        self.run_bot(self.make_bot(fake, clock, events=lines, on_sleep=self.kill_after(fake, 4), disaster_stop=D("0")))
+        self.assertEqual([(e["ratio"], e["source"]) for e in self.config_events()], [("0", "explicit")])
         self.assertTrue(any("未啟用保底停損" in line for line in lines), lines)
         manifest = json.loads((self.root / "run" / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["disaster_stop"], "0")  # the default of a new run is unchanged (P6)
+        self.assertEqual(manifest["disaster_stop"], "0")  # 0 still means off (P6); it only has to be written
         self.assertEqual(fake.algo_posts, [])
 
     def test_new_run_with_a_ratio_records_it_as_explicit(self):
@@ -136,6 +150,16 @@ class DisasterStopInheritanceTests(_Base):
         self.assertIsNone(parser.parse_args(["--profile", "p.json"]).disaster_stop)
         self.assertEqual(parser.parse_args(["--profile", "p.json", "--disaster-stop", "0%"]).disaster_stop, D("0"))
         self.assertEqual(parser.parse_args(["--profile", "p.json", "--disaster-stop", "10%"]).disaster_stop, D("0.1"))
+
+    def test_a_fraction_without_the_percent_sign_is_refused(self):
+        """Review F11: "0.1" meant 10% to the writer and 0.1% to the parser."""
+        parser = demo_bot._parser()
+        for text in ("0.1", "0.05", ".5"):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                parser.parse_args(["--profile", "p.json", "--disaster-stop", text])
+        ok = {"0.5%": D("0.005"), "10": D("0.1"), "0": D("0"), "1": D("0.01"), "2.5": D("0.025")}
+        for text, value in ok.items():
+            self.assertEqual(parser.parse_args(["--profile", "p.json", "--disaster-stop", text]).disaster_stop, value)
 
 
 class ReadBackoffTests(_Base):
@@ -272,6 +296,61 @@ class HeartbeatTests(_Base):
             status = self.run_bot(self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 7)))
         self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
         self.assertEqual(len(fake.posts), 4)
+
+    def test_heartbeat_says_whether_the_position_has_a_confirmed_stop(self):
+        """Review F2: the Guardian reads this to tell "holding with no stop on OKX" from outside."""
+        for ratio, expected in ((self.TEN, (True, "94.5")), (D("0"), (False, None))):
+            with self.subTest(ratio=ratio):
+                self.setUp()
+                clock = Clock(BASE + 1_000)
+                fake = FakeOkx(clock, start_index=3)
+                bot = self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 6), disaster_stop=ratio)
+                bot.heartbeat_s = 0
+                beats, real = [], demo_bot.atomic_json
+
+                def keeping(path, value, beats=beats, real=real):
+                    if path.name == "heartbeat.json":
+                        beats.append(value)
+                    return real(path, value)
+
+                with mock.patch.object(demo_bot, "atomic_json", keeping):
+                    self.run_bot(bot)
+                flat = [b for b in beats if b.get("position") == "0" and b.get("protection")]
+                held = [b for b in beats if b.get("position") == "1"]
+                self.assertTrue(flat and held, sorted({str(b.get("position")) for b in beats}))
+                self.assertTrue(all(b["protection"]["unprotected_since"] is None for b in flat), flat[:2])
+                self.assertEqual(held[-1]["protection"]["ratio"], str(ratio))
+                self.assertEqual((held[-1]["protection"]["confirmed"], held[-1]["protection"]["price"]), expected)
+                unprotected = held[-1]["protection"]["unprotected_since"]
+                if expected[0]:
+                    self.assertIsNone(unprotected)
+                else:  # holding without a stop: since when, and it does not move while that lasts
+                    self.assertIsNotNone(iso_ms(unprotected))
+                    self.assertEqual({b["protection"]["unprotected_since"] for b in held}, {unprotected})
+
+
+class KillReentryTests(_Base):
+    def test_a_failed_read_while_flattening_does_not_start_the_kill_again(self):
+        """Review F5: the backoff inside a Kill flatten checked the Kill-Switch again and re-entered the flatten."""
+        clock = Clock(BASE + 1_000)
+        fake = FakeOkx(clock, start_index=3)
+        bot = self.make_bot(fake, clock, on_sleep=self.kill_after(fake, 4), disaster_stop=self.TEN)
+        original, hit = bot._reconcile_if_marked, []
+
+        async def failing_once(facts, flattening):
+            if flattening and not hit:
+                hit.append(clock.ms)
+                fake.balance_failures = 1  # the read right after the stop was canceled fails once
+            return await original(facts, flattening)
+
+        bot._reconcile_if_marked = failing_once
+        status = self.run_bot(bot)
+        self.assertTrue(hit)
+        kinds = [e["kind"] for e in self.events()]
+        self.assertIn("read_retry", kinds)
+        self.assertEqual((kinds.count("kill_switch"), kinds.count("flatten")), (1, 1), kinds)
+        self.assertTrue(status["stop_reason"].startswith("manual_kill:"), status)
+        self.assertEqual((status["position"], fake.position), ("0", 0))
 
 
 if __name__ == "__main__":
